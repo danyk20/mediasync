@@ -22,15 +22,20 @@ value class FrameType(val code: Int) {
         const val MAX_CODE = 0xFF
 
         val HELLO = FrameType(0x01)
-        val OFFER = FrameType(0x02)
-        val WANT = FrameType(0x03)
-        val HAVE = FrameType(0x04)
-        val FILE_BEGIN = FrameType(0x05)
-        val DATA = FrameType(0x06)
-        val FILE_END = FrameType(0x07)
-        val FILE_ACK = FrameType(0x08)
-        val BACKUP_STATUS = FrameType(0x09)
+        val PAIR_REQUEST = FrameType(0x02)
+        val PAIR_RESULT = FrameType(0x03)
+        val OFFER = FrameType(0x04)
+        val OFFER_RESPONSE = FrameType(0x05)
+        val FILE_BEGIN = FrameType(0x06)
+
+        /** Raw file bytes; the only frame type whose payload isn't a protobuf message. */
+        val DATA = FrameType(0x07)
+        val FILE_END = FrameType(0x08)
+        val FILE_ACK = FrameType(0x09)
         val BYE = FrameType(0x0A)
+
+        /** Reserved for v1.1: the consumer reports cloud backup state back to producers. */
+        val BACKUP_STATUS = FrameType(0x0B)
     }
 }
 

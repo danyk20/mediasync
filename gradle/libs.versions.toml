@@ -17,18 +17,24 @@ datastore = "1.2.1"
 hiltLifecycleViewmodelCompose = "1.4.0"
 lifecycle = "2.11.0"
 navigation3 = "1.2.0"
+room = "2.8.5"
+camerax = "1.6.2"
+exifinterface = "1.4.2"
 
 # Libraries
 coroutines = "1.11.0"
 hilt = "2.60.1"
 okio = "3.18.2"
 serialization = "1.11.0"
+zxing = "3.5.4"
 
 # Testing
 androidxTestCore = "1.7.0"
 androidxTestExt = "1.3.0"
 androidxTestOrchestrator = "1.6.1"
 androidxTestRunner = "1.7.0"
+androidxTestRules = "1.7.0"
+bouncycastle = "1.86"
 junit4 = "4.13.2"
 junit5 = "6.1.3"
 kotest = "6.2.5"
@@ -69,12 +75,24 @@ hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hil
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "serialization" }
+kotlinx-serialization-protobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "serialization" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
+androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }
 androidx-test-orchestrator = { module = "androidx.test:orchestrator", version.ref = "androidxTestOrchestrator" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTestRules" }
+bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
@@ -110,6 +128,7 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 licensee = { id = "app.cash.licensee", version.ref = "licensee" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
+room = { id = "androidx.room", version.ref = "room" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 
 # Convention plugins (build-logic)

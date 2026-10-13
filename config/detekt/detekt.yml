@@ -16,6 +16,8 @@ complexity:
 style:
   MagicNumber:
     ignorePropertyDeclaration: true
+    # Protobuf field tags (@ProtoNumber) are numbers by nature.
+    ignoreAnnotation: true
     ignoreAnnotated: ['Composable', 'Preview']
     excludes: ['**/test/**', '**/androidTest/**', '**/designsystem/**']
   UnusedPrivateMember:

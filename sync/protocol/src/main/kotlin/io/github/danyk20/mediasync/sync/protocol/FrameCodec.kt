@@ -10,7 +10,7 @@ import okio.BufferedSource
 import okio.EOFException
 
 /** The peer sent bytes that are not a valid MediaSync frame. The session must be closed. */
-class ProtocolException(message: String, cause: Throwable? = null) : IOException(message, cause)
+open class ProtocolException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /**
  * Reads and writes [Frame]s.

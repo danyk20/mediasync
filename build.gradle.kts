@@ -37,7 +37,9 @@ dependencies {
     kover(projects.feature.consumer)
     kover(projects.feature.onboarding)
     kover(projects.feature.producer)
+    kover(projects.sync.engine)
     kover(projects.sync.protocol)
+    kover(projects.transport.lan)
 }
 
 kover {
