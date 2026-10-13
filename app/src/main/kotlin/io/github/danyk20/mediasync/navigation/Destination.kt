@@ -19,6 +19,14 @@ sealed interface Destination : NavKey {
 
     @Serializable
     data object ConsumerHome : Destination
+
+    /** The consumer shows its pairing code. */
+    @Serializable
+    data object ConsumerPairing : Destination
+
+    /** The producer scans the consumer's pairing code, or confirms an [openedLink]. */
+    @Serializable
+    data class ProducerPairing(val openedLink: String? = null) : Destination
 }
 
 /** Where the app starts for a device with the given role. */

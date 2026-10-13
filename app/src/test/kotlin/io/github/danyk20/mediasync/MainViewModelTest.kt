@@ -42,6 +42,17 @@ class MainViewModelTest {
     }
 
     @Test
+    fun openedLink_waitsUntilHandled() {
+        val viewModel = MainViewModel(FakeSettingsRepository())
+
+        viewModel.onLinkOpened("mediasync://pair?v=1")
+        viewModel.openedLink.value shouldBe "mediasync://pair?v=1"
+
+        viewModel.linkHandled()
+        viewModel.openedLink.value shouldBe null
+    }
+
+    @Test
     fun startDestination_matchesRole() {
         startDestinationFor(null) shouldBe Destination.RoleChoice
         startDestinationFor(DeviceRole.PRODUCER) shouldBe Destination.ProducerHome

@@ -7,6 +7,7 @@ import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
 import io.github.danyk20.mediasync.buildlogic.configureJava
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
 import io.github.danyk20.mediasync.buildlogic.configureLint
+import io.github.danyk20.mediasync.buildlogic.configureManagedDevices
 import io.github.danyk20.mediasync.buildlogic.configureUnitTests
 import io.github.danyk20.mediasync.buildlogic.library
 import io.github.danyk20.mediasync.buildlogic.libs
@@ -32,6 +33,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             lint.targetSdk = libs.version("targetSdk").toInt()
             testOptions.targetSdk = libs.version("targetSdk").toInt()
             testOptions.unitTests.configureUnitTests()
+            testOptions.configureManagedDevices()
         }
 
         dependencies {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Producer: read the photo library. Backup/sync is a core use case for Play's photo permission policy. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Android 14+: lets the system offer "selected photos only"; MediaSync then asks for full access. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Producer: read photo and video locations unredacted, so they reach the backup (docs/PLAN.md §6.2). -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
+</manifest>

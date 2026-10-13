@@ -4,11 +4,11 @@
  */
 import app.cash.licensee.LicenseeExtension
 import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.api.dsl.ManagedVirtualDevice
 import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
 import io.github.danyk20.mediasync.buildlogic.configureJava
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
 import io.github.danyk20.mediasync.buildlogic.configureLint
+import io.github.danyk20.mediasync.buildlogic.configureManagedDevices
 import io.github.danyk20.mediasync.buildlogic.configureUnitTests
 import io.github.danyk20.mediasync.buildlogic.libs
 import io.github.danyk20.mediasync.buildlogic.pluginId
@@ -37,37 +37,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 unitTests.configureUnitTests()
                 animationsDisabled = true
                 execution = "ANDROIDX_TEST_ORCHESTRATOR"
-                managedDevices {
-                    // Oldest supported Android (minSdk) and the current target.
-                    val devices = listOf(
-                        ManagedDeviceSpec("api29", "Pixel 2", 29),
-                        ManagedDeviceSpec("api31", "Pixel 4", 31),
-                        ManagedDeviceSpec("api34", "Pixel 6", 34),
-                        ManagedDeviceSpec("api36", "Pixel 6", 36),
-                    )
-                    // Emulators only run at native speed on the host's own CPU architecture:
-                    // x86_64 on CI (Linux runners), arm64 on Apple-silicon Macs.
-                    val hostAbi = if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) {
-                        "arm64-v8a"
-                    } else {
-                        "x86_64"
-                    }
-                    devices.forEach { spec ->
-                        allDevices.create(spec.name, ManagedVirtualDevice::class.java) {
-                            device = spec.device
-                            apiLevel = spec.apiLevel
-                            systemImageSource = "aosp"
-                            testedAbi = hostAbi
-                        }
-                    }
-                    groups.create("ci") {
-                        targetDevices.add(allDevices.getByName("api29"))
-                        targetDevices.add(allDevices.getByName("api36"))
-                    }
-                    groups.create("nightly") {
-                        devices.forEach { targetDevices.add(allDevices.getByName(it.name)) }
-                    }
-                }
+                configureManagedDevices()
             }
         }
 
@@ -81,6 +51,4 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
         configureKotlin()
         configureCodeQuality(koverSourceVariant = "debug")
     }
-
-    private data class ManagedDeviceSpec(val name: String, val device: String, val apiLevel: Int)
 }

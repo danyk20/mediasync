@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,11 +24,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) handle(intent)
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val openedLink by viewModel.openedLink.collectAsStateWithLifecycle()
             MediaSyncTheme {
-                MediaSyncApp(uiState = uiState)
+                MediaSyncApp(uiState = uiState, openedLink = openedLink, onLinkHandled = viewModel::linkHandled)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handle(intent)
+    }
+
+    private fun handle(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) intent.dataString?.let(viewModel::onLinkOpened)
     }
 }

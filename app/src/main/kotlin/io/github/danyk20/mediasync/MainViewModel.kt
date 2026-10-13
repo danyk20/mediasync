@@ -10,8 +10,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -33,6 +35,19 @@ class MainViewModel @Inject constructor(settingsRepository: SettingsRepository) 
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
             initialValue = MainUiState.Loading,
         )
+
+    private val _openedLink = MutableStateFlow<String?>(null)
+
+    /** A pairing link opened from outside the app, waiting until a producer screen can show it. */
+    val openedLink: StateFlow<String?> = _openedLink.asStateFlow()
+
+    fun onLinkOpened(link: String) {
+        _openedLink.value = link
+    }
+
+    fun linkHandled() {
+        _openedLink.value = null
+    }
 
     private companion object {
         /** Keeps the flow alive across configuration changes. */

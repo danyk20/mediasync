@@ -196,8 +196,8 @@ The **LAN-only** setting needs no internet services at all. The Worker is only u
 - Show a pairing QR code and approve new producers.
 - **Sync schedule** for the whole household (§10.1): *Once a day at 03:00* (default), *Every 2–12 hours*, *Whenever charging*, *Every 2–3 days*, *Weekly*, or *Manual only*.
 - Receive into the gallery so files appear there. Original filename, capture date, location and all other metadata are preserved (§6).
-  - When the Google Photos app does the backup: one folder, `Pictures/MediaSync/`.
-  - Otherwise: `Pictures/MediaSync/<Producer>/<Album>/`.
+  - When the Google Photos app does the backup: one folder, `DCIM/MediaSync/`.
+  - Otherwise: `DCIM/MediaSync/<Producer>/<Album>/`.
 - Storage guard: stop accepting files below a free-space threshold (default 2 GB) and tell the producers why.
 - Cloud backup through connectors. It starts **as soon as items arrive**, independent of the sync schedule.
   - **v1.0:** *Google Photos app on this phone*: free and unlimited on Pixel 2–5 (§9.3.1).
@@ -460,7 +460,7 @@ The `meta` sidecar carries details that live *outside* the file, in the producer
 
 ### 5.3 Receiving (consumer)
 
-- Each file is inserted into MediaStore in the backup folder (`Pictures/MediaSync/` in Google Photos app mode, otherwise `Pictures/MediaSync/<Producer>/<Album>/`) with `IS_PENDING=1` and written straight to the file descriptor. Partial files never appear in the gallery.
+- Each file is inserted into MediaStore in the backup folder (`DCIM/MediaSync/` in Google Photos app mode, otherwise `DCIM/MediaSync/<Producer>/<Album>/`) with `IS_PENDING=1` and written straight to the file descriptor. Partial files never appear in the gallery.
   - The insert carries the original filename, the capture date from the sidecar and, on Android 11+, the favorite flag.
 - On `FILE_END` the consumer verifies the SHA-256, sets `IS_PENDING=0`, records `received_item` and sends `FILE_ACK`.
 - **Resume:** `incoming_partial` keeps the pending URI and offset. On reconnect, `WANT` returns `resumeOffset`.
@@ -527,8 +527,11 @@ In v1.0 the consumer's files are removed by the connector app (Google Photos) af
    - Motion Photos are uploaded in original form, so the motion part is never lost.
 5. **Time zones.** The original time-zone offset is kept. When MediaSync has to write a date itself, it also writes the producer's UTC offset for that date, so photos from trips sort correctly.
 6. **Consumer gallery date.**
-   - The consumer sets the capture date when it inserts each file into the gallery. An instrumented test checks that the media scanner keeps it.
-   - If some Android version overrides it, the consumer falls back to the lossless date insert from point 3. This applies only to files without an internal date.
+   - The consumer sets the capture date when it inserts each file into the gallery.
+   - Android's media scanner recomputes it whenever it scans the file. Most cameras record the capture time without a time zone, so the scanner estimates the zone from the file's **modification time**, rounded to 15 minutes. A file modified "now" on arrival would shift by the sync delay, and lose its date entirely after 24 hours. Found in the two-emulator test of M1.
+   - So the consumer gives each stored file the producer's modification time (Android 11+). The scanner then makes the same estimate as on the producer. An instrumented test forces a rescan and checks the date.
+   - On Android 10, apps can't set it. The explicit capture date stays until something rescans the file.
+   - Files without an internal date get the lossless date insert from point 3.
 
 ### 6.3 Privacy setting: "Photo details"
 
@@ -794,7 +797,7 @@ There are two connectors, and the choice is made per consumer device.
 
 - **Capability:** `DELEGATED_TO_DEVICE_APP`. MediaSync doesn't upload anything. It stores files where the Google Photos app backs them up, which is free and unlimited in Storage saver on Pixel 2–5 (§1.5).
 - **One folder:**
-  - All received files go into `Pictures/MediaSync/`.
+  - All received files go into `DCIM/MediaSync/`. (`DCIM` because, on Android 10, it's the only top-level folder MediaStore accepts for both photos and videos.)
   - The Google Photos app treats every subfolder as a separate "device folder" that needs its own backup switch. A single folder means one switch covers every producer, now and later.
   - Producer and album are kept in MediaSync's database.
 - **Guided setup:** onboarding checks that Google Photos is installed, opens its backup settings, and asks for two things:

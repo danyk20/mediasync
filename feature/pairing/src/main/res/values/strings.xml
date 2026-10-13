@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Close</string>
+    <string name="pairing_done">Done</string>
+    <string name="pairing_try_again">Try again</string>
+
+    <!-- Receiving phone -->
+    <string name="pairing_consumer_title">Add sending phone</string>
+    <string name="pairing_consumer_instructions">On the phone that will send photos, open MediaSync and scan this code.</string>
+    <string name="pairing_qr_description">Pairing code</string>
+    <string name="pairing_consumer_validity">The code works once, for 5 minutes. Both phones need to be on the same Wi-Fi.</string>
+    <string name="pairing_share_link">Share pairing link</string>
+    <string name="pairing_share_chooser">Send the pairing link to your other phone</string>
+    <string name="pairing_no_network_title">Connect to Wi-Fi</string>
+    <string name="pairing_no_network_body">This phone needs to be on Wi-Fi to show a pairing code.</string>
+    <string name="pairing_approve_title">Allow %1$s?</string>
+    <string name="pairing_approve_body">It will be able to send its photos and videos to this phone.</string>
+    <string name="pairing_approve_allow">Allow</string>
+    <string name="pairing_approve_deny">Don\'t allow</string>
+    <string name="pairing_paired_title">Paired with %1$s</string>
+    <string name="pairing_paired_consumer_body">Its photos and videos will arrive here.</string>
+
+    <!-- Sending phone -->
+    <string name="pairing_producer_title">Pair with receiving phone</string>
+    <string name="pairing_producer_instructions">On the receiving phone, open MediaSync, tap Add sending phone, and point this camera at the code.</string>
+    <string name="pairing_camera_needed">Allow the camera to scan the code, or paste the pairing link instead.</string>
+    <string name="pairing_paste_link">Paste pairing link</string>
+    <string name="pairing_not_a_code">That isn\'t a MediaSync pairing code.</string>
+    <string name="pairing_waiting_for_approval">Tap Allow on %1$s to finish pairing.</string>
+    <string name="pairing_paired_producer_body">You can now send your photos and videos to it.</string>
+    <string name="pairing_confirm_title">Pair with %1$s?</string>
+    <string name="pairing_confirm_body">Only continue if %1$s is your own receiving phone: this phone will send its photos and videos to it.</string>
+    <string name="pairing_confirm_pair">Pair</string>
+    <string name="pairing_confirm_cancel">Cancel</string>
+    <string name="pairing_failed_title">Not paired</string>
+    <string name="pairing_problem_declined">The receiving phone didn\'t allow this phone.</string>
+    <string name="pairing_problem_expired">This code has expired or was already used. Show a new one on the receiving phone.</string>
+    <string name="pairing_problem_no_answer">Nobody tapped Allow on the receiving phone in time.</string>
+    <string name="pairing_problem_unreachable">Couldn\'t reach the receiving phone. Check that both phones are on the same Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">The connection dropped. Please try again.</string>
+    <string name="pairing_problem_incompatible">The phones run different MediaSync versions. Update the app on both.</string>
+</resources>

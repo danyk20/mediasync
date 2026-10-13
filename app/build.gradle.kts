@@ -55,6 +55,7 @@ dependencies {
     implementation(projects.core.model)
     implementation(projects.feature.consumer)
     implementation(projects.feature.onboarding)
+    implementation(projects.feature.pairing)
     implementation(projects.feature.producer)
 
     implementation(libs.androidx.activity.compose)

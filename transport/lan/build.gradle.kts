@@ -1,12 +1,13 @@
 plugins {
     alias(libs.plugins.mediasync.jvm.library)
+    `java-test-fixtures`
 }
 
 dependencies {
     api(projects.transport.api)
 
     // Test-only: generates the self-signed identity certificates Android Keystore makes on devices.
-    testImplementation(libs.bouncycastle.bcpkix)
+    testFixturesImplementation(libs.bouncycastle.bcpkix)
     testImplementation(testFixtures(projects.sync.engine))
 }
 

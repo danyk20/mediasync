@@ -10,6 +10,7 @@ import java.io.Closeable
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.security.cert.X509Certificate
+import javax.net.SocketFactory
 import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
 import okio.BufferedSink
@@ -71,21 +72,27 @@ object LanClient {
     /**
      * Opens an encrypted connection to [address] and proves it reached [expectedPeer]: the certificate
      * presented must hash to exactly that id, so nobody else on the network can pose as the consumer.
+     *
+     * @param network creates the underlying TCP socket, e.g. one bound to the Wi-Fi network.
      */
     fun connect(
         address: InetSocketAddress,
         identity: DeviceIdentity,
         expectedPeer: DeviceId,
         timeouts: LanTimeouts = LanTimeouts(),
+        network: SocketFactory = SocketFactory.getDefault(),
     ): PeerConnection {
-        val socket = sslContext(identity) { it == expectedPeer }.socketFactory.createSocket() as SSLSocket
+        val tcp = network.createSocket()
         try {
-            socket.sendBufferSize = SOCKET_BUFFER_BYTES
+            tcp.sendBufferSize = SOCKET_BUFFER_BYTES
+            tcp.connect(address, timeouts.connectMillis)
+            val factory = sslContext(identity) { it == expectedPeer }.socketFactory
+            val socket = factory.createSocket(tcp, address.hostString, address.port, true) as SSLSocket
             socket.enabledProtocols = arrayOf(TLS_PROTOCOL)
-            socket.connect(address, timeouts.connectMillis)
+            socket.useClientMode = true
             return socket.establish(timeouts)
         } catch (e: IOException) {
-            socket.close()
+            tcp.close()
             throw e
         }
     }
