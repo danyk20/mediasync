@@ -4,8 +4,11 @@
  */
 package io.github.danyk20.mediasync
 
+import androidx.annotation.StringRes
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,17 +28,31 @@ class MainActivityTest {
 
     @Test
     fun firstLaunch_choosingSends_opensProducerHome() {
-        composeRule.onNodeWithText(string(OnboardingR.string.onboarding_role_producer_title)).performClick()
+        awaitText(OnboardingR.string.onboarding_role_producer_title).performClick()
 
-        composeRule.onNodeWithText(string(ProducerR.string.producer_status_not_paired_title)).assertIsDisplayed()
+        awaitText(ProducerR.string.producer_status_not_paired_title).assertIsDisplayed()
     }
 
     @Test
     fun firstLaunch_choosingReceives_opensConsumerHome() {
-        composeRule.onNodeWithText(string(OnboardingR.string.onboarding_role_consumer_title)).performClick()
+        awaitText(OnboardingR.string.onboarding_role_consumer_title).performClick()
 
-        composeRule.onNodeWithText(string(ConsumerR.string.consumer_status_ready_title)).assertIsDisplayed()
+        awaitText(ConsumerR.string.consumer_status_ready_title).assertIsDisplayed()
     }
 
-    private fun string(id: Int): String = composeRule.activity.getString(id)
+    /**
+     * Settings are read from and written to disk asynchronously, which Compose's idling doesn't track.
+     * Waits until the text appears; on slow emulators the first DataStore read can take seconds.
+     */
+    private fun awaitText(@StringRes id: Int): SemanticsNodeInteraction {
+        val text = composeRule.activity.getString(id)
+        composeRule.waitUntil(timeoutMillis = SCREEN_TIMEOUT_MILLIS) {
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+        return composeRule.onNodeWithText(text)
+    }
+
+    private companion object {
+        const val SCREEN_TIMEOUT_MILLIS = 10_000L
+    }
 }

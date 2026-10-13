@@ -45,11 +45,19 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                         ManagedDeviceSpec("api34", "Pixel 6", 34),
                         ManagedDeviceSpec("api36", "Pixel 6", 36),
                     )
+                    // Emulators only run at native speed on the host's own CPU architecture:
+                    // x86_64 on CI (Linux runners), arm64 on Apple-silicon Macs.
+                    val hostAbi = if (System.getProperty("os.arch") in setOf("aarch64", "arm64")) {
+                        "arm64-v8a"
+                    } else {
+                        "x86_64"
+                    }
                     devices.forEach { spec ->
                         allDevices.create(spec.name, ManagedVirtualDevice::class.java) {
                             device = spec.device
                             apiLevel = spec.apiLevel
                             systemImageSource = "aosp"
+                            testedAbi = hostAbi
                         }
                     }
                     groups.create("ci") {
