@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration
+local.properties
+*.keystore
+*.jks
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.fleet/
+
+# OS
+.DS_Store
+
+# Android
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Logs
+*.log
