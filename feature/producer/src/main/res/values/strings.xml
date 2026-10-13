@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="producer_home_title">This phone sends</string>
+    <string name="producer_status_not_paired_title">Not paired yet</string>
+    <string name="producer_status_not_paired_body">Open MediaSync on your receiving phone and scan the QR code it shows.</string>
+    <string name="producer_role_hint">New photos and videos will be sent to your receiving phone while this phone is charging.</string>
+</resources>

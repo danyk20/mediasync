@@ -1,0 +1,22 @@
+# Builds on detekt's default configuration (buildUponDefaultConfig = true); only deviations are listed here.
+
+naming:
+  FunctionNaming:
+    # Composable functions are PascalCase by convention.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+complexity:
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    ignorePrivate: true
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreAnnotated: ['Composable', 'Preview']
+    excludes: ['**/test/**', '**/androidTest/**', '**/designsystem/**']
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']

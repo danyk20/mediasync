@@ -1,0 +1,45 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      # Kotlin, KSP and the Compose compiler must move together.
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+      androidx:
+        patterns:
+          - "androidx.*"
+          - "com.android.*"
+      testing:
+        patterns:
+          - "org.junit*"
+          - "junit:*"
+          - "io.kotest*"
+          - "org.robolectric*"
+          - "io.github.takahirom.roborazzi*"
+          - "app.cash.turbine*"
+      code-quality:
+        patterns:
+          - "com.diffplug.spotless*"
+          - "io.gitlab.arturbosch.detekt*"
+          - "org.jetbrains.kotlinx.kover*"
+          - "app.cash.licensee*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
