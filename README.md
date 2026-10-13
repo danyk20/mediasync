@@ -32,11 +32,11 @@ The APK is written to `app/build/outputs/apk/debug/`.
 
 | Task | Command |
 |---|---|
-| Unit, Robolectric and screenshot tests | `./gradlew testDebugUnitTest :sync:protocol:test :core:model:test` |
+| All unit, Robolectric and screenshot tests | `./gradlew koverVerifyCi` (also checks coverage) |
 | Instrumented tests on emulators (API 29 + 36) | `./gradlew ciGroupDebugAndroidTest` |
 | Formatting, static analysis, lint, licenses | `./gradlew spotlessCheck detekt lintDebug licenseeDebug` |
 | Auto-format | `./gradlew spotlessApply` |
-| Coverage report and gates | `./gradlew koverXmlReportCi koverVerifyCi` |
+| Coverage report | `./gradlew koverXmlReportCi` (`build/reports/kover/`) |
 | Re-record screenshots after an intended UI change | `./gradlew testDebugUnitTest -Proborazzi.test.verify=false -Proborazzi.test.record=true` |
 
 ## Project layout
@@ -48,7 +48,10 @@ core/designsystem   Theme and shared Compose components
 core/datastore      Persistent settings
 core/testing        Test fakes and helpers
 feature/*           One module per screen group (onboarding, producer, consumer)
-sync/protocol       Wire protocol (pure Kotlin)
+sync/protocol       Wire protocol: frames and messages (pure Kotlin)
+sync/engine         Producer/consumer sessions, ledgers, pairing (pure Kotlin)
+transport/api       The authenticated-connection interface
+transport/lan       TLS 1.3 with certificate pinning over the local network
 build-logic/        Gradle convention plugins shared by all modules
 docs/               Plan, architecture and decision records
 ```
