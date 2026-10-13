@@ -19,13 +19,12 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 
 Signing secrets live in a GitHub **environment** called `release`, which requires your approval before each release job runs.
 
-1. Create the key on your own computer and store the file somewhere safe (for example, a password manager):
+1. Run the script on your own computer, giving the path where the keystore should live. Use the same folder as your other apps' keys, but a **separate file**: GitHub stores the whole file, so a shared file would expose every app's key to this project's CI.
    ```bash
-   scripts/create-release-keystore.sh
+   scripts/create-release-keystore.sh /path/to/keys/mediasync-release.jks
    ```
-   The script asks for a password and prints the commands for step 2. The key never leaves your machine except as an encrypted GitHub secret.
-2. Add the four secrets to the `release` environment:
-   `MEDIASYNC_KEYSTORE_BASE64`, `MEDIASYNC_KEYSTORE_PASSWORD`, `MEDIASYNC_KEY_ALIAS`, `MEDIASYNC_KEY_PASSWORD`.
+   The script creates the key, or reuses the file if it already exists. It checks the password, then stores the four secrets in the `release` environment: `MEDIASYNC_KEYSTORE_BASE64`, `MEDIASYNC_KEYSTORE_PASSWORD`, `MEDIASYNC_KEY_ALIAS`, `MEDIASYNC_KEY_PASSWORD`. The password is never written to disk or passed on a command line.
+2. Save the password in your password manager, and back up the keystore file to a second safe place.
 3. Later, for Google Play: enrol in Play App Signing with **this same key** ("Use my own key"). GitHub and Play builds then share one certificate, so users can switch between them (docs/PLAN.md §14.4).
 
 **Losing this key means existing installs can no longer be updated.** Keep two backups.
