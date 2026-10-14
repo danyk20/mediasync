@@ -293,7 +293,7 @@ Grouped, each group with one plain-language choice:
 - *Privacy → Photo details*: Keep all / Remove location / Remove all.
 - *Data usage*: relay allowance meter and budget; this phone's mobile data used by MediaSync.
 - *Battery*: unrestricted-battery check and minimum battery level.
-- *Diagnostics*: link test and logs export.
+- *Diagnostics*: logs export (M2, from ⋮ on the home screens) and the link test (M3).
 
 **Notifications**
 
@@ -1002,6 +1002,12 @@ How a scheduled sync runs:
 - **No plaintext on any network.** The relay and the Worker only ever see ciphertext.
 - **Metadata privacy at the source.** *Photo details* removal on the producer happens before encryption and sending, so removed details never leave the phone (§6.3).
 - **No analytics by default.** Optional, opt-in crash reporting can be added later (with the Play Data safety form updated). Logs stay on the device, contain no file locations, and are exported only by the user.
+  - The diagnostic log (`:core:diagnostics`) records what MediaSync did:
+    - schedule decisions, background work and why Android stopped it;
+    - how the other phone was found, and each session's counts, duration and errors, with how far a failed session got.
+  - It names no files, places or people. Phones appear by a short id, IP addresses keep only their subnet, times show only their UTC offset, and paths and content URIs are removed from error messages.
+  - It's kept in the app's private files (two files of 512 KB at most).
+  - *Diagnostics* (⋮ on the home screens) shows a summary of the phone's setup and the recent entries. *Share log* and *Save to a file* export both, through the user's choice of app or folder.
 - **Secrets in CI:**
   - The signing key, Play service account, Cloudflare tokens (deploy, analytics) and the Firebase service account (for FCM, a Worker secret) live only in GitHub *Environments* with required reviewers.
   - GitHub secret scanning and push protection are on (free for public repos).

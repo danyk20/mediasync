@@ -10,6 +10,7 @@ import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.database.RoomSentLedger
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
@@ -20,6 +21,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
 import io.github.danyk20.mediasync.transport.lan.testIdentity
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
@@ -30,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -216,6 +219,48 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun theDiagnosticLogSaysWhatHappenedWithoutNamingFilesOrPhones() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+            producer.syncNow()
+            withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+            withTimeout(TIMEOUT) {
+                while (entries.none { it.startsWith("receive Session from") && "received" in it }) delay(POLL)
+            }
+
+            entries.single { it.startsWith("send Sync done") } shouldContain "sent 4"
+            entries.single { it.startsWith("receive Session from") && "received" in it } shouldContain "received 4"
+            entries.any { it.startsWith("receive Listening on port") } shouldBe true
+            val everything = synchronized(entries) { entries.joinToString("\n") }
+            listOf("photo0", ".jpg", "Pixel 2 XL", "Anna's Pixel").filter { it in everything } shouldBe emptyList()
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
+    }
+
+    @Test
+    fun aFailedSyncIsLoggedWithWhatWentWrong() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+            receiver.stop() // The receiving phone is gone.
+
+            producer.syncNow()
+            withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Failed } }
+
+            entries.any { it.startsWith("send Couldn't connect to 127.0.0.x:") } shouldBe true
+            entries.any { it.startsWith("send Not found on the network") } shouldBe true
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
+    }
+
+    @Test
     fun anUnpairedPhoneCantSync() = runBlocking<Unit> {
         receiver.start()
         val link = receiver.openPairing().shouldNotBeNull()
@@ -252,5 +297,6 @@ class RuntimeEndToEndTest {
 
     private companion object {
         const val TIMEOUT = 20_000L
+        const val POLL = 20L
     }
 }

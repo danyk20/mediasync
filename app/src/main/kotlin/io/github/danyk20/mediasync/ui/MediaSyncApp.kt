@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.MainUiState
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.feature.consumer.ConsumerHomeRoute
 import io.github.danyk20.mediasync.feature.consumer.SyncScheduleRoute
+import io.github.danyk20.mediasync.feature.diagnostics.DiagnosticsRoute
 import io.github.danyk20.mediasync.feature.onboarding.RoleChoiceRoute
 import io.github.danyk20.mediasync.feature.pairing.ConsumerPairingRoute
 import io.github.danyk20.mediasync.feature.pairing.ProducerPairingRoute
@@ -77,10 +78,12 @@ private fun MediaSyncNavDisplay(
                     onPair = { backStack.add(Destination.ProducerPairing()) },
                     onChooseFolders = { backStack.add(Destination.ProducerFolders) },
                     onChooseDetails = { backStack.add(Destination.ProducerPhotoDetails) },
+                    onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                 )
             }
             entry<Destination.ProducerFolders> { SourceFoldersRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerPhotoDetails> { PhotoDetailsRoute(onDone = { backStack.removeLastOrNull() }) }
+            entry<Destination.Diagnostics> { DiagnosticsRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerPairing> { destination ->
                 ProducerPairingRoute(onDone = { backStack.removeLastOrNull() }, openedLink = destination.openedLink)
             }
@@ -88,6 +91,7 @@ private fun MediaSyncNavDisplay(
                 ConsumerHomeRoute(
                     onAddProducer = { backStack.add(Destination.ConsumerPairing) },
                     onChangeSchedule = { backStack.add(Destination.ConsumerSchedule) },
+                    onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                 )
             }
             entry<Destination.ConsumerSchedule> { SyncScheduleRoute(onDone = { backStack.removeLastOrNull() }) }

@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
@@ -71,6 +72,7 @@ fun ProducerHomeRoute(
     onChooseFolders: () -> Unit,
     modifier: Modifier = Modifier,
     onChooseDetails: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
     viewModel: ProducerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -109,6 +111,7 @@ fun ProducerHomeRoute(
         },
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
+        onOpenDiagnostics = onOpenDiagnostics,
         modifier = modifier,
     )
 }
@@ -128,10 +131,16 @@ fun ProducerHomeScreen(
     onAllowNotifications: () -> Unit = {},
     onChooseDetails: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.producer_home_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.producer_home_title)) },
+                actions = { MoreMenu(onOpenDiagnostics) },
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier

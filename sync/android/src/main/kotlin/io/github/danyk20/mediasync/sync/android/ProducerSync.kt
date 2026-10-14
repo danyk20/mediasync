@@ -7,6 +7,8 @@ package io.github.danyk20.mediasync.sync.android
 import io.github.danyk20.mediasync.core.crypto.IdentityProvider
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.metadata.isWithheld
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
@@ -174,8 +176,11 @@ class ProducerSync @Inject constructor(
 
     private suspend fun runSync(): ProducerState {
         val consumer = peers.consumer() ?: return ProducerState.Failed(SyncFailure.NOT_PAIRED)
+        val details = device.photoDetails()
+        Diagnostics.log(Area.SEND, "Sync to ${consumer.id.short()} (photo details: ${details.name.lowercase()})")
         val connection = connect(consumer) ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
         _state.value = ProducerState.Syncing(progress = null)
+        val started = System.currentTimeMillis()
         return try {
             connection.use {
                 val result = ProducerSession(
@@ -184,36 +189,59 @@ class ProducerSync @Inject constructor(
                     ledger,
                     progress = { progress -> _state.value = ProducerState.Syncing(progress) },
                     shouldContinue = { !cancelled && !pauseWhen() },
-                    details = device.photoDetails(),
+                    details = details,
                 ).sync(it)
                 peers.recordAddress(consumer.id, it.remoteAddress)
                 peers.recordSchedule(consumer.id, result.consumerSchedule)
                 if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
+                Diagnostics.log(Area.SEND, "Sync done in ${since(started)}: ${result.describe()}")
                 ProducerState.Idle(result)
             }
-        } catch (e: PeerEndedSessionException) {
-            ProducerState.Failed(
-                if (e.byeReason == Bye.Reason.NOT_PAIRED) SyncFailure.NOT_ALLOWED else SyncFailure.CONNECTION_LOST,
-            )
-        } catch (_: IncompatiblePeerException) {
-            ProducerState.Failed(SyncFailure.INCOMPATIBLE)
-        } catch (_: IOException) {
-            ProducerState.Failed(SyncFailure.CONNECTION_LOST)
+        } catch (e: IOException) {
+            // Where it stopped tells which side stalled: during a file, or waiting for the other phone.
+            val progress = (_state.value as? ProducerState.Syncing)?.progress
+            Diagnostics.log(Area.SEND, "Sync failed after ${since(started)} at ${progress.describe()}", e)
+            ProducerState.Failed(failureOf(e))
         }
+    }
+
+    private fun failureOf(error: IOException): SyncFailure = when {
+        error is PeerEndedSessionException && error.byeReason == Bye.Reason.NOT_PAIRED -> SyncFailure.NOT_ALLOWED
+        error is IncompatiblePeerException -> SyncFailure.INCOMPATIBLE
+        else -> SyncFailure.CONNECTION_LOST
     }
 
     /** The last known address first (fast), then whatever the network advertises (moved to a new IP). */
     private suspend fun connect(consumer: Peer): PeerConnection? {
-        consumer.lastAddress?.let { address -> connectToFirst(listOf(address), consumer.id)?.let { return it } }
-        val found = discovery.find(serviceIdOf(consumer.id), DISCOVERY_TIMEOUT_MILLIS) ?: return null
-        return connectToFirst(listOf(found), consumer.id)
+        consumer.lastAddress?.let { address ->
+            connectToFirst(listOf(address), consumer.id)?.let { return it }
+            Diagnostics.log(Area.SEND, "Not at its last address $address; looking for it on the network")
+        }
+        val found = discovery.find(serviceIdOf(consumer.id), DISCOVERY_TIMEOUT_MILLIS)
+        if (found == null) {
+            Diagnostics.log(Area.SEND, "Not found on the network within ${since(0, DISCOVERY_TIMEOUT_MILLIS)}")
+            return null
+        }
+        return connectToFirst(listOf(found), consumer.id).also { connection ->
+            Diagnostics.log(
+                Area.SEND,
+                if (connection ==
+                    null
+                ) {
+                    "Found at $found, but it didn't answer"
+                } else {
+                    "Found at $found"
+                },
+            )
+        }
     }
 
     private fun connectToFirst(addresses: List<String>, expected: DeviceId): PeerConnection? =
         addresses.asSequence().mapNotNull(::parseAddress).firstNotNullOfOrNull { address ->
             try {
                 LanClient.connect(address, identity.identity(), expected, TIMEOUTS, sockets.factoryFor(address))
-            } catch (_: IOException) {
+            } catch (e: IOException) {
+                Diagnostics.log(Area.SEND, "Couldn't connect to ${address.hostString}:${address.port}", e)
                 null
             }
         }

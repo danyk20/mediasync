@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.feature.producer
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -215,6 +216,15 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun diagnostics_areInTheMenu() {
+        show(paired.copy(pendingCount = 0))
+
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Diagnostics").performClick()
+        events shouldBe listOf("diagnostics")
+    }
+
+    @Test
     fun setupCards_askAndCanBeDismissed() {
         show(paired.copy(pendingCount = 0, askNotifications = true, askBattery = true))
 
@@ -297,6 +307,7 @@ class ProducerHomeScreenTest {
                     onAllowNotifications = { events += "notifications" },
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
+                    onOpenDiagnostics = { events += "diagnostics" },
                 )
             }
         }

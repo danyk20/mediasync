@@ -22,6 +22,8 @@
     <string name="moment_weekday">%1$s at %2$s</string>
 
     <string name="notice_not_now">Not now</string>
+    <string name="more_options">More options</string>
+    <string name="menu_diagnostics">Diagnostics</string>
 
     <!-- Cards asking for what background syncs need (Android 12+ battery, Android 13+ notifications). -->
     <string name="setup_notifications_title">See how syncs are going</string>
