@@ -36,9 +36,11 @@ jobs:
         run: >
           ./gradlew :app:api29Setup :app:api31Setup :app:api34Setup :app:api36Setup --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+      # Each test task boots its own emulator; at most two at a time, or the runner runs out of memory and
+      # systemd-oomd stops the job (exit code 143).
       - name: Run on every supported API level
         run: >
-          ./gradlew nightlyGroupDebugAndroidTest
+          ./gradlew nightlyGroupDebugAndroidTest --max-workers=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       - name: Upload reports
         if: failure()
