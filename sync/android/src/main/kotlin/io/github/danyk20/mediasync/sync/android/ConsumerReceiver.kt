@@ -62,6 +62,8 @@ data class ReceiverState(
     val turboNeedsPermission: Boolean = false,
     /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's network. */
     val turboReceiving: Boolean = false,
+    /** Sessions running now; while there are any, receiving runs as foreground work (docs/PLAN.md §7). */
+    val sessions: Int = 0,
 )
 
 /**
@@ -209,11 +211,11 @@ class ConsumerReceiver internal constructor(
         val started = System.currentTimeMillis()
         Diagnostics.log(Area.RECEIVE, "Session from ${producer.short()} at ${connection.remoteAddress}")
         markActivity()
-        activeSessions.incrementAndGet()
+        countSession(+1)
         try {
             addresses.keepingAwake { receive(producer, connection, started) }
         } finally {
-            activeSessions.decrementAndGet()
+            countSession(-1)
             markActivity()
         }
     }
@@ -279,6 +281,11 @@ class ConsumerReceiver internal constructor(
         }
 
     private fun markActivity() = _state.update { it.copy(lastActivityMillis = System.currentTimeMillis()) }
+
+    private fun countSession(change: Int) {
+        val now = activeSessions.addAndGet(change)
+        _state.update { it.copy(sessions = now) }
+    }
 
     /**
      * Turbo transfer, as the receiving phone (docs/PLAN.md §8.3): the direct links sending phones join, one at a
