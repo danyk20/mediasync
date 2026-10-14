@@ -8,8 +8,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
+import io.kotest.matchers.shouldBe
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,29 +27,61 @@ class ConsumerHomeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val receiving = ConsumerHomeUiState(
+        listening = true,
+        transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000),
+        producers = listOf("Anna's Pixel", "Tom's Galaxy"),
+        receivedCount = 1234,
+    )
+
     @Test
-    fun showsReadyStatus() {
-        showScreen()
+    fun readyWithoutProducers_invitesPairing() {
+        var added = 0
+        show(ConsumerHomeUiState(listening = true), onAdd = { added++ })
 
         composeRule.onNodeWithText("Ready to receive").assertIsDisplayed()
+        composeRule.onNodeWithText("Add sending phone").performClick()
+        added shouldBe 1
     }
 
     @Test
-    fun screenshot_light() {
-        showScreen(darkTheme = false)
-        composeRule.onRoot().captureScreenshot("consumer_home_light")
+    fun receiving_showsWhoAndHowFar() {
+        show(receiving)
+
+        composeRule.onNodeWithText("Receiving from Anna's Pixel").assertIsDisplayed()
+        composeRule.onNodeWithText("12 of 40 · 145 MB of 830 MB").assertIsDisplayed()
+        composeRule.onNodeWithText("Tom's Galaxy").assertIsDisplayed()
     }
 
     @Test
-    fun screenshot_dark() {
-        showScreen(darkTheme = true)
-        composeRule.onRoot().captureScreenshot("consumer_home_dark")
+    fun offline_asksForWifi() {
+        show(ConsumerHomeUiState(listening = false))
+
+        composeRule.onNodeWithText("Not receiving").assertIsDisplayed()
     }
 
-    private fun showScreen(darkTheme: Boolean = false) {
+    @Test
+    fun screenshot_ready_light() {
+        show(ConsumerHomeUiState(listening = true))
+        composeRule.onRoot().captureScreenshot("consumer_home_ready_light")
+    }
+
+    @Test
+    fun screenshot_receiving_light() {
+        show(receiving)
+        composeRule.onRoot().captureScreenshot("consumer_home_receiving_light")
+    }
+
+    @Test
+    fun screenshot_receiving_dark() {
+        show(receiving, darkTheme = true)
+        composeRule.onRoot().captureScreenshot("consumer_home_receiving_dark")
+    }
+
+    private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false, onAdd: () -> Unit = {}) {
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ConsumerHomeScreen()
+                ConsumerHomeScreen(state = state, onAddProducer = onAdd)
             }
         }
     }

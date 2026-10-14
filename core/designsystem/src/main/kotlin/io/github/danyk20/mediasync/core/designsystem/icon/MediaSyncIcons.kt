@@ -14,4 +14,6 @@ object MediaSyncIcons {
     @DrawableRes val Receive: Int = R.drawable.ic_download
 
     @DrawableRes val Info: Int = R.drawable.ic_info
+
+    @DrawableRes val Folder: Int = R.drawable.ic_folder
 }

@@ -4,20 +4,20 @@
  */
 package io.github.danyk20.mediasync.ui
 
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import io.github.danyk20.mediasync.MainUiState
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
-import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.kotest.matchers.shouldBe
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The onboarding path needs Hilt and is covered by the instrumented MainActivityTest. */
+/**
+ * Screens need their Hilt view models, so navigation between them is covered by the instrumented
+ * MainActivityTest on real Android. This checks what renders without them.
+ */
 @RunWith(RobolectricTestRunner::class)
 class MediaSyncAppTest {
 
@@ -25,32 +25,13 @@ class MediaSyncAppTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun producer_startsOnProducerHome() {
-        show(MainUiState.Ready(DeviceRole.PRODUCER))
-
-        composeRule.onNodeWithText("Not paired yet").assertIsDisplayed()
-    }
-
-    @Test
-    fun consumer_startsOnConsumerHome() {
-        show(MainUiState.Ready(DeviceRole.CONSUMER))
-
-        composeRule.onNodeWithText("Ready to receive").assertIsDisplayed()
-    }
-
-    @Test
     fun loading_showsNoScreenYet() {
-        show(MainUiState.Loading)
-
-        composeRule.onAllNodesWithText("Not paired yet").fetchSemanticsNodes().size shouldBe 0
-        composeRule.onAllNodesWithText("Ready to receive").fetchSemanticsNodes().size shouldBe 0
-    }
-
-    private fun show(state: MainUiState) {
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {
-                MediaSyncApp(uiState = state)
+                MediaSyncApp(uiState = MainUiState.Loading)
             }
         }
+
+        composeRule.onRoot().fetchSemanticsNode().children.size shouldBe 0
     }
 }

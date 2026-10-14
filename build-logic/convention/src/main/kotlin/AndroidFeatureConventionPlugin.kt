@@ -20,11 +20,13 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
         dependencies {
             "implementation"(project(":core:designsystem"))
             "implementation"(project(":core:model"))
+            "implementation"(libs.library("androidx-activity-compose"))
             "implementation"(libs.library("androidx-hilt-lifecycle-viewmodel-compose"))
             "implementation"(libs.library("androidx-lifecycle-runtime-compose"))
             "implementation"(libs.library("androidx-lifecycle-viewmodel-compose"))
 
             "testImplementation"(project(":core:testing"))
+            "testImplementation"(libs.library("mockk"))
         }
     }
 }

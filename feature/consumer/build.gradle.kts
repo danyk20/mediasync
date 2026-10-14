@@ -5,3 +5,7 @@ plugins {
 android {
     namespace = "io.github.danyk20.mediasync.feature.consumer"
 }
+
+dependencies {
+    implementation(projects.sync.android)
+}

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.lint) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.kotlin.compose) apply false
@@ -31,13 +32,20 @@ spotless {
 // Aggregated coverage over every module: `./gradlew :koverXmlReportCi :koverVerifyCi`.
 dependencies {
     kover(projects.app)
+    kover(projects.core.crypto)
+    kover(projects.core.database)
     kover(projects.core.datastore)
     kover(projects.core.designsystem)
+    kover(projects.core.media)
     kover(projects.core.model)
     kover(projects.feature.consumer)
     kover(projects.feature.onboarding)
+    kover(projects.feature.pairing)
     kover(projects.feature.producer)
+    kover(projects.sync.android)
+    kover(projects.sync.engine)
     kover(projects.sync.protocol)
+    kover(projects.transport.lan)
 }
 
 kover {
@@ -53,6 +61,8 @@ kover {
                     "*_Factory",
                     "*_Factory\$*",
                     "*_HiltModules*",
+                    "*_Impl",
+                    "*_Impl$*",
                     "*_MembersInjector",
                     "*Hilt_*",
                     "*.MainActivity",
@@ -60,7 +70,12 @@ kover {
                     "dagger.hilt.*",
                     "hilt_aggregated_deps.*",
                 )
-                annotatedBy("androidx.compose.ui.tooling.preview.Preview", "dagger.Module")
+                annotatedBy(
+                    "androidx.compose.ui.tooling.preview.Preview",
+                    "dagger.Module",
+                    // Tested on emulators instead; see the annotation's documentation.
+                    "io.github.danyk20.mediasync.core.model.ExercisedOnDevice",
+                )
             }
         }
         variant("ci") {

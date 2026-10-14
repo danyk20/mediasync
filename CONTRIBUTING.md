@@ -14,7 +14,7 @@ Run the same checks CI runs:
 
 ```bash
 ./gradlew spotlessCheck detekt lintDebug licenseeDebug
-./gradlew testDebugUnitTest :sync:protocol:test :core:model:test koverVerifyCi
+./gradlew koverVerifyCi   # every module's tests + coverage gates
 ```
 
 - **Formatting:** `./gradlew spotlessApply` fixes formatting and adds the license header to new files.

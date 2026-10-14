@@ -10,12 +10,21 @@ naming:
 complexity:
   LongParameterList:
     ignoreAnnotated: ['Composable']
+    # Dependency-injected constructors list their collaborators; that's their job.
+    constructorThreshold: 10
   TooManyFunctions:
     ignorePrivate: true
 
 style:
+  ReturnCount:
+    # Guard clauses (`?: return`) are idiomatic Kotlin and keep the main path unindented.
+    max: 3
+    excludeGuardClauses: true
+    excludeReturnFromLambda: true
   MagicNumber:
     ignorePropertyDeclaration: true
+    # Protobuf field tags (@ProtoNumber) are numbers by nature.
+    ignoreAnnotation: true
     ignoreAnnotated: ['Composable', 'Preview']
     excludes: ['**/test/**', '**/androidTest/**', '**/designsystem/**']
   UnusedPrivateMember:

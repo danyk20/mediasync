@@ -41,7 +41,7 @@ class FrameCodecTest {
 
         FrameCodec.writeHeader(FrameHeader(FrameType.DATA, 300), buffer)
 
-        buffer.readByteString() shouldBe "06ac02".decodeHex()
+        buffer.readByteString() shouldBe "07ac02".decodeHex()
     }
 
     @ParameterizedTest
@@ -84,7 +84,7 @@ class FrameCodecTest {
 
     @Test
     fun `rejects a stream that ends inside the header`() {
-        val buffer = Buffer().write("0680".decodeHex())
+        val buffer = Buffer().write("0780".decodeHex())
 
         val error = shouldThrow<ProtocolException> { FrameCodec.read(buffer) }
 
@@ -103,7 +103,7 @@ class FrameCodecTest {
     @Test
     fun `rejects a declared length above the limit before allocating it`() {
         // 0x80 0x80 0x81 0x01 = 2_113_536 bytes, just over MAX_PAYLOAD_SIZE.
-        val buffer = Buffer().write("0680808101".decodeHex())
+        val buffer = Buffer().write("0780808101".decodeHex())
 
         val error = shouldThrow<ProtocolException> { FrameCodec.read(buffer) }
 
@@ -112,7 +112,7 @@ class FrameCodecTest {
 
     @Test
     fun `rejects a length encoded in more than four bytes`() {
-        val buffer = Buffer().write("068080808001".decodeHex())
+        val buffer = Buffer().write("078080808001".decodeHex())
 
         shouldThrow<ProtocolException> { FrameCodec.read(buffer) }
     }

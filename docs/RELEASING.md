@@ -2,6 +2,8 @@
 
 Releases are automated with [release-please](https://github.com/googleapis/release-please). Version numbers and the changelog come from the Conventional Commit titles of merged pull requests.
 
+Until the Play Store launch (M6, docs/PLAN.md §15) versions stay below 1.0: the first release is 0.1.0 (`initial-version`), and `feat` pull requests bump the minor version (`bump-minor-pre-major`). Version 1.0.0 is chosen deliberately, with a `Release-As: 1.0.0` footer on the launch pull request.
+
 ## How a release happens
 
 1. Pull requests are merged into `main`.

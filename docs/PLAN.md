@@ -196,8 +196,8 @@ The **LAN-only** setting needs no internet services at all. The Worker is only u
 - Show a pairing QR code and approve new producers.
 - **Sync schedule** for the whole household (§10.1): *Once a day at 03:00* (default), *Every 2–12 hours*, *Whenever charging*, *Every 2–3 days*, *Weekly*, or *Manual only*.
 - Receive into the gallery so files appear there. Original filename, capture date, location and all other metadata are preserved (§6).
-  - When the Google Photos app does the backup: one folder, `Pictures/MediaSync/`.
-  - Otherwise: `Pictures/MediaSync/<Producer>/<Album>/`.
+  - When the Google Photos app does the backup: one folder, `DCIM/MediaSync/`.
+  - Otherwise: `DCIM/MediaSync/<Producer>/<Album>/`.
 - Storage guard: stop accepting files below a free-space threshold (default 2 GB) and tell the producers why.
 - Cloud backup through connectors. It starts **as soon as items arrive**, independent of the sync schedule.
   - **v1.0:** *Google Photos app on this phone*: free and unlimited on Pixel 2–5 (§9.3.1).
@@ -460,7 +460,7 @@ The `meta` sidecar carries details that live *outside* the file, in the producer
 
 ### 5.3 Receiving (consumer)
 
-- Each file is inserted into MediaStore in the backup folder (`Pictures/MediaSync/` in Google Photos app mode, otherwise `Pictures/MediaSync/<Producer>/<Album>/`) with `IS_PENDING=1` and written straight to the file descriptor. Partial files never appear in the gallery.
+- Each file is inserted into MediaStore in the backup folder (`DCIM/MediaSync/` in Google Photos app mode, otherwise `DCIM/MediaSync/<Producer>/<Album>/`) with `IS_PENDING=1` and written straight to the file descriptor. Partial files never appear in the gallery.
   - The insert carries the original filename, the capture date from the sidecar and, on Android 11+, the favorite flag.
 - On `FILE_END` the consumer verifies the SHA-256, sets `IS_PENDING=0`, records `received_item` and sends `FILE_ACK`.
 - **Resume:** `incoming_partial` keeps the pending URI and offset. On reconnect, `WANT` returns `resumeOffset`.
@@ -527,8 +527,12 @@ In v1.0 the consumer's files are removed by the connector app (Google Photos) af
    - Motion Photos are uploaded in original form, so the motion part is never lost.
 5. **Time zones.** The original time-zone offset is kept. When MediaSync has to write a date itself, it also writes the producer's UTC offset for that date, so photos from trips sort correctly.
 6. **Consumer gallery date.**
-   - The consumer sets the capture date when it inserts each file into the gallery. An instrumented test checks that the media scanner keeps it.
-   - If some Android version overrides it, the consumer falls back to the lossless date insert from point 3. This applies only to files without an internal date.
+   - The consumer sets the capture date when it inserts each file into the gallery.
+   - Android's media scanner recomputes it whenever it scans the file. Most cameras record the capture time without a time zone, so the scanner estimates the zone from the file's **modification time**, rounded to 15 minutes. A file modified "now" on arrival would shift by the sync delay, and lose its date entirely after 24 hours. Found in the two-emulator test of M1.
+   - So on Android 11+ the consumer gives each stored file the producer's modification time. The scanner then makes the same estimate as on the producer, and the file stays byte-identical.
+   - Android 10 doesn't let apps set file times. There the consumer writes the producer's UTC offset into the photo's EXIF (`OffsetTimeOriginal`) when the date has none: a lossless EXIF change, computed from the producer's capture instant and the EXIF local time. This works for JPEG, PNG and WebP; ExifInterface can't write HEIC, so HEIC photos without a zone may still shift on Android 10 consumers.
+   - An instrumented test forces a rescan and checks the date on every API level in CI (29 and 36).
+   - Files without an internal date get the lossless date insert from point 3.
 
 ### 6.3 Privacy setting: "Photo details"
 
@@ -794,7 +798,7 @@ There are two connectors, and the choice is made per consumer device.
 
 - **Capability:** `DELEGATED_TO_DEVICE_APP`. MediaSync doesn't upload anything. It stores files where the Google Photos app backs them up, which is free and unlimited in Storage saver on Pixel 2–5 (§1.5).
 - **One folder:**
-  - All received files go into `Pictures/MediaSync/`.
+  - All received files go into `DCIM/MediaSync/`. (`DCIM` because, on Android 10, it's the only top-level folder MediaStore accepts for both photos and videos.)
   - The Google Photos app treats every subfolder as a separate "device folder" that needs its own backup switch. A single folder means one switch covers every producer, now and later.
   - Producer and album are kept in MediaSync's database.
 - **Guided setup:** onboarding checks that Google Photos is installed, opens its backup settings, and asks for two things:
@@ -1131,7 +1135,7 @@ Estimates assume one developer working full-time with AI assistance. They are ro
 |---|---|---|---|---|
 | **M0** | Foundations | Repo, CI/CD (all workflows green), module skeleton, convention plugins, design system, DI, empty app shell with role choice, golden media set | A PR to `main` runs the full pipeline (including API 29 tests). A tag produces a signed GitHub Release. | 1 wk |
 | **M1** | Wi-Fi MVP | Identity keys, QR pairing, mDNS + last-known IP, TLS session, protocol v1, MediaStore indexing (with the Android 10 fallback), outbox/receive, **full metadata preservation** (unredacted GPS, sidecar, album folders), manual *Sync now* | Two real phones (one on Android 10) pair and transfer 1,000 photos + 5 videos with zero loss and **byte-identical metadata**. Resume works after killing either app. | 3 wks |
-| **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, **Worker skeleton + FCM wake-up**, source selection UI, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
+| **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, **Worker skeleton + FCM wake-up**, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
 | **M3** | Speed + Turbo | Parallel adaptive streams, pipelining, path switching, **Turbo transfer** (Wi-Fi Direct, Wi-Fi Aware when available), link test, benchmarks | ≥ 85 % of raw link throughput on Wi-Fi and Turbo. Turbo starts with one tap and no system dialogs. CI benchmark trend in place. | 2 wks |
 | **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
 | **M5** | Internet sync | Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |

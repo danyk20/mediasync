@@ -2,6 +2,69 @@
 <resources>
     <string name="producer_home_title">This phone sends</string>
     <string name="producer_status_not_paired_title">Not paired yet</string>
-    <string name="producer_status_not_paired_body">Open MediaSync on your receiving phone and scan the QR code it shows.</string>
-    <string name="producer_role_hint">New photos and videos will be sent to your receiving phone while this phone is charging.</string>
+    <string name="producer_status_not_paired_body">On your receiving phone, open MediaSync and tap Add sending phone. Then scan the code it shows.</string>
+    <string name="producer_pair">Pair with receiving phone</string>
+
+    <string name="producer_access_title">Allow access to photos</string>
+    <string name="producer_access_body">MediaSync sends your photos and videos to %1$s. It needs access to all of them, and to the places they were taken so locations stay in your backup.</string>
+    <string name="producer_access_grant">Allow access</string>
+    <string name="producer_access_settings">Open settings</string>
+
+    <string name="producer_sync_now">Sync now</string>
+    <string name="producer_stop">Stop</string>
+    <string name="producer_status_checking_title">Checking for new photos…</string>
+    <string name="producer_status_checking_body">Comparing with what %1$s already has.</string>
+    <string name="producer_status_up_to_date_title">Up to date</string>
+    <string name="producer_status_up_to_date_body">%1$s has all your photos and videos.</string>
+    <string name="producer_last_sync">Last sync at %1$s</string>
+    <plurals name="producer_status_pending_title">
+        <item quantity="one">%d new photo or video</item>
+        <item quantity="other">%d new photos and videos</item>
+    </plurals>
+    <plurals name="producer_status_pending_body">
+        <item quantity="one">Tap Sync now to send it to %1$s.</item>
+        <item quantity="other">Tap Sync now to send them to %1$s.</item>
+    </plurals>
+    <string name="producer_status_connecting_title">Looking for %1$s…</string>
+    <string name="producer_status_connecting_body">Both phones need to be on the same Wi-Fi, with MediaSync open.</string>
+    <string name="producer_status_sending_title">Sending to %1$s</string>
+    <string name="producer_status_sending_preparing">Preparing…</string>
+    <string name="producer_status_sending_body">%1$d of %2$d · %3$s of %4$s</string>
+
+    <string name="producer_status_failed_title">Sync didn\'t finish</string>
+    <string name="producer_failure_unreachable">Couldn\'t find %1$s. Check that both phones are on the same Wi-Fi and MediaSync is open on it.</string>
+    <string name="producer_failure_connection_lost">The connection to %1$s dropped. Nothing is lost: the next sync continues where this one stopped.</string>
+    <string name="producer_failure_not_allowed">%1$s no longer recognises this phone. Pair them again.</string>
+    <string name="producer_failure_incompatible">%1$s runs a different MediaSync version. Update the app on both phones.</string>
+
+    <string name="producer_location_missing">Locations won\'t be included in your photos until you allow MediaSync to read them.</string>
+    <string name="producer_location_grant">Keep locations</string>
+    <string name="producer_keep_open_hint">For now, keep MediaSync open on both phones while syncing. Automatic sync while charging is coming.</string>
+    <!-- Folders to send -->
+    <string name="producer_sources_title">Folders to send</string>
+    <string name="producer_sources_change">Change</string>
+    <string name="producer_sources_none">None chosen</string>
+    <plurals name="producer_sources_more">
+        <item quantity="one">%1$s and %2$d more</item>
+        <item quantity="other">%1$s and %2$d more</item>
+    </plurals>
+    <string name="producer_status_no_folders_title">No folders chosen</string>
+    <string name="producer_status_no_folders_body">Choose which folders to send to %1$s.</string>
+
+    <string name="producer_folders_title">Folders to send</string>
+    <string name="producer_folders_done">Done</string>
+    <string name="producer_folders_intro">Photos and videos in these folders are sent to your receiving phone. Turning a folder off doesn\'t remove what it already received.</string>
+    <string name="producer_folders_preset_camera">Camera only</string>
+    <string name="producer_folders_preset_camera_screenshots">Camera + screenshots</string>
+    <string name="producer_folders_preset_everything">All folders</string>
+    <string name="producer_folders_hint_preset">Matching folders added later are included automatically.</string>
+    <string name="producer_folders_hint_chosen">Only the folders you check are sent.</string>
+    <string name="producer_folders_empty">No photos or videos on this phone yet.</string>
+    <!-- The count is already formatted for the locale: "2,814". -->
+    <plurals name="producer_folders_items">
+        <item quantity="one">%1$s item</item>
+        <item quantity="other">%1$s items</item>
+    </plurals>
+    <!-- "214 items · 1.2 GB · DCIM/Camera" -->
+    <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
 </resources>

@@ -9,6 +9,8 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SourcePreset
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.io.File
@@ -56,6 +58,46 @@ class DataStoreSettingsRepositoryTest {
         dataStore.edit { it[DataStoreSettingsRepository.RoleKey] = "ROLE_FROM_A_NEWER_VERSION" }
 
         DataStoreSettingsRepository(dataStore).role.first().shouldBeNull()
+    }
+
+    @Test
+    fun sendsTheCameraFolderUntilFoldersAreChosen() = runTest {
+        DataStoreSettingsRepository(dataStore()).sourceSelection.first() shouldBe SourceSelection.Default
+    }
+
+    @Test
+    fun storesAPresetOrHandPickedFolders() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+
+        repository.setSourceSelection(SourceSelection(SourcePreset.EVERYTHING))
+        repository.sourceSelection.first() shouldBe SourceSelection(SourcePreset.EVERYTHING)
+
+        val chosen = SourceSelection.of(setOf("DCIM/Camera/", "Pictures/Screenshots/"))
+        repository.setSourceSelection(chosen)
+        repository.sourceSelection.first() shouldBe chosen
+
+        repository.setSourceSelection(SourceSelection.of(emptySet()))
+        repository.sourceSelection.first() shouldBe SourceSelection.of(emptySet())
+    }
+
+    @Test
+    fun choosingAPresetForgetsHandPickedFolders() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+
+        repository.setSourceSelection(SourceSelection.of(setOf("DCIM/Camera/")))
+        repository.setSourceSelection(SourceSelection(SourcePreset.CAMERA_AND_SCREENSHOTS))
+
+        repository.sourceSelection.first() shouldBe SourceSelection(SourcePreset.CAMERA_AND_SCREENSHOTS)
+        dataStore.data.first()[DataStoreSettingsRepository.SourceFoldersKey] shouldBe emptySet()
+    }
+
+    @Test
+    fun treatsAnUnknownStoredPresetAsTheDefault() = runTest {
+        val dataStore = dataStore()
+        dataStore.edit { it[DataStoreSettingsRepository.SourcePresetKey] = "PRESET_FROM_A_NEWER_VERSION" }
+
+        DataStoreSettingsRepository(dataStore).sourceSelection.first() shouldBe SourceSelection.Default
     }
 
     private fun TestScope.dataStore(): DataStore<Preferences> = PreferenceDataStoreFactory.create(
