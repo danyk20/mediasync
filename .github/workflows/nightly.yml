@@ -30,6 +30,12 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # Every module sets up the same emulators in parallel, and two of them installing one system image at
+      # once can fail ("System Image ... does not exist for this architecture"). Install them once first.
+      - name: Install emulator images
+        run: >
+          ./gradlew :app:api29Setup :app:api31Setup :app:api34Setup :app:api36Setup --max-workers=1
+          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       - name: Run on every supported API level
         run: >
           ./gradlew nightlyGroupDebugAndroidTest
