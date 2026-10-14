@@ -32,6 +32,9 @@ spotless {
 // Aggregated coverage over every module: `./gradlew :koverXmlReportCi :koverVerifyCi`.
 dependencies {
     kover(projects.app)
+    kover(projects.connector.android)
+    kover(projects.connector.api)
+    kover(projects.connector.contractTests)
     kover(projects.core.crypto)
     kover(projects.core.database)
     kover(projects.core.datastore)

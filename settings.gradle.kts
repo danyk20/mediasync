@@ -35,6 +35,9 @@ rootProject.name = "mediasync"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":app")
+include(":connector:android")
+include(":connector:api")
+include(":connector:contract-tests")
 include(":core:crypto")
 include(":core:database")
 include(":core:datastore")

@@ -81,3 +81,38 @@ data class MediaFingerprintEntity(
     val original: Boolean,
     val fingerprint: String,
 )
+
+/**
+ * Consumer side: a place received items are backed up to (docs/PLAN.md §9), such as the Google Photos app on this
+ * phone. Since version 4.
+ */
+@Entity(tableName = "connector_accounts")
+data class ConnectorAccountEntity(
+    @PrimaryKey val id: String,
+    /** The connector kind, e.g. `google-photos-app`. */
+    val connectorId: String,
+    val displayName: String,
+    /** The account's settings, as a JSON object of strings by key. */
+    val settingsJson: String,
+    val createdAtMillis: Long,
+)
+
+/**
+ * Consumer side: the backup ledger (docs/PLAN.md §9.4). One receipt per received item and account, kept after the
+ * file is gone. Since version 4.
+ */
+@Entity(
+    tableName = "backup_receipts",
+    primaryKeys = ["contentId", "accountId"],
+    indices = [Index("accountId", "state")],
+)
+data class BackupReceiptEntity(
+    val contentId: String,
+    val accountId: String,
+    /** Where the service keeps it, or for another app's connector, where it was stored on this phone. */
+    val remoteId: String,
+    /** A `BackupState` name: `HANDED_OVER`, `REMOVED_BY_APP`, `BACKED_UP`, `VERIFIED` or `SKIPPED`. */
+    val state: String,
+    val backedUpAtMillis: Long,
+    val checkedAtMillis: Long?,
+)

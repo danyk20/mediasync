@@ -93,3 +93,49 @@ interface MediaFingerprintDao {
     @Upsert
     fun upsert(entry: MediaFingerprintEntity)
 }
+
+/** How many receipts an account has in one state. */
+data class StateCount(val state: String, val count: Int)
+
+@Dao
+interface BackupDao {
+    @Query("SELECT * FROM connector_accounts ORDER BY createdAtMillis")
+    fun observeAccounts(): Flow<List<ConnectorAccountEntity>>
+
+    @Upsert
+    suspend fun upsertAccount(account: ConnectorAccountEntity)
+
+    @Query("DELETE FROM connector_accounts WHERE id = :id")
+    suspend fun deleteAccount(id: String)
+
+    /** Received items without a receipt for the account yet, oldest first. */
+    @Query(
+        "SELECT * FROM received_items AS item WHERE NOT EXISTS (SELECT 1 FROM backup_receipts AS receipt " +
+            "WHERE receipt.accountId = :accountId AND receipt.contentId = item.contentId) " +
+            "ORDER BY item.rowId LIMIT :limit",
+    )
+    suspend fun pending(accountId: String, limit: Int): List<ReceivedItemEntity>
+
+    @Upsert
+    suspend fun upsertReceipts(receipts: List<BackupReceiptEntity>)
+
+    @Query("SELECT * FROM backup_receipts WHERE accountId = :accountId AND state = :state")
+    suspend fun receipts(accountId: String, state: String): List<BackupReceiptEntity>
+
+    @Query("SELECT state, COUNT(*) AS count FROM backup_receipts WHERE accountId = :accountId GROUP BY state")
+    fun observeStateCounts(accountId: String): Flow<List<StateCount>>
+
+    /** Items backed up or handed over since [sinceMillis], whatever happened to them afterwards. */
+    @Query(
+        "SELECT COUNT(*) FROM backup_receipts WHERE accountId = :accountId AND backedUpAtMillis >= :sinceMillis " +
+            "AND state != 'SKIPPED'",
+    )
+    fun observeBackedUpSince(accountId: String, sinceMillis: Long): Flow<Int>
+
+    /** Received items (each content once) that the account has no receipt for yet. */
+    @Query(
+        "SELECT COUNT(DISTINCT contentId) FROM received_items AS item WHERE NOT EXISTS (SELECT 1 FROM " +
+            "backup_receipts AS receipt WHERE receipt.accountId = :accountId AND receipt.contentId = item.contentId)",
+    )
+    fun observeWaiting(accountId: String): Flow<Int>
+}

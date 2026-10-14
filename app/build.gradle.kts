@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation(projects.connector.android)
     implementation(projects.core.datastore)
     implementation(projects.core.designsystem)
     implementation(projects.core.model)
