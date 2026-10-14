@@ -7,4 +7,7 @@ dependencies {
     api(projects.core.model)
     implementation(libs.okio)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+
+    testImplementation(libs.okhttp.mockwebserver)
 }
