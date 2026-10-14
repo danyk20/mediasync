@@ -14,6 +14,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.time.LocalTime
 import okio.ByteString.Companion.encodeUtf8
+import okio.ByteString.Companion.toByteString
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,8 +59,39 @@ class MigrationTest {
             RoomSentLedger(database.sentItemDao()).sentFingerprints(consumer) shouldBe setOf(fingerprint)
 
             val everySix = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
-            peers.recordSchedule(consumer, everySix)
+            peers.recordConsumer(consumer, everySix)
             peers.consumer()!!.schedule shouldBe everySix
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun version2PairingsSurviveAndHaveNoTurboKeyYet() {
+        helper.createDatabase(NAME, 2).use { db ->
+            db.execSQL(
+                "INSERT INTO peers (deviceId, name, role, pairedAtMillis, lastAddress, lastSeenMillis, schedule) " +
+                    "VALUES ('${consumer.hex}', 'Pixel 2 XL', 'CONSUMER', 1, '192.168.1.20:47420', 2, 'charging')",
+            )
+        }
+
+        helper.runMigrationsAndValidate(NAME, 3, true).close()
+
+        val database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MediaSyncDatabase::class.java,
+            NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val peers = PeerStore(database.peerDao())
+            peers.consumer()!!.name shouldBe "Pixel 2 XL"
+            peers.consumer()!!.turboKey.shouldBeNull()
+
+            val key = ByteArray(32) { 5 }.toByteString()
+            peers.recordConsumer(consumer, schedule = null, turboKey = key)
+            // An older consumer that didn't say: the key known stays.
+            peers.recordConsumer(consumer, schedule = null, turboKey = null)
+            peers.consumer()!!.turboKey shouldBe key
         } finally {
             database.close()
         }

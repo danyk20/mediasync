@@ -82,6 +82,7 @@ class ConsumerSession(
     fun serve(connection: PeerConnection): ServeResult {
         val channel = FrameChannel(connection)
         val hello = channel.expect<Hello>()
+        val paired = registry.isPaired(connection.peerId)
         channel.send(
             Hello(
                 PROTOCOL_VERSION,
@@ -90,6 +91,7 @@ class ConsumerSession(
                 local.appVersion,
                 sink.availableBytes(),
                 local.schedule?.encode().orEmpty(),
+                local.turboKey?.takeIf { paired } ?: ByteString.EMPTY, // Only for phones paired already.
             ),
         )
         if (hello.protocolVersion != PROTOCOL_VERSION || hello.role != WireRole.PRODUCER) {

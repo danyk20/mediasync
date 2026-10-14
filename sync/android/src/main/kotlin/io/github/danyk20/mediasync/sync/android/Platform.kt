@@ -81,14 +81,17 @@ enum class TurboAvailability {
 interface DirectLinks {
     fun availability(): TurboAvailability
 
-    /** As a receiving phone: creates a link that sending phones can join, listening on it at [port]. Blocks. */
-    fun open(port: Int): TurboAnswer
+    /**
+     * As a receiving phone: creates a link that sending phones join with [credentials] (network name and
+     * passphrase), listening on it at [port]. Blocks.
+     */
+    fun open(port: Int, credentials: Pair<String, String> = DirectLink.credentials()): TurboAnswer
 
-    /** As a receiving phone: removes the link it opened. */
-    fun close()
+    /** As a receiving phone: removes the link named [networkName], if it's still up. */
+    fun close(networkName: String)
 
-    /** As a sending phone: joins [link]; `false` if that didn't work within [timeoutMillis]. */
-    suspend fun join(link: DirectLink, timeoutMillis: Long): Boolean
+    /** As a sending phone: joins [link]; the address of the phone that opened it, or `null` if not joined in time. */
+    suspend fun join(link: DirectLink, timeoutMillis: Long): String?
 
     /** As a sending phone: leaves the link it joined. */
     fun leave()
@@ -97,11 +100,12 @@ interface DirectLinks {
     object None : DirectLinks {
         override fun availability() = TurboAvailability.UNSUPPORTED
 
-        override fun open(port: Int): TurboAnswer = TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+        override fun open(port: Int, credentials: Pair<String, String>): TurboAnswer =
+            TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
 
-        override fun close() = Unit
+        override fun close(networkName: String) = Unit
 
-        override suspend fun join(link: DirectLink, timeoutMillis: Long) = false
+        override suspend fun join(link: DirectLink, timeoutMillis: Long): String? = null
 
         override fun leave() = Unit
     }

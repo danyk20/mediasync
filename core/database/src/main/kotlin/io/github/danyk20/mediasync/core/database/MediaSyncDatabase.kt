@@ -16,10 +16,11 @@ import androidx.room.RoomDatabase
         PartialTransferEntity::class,
         MediaFingerprintEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // peers.schedule
+        AutoMigration(from = 2, to = 3), // peers.turboKey
     ],
 )
 abstract class MediaSyncDatabase : RoomDatabase() {

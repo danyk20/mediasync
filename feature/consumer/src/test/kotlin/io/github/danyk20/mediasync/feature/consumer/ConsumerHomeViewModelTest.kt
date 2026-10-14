@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -50,11 +51,14 @@ class ConsumerHomeViewModelTest {
     private val anna = Peer(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel", DeviceRole.PRODUCER, 0, null, null)
     private val receiverState = MutableStateFlow(ReceiverState(listening = true, port = 47_420))
     private var freeBytes = 20L * 1024 * 1024 * 1024
-    private var turbo = TurboAvailability.AVAILABLE
+    private var turboAvailability = TurboAvailability.AVAILABLE
+    private val turbo = mockk<ConsumerReceiver.Turbo>(relaxed = true) {
+        every { availability() } answers { turboAvailability }
+    }
     private val receiver = mockk<ConsumerReceiver>(relaxed = true) {
         every { state } returns receiverState
         every { freeBytes() } answers { freeBytes }
-        every { turboAvailability() } answers { turbo }
+        every { turbo } returns this@ConsumerHomeViewModelTest.turbo
     }
     private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(anna)) }
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
@@ -135,7 +139,7 @@ class ConsumerHomeViewModelTest {
 
     @Test
     fun aTurboRequestAsksForItsPermissionUntilAnswered() = runTest {
-        turbo = TurboAvailability.NOT_ALLOWED
+        turboAvailability = TurboAvailability.NOT_ALLOWED
         val viewModel = viewModel()
         viewModel.uiState.first { it.listening }
 
@@ -143,10 +147,34 @@ class ConsumerHomeViewModelTest {
         viewModel.uiState.first { it.askTurbo }
 
         // Allowed: the card goes, and the receiver stops asking.
-        turbo = TurboAvailability.AVAILABLE
+        turboAvailability = TurboAvailability.AVAILABLE
         viewModel.onTurboAnswered()
         viewModel.uiState.first { !it.askTurbo && it.turbo == TurboAvailability.AVAILABLE }
-        verify { receiver.turboPermissionHandled() }
+        verify { turbo.permissionHandled() }
+    }
+
+    @Test
+    fun turboReceiveStartsWhenThisPhoneCanUseIt() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.listening }
+
+        viewModel.startTurboReceive()
+        verify(timeout = 5_000) { turbo.startReceive() }
+        receiverState.value = receiverState.value.copy(directLinkOpen = true, turboReceiving = true)
+        viewModel.uiState.first { it.turboReceiving }
+
+        viewModel.stopTurboReceive()
+        verify { turbo.stopReceive() }
+    }
+
+    @Test
+    fun turboReceiveNeedsItsPermissionFirst() = runTest {
+        turboAvailability = TurboAvailability.NOT_ALLOWED
+        val viewModel = viewModel()
+
+        viewModel.startTurboReceive()
+
+        verify(exactly = 0) { turbo.startReceive() }
     }
 
     @Test
@@ -168,7 +196,7 @@ class ConsumerHomeViewModelTest {
                 ConsumerHomeRoute(onAddProducer = { added = true }, onChangeSchedule = {}, viewModel = viewModel)
             }
         }
-        composeRule.onNodeWithText("Anna's Pixel").assertIsDisplayed()
+        composeRule.onNodeWithText("Anna's Pixel").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Add sending phone").performClick()
 
         added shouldBe true

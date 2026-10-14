@@ -53,7 +53,14 @@ data class SyncResult(
      * formats MediaSync can't read). They're sent once the setting allows it.
      */
     val withheld: Int = 0,
-)
+    /** What the consumer's *Turbo receive* links derive from (docs/PLAN.md §8.3); `null` if it didn't say. */
+    val consumerTurboKey: ByteString? = null,
+) {
+    /** Never the key: this ends up in logs. */
+    override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
+        "deferred=$deferred, bytesSent=$bytesSent, cancelled=$cancelled, consumerSchedule=$consumerSchedule, " +
+        "withheld=$withheld)"
+}
 
 /**
  * Sends everything the consumer hasn't confirmed yet, newest first (docs/PLAN.md §5), with the [details] the user
@@ -91,6 +98,7 @@ class ProducerSession(
 
         val run = Run(connection, channel, consumer, queue.total, queue.totalBytes)
         run.consumerSchedule = SyncSchedule.decode(hello.schedule)
+        run.consumerTurboKey = hello.turboKey.takeIf { it.size == TURBO_KEY_BYTES }
         return run.send(queue)
     }
 
@@ -137,6 +145,7 @@ class ProducerSession(
         private var bytesSent = 0L
         private var cancelled = false
         var consumerSchedule: SyncSchedule? = null
+        var consumerTurboKey: ByteString? = null
 
         fun send(queue: WorkQueue): SyncResult {
             replies.start()
@@ -156,7 +165,17 @@ class ProducerSession(
                 finished = true
             }
             return lock.withLock {
-                SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled, consumerSchedule, withheld)
+                SyncResult(
+                    sent,
+                    alreadyOnConsumer,
+                    failed,
+                    deferred,
+                    bytesSent,
+                    cancelled,
+                    consumerSchedule,
+                    withheld,
+                    consumerTurboKey,
+                )
             }
         }
 

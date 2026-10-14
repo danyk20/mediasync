@@ -84,24 +84,24 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
         else -> TurboAvailability.AVAILABLE
     }
 
-    override fun open(port: Int): TurboAnswer = when (availability()) {
+    override fun open(port: Int, credentials: Pair<String, String>): TurboAnswer = when (availability()) {
         TurboAvailability.UNSUPPORTED -> TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
 
         TurboAvailability.NOT_ALLOWED, TurboAvailability.LOCATION_OFF ->
             TurboAnswer.Unavailable(TurboUnavailable.NOT_ALLOWED)
 
         TurboAvailability.AVAILABLE -> runBlocking {
-            withTimeoutOrNull(OPEN_TIMEOUT_MILLIS) { createGroup(port) }
+            withTimeoutOrNull(OPEN_TIMEOUT_MILLIS) { createGroup(port, credentials) }
         } ?: TurboAnswer.Unavailable(TurboUnavailable.FAILED).also {
             Diagnostics.log(Area.RECEIVE, "Turbo: the group wasn't up within ${since(0, OPEN_TIMEOUT_MILLIS)}")
-            close()
+            close(credentials.first)
         }
     }
 
-    private suspend fun createGroup(port: Int): TurboAnswer {
+    private suspend fun createGroup(port: Int, credentials: Pair<String, String>): TurboAnswer {
         val channel = channel()
         if (!makeRoom(channel)) return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
-        val (name, passphrase) = DirectLink.credentials()
+        val (name, passphrase) = credentials
         val created = BANDS.any { band ->
             val config = WifiP2pConfig.Builder()
                 .setNetworkName(name)
@@ -129,23 +129,22 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
         return existing.isOurs() && action(Area.RECEIVE, "remove the old group") { removeGroup(channel, it) }
     }
 
-    override fun close() {
+    override fun close(networkName: String) {
         if (manager == null) return
         runBlocking {
             withTimeoutOrNull(LEAVE_TIMEOUT_MILLIS) {
                 val channel = channel()
-                if (group(channel)?.isOurs() ==
-                    true
-                ) {
+                // That group only: a newer one may have replaced it meanwhile.
+                if (group(channel)?.networkName == networkName) {
                     action(Area.RECEIVE, "remove the group") { removeGroup(channel, it) }
                 }
             }
         }
     }
 
-    override suspend fun join(link: DirectLink, timeoutMillis: Long): Boolean {
-        if (availability() != TurboAvailability.AVAILABLE) return false
-        val joinedIt = withTimeoutOrNull(timeoutMillis) {
+    override suspend fun join(link: DirectLink, timeoutMillis: Long): String? {
+        if (availability() != TurboAvailability.AVAILABLE) return null
+        return withTimeoutOrNull(timeoutMillis) {
             val channel = channel()
             val config = WifiP2pConfig.Builder()
                 .setNetworkName(link.networkName)
@@ -153,15 +152,14 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
                 .enablePersistentMode(false)
                 .build()
             joined = link.networkName
-            if (!action(Area.SEND, "join the group") { connect(channel, config, it) }) return@withTimeoutOrNull false
+            if (!action(Area.SEND, "join the group") { connect(channel, config, it) }) return@withTimeoutOrNull null
             // Formed, and this phone has its address in it (DHCP takes a moment longer).
-            awaitInfo(channel) { info ->
+            val info = awaitInfo(channel) { info ->
                 val owner = info.groupOwnerAddress
                 info.groupFormed && !info.isGroupOwner && owner != null && hasAddressNear(owner)
             }
-            true
+            info.groupOwnerAddress?.hostAddress
         }
-        return joinedIt == true
     }
 
     override fun leave() {
@@ -228,7 +226,7 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
         }
     }
 
-    private fun WifiP2pGroup.isOurs() = networkName.orEmpty().endsWith(DirectLink.NAME_SUFFIX)
+    private fun WifiP2pGroup.isOurs() = networkName.orEmpty().contains(DirectLink.NAME_MARKER)
 
     /** This phone has an IPv4 address in the group owner's network. */
     private fun hasAddressNear(owner: InetAddress): Boolean {

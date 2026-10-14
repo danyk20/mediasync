@@ -10,6 +10,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.ConsumerSession
+import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.MediaSink
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PairingLink
@@ -59,6 +60,8 @@ data class ReceiverState(
     val directLinkOpen: Boolean = false,
     /** A sending phone asked for Turbo transfer, which needs the user's permission here. */
     val turboNeedsPermission: Boolean = false,
+    /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's network. */
+    val turboReceiving: Boolean = false,
 )
 
 /**
@@ -112,12 +115,8 @@ class ConsumerReceiver internal constructor(
     private val nextSession = AtomicLong()
     private val activeSessions = AtomicInteger()
 
-    /** The direct link open now, for every sending phone that asks; `null` while there's none. */
-    private val directLink = AtomicReference<TurboAnswer.Ready?>(null)
-
-    /** One link opened at a time. Never held while calling into this class's synchronized methods. */
-    private val opening = Any()
-    private val turbo = TurboHost { openDirectLink() }
+    /** Turbo transfer, as the receiving phone (docs/PLAN.md §8.3). */
+    val turbo = Turbo()
 
     val state: StateFlow<ReceiverState> = _state.asStateFlow()
 
@@ -160,7 +159,7 @@ class ConsumerReceiver internal constructor(
 
     @Synchronized
     fun stop() {
-        closeDirectLink()
+        turbo.stopReceive()
         if (server != null) Diagnostics.log(Area.RECEIVE, "Stopped listening")
         acceptJob?.cancel()
         server?.close()
@@ -186,63 +185,6 @@ class ConsumerReceiver internal constructor(
 
     /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
     fun freeBytes(): Long = sink.availableBytes()
-
-    /** Whether sending phones can use Turbo transfer (docs/PLAN.md §8.3) with this one now. */
-    fun turboAvailability(): TurboAvailability = directLinks.availability()
-
-    /** The user allowed Turbo here, or dismissed the request: stop asking. */
-    fun turboPermissionHandled() = _state.update { it.copy(turboNeedsPermission = false) }
-
-    /**
-     * Opens a direct link for a sending phone that asked for Turbo transfer, or hands out the one already open. It
-     * stays open, and this phone keeps listening, until a while after the last session.
-     */
-    private fun openDirectLink(): TurboAnswer {
-        var opened = false
-        val answer = synchronized(opening) {
-            directLink.get() ?: run {
-                val port = _state.value.port ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
-                directLinks.open(port).also { answer ->
-                    Diagnostics.log(Area.RECEIVE, "Turbo: ${answer.describe()}")
-                    if (answer is TurboAnswer.Ready) {
-                        directLink.set(answer)
-                        opened = true
-                    }
-                }
-            }
-        }
-        markActivity()
-        when {
-            opened -> {
-                hold(DIRECT_LINK_HOLDER)
-                _state.update { it.copy(directLinkOpen = true, turboNeedsPermission = false) }
-                scope.launch { closeWhenIdle() }
-            }
-
-            answer is TurboAnswer.Unavailable -> _state.update {
-                it.copy(turboNeedsPermission = answer.reason == TurboUnavailable.NOT_ALLOWED)
-            }
-        }
-        return answer
-    }
-
-    private suspend fun closeWhenIdle() {
-        while (true) {
-            delay(minOf(directLinkIdleMillis, IDLE_CHECK_MILLIS))
-            val quietFor = System.currentTimeMillis() - (_state.value.lastActivityMillis ?: 0L)
-            if (activeSessions.get() == 0 && quietFor >= directLinkIdleMillis) break
-        }
-        closeDirectLink()
-    }
-
-    /** Never waits: [stop] calls it, on the main thread too. */
-    private fun closeDirectLink() {
-        directLink.getAndSet(null) ?: return
-        scope.launch(Dispatchers.IO) { directLinks.close() } // Waits for Wi-Fi Direct: never on the main thread.
-        Diagnostics.log(Area.RECEIVE, "Turbo: direct link closed")
-        _state.update { it.copy(directLinkOpen = false) }
-        release(DIRECT_LINK_HOLDER)
-    }
 
     private suspend fun acceptLoop(server: LanServer) {
         while (scope.isActive) {
@@ -291,7 +233,7 @@ class ConsumerReceiver internal constructor(
                     _state.update { it.copy(transfers = transfers(), lastActivityMillis = System.currentTimeMillis()) }
                 },
                 space = space,
-                turbo = turbo,
+                turbo = turbo.host,
             )
             val result = try {
                 session.serve(it).also { result ->
@@ -338,11 +280,122 @@ class ConsumerReceiver internal constructor(
 
     private fun markActivity() = _state.update { it.copy(lastActivityMillis = System.currentTimeMillis()) }
 
+    /**
+     * Turbo transfer, as the receiving phone (docs/PLAN.md §8.3): the direct links sending phones join, one at a
+     * time, whether they asked over Wi-Fi or this phone's user started *Turbo receive*.
+     */
+    inner class Turbo internal constructor() {
+        /** The direct link open now, for every sending phone that asks; `null` while there's none. */
+        private val link = AtomicReference<TurboAnswer.Ready?>(null)
+
+        /** One link opened at a time. Never held while calling into the receiver's synchronized methods. */
+        private val opening = Any()
+
+        /** Answers sending phones that ask over Wi-Fi. */
+        internal val host = TurboHost { open() }
+
+        /** Whether sending phones can use Turbo transfer with this phone now. */
+        fun availability(): TurboAvailability = directLinks.availability()
+
+        /** The user allowed Turbo here, or dismissed the request: stop asking. */
+        fun permissionHandled() = _state.update { it.copy(turboNeedsPermission = false) }
+
+        /**
+         * *Turbo receive*: opens a direct link that paired sending phones find without a network in common, as its
+         * name and passphrase come from this phone's Turbo key and the time. It stays open until [stopReceive], or
+         * 10 minutes without a session over it. Blocks while Wi-Fi Direct sets it up.
+         */
+        fun startReceive(): TurboAnswer {
+            hold(TURBO_RECEIVE_HOLDER) // Listening, so there's a port to offer.
+            try {
+                // A link opened for a sending phone on this Wi-Fi has a random name: replaced by one others can find.
+                link.get()?.let { open -> if (forget(open)) directLinks.close(open.link.networkName) }
+                val key = device.local().turboKey ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+                val credentials = DirectLink.derived(key, DirectLink.epochAt(System.currentTimeMillis()))
+                return open(credentials, TURBO_RECEIVE_IDLE_MILLIS).also { answer ->
+                    if (answer is TurboAnswer.Ready) _state.update { it.copy(turboReceiving = true) }
+                }
+            } finally {
+                release(TURBO_RECEIVE_HOLDER) // The link holds on to listening itself while it's open.
+            }
+        }
+
+        /** Ends *Turbo receive*, or any direct link open. Never waits, so the main thread may call it. */
+        fun stopReceive() {
+            link.get()?.let(::close)
+        }
+
+        /**
+         * Opens a direct link for a sending phone that asked for Turbo transfer, or hands out the one already open.
+         * It stays open, and this phone keeps listening, until [idleMillis] after the last session.
+         */
+        private fun open(
+            credentials: Pair<String, String> = DirectLink.credentials(),
+            idleMillis: Long = directLinkIdleMillis,
+        ): TurboAnswer {
+            var opened: TurboAnswer.Ready? = null
+            val answer = synchronized(opening) {
+                link.get() ?: run {
+                    val port = _state.value.port ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+                    directLinks.open(port, credentials).also { answer ->
+                        Diagnostics.log(Area.RECEIVE, "Turbo: ${answer.describe()}")
+                        if (answer is TurboAnswer.Ready) {
+                            link.set(answer)
+                            opened = answer
+                        }
+                    }
+                }
+            }
+            markActivity()
+            val new = opened
+            when {
+                new != null -> {
+                    hold(DIRECT_LINK_HOLDER)
+                    _state.update { it.copy(directLinkOpen = true, turboNeedsPermission = false) }
+                    scope.launch { closeWhenIdle(new, idleMillis) }
+                }
+
+                answer is TurboAnswer.Unavailable -> _state.update {
+                    it.copy(turboNeedsPermission = answer.reason == TurboUnavailable.NOT_ALLOWED)
+                }
+            }
+            return answer
+        }
+
+        /** Closes [open] once nothing came over it (or anywhere) for [idleMillis]; done if it closed before. */
+        private suspend fun closeWhenIdle(open: TurboAnswer.Ready, idleMillis: Long) {
+            while (link.get() === open) {
+                delay(minOf(idleMillis, IDLE_CHECK_MILLIS))
+                val quietFor = System.currentTimeMillis() - (_state.value.lastActivityMillis ?: 0L)
+                if (activeSessions.get() == 0 && quietFor >= idleMillis) close(open)
+            }
+        }
+
+        private fun close(open: TurboAnswer.Ready) {
+            if (!forget(open)) return
+            // Waits for Wi-Fi Direct: never on the main thread.
+            scope.launch(Dispatchers.IO) { directLinks.close(open.link.networkName) }
+        }
+
+        /** Marks [open] closed, if it's the one open; `true` if it was. */
+        private fun forget(open: TurboAnswer.Ready): Boolean {
+            if (!link.compareAndSet(open, null)) return false
+            Diagnostics.log(Area.RECEIVE, "Turbo: direct link closed")
+            _state.update { it.copy(directLinkOpen = false, turboReceiving = false) }
+            release(DIRECT_LINK_HOLDER)
+            return true
+        }
+    }
+
     companion object {
         /** Fixed when possible, so a phone's last known address keeps working. */
         const val PREFERRED_PORT = 47_420
         private const val MAX_NAME = 64
         private const val DIRECT_LINK_HOLDER = "turbo"
+        private const val TURBO_RECEIVE_HOLDER = "turbo-receive"
+
+        /** Time for the user to walk over to the sending phone and start Turbo there. */
+        private const val TURBO_RECEIVE_IDLE_MILLIS = 10 * 60_000L
 
         /** Time for the sending phone to join the link, and to come back after a short break. */
         private const val DIRECT_LINK_IDLE_MILLIS = 60_000L

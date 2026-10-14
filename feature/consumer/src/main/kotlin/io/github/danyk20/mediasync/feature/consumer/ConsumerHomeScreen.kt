@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.feature.consumer
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -21,10 +22,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -74,6 +78,12 @@ fun ConsumerHomeRoute(
     val requestTurbo = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onTurboAnswered()
     }
+    val requestTurboReceive = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        viewModel.refresh()
+        if (granted.isNotEmpty() && granted.values.all { it }) viewModel.startTurboReceive()
+    }
     // Back from settings, or space freed up meanwhile.
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -89,14 +99,7 @@ fun ConsumerHomeRoute(
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         },
-        onOpenSettings = {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.fromParts("package", context.packageName, null),
-                ),
-            )
-        },
+        onOpenSettings = { context.openAppSettings() },
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
         onDismiss = viewModel::dismiss,
         onOpenDiagnostics = onOpenDiagnostics,
@@ -109,8 +112,25 @@ fun ConsumerHomeRoute(
             }
         },
         onDismissTurbo = viewModel::onTurboAnswered,
+        onStartTurboReceive = {
+            when (state.turbo) {
+                TurboAvailability.NOT_ALLOWED -> requestTurboReceive.launch(TurboPermissions.requested.toTypedArray())
+
+                TurboAvailability.LOCATION_OFF -> context.startActivity(
+                    Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                )
+
+                else -> viewModel.startTurboReceive()
+            }
+        },
+        onStopTurboReceive = viewModel::stopTurboReceive,
     )
 }
+
+/** MediaSync's page in the system settings: permissions, battery use. */
+private fun Context.openAppSettings() = startActivity(
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+)
 
 /** Home screen of the phone that receives. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,6 +147,8 @@ fun ConsumerHomeScreen(
     onOpenDiagnostics: () -> Unit = {},
     onAllowTurbo: () -> Unit = {},
     onDismissTurbo: () -> Unit = {},
+    onStartTurboReceive: () -> Unit = {},
+    onStopTurboReceive: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -146,6 +168,11 @@ fun ConsumerHomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Status(state)
+            if (state.turboReceiving && state.transfer == null) {
+                OutlinedButton(onClick = onStopTurboReceive, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.consumer_turbo_receive_stop))
+                }
+            }
             Button(onClick = onAddProducer, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.consumer_add_producer))
             }
@@ -160,6 +187,7 @@ fun ConsumerHomeScreen(
                 onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
             )
             ScheduleRow(state.schedule, onChangeSchedule)
+            TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
                 text = pluralStringResource(
@@ -191,11 +219,57 @@ private fun TurboNotice(state: ConsumerHomeUiState, onAllowTurbo: () -> Unit, on
     )
 }
 
+/**
+ * *Turbo receive* (docs/PLAN.md §8.3): for a sending phone that isn't on this Wi-Fi. Offered while there are sending
+ * phones, nothing is coming in, and this phone has Wi-Fi Direct.
+ */
+@Composable
+private fun TurboReceiveRow(state: ConsumerHomeUiState, onStart: () -> Unit) {
+    val offered = state.producers.isNotEmpty() && state.transfer == null && !state.directLinkOpen &&
+        !state.askTurbo && state.turbo != TurboAvailability.UNSUPPORTED
+    if (!offered) return
+    val locationOff = state.turbo == TurboAvailability.LOCATION_OFF
+    OutlinedCard(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.consumer_turbo_receive_title)) },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        if (locationOff) R.string.consumer_turbo_location_off else R.string.consumer_turbo_receive_body,
+                    ),
+                )
+            },
+            leadingContent = { Icon(painterResource(MediaSyncIcons.Turbo), contentDescription = null) },
+            trailingContent = {
+                Text(
+                    text = stringResource(
+                        if (locationOff) {
+                            R.string.consumer_turbo_location_settings
+                        } else {
+                            R.string.consumer_turbo_receive_start
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
 @Composable
 private fun Status(state: ConsumerHomeUiState) {
     val transfer = state.transfer
     when {
         transfer != null -> Receiving(transfer, overTurbo = state.directLinkOpen)
+
+        state.turboReceiving -> StatusCard(
+            title = stringResource(R.string.consumer_turbo_receive_waiting_title),
+            body = stringResource(R.string.consumer_turbo_receive_waiting_body),
+            icon = MediaSyncIcons.Turbo,
+            tone = StatusTone.Positive,
+        )
 
         state.directLinkOpen -> StatusCard(
             title = stringResource(R.string.consumer_turbo_open_title),

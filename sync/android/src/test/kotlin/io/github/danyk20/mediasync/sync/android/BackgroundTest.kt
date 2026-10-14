@@ -98,7 +98,7 @@ class BackgroundTest {
 
     private fun pairWithConsumer(schedule: SyncSchedule? = null) {
         peers.register(PairedPeer(consumer, "Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        peers.recordSchedule(consumer, schedule)
+        peers.recordConsumer(consumer, schedule)
     }
 
     private fun millis(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]").toInstant().toEpochMilli()

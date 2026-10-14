@@ -34,6 +34,11 @@ data class Hello(
     @ProtoNumber(5) val freeSpaceBytes: Long = 0,
     /** Consumer only: its sync schedule (`SyncSchedule.encode`), which its producers follow; empty if none. */
     @ProtoNumber(6) val schedule: String = "",
+    /**
+     * Consumer only, and only to a paired producer: the key its *Turbo receive* links derive from (docs/PLAN.md
+     * §8.3), so the producer can join one when the two share no network. Empty otherwise.
+     */
+    @ProtoNumber(7) @Serializable(with = ByteStringSerializer::class) val turboKey: ByteString = ByteString.EMPTY,
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */

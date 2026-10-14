@@ -133,6 +133,7 @@ class ParallelSync(
                 cancelled = a.cancelled || b.cancelled,
                 consumerSchedule = a.consumerSchedule ?: b.consumerSchedule,
                 withheld = a.withheld + b.withheld,
+                consumerTurboKey = a.consumerTurboKey ?: b.consumerTurboKey,
             )
         }
     }
