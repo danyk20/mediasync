@@ -11,6 +11,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.metadata.isWithheld
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
 import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.PairingClient
@@ -198,21 +199,7 @@ class ProducerSync @Inject constructor(
         _state.value = ProducerState.Syncing(progress = null)
         val started = System.currentTimeMillis()
         return try {
-            connection.use {
-                val result = ProducerSession(
-                    device.local(),
-                    source,
-                    ledger,
-                    progress = { progress -> _state.value = ProducerState.Syncing(progress) },
-                    shouldContinue = { !cancelled && !pauseWhen() },
-                    details = details,
-                ).sync(it)
-                peers.recordAddress(consumer.id, it.remoteAddress)
-                peers.recordSchedule(consumer.id, result.consumerSchedule)
-                if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
-                Diagnostics.log(Area.SEND, "Sync done in ${since(started)}: ${result.describe()}")
-                ProducerState.Idle(result)
-            }
+            sockets.keepingAwake { session(consumer, connection, details, started) }
         } catch (e: IOException) {
             // Where it stopped tells which side stalled: during a file, or waiting for the other phone.
             val progress = (_state.value as? ProducerState.Syncing)?.progress
@@ -220,6 +207,23 @@ class ProducerSync @Inject constructor(
             ProducerState.Failed(failureOf(e))
         }
     }
+
+    private fun session(consumer: Peer, connection: PeerConnection, details: PhotoDetails, started: Long) =
+        connection.use {
+            val result = ProducerSession(
+                device.local(),
+                source,
+                ledger,
+                progress = { progress -> _state.value = ProducerState.Syncing(progress) },
+                shouldContinue = { !cancelled && !pauseWhen() },
+                details = details,
+            ).sync(it)
+            peers.recordAddress(consumer.id, it.remoteAddress)
+            peers.recordSchedule(consumer.id, result.consumerSchedule)
+            if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
+            Diagnostics.log(Area.SEND, "Sync done in ${since(started)}: ${result.describe()}")
+            ProducerState.Idle(result)
+        }
 
     private fun failureOf(error: IOException): SyncFailure = when {
         error is PeerEndedSessionException && error.byeReason == Bye.Reason.NOT_PAIRED -> SyncFailure.NOT_ALLOWED

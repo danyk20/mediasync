@@ -88,6 +88,45 @@ jobs:
             **/src/test/screenshots/*_actual.png
           if-no-files-found: ignore
 
+  benchmark:
+    name: Throughput benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # Whole sync sessions over loopback TLS and over a simulated Wi-Fi hop (docs/PLAN.md §7).
+      - name: Measure sync throughput
+        run: ./gradlew :transport:lan:benchmark
+      # The history comes from runs on main; pull requests compare against it without changing it.
+      - name: Restore earlier results
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: benchmark-history
+          key: benchmark-${{ github.run_id }}
+          restore-keys: benchmark-
+      # Shared CI machines vary a lot: only a halving fails the check.
+      - name: Compare with earlier results
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: Sync throughput
+          tool: customBiggerIsBetter
+          output-file-path: transport/lan/build/benchmark/results.json
+          external-data-json-path: benchmark-history/data.json
+          alert-threshold: 200%
+          fail-on-alert: true
+          summary-always: true
+      - name: Keep the results of main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: benchmark-history
+          key: benchmark-${{ github.run_id }}
+
   build:
     name: Build
     runs-on: ubuntu-latest

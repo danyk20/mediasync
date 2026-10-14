@@ -80,6 +80,31 @@ class AndroidPlatformTest {
     }
 
     @Test
+    fun sessionsKeepTheWifiAwakeAndLetItRestAfterwards() {
+        val network = AndroidLocalNetwork(context)
+
+        val held = network.keepingAwake { wifiLocks() }
+
+        held shouldBe true
+        wifiLocks() shouldBe false
+    }
+
+    /** Whether this app holds a Wi-Fi lock: listed under "Locks held:" (newer Androids also log past ones). */
+    private fun wifiLocks(): Boolean {
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("dumpsys wifi")
+        val dump = ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes().decodeToString() }
+        var held = false
+        return dump.lines().any { line ->
+            val text = line.trim()
+            when {
+                text == "Locks held:" -> held = true
+                text.isEmpty() || text.startsWith("Locks ") || text.startsWith("Active lock owners") -> held = false
+            }
+            held && "MediaSync:session" in text
+        }
+    }
+
+    @Test
     fun anAdvertisedReceiverIsFoundByItsServiceId() = runBlocking<Unit> {
         requireWifi()
         val discovery = NsdServiceDiscovery(context)

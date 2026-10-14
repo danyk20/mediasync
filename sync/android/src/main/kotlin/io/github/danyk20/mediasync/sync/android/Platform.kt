@@ -29,6 +29,9 @@ fun interface DeviceInfo {
 /** This phone's addresses on the local network, or none when it isn't on Wi-Fi or Ethernet. */
 fun interface AddressProvider {
     fun localAddresses(): List<InetAddress>
+
+    /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a receiving phone. */
+    fun <T> keepingAwake(session: () -> T): T = session()
 }
 
 /**
@@ -37,6 +40,9 @@ fun interface AddressProvider {
  */
 fun interface LanSockets {
     fun factoryFor(address: InetSocketAddress): SocketFactory
+
+    /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a sending phone. */
+    fun <T> keepingAwake(session: () -> T): T = session()
 }
 
 /** Why background work waits for better conditions (docs/PLAN.md §10.5). */
