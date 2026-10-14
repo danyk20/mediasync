@@ -85,9 +85,10 @@ class SyncSessionTest {
         sync(producer, consumer)
         producer.source.opened.clear()
 
-        val (sent, _) = sync(producer, consumer)
+        val (sent, served) = sync(producer, consumer)
 
         sent.getOrThrow() shouldBe SyncResult()
+        served.getOrThrow() shouldBe ServeResult.Synced(received = 0, alreadyHad = 0, failed = 0, bytesReceived = 0)
         producer.source.opened.shouldBeEmpty()
         consumer.sink.stored.size shouldBe 2
     }
