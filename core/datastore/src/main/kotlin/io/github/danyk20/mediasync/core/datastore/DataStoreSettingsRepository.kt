@@ -57,11 +57,24 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[SyncScheduleKey] = schedule.encode() }
     }
 
+    override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
+        .map { preferences ->
+            preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
+                SetupPrompt.entries.firstOrNull { it.name == name }
+            }
+        }
+        .distinctUntilChanged()
+
+    override suspend fun dismissPrompt(prompt: SetupPrompt) {
+        dataStore.edit { it[DismissedPromptsKey] = it[DismissedPromptsKey].orEmpty() + prompt.name }
+    }
+
     internal companion object {
         val RoleKey = stringPreferencesKey("device_role")
         val SyncScheduleKey = stringPreferencesKey("sync_schedule")
         val SourcePresetKey = stringPreferencesKey("source_preset")
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
+        val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

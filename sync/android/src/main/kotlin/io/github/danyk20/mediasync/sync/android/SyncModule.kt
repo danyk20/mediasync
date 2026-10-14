@@ -64,6 +64,9 @@ internal abstract class SyncModule {
     @Binds
     abstract fun bindScheduleSource(impl: SettingsScheduleSource): ScheduleSource
 
+    @Binds
+    abstract fun bindDeviceConditions(impl: AndroidDeviceConditions): DeviceConditions
+
     companion object {
         @Provides
         @Singleton

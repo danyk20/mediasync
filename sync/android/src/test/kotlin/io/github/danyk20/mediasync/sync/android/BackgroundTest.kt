@@ -8,6 +8,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
+import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -22,6 +23,7 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
+import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -30,7 +32,9 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import java.net.InetAddress
 import java.time.Clock
 import java.time.Duration
@@ -38,6 +42,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -56,6 +61,9 @@ class BackgroundTest {
     private val peers = PeerStore(database.peerDao())
     private val settings = FakeSettingsRepository()
     private val state = ScheduleState(context)
+    private val history = SyncHistory(context)
+    private var pauseReason: PauseReason? = null
+    private val conditions = DeviceConditions { pauseReason }
     private val consumer = deviceId(2)
 
     /** 20:00 in Zurich; tests move it. */
@@ -81,7 +89,7 @@ class BackgroundTest {
     fun tearDown() = database.close()
 
     private fun kotlinx.coroutines.test.TestScope.scheduler() =
-        SyncScheduler(workManager, settings, peers, state, clock, backgroundScope)
+        SyncScheduler(workManager, settings, peers, state, history, clock, backgroundScope)
 
     private suspend fun SyncScheduler.applyCurrentPlan() = apply(plans().first())
 
@@ -221,13 +229,79 @@ class BackgroundTest {
     fun theSendingPhoneWaitsForWifiAndRetriesWhileTheReceiverIsAway() = runTest {
         settings.setRole(DeviceRole.PRODUCER)
         pairWithConsumer(SyncSchedule.Default)
-        val sync =
-            mockk<ProducerSync> { coEvery { syncAndWait() } returns ProducerState.Failed(SyncFailure.UNREACHABLE) }
+        val sync = producerSync { ProducerState.Failed(SyncFailure.UNREACHABLE) }
 
         runSyncWorker(sync, wifi = emptyList()) shouldBe ListenableWorker.Result.retry()
-        coVerify(exactly = 0) { sync.syncAndWait() }
+        coVerify(exactly = 0) { sync.syncAndWait(any()) }
+        history.record.value.problem shouldBe SyncProblem.NO_WIFI
 
         runSyncWorker(sync) shouldBe ListenableWorker.Result.retry()
+        history.record.value.problem shouldBe SyncProblem.UNREACHABLE
+    }
+
+    @Test
+    fun aHotPhoneWaitsToSync() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        val sync = producerSync { ProducerState.Idle() }
+        pauseReason = PauseReason.HOT
+
+        runSyncWorker(sync) shouldBe ListenableWorker.Result.retry()
+
+        coVerify(exactly = 0) { sync.syncAndWait(any()) }
+        history.record.value.problem shouldBe SyncProblem.HOT
+    }
+
+    @Test
+    fun aSyncPausedByALowBatteryCarriesOnLater() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        now = ZonedDateTime.parse("2026-10-15T03:02+02:00[Europe/Zurich]")
+        state.markHandled(DeviceRole.PRODUCER, millis("2026-10-14T03:00+02:00"))
+        val sync = producerSync { pauseWhen ->
+            pauseReason = PauseReason.LOW_BATTERY // The battery runs low while sending.
+            pauseWhen() shouldBe true
+            ProducerState.Idle(SyncResult(sent = 3, cancelled = true))
+        }
+
+        runSyncWorker(sync) shouldBe ListenableWorker.Result.retry()
+
+        history.record.value.problem shouldBe SyncProblem.LOW_BATTERY
+        state.lastHandledDue(DeviceRole.PRODUCER) shouldBe millis("2026-10-14T03:00+02:00") // 03:00 isn't done.
+    }
+
+    @Test
+    fun aScheduledSyncThatDidntRunIsReportedUntilASyncGetsThrough() = runTest {
+        val scheduler = scheduler()
+        state.markHandled(DeviceRole.PRODUCER, millis("2026-10-14T03:00+02:00"))
+
+        now = ZonedDateTime.parse("2026-10-15T03:40+02:00[Europe/Zurich]") // Background jobs may start late.
+        scheduler.missedSync(SyncSchedule.Default).shouldBeNull()
+
+        now = ZonedDateTime.parse("2026-10-15T07:00+02:00[Europe/Zurich]")
+        scheduler.missedSync(SyncSchedule.Default) shouldBe
+            ZonedDateTime.parse("2026-10-15T03:00+02:00[Europe/Zurich]")
+        scheduler.missedSync(SyncSchedule.WhileCharging).shouldBeNull()
+
+        history.recordSync(millis("2026-10-15T06:30+02:00"), waitingForSpace = 0) // Sync now.
+        scheduler.missedSync(SyncSchedule.Default).shouldBeNull()
+    }
+
+    @Test
+    fun aReceiveWindowClosesWhileThePhoneIsHotAndOpensAgainLater() = runTest {
+        settings.setRole(DeviceRole.CONSUMER)
+        now = ZonedDateTime.parse("2026-10-15T02:55+02:00[Europe/Zurich]")
+        val receiver = mockk<ConsumerReceiver>(relaxed = true) {
+            every { state } returns MutableStateFlow(ReceiverState(listening = true))
+            every { hold(any()) } answers { pauseReason = PauseReason.HOT } // Gets hot once listening.
+        }
+
+        runReceiveWindow(receiver) shouldBe ListenableWorker.Result.retry()
+        verify { receiver.release(any()) }
+
+        runReceiveWindow(receiver) shouldBe ListenableWorker.Result.retry() // Still hot: doesn't open.
+        verify(exactly = 1) { receiver.hold(any()) }
+        state.lastHandledDue(DeviceRole.CONSUMER).shouldBeNull()
     }
 
     @Test
@@ -235,12 +309,23 @@ class BackgroundTest {
         settings.setRole(DeviceRole.PRODUCER)
         pairWithConsumer(SyncSchedule.Default)
         now = ZonedDateTime.parse("2026-10-15T03:02+02:00[Europe/Zurich]")
-        val sync = mockk<ProducerSync> { coEvery { syncAndWait() } returns ProducerState.Idle() }
+        val sync = producerSync { ProducerState.Idle(SyncResult(sent = 2)) }
 
         runSyncWorker(sync) shouldBe ListenableWorker.Result.success()
 
         state.lastHandledDue(DeviceRole.PRODUCER) shouldBe millis("2026-10-15T03:00+02:00")
         pending(DeviceRole.PRODUCER) shouldHaveSize 1
+    }
+
+    @Test
+    fun theSyncHistoryOutlivesTheAppAndASyncClearsTheProblem() {
+        history.recordProblem(SyncProblem.UNREACHABLE)
+        SyncHistory(context).record.value shouldBe SyncRecord(problem = SyncProblem.UNREACHABLE)
+
+        history.recordSync(atMillis = 1_000, waitingForSpace = 3)
+
+        SyncHistory(context).record.value shouldBe SyncRecord(lastSyncMillis = 1_000, waitingForSpace = 3)
+        history.record.value shouldBe SyncRecord(lastSyncMillis = 1_000, waitingForSpace = 3)
     }
 
     @Test
@@ -274,22 +359,65 @@ class BackgroundTest {
         receiveWindowDone(null, pluggedInAt, millis("2026-10-16T07:00+02:00"), ReceiverState()) shouldBe false
     }
 
+    /** A sync that ends as [end] says, given the worker's `pauseWhen`. */
+    private fun producerSync(end: (pauseWhen: () -> Boolean) -> ProducerState) = mockk<ProducerSync> {
+        every { state } returns MutableStateFlow(ProducerState.Idle())
+        coEvery { syncAndWait(any()) } answers { end(firstArg()) }
+    }
+
     private suspend fun kotlinx.coroutines.test.TestScope.runSyncWorker(
         sync: ProducerSync,
         wifi: List<InetAddress> = listOf(InetAddress.getByName("192.168.1.30")),
     ): ListenableWorker.Result {
         val scheduler = scheduler()
-        val notifications = mockk<SyncNotifications>(relaxed = true)
-        val worker = TestListenableWorkerBuilder<ScheduledSyncWorker>(context)
+        return runWorker<ScheduledSyncWorker> { appContext, parameters ->
+            val network = AddressProvider { wifi }
+            ScheduledSyncWorker(
+                appContext,
+                parameters,
+                sync,
+                peers,
+                network,
+                conditions,
+                scheduler,
+                history,
+                notifications,
+            )
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.runReceiveWindow(
+        receiver: ConsumerReceiver,
+    ): ListenableWorker.Result {
+        val scheduler = scheduler()
+        return runWorker<ReceiveWindowWorker> { appContext, parameters ->
+            ReceiveWindowWorker(
+                appContext,
+                parameters,
+                receiver,
+                settings,
+                peers,
+                conditions,
+                scheduler,
+                notifications,
+                clock,
+            )
+        }
+    }
+
+    private val notifications = mockk<SyncNotifications>(relaxed = true)
+
+    private suspend inline fun <reified W : CoroutineWorker> runWorker(
+        crossinline create: (Context, WorkerParameters) -> W,
+    ): ListenableWorker.Result {
+        val worker = TestListenableWorkerBuilder<W>(context)
             .setWorkerFactory(
                 object : WorkerFactory() {
                     override fun createWorker(
                         appContext: Context,
                         workerClassName: String,
                         workerParameters: WorkerParameters,
-                    ) = ScheduledSyncWorker(appContext, workerParameters, sync, peers, {
-                        wifi
-                    }, scheduler, notifications)
+                    ) = create(appContext, workerParameters)
                 },
             )
             .build()

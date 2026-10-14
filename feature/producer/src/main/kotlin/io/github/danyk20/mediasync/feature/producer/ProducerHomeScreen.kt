@@ -4,8 +4,10 @@
  */
 package io.github.danyk20.mediasync.feature.producer
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,9 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
+import io.github.danyk20.mediasync.core.designsystem.component.pastMoment
 import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -53,9 +59,10 @@ import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
+import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
-import java.text.DateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZonedDateTime
 
 @Composable
 fun ProducerHomeRoute(
@@ -67,6 +74,10 @@ fun ProducerHomeRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val requestPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.onPermissionsChanged()
+    }
+    val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (!it) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
         viewModel.onPermissionsChanged()
     }
     // Back from system settings, or permissions changed elsewhere.
@@ -89,6 +100,12 @@ fun ProducerHomeRoute(
                 ),
             )
         },
+        onAllowNotifications = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        },
+        onDismiss = viewModel::dismiss,
         modifier = modifier,
     )
 }
@@ -105,6 +122,8 @@ fun ProducerHomeScreen(
     onGrantAccess: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onAllowNotifications: () -> Unit = {},
+    onDismiss: (SetupPrompt) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -126,6 +145,15 @@ fun ProducerHomeScreen(
 
                 else -> {
                     Paired(consumer, state, onSyncNow, onStop)
+                    Notices(state, consumer, onOpenSettings)
+                    BackgroundSetupNotices(
+                        askNotifications = state.askNotifications,
+                        askBattery = state.askBattery,
+                        onAllowNotifications = onAllowNotifications,
+                        onOpenBatterySettings = onOpenSettings,
+                        onDismissNotifications = { onDismiss(SetupPrompt.NOTIFICATIONS) },
+                        onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
+                    )
                     SourcesRow(state.sources, onChooseFolders)
                     Hints(state, consumer, onGrantAccess)
                 }
@@ -192,11 +220,59 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
                     icon = MediaSyncIcons.Info,
                 )
             } else {
-                IdleStatus(consumer, state.pendingCount, sync.finishedAtMillis)
+                IdleStatus(consumer, state.pendingCount, state.lastSyncMillis, state.now)
                 SyncNowButton(onSyncNow)
             }
         }
     }
+}
+
+/** What needs the user's attention while nothing is being sent: a missed sync, a full receiving phone. */
+@Composable
+private fun Notices(state: ProducerHomeUiState, consumer: String, onOpenSettings: () -> Unit) {
+    if (state.sync is ProducerState.Syncing || state.sync == ProducerState.Connecting) return
+    state.missedSync?.let { missed -> MissedSyncNotice(missed, consumer, state.now ?: missed.due, onOpenSettings) }
+    if (state.waitingForSpace > 0) {
+        NoticeCard(
+            title = stringResource(R.string.producer_waiting_for_space_title, consumer),
+            body = pluralStringResource(
+                R.plurals.producer_waiting_for_space_body,
+                state.waitingForSpace,
+                state.waitingForSpace,
+                consumer,
+            ),
+            icon = MediaSyncIcons.Warning,
+            warning = true,
+        )
+    }
+}
+
+/** "The sync planned for today at 3:00 AM didn't run", and why, as far as known (docs/PLAN.md §10.3). */
+@Composable
+private fun MissedSyncNotice(missed: MissedSync, consumer: String, now: ZonedDateTime, onOpenSettings: () -> Unit) {
+    val restricted = missed.problem == null && missed.batteryRestricted
+    NoticeCard(
+        title = stringResource(R.string.producer_missed_title, relativeMoment(missed.due, now)),
+        body = when (missed.problem) {
+            SyncProblem.NO_WIFI -> stringResource(R.string.producer_missed_no_wifi)
+
+            SyncProblem.UNREACHABLE -> stringResource(R.string.producer_missed_unreachable, consumer)
+
+            SyncProblem.CONNECTION_LOST -> stringResource(R.string.producer_missed_connection_lost, consumer)
+
+            SyncProblem.HOT -> stringResource(R.string.producer_missed_hot)
+
+            SyncProblem.LOW_BATTERY -> stringResource(R.string.producer_missed_low_battery)
+
+            null -> stringResource(
+                if (restricted) R.string.producer_missed_battery_restricted else R.string.producer_missed_unknown,
+            )
+        },
+        icon = MediaSyncIcons.Warning,
+        action = if (restricted) stringResource(R.string.producer_access_settings) else null,
+        onAction = onOpenSettings,
+        warning = true,
+    )
 }
 
 /** When this phone syncs next, following the receiving phone's schedule. */
@@ -317,9 +393,12 @@ private fun Sending(consumer: String, progress: TransferProgress?) {
 }
 
 @Composable
-private fun IdleStatus(consumer: String, pending: Int?, finishedAtMillis: Long?) {
-    val lastSync = finishedAtMillis?.let {
-        stringResource(R.string.producer_last_sync, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)))
+private fun IdleStatus(consumer: String, pending: Int?, lastSyncMillis: Long?, now: ZonedDateTime?) {
+    val lastSync = if (lastSyncMillis != null && now != null) {
+        val at = Instant.ofEpochMilli(lastSyncMillis).atZone(now.zone)
+        stringResource(R.string.producer_last_sync, pastMoment(at, now))
+    } else {
+        null
     }
     when {
         pending == null -> StatusCard(

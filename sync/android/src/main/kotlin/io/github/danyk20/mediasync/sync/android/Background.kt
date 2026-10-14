@@ -12,6 +12,7 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -89,12 +90,36 @@ class SyncScheduler @Inject constructor(
     private val settings: SettingsRepository,
     private val peers: PeerStore,
     private val state: ScheduleState,
+    private val history: SyncHistory,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     /** Follows the role and the schedule while the app runs. Call once, at start-up. */
     fun start() {
         scope.launch { plans().distinctUntilChanged().collect { apply(it) } }
+    }
+
+    /** Sends now as a foreground job that carries on when the user leaves the app (docs/PLAN.md §10.2). */
+    fun syncNow() {
+        val request = OneTimeWorkRequest.Builder(SyncNowWorker::class.java)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .addTag(TAG)
+            .build()
+        workManager.enqueueUniqueWork(SYNC_NOW, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /**
+     * The sending phone's latest due time that should have synced by now but didn't (docs/PLAN.md §10.3), or
+     * `null`. A due time counts as missed an hour after it, as background jobs may start up to ~31 minutes late,
+     * and no longer once any sync, e.g. *Sync now*, got through after it.
+     */
+    fun missedSync(schedule: SyncSchedule): ZonedDateTime? {
+        val now = ZonedDateTime.now(clock)
+        val previous = schedule.previousDue(now) ?: return null
+        val handled = state.lastHandledDue(DeviceRole.PRODUCER) ?: return null
+        val since = maxOf(handled, history.record.value.lastSyncMillis ?: 0)
+        val late = previous.toInstant().toEpochMilli() > since && Duration.between(previous, now) > MISSED_AFTER
+        return previous.takeIf { late }
     }
 
     /** The due time a run starting now serves, or `null` for *whenever charging*. */
@@ -198,6 +223,8 @@ class SyncScheduler @Inject constructor(
             if (role == DeviceRole.CONSUMER) Duration.ofMinutes(WINDOW_LEAD_MINUTES) else Duration.ZERO
 
         val RETRY_INTERVAL: Duration = Duration.ofMinutes(15)
+        private val MISSED_AFTER: Duration = Duration.ofHours(1)
+        private const val SYNC_NOW = "sync-now"
         private const val WINDOW_LEAD_MINUTES = 5L
         private const val STAGGER_SECONDS = 180L
     }

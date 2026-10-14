@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -22,8 +23,12 @@ import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
+import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.android.SyncHistory
+import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -69,6 +74,18 @@ class ProducerHomeViewModelTest {
     private val clock = Clock.fixed(Instant.parse("2026-10-14T18:00:00Z"), ZoneId.of("Europe/Zurich"))
     private val consumer = Peer(DeviceId.of(ByteArray(32)), "Pixel 2 XL", DeviceRole.CONSUMER, 0, null, null)
     private val peers = mockk<PeerStore> { every { observeConsumer() } returns flowOf(consumer) }
+    private var missed: ZonedDateTime? = null
+    private val scheduler = mockk<SyncScheduler>(relaxed = true) { every { missedSync(any()) } answers { missed } }
+    private val history = SyncHistory(application)
+    private var canNotify = true
+    private var batteryRestricted = false
+    private val setup = mockk<BackgroundSetup> {
+        every { canNotify() } answers { canNotify }
+        every { batteryRestricted() } answers { batteryRestricted }
+    }
+
+    private fun viewModel() =
+        ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock)
 
     private fun grantLibraryAccess() {
         val library = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -81,7 +98,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun withoutAccessItAsksForPhotosFirst() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
 
         val state = viewModel.uiState.first { it.consumerName != null }
 
@@ -92,7 +109,7 @@ class ProducerHomeViewModelTest {
     @Test
     fun withAccessItCountsWhatsWaiting() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
 
         val state = viewModel.uiState.first { it.pendingCount != null }
 
@@ -111,7 +128,7 @@ class ProducerHomeViewModelTest {
     @Test
     fun newPhotosAreCountedWhileTheScreenIsOpen() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
         viewModel.uiState.first { it.pendingCount == 214 }
 
         waiting = 215
@@ -123,7 +140,7 @@ class ProducerHomeViewModelTest {
     @Test
     fun choosingOtherFoldersRecounts() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
         viewModel.uiState.first { it.pendingCount == 214 }
 
         waiting = 1_030
@@ -135,7 +152,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun grantingAccessLaterIsPickedUp() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
         viewModel.uiState.first { it.consumerName != null }
 
         grantLibraryAccess()
@@ -146,20 +163,68 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun buttonsReachTheSyncRuntime() {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        val viewModel = viewModel()
 
         viewModel.syncNow()
         viewModel.stop()
 
-        verify { sync.syncNow() }
+        verify { scheduler.syncNow() } // In the background: it carries on when the user leaves the app.
         verify { sync.cancel() }
+    }
+
+    @Test
+    fun theLastSyncAndAFullReceivingPhoneAreRemembered() = runTest {
+        grantLibraryAccess()
+        history.recordSync(atMillis = 1_000, waitingForSpace = 12)
+
+        val state = viewModel().uiState.first { it.consumerName != null }
+
+        state.lastSyncMillis shouldBe 1_000
+        state.waitingForSpace shouldBe 12
+    }
+
+    @Test
+    fun aMissedSyncSaysWhatItRanInto() = runTest {
+        grantLibraryAccess()
+        missed = ZonedDateTime.parse("2026-10-14T03:00+02:00[Europe/Zurich]")
+        batteryRestricted = true
+        history.recordProblem(SyncProblem.UNREACHABLE)
+
+        val state = viewModel().uiState.first { it.consumerName != null }
+
+        state.missedSync shouldBe MissedSync(missed!!, SyncProblem.UNREACHABLE, batteryRestricted = true)
+    }
+
+    @Test
+    fun itAsksForWhatBackgroundSyncsNeedUntilAnsweredWithNotNow() = runTest {
+        grantLibraryAccess()
+        canNotify = false
+        batteryRestricted = true
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.askNotifications && it.askBattery }
+
+        viewModel.dismiss(SetupPrompt.BATTERY)
+        viewModel.uiState.first { !it.askBattery }.askNotifications shouldBe true
+
+        canNotify = true // Allowed.
+        viewModel.onPermissionsChanged()
+        viewModel.uiState.first { !it.askNotifications }
+    }
+
+    @Test
+    fun noBatteryCardWhenNothingRunsInTheBackground() = runTest {
+        grantLibraryAccess()
+        batteryRestricted = true
+        every { peers.observeConsumer() } returns flowOf(consumer.copy(schedule = SyncSchedule.Manual))
+
+        viewModel().uiState.first { it.consumerName != null }.askBattery shouldBe false
     }
 
     @Test
     fun theRouteShowsTheStateAndSyncs() {
         grantLibraryAccess()
-        syncState.value = ProducerState.Idle(SyncResult(sent = 3), finishedAtMillis = 0)
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
+        syncState.value = ProducerState.Idle(SyncResult(sent = 3))
+        val viewModel = viewModel()
 
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {
@@ -169,6 +234,6 @@ class ProducerHomeViewModelTest {
         composeRule.onNodeWithText("214 new photos and videos").assertIsDisplayed()
         composeRule.onNodeWithText("Sync now").performClick()
 
-        verify { sync.syncNow() }
+        verify { scheduler.syncNow() }
     }
 }

@@ -32,7 +32,14 @@ import okio.buffer
 
 /** The outcome of serving one incoming connection. */
 sealed interface ServeResult {
-    data class Synced(val received: Int, val alreadyHad: Int, val failed: Int, val bytesReceived: Long) : ServeResult
+    data class Synced(
+        val received: Int,
+        val alreadyHad: Int,
+        val failed: Int,
+        val bytesReceived: Long,
+        /** Offered but not asked for, as they didn't fit in the free space: the storage is full. */
+        val waitingForSpace: Int = 0,
+    ) : ServeResult
 
     data class Paired(val peer: PairedPeer) : ServeResult
 
@@ -131,6 +138,7 @@ class ConsumerSession(
         private var received = 0
         private var alreadyHad = 0
         private var failed = 0
+        private var waitingForSpace = 0
 
         /** Receives until `Bye`, starting with [first], the message already read after `Hello`. */
         fun run(first: ControlMessage): ServeResult {
@@ -143,7 +151,7 @@ class ConsumerSession(
                 }
                 message = channel.receive()
             }
-            return ServeResult.Synced(received, alreadyHad, failed, bytesDone)
+            return ServeResult.Synced(received, alreadyHad, failed, bytesDone, waitingForSpace)
         }
 
         private fun answer(offer: Offer) {
@@ -173,6 +181,8 @@ class ConsumerSession(
                             budget -= needed
                             itemsTotal++
                             bytesTotal += descriptor.size
+                        } else {
+                            waitingForSpace++
                         }
                     }
                 }

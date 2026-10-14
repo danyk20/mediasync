@@ -11,12 +11,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.android.SyncHistory
+import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import java.time.Clock
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -47,40 +52,76 @@ data class ProducerHomeUiState(
     /** When the next scheduled sync is due, as of [now]; `null` without a timed schedule. */
     val nextSyncAt: ZonedDateTime? = null,
     val now: ZonedDateTime? = null,
+    /** When a sync last sent everything it could. */
+    val lastSyncMillis: Long? = null,
+    /** Photos and videos the receiving phone had no space for in the last sync. */
+    val waitingForSpace: Int = 0,
+    /** A scheduled sync that should have happened by now but didn't. */
+    val missedSync: MissedSync? = null,
+    /** Android 13+: ask to show sync progress. */
+    val askNotifications: Boolean = false,
+    /** Android 12+: ask for *Unrestricted* battery use, which syncs at night need. */
+    val askBattery: Boolean = false,
+)
+
+/**
+ * A scheduled sync that didn't happen (docs/PLAN.md §10.3), and what's known about why: the [problem] its last
+ * try ran into, or that Android restricts the app's battery use.
+ */
+data class MissedSync(val due: ZonedDateTime, val problem: SyncProblem?, val batteryRestricted: Boolean)
+
+/** What the phone allows MediaSync, as of [checkedAtMillis]. */
+private data class DeviceAccess(
+    val library: Boolean,
+    val location: Boolean,
+    val canNotify: Boolean,
+    val batteryRestricted: Boolean,
+    val checkedAtMillis: Long,
 )
 
 @HiltViewModel
 class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
+    private val scheduler: SyncScheduler,
     peers: PeerStore,
     library: MediaLibrary,
-    settings: SettingsRepository,
+    private val settings: SettingsRepository,
+    history: SyncHistory,
+    private val setup: BackgroundSetup,
     private val clock: Clock,
 ) : ViewModel() {
 
-    private val permissions = MutableStateFlow(currentPermissions())
+    private val access = MutableStateFlow(checkAccess())
     private val pending = MutableStateFlow<Int?>(null)
 
     val uiState: StateFlow<ProducerHomeUiState> = combine(
         peers.observeConsumer(),
-        permissions,
         sync.state,
         pending,
         settings.sourceSelection,
-    ) { consumer, (library, location), state, count, sources ->
+        combine(access, history.record, settings.dismissedPrompts, ::Triple),
+    ) { consumer, state, count, sources, (access, record, dismissed) ->
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
         val now = ZonedDateTime.now(clock)
         ProducerHomeUiState(
             consumerName = consumer?.name,
-            canReadLibrary = library,
-            canReadLocation = location,
+            canReadLibrary = access.library,
+            canReadLocation = access.location,
             sync = state,
             pendingCount = count,
             sources = sources,
             schedule = schedule,
             nextSyncAt = schedule?.nextDue(now),
             now = now,
+            lastSyncMillis = record.lastSyncMillis,
+            waitingForSpace = record.waitingForSpace,
+            missedSync = schedule?.let(scheduler::missedSync)
+                ?.let { MissedSync(it, record.problem, access.batteryRestricted) },
+            askNotifications = !access.canNotify && SetupPrompt.NOTIFICATIONS !in dismissed,
+            askBattery = access.batteryRestricted &&
+                schedule != SyncSchedule.Manual &&
+                SetupPrompt.BATTERY !in dismissed,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
@@ -98,13 +139,19 @@ class ProducerHomeViewModel @Inject constructor(
         viewModelScope.launch { reasons.collectLatest { countPending() } }
     }
 
-    fun syncNow() = sync.syncNow()
+    /** Sends in the background, so it carries on when the user leaves the app. */
+    fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
 
-    /** Call after the user answered a permission prompt or came back from settings. */
+    /** Call when the screen is shown again, e.g. back from settings, and after the user answered a prompt. */
     fun onPermissionsChanged() {
-        permissions.value = currentPermissions()
+        access.value = checkAccess()
+    }
+
+    /** The user answered a setup card with *Not now*, or declined what it asked for. */
+    fun dismiss(prompt: SetupPrompt) {
+        viewModelScope.launch { settings.dismissPrompt(prompt) }
     }
 
     private suspend fun countPending() {
@@ -113,8 +160,13 @@ class ProducerHomeViewModel @Inject constructor(
         pending.value = sync.pendingCount()
     }
 
-    private fun currentPermissions() =
-        MediaPermissions.canReadLibrary(context) to MediaPermissions.canReadLocation(context)
+    private fun checkAccess() = DeviceAccess(
+        library = MediaPermissions.canReadLibrary(context),
+        location = MediaPermissions.canReadLocation(context),
+        canNotify = setup.canNotify(),
+        batteryRestricted = setup.batteryRestricted(),
+        checkedAtMillis = clock.millis(), // Also brings the times shown up to date.
+    )
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L

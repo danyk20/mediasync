@@ -4,7 +4,9 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
@@ -12,6 +14,8 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
+import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -90,6 +94,56 @@ class AndroidPlatformTest {
         NsdServiceDiscovery(context).find("not-advertised", timeoutMillis = 2_000).shouldBeNull()
     }
 
+    @Test
+    fun aHotPhoneOrALowBatteryPausesBackgroundWork() {
+        val conditions = AndroidDeviceConditions(context)
+        try {
+            shell("dumpsys battery set level 50")
+            awaitValue(null) { conditions.pauseReason() }.shouldBeNull()
+
+            shell("dumpsys battery set level 19")
+            awaitValue(PauseReason.LOW_BATTERY) { conditions.pauseReason() } shouldBe PauseReason.LOW_BATTERY
+
+            shell("dumpsys battery set level 50")
+            shell("cmd thermalservice override-status ${PowerManager.THERMAL_STATUS_SEVERE}")
+            awaitValue(PauseReason.HOT) { conditions.pauseReason() } shouldBe PauseReason.HOT
+        } finally {
+            shell("cmd thermalservice reset")
+            shell("dumpsys battery reset")
+        }
+    }
+
+    @Test
+    fun nightlySyncsNeedUnrestrictedBatteryOnAndroid12AndUp() {
+        val setup = BackgroundSetup(context)
+        val app = context.packageName
+        try {
+            shell("cmd deviceidle whitelist -$app")
+            setup.batteryRestricted() shouldBe (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+
+            shell("cmd deviceidle whitelist +$app") // What choosing Unrestricted does.
+            setup.batteryRestricted() shouldBe false
+        } finally {
+            shell("cmd deviceidle whitelist -$app")
+        }
+    }
+
+    @Test
+    fun progressNotificationsNeedThePermissionOnAndroid13AndUp() {
+        val setup = BackgroundSetup(context)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            setup.canNotify() shouldBe true
+            return
+        }
+        // Revoking it would end this test's process, so this only grants it.
+        val granted = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        setup.canNotify() shouldBe granted
+
+        shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
+        setup.canNotify() shouldBe true
+    }
+
     /**
      * Emulators join their virtual Wi-Fi ("AndroidWifi") a while after booting, which is when CI starts testing,
      * and drop it when the host's network changes. Asks for it and waits; a test without it is skipped, not failed.
@@ -98,6 +152,17 @@ class AndroidPlatformTest {
         shell("svc wifi enable")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) shell("cmd wifi connect-network AndroidWifi open")
         assumeTrue("This emulator has no Wi-Fi", wifiIsUp())
+    }
+
+    /** Android tells apps about the battery by a broadcast, which arrives a moment after the change. */
+    private fun <T> awaitValue(expected: T, read: () -> T): T {
+        val deadline = SystemClock.uptimeMillis() + SETTLE_MILLIS
+        var value = read()
+        while (value != expected && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(POLL_MILLIS)
+            value = read()
+        }
+        return value
     }
 
     private fun shell(command: String) {
@@ -128,5 +193,7 @@ class AndroidPlatformTest {
 
     private companion object {
         const val WIFI_TIMEOUT_SECONDS = 60L
+        const val SETTLE_MILLIS = 10_000L
+        const val POLL_MILLIS = 100L
     }
 }

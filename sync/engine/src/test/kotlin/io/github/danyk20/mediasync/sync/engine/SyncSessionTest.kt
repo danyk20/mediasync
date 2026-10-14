@@ -201,9 +201,10 @@ class SyncSessionTest {
         val producer = Producer(listOf(media("small", 1000), media("large", 50_000)))
         val consumer = Consumer(FakeMediaSink(availableBytes = 10_000))
 
-        val (sent, _) = sync(producer, consumer)
+        val (sent, served) = sync(producer, consumer)
 
         sent.getOrThrow() shouldBe SyncResult(sent = 1, deferred = 1, bytesSent = 1000)
+        served.getOrThrow() shouldBe ServeResult.Synced(1, 0, 0, bytesReceived = 1000, waitingForSpace = 1)
         producer.ledger.entries.size shouldBe 1
     }
 

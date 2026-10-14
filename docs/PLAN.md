@@ -930,10 +930,10 @@ How a scheduled sync runs:
 
 | Situation | Mechanism |
 |---|---|
-| Scheduled sync (producer) | WorkManager one-time work at the due time, with constraints `requiresCharging + network (UNMETERED or CONNECTED per policy) + storageNotLow`. It is re-enqueued for the next due time after it runs. In *Whenever charging* mode, a content-URI trigger starts it instead. |
+| Scheduled sync (producer) | WorkManager one-time work at the due time, with the constraint `requiresCharging` (the consumer's window also `storageNotLow`). There is no network constraint: Android counts only Wi-Fi with verified internet as a network, so the worker checks for a local network itself and retries without one. It is re-enqueued for the next due time after it runs. In *Whenever charging* mode, a content-URI trigger starts it instead. |
 | Receive window (consumer) | The same WorkManager pattern starts a `dataSync` foreground service that listens until the window closes. |
 | Long transfer started in the background | The worker promotes itself to a **foreground service of type `dataSync`**, with an ongoing notification. |
-| **Sync now** or **Turbo** tapped by the user | **UIDT job** (`setUserInitiated`, API 34+): not subject to standby-bucket quotas, and it shows a system-managed notification. On API 29–33, an expedited worker plus a foreground service is used instead. |
+| **Sync now** or **Turbo** tapped by the user | An **expedited worker** that runs as a `dataSync` foreground service, with a progress notification, on every API level. It starts while the app is open, where a foreground service is always allowed, so it carries on when the user leaves the app. A **UIDT job** (`setUserInitiated`, API 34+) is the alternative if the 6 h `dataSync` cap ever limits manual syncs. |
 | Charger unplugged | A dynamically registered `ACTION_POWER_DISCONNECTED` receiver checkpoints and stops background sessions at once. The WorkManager constraint also cancels the work. The item stays due and resumes at the next charge. User-started sessions continue. |
 | Cloud backup (consumer) | A unique WorkManager chain is enqueued as items are verified, with constraints `requiresCharging + network per backup policy`. Long upload runs promote themselves to a `dataSync` foreground service. Connector decorators handle the Google quota and retries. |
 | Reboot or app update | WorkManager restores the persisted schedule and the upload queue automatically. |
@@ -941,18 +941,18 @@ How a scheduled sync runs:
 ### 10.3 Platform limits handled
 
 - **Android 15+:** `dataSync` foreground services may run **6 h per 24 h** in total. Opening the app resets the counter.
-  - MediaSync handles `onTimeout()` by checkpointing and stopping cleanly.
+  - WorkManager stops the worker on `onTimeout()`. The sync stops after the current file, everything confirmed stays recorded, and WorkManager runs the work again later, which carries on where it stopped.
   - With a scheduled window the cap is rarely reached, because windows are short.
   - Cloud uploads count toward the same cap. A very large first backup can reach it, so uploads checkpoint and continue when the 24 h window allows, or immediately when the user opens the app.
   - It matters mainly in *Whenever charging* mode, where the consumer listens for long periods. There the consumer checkpoints and resumes after the user next opens the app or on the next day.
 - **Android 12+ background foreground-service starts:** these are allowed only under certain exemptions. MediaSync relies on two of them:
   - *The user has turned off battery optimization for the app.* Onboarding guides the user to set battery to **Unrestricted**, using the policy-compliant settings intent, and explains why.
   - *A high-priority FCM message* (§10.4).
-  - Without these, the app falls back to running only when opened or via *Sync now*.
+  - Without these, the work still runs, as ordinary background work: Android stops it after about 10 minutes and it resumes at the next run. *Sync now* is unaffected, as it starts while the app is open.
   - Android 10–11 don't have this restriction.
 - **Android 16 job-quota changes:** jobs running alongside a foreground service now count against the job quota. Long transfers therefore run inside the foreground service or UIDT job itself, not in parallel regular jobs.
 - **OEM battery killers** (Samsung, Xiaomi, OnePlus, …):
-  - A missed 03:00 run is detected and reported, e.g. "Last night's sync didn't run", with manufacturer-specific instructions (dontkillmyapp.com style).
+  - A missed run is detected and reported on the sending phone an hour after its due time, e.g. "The sync planned for today at 3:00 AM didn't run". It says why, as far as known: what the last try ran into (no Wi-Fi, receiving phone not found, connection dropped, too warm, battery below 20 %), restricted battery use, or else general advice about charging and battery savers. Manufacturer-specific instructions (dontkillmyapp.com style) follow with the real-device tests.
   - The manual test matrix includes Samsung and Xiaomi devices.
 
 ### 10.4 Waking the consumer outside its window (M5)
@@ -966,8 +966,9 @@ How a scheduled sync runs:
 
 ### 10.5 Additional guards
 
-- Pause when battery temperature or thermal status is high.
-- Pause below a battery level (default 20 %) even while charging, since slow chargers exist.
+- Pause when the thermal status is *severe* or worse.
+- Pause below 20 % battery even while charging, since slow chargers exist.
+- A paused sync stops after the current file and tries again every 15 minutes while charging; a receive window closes and opens again later. *Sync now* doesn't wait: the user asked for it.
 - The respect-metered-network policy is honoured.
 
 ---

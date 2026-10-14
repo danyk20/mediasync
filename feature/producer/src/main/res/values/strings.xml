@@ -16,7 +16,8 @@
     <string name="producer_status_checking_body">Comparing with what %1$s already has.</string>
     <string name="producer_status_up_to_date_title">Up to date</string>
     <string name="producer_status_up_to_date_body">%1$s has all your photos and videos.</string>
-    <string name="producer_last_sync">Last sync at %1$s</string>
+    <!-- "Last sync today at 3:04 AM" -->
+    <string name="producer_last_sync">Last sync %1$s</string>
     <plurals name="producer_status_pending_title">
         <item quantity="one">%d new photo or video</item>
         <item quantity="other">%d new photos and videos</item>
@@ -36,6 +37,21 @@
     <string name="producer_failure_connection_lost">The connection to %1$s dropped. Nothing is lost: the next sync continues where this one stopped.</string>
     <string name="producer_failure_not_allowed">%1$s no longer recognises this phone. Pair them again.</string>
     <string name="producer_failure_incompatible">%1$s runs a different MediaSync version. Update the app on both phones.</string>
+
+    <!-- A scheduled sync that didn't happen. "The sync planned for today at 3:00 AM didn't run" -->
+    <string name="producer_missed_title">The sync planned for %1$s didn\'t run</string>
+    <string name="producer_missed_no_wifi">This phone wasn\'t on Wi-Fi. It tries again while charging.</string>
+    <string name="producer_missed_unreachable">%1$s couldn\'t be found on the Wi-Fi. This phone tries again while charging.</string>
+    <string name="producer_missed_connection_lost">The connection to %1$s dropped. This phone tries again while charging and continues where it stopped.</string>
+    <string name="producer_missed_hot">This phone was too warm. It tries again once it has cooled down.</string>
+    <string name="producer_missed_low_battery" formatted="false">The battery was below 20%. This phone tries again once it has charged more.</string>
+    <string name="producer_missed_battery_restricted">Android may have paused MediaSync to save battery. In MediaSync\'s settings, open the battery settings and choose Unrestricted.</string>
+    <string name="producer_missed_unknown">Syncs run while this phone is charging, so leave it plugged in, e.g. overnight. If it was charging, the phone\'s battery saver may have stopped MediaSync: allow it to run in the background in the phone\'s battery settings.</string>
+    <string name="producer_waiting_for_space_title">%1$s is full</string>
+    <plurals name="producer_waiting_for_space_body">
+        <item quantity="one">%1$d photo or video is waiting. It\'s sent once there\'s space on %2$s.</item>
+        <item quantity="other">%1$d photos and videos are waiting. They\'re sent once there\'s space on %2$s.</item>
+    </plurals>
 
     <string name="producer_location_missing">Locations won\'t be included in your photos until you allow MediaSync to read them.</string>
     <string name="producer_location_grant">Keep locations</string>

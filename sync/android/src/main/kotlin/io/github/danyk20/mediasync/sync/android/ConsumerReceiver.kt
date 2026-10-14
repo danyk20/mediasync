@@ -41,6 +41,8 @@ data class ReceiverState(
     val lastPaired: PairedPeer? = null,
     /** When a phone last connected or sent something; a receive window closes after a quiet spell. */
     val lastActivityMillis: Long? = null,
+    /** Photos and videos the last sync offered that didn't fit in the free space. */
+    val waitingForSpace: Int = 0,
 )
 
 /**
@@ -145,6 +147,9 @@ class ConsumerReceiver internal constructor(
 
     fun closePairing() = window.close()
 
+    /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
+    fun freeBytes(): Long = sink.availableBytes()
+
     private suspend fun acceptLoop(server: LanServer) {
         while (scope.isActive) {
             val pending = try {
@@ -190,6 +195,7 @@ class ConsumerReceiver internal constructor(
                     transfers = state.transfers - producer,
                     lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
                     lastActivityMillis = System.currentTimeMillis(),
+                    waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
                 )
             }
         }

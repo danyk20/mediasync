@@ -55,7 +55,7 @@ enum class SyncFailure {
 
 /** What the producer's home screen shows. */
 sealed interface ProducerState {
-    data class Idle(val lastResult: SyncResult? = null, val finishedAtMillis: Long? = null) : ProducerState
+    data class Idle(val lastResult: SyncResult? = null) : ProducerState
 
     data object Connecting : ProducerState
 
@@ -83,6 +83,7 @@ class ProducerSync @Inject constructor(
     private val device: DeviceInfo,
     private val discovery: ServiceDiscovery,
     private val sockets: LanSockets,
+    private val history: SyncHistory,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
@@ -90,6 +91,9 @@ class ProducerSync @Inject constructor(
 
     @Volatile
     private var cancelled = false
+
+    @Volatile
+    private var pauseWhen: () -> Boolean = { false }
 
     val state: StateFlow<ProducerState> = _state.asStateFlow()
 
@@ -118,15 +122,16 @@ class ProducerSync @Inject constructor(
 
     /** Starts sending to the paired consumer, unless a sync is already running. */
     fun syncNow() {
-        launchSync()
+        launchSync(pauseWhen = { false })
     }
 
     /**
      * Syncs now, or joins the sync already running, and returns how it ended. For background work: if the
-     * caller is cancelled (the charger was unplugged), the sync stops after the current file.
+     * caller is cancelled (the charger was unplugged), or [pauseWhen] of the sync it started becomes true (the
+     * phone got hot), the sync stops after the current file.
      */
-    suspend fun syncAndWait(): ProducerState {
-        val running = launchSync()
+    suspend fun syncAndWait(pauseWhen: () -> Boolean = { false }): ProducerState {
+        val running = launchSync(pauseWhen)
         try {
             running.join()
         } catch (e: CancellationException) {
@@ -137,9 +142,10 @@ class ProducerSync @Inject constructor(
     }
 
     @Synchronized
-    private fun launchSync(): Job {
+    private fun launchSync(pauseWhen: () -> Boolean): Job {
         job?.takeIf { it.isActive }?.let { return it }
         cancelled = false
+        this.pauseWhen = pauseWhen
         _state.value = ProducerState.Connecting
         return scope.launch(Dispatchers.IO) { _state.value = runSync() }.also { job = it }
     }
@@ -167,11 +173,12 @@ class ProducerSync @Inject constructor(
                     source,
                     ledger,
                     progress = { progress -> _state.value = ProducerState.Syncing(progress) },
-                    shouldContinue = { !cancelled },
+                    shouldContinue = { !cancelled && !pauseWhen() },
                 ).sync(it)
                 peers.recordAddress(consumer.id, it.remoteAddress)
                 peers.recordSchedule(consumer.id, result.consumerSchedule)
-                ProducerState.Idle(result, System.currentTimeMillis())
+                if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
+                ProducerState.Idle(result)
             }
         } catch (e: PeerEndedSessionException) {
             ProducerState.Failed(

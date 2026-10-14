@@ -4,6 +4,13 @@
  */
 package io.github.danyk20.mediasync.feature.consumer
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -33,7 +41,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
@@ -50,11 +62,36 @@ fun ConsumerHomeRoute(
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (!it) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
+        viewModel.refresh()
+    }
+    // Back from settings, or space freed up meanwhile.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose {}
+    }
     ConsumerHomeScreen(
         state = state,
         onAddProducer = onAddProducer,
         onChangeSchedule = onChangeSchedule,
         modifier = modifier,
+        onAllowNotifications = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        },
+        onOpenSettings = {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", context.packageName, null),
+                ),
+            )
+        },
+        onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
+        onDismiss = viewModel::dismiss,
     )
 }
 
@@ -66,6 +103,10 @@ fun ConsumerHomeScreen(
     onAddProducer: () -> Unit,
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
+    onAllowNotifications: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenStorage: () -> Unit = {},
+    onDismiss: (SetupPrompt) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -83,6 +124,15 @@ fun ConsumerHomeScreen(
             Button(onClick = onAddProducer, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.consumer_add_producer))
             }
+            StorageNotice(state, onOpenStorage)
+            BackgroundSetupNotices(
+                askNotifications = state.askNotifications,
+                askBattery = state.askBattery,
+                onAllowNotifications = onAllowNotifications,
+                onOpenBatterySettings = onOpenSettings,
+                onDismissNotifications = { onDismiss(SetupPrompt.NOTIFICATIONS) },
+                onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
+            )
             ScheduleRow(state.schedule, onChangeSchedule)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
@@ -146,6 +196,31 @@ private fun Status(state: ConsumerHomeUiState) {
             body = stringResource(R.string.consumer_status_waiting_body),
             icon = MediaSyncIcons.Receive,
             tone = StatusTone.Positive,
+        )
+    }
+}
+
+/** The storage guard (docs/PLAN.md §2.2): receiving stops when this phone runs out of space. */
+@Composable
+private fun StorageNotice(state: ConsumerHomeUiState, onOpenStorage: () -> Unit) {
+    val waiting = state.waitingForSpace
+    when {
+        state.storageFull -> NoticeCard(
+            title = stringResource(R.string.consumer_storage_full_title),
+            body = stringResource(R.string.consumer_storage_full_body) +
+                if (waiting > 0) " " + pluralStringResource(R.plurals.consumer_waiting, waiting, waiting) else "",
+            icon = MediaSyncIcons.Warning,
+            action = stringResource(R.string.consumer_storage_open),
+            onAction = onOpenStorage,
+            warning = true,
+        )
+
+        waiting > 0 -> NoticeCard(
+            title = stringResource(R.string.consumer_storage_didnt_fit_title),
+            body = pluralStringResource(R.plurals.consumer_storage_didnt_fit_body, waiting, waiting),
+            icon = MediaSyncIcons.Warning,
+            action = stringResource(R.string.consumer_storage_open),
+            onAction = onOpenStorage,
         )
     }
 }

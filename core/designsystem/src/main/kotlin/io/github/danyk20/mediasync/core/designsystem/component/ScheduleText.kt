@@ -47,7 +47,10 @@ fun scheduleSummary(schedule: SyncSchedule): String = when (schedule) {
     SyncSchedule.Manual -> stringResource(R.string.schedule_manual)
 }
 
-/** "today at 9:00 PM", "tomorrow at 3:00 AM", or "Monday at 3:00 AM" for a [moment] within the coming week. */
+/**
+ * "today at 9:00 PM", "tomorrow at 3:00 AM", "yesterday at 3:00 AM", or "Monday at 3:00 AM" for another
+ * [moment] within a week of [now].
+ */
 @Composable
 fun relativeMoment(moment: ZonedDateTime, now: ZonedDateTime): String {
     val local = moment.withZoneSameInstant(now.zone)
@@ -55,9 +58,20 @@ fun relativeMoment(moment: ZonedDateTime, now: ZonedDateTime): String {
     return when (local.toLocalDate()) {
         now.toLocalDate() -> stringResource(R.string.moment_today, time)
         now.toLocalDate().plusDays(1) -> stringResource(R.string.moment_tomorrow, time)
+        now.toLocalDate().minusDays(1) -> stringResource(R.string.moment_yesterday, time)
         else -> stringResource(R.string.moment_weekday, dayName(local.dayOfWeek), time)
     }
 }
+
+/** A past [moment] as [relativeMoment] says it within the last week, else its date: "Oct 2, 2026". */
+@Composable
+fun pastMoment(moment: ZonedDateTime, now: ZonedDateTime): String {
+    if (moment.isAfter(now.minusDays(RECENT_DAYS))) return relativeMoment(moment, now)
+    LocalConfiguration.current // Recompose when the locale changes.
+    return DateFormat.getMediumDateFormat(LocalContext.current).format(Date.from(moment.toInstant()))
+}
+
+private const val RECENT_DAYS = 6L
 
 @Composable
 private fun dayName(day: DayOfWeek): String = day.getDisplayName(TextStyle.FULL, LocalConfiguration.current.locales[0])

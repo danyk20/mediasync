@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.feature.consumer
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -35,15 +36,15 @@ class ConsumerHomeScreenTest {
         producers = listOf("Anna's Pixel", "Tom's Galaxy"),
         receivedCount = 1234,
     )
+    private val events = mutableListOf<String>()
 
     @Test
     fun readyWithoutProducers_invitesPairing() {
-        var added = 0
-        show(ConsumerHomeUiState(listening = true), onAdd = { added++ })
+        show(ConsumerHomeUiState(listening = true))
 
         composeRule.onNodeWithText("Ready to receive").assertIsDisplayed()
         composeRule.onNodeWithText("Add sending phone").performClick()
-        added shouldBe 1
+        events shouldBe listOf("add")
     }
 
     @Test
@@ -64,15 +65,46 @@ class ConsumerHomeScreenTest {
 
     @Test
     fun theScheduleIsShownAndCanBeChanged() {
-        var changes = 0
-        show(
-            ConsumerHomeUiState(listening = true, schedule = SyncSchedule.EveryHours(4, LocalTime.of(1, 0))),
-            onChangeSchedule = { changes++ },
-        )
+        show(ConsumerHomeUiState(listening = true, schedule = SyncSchedule.EveryHours(4, LocalTime.of(1, 0))))
 
         composeRule.onNodeWithText("Every 4 hours from 1:00 AM").assertIsDisplayed()
         composeRule.onNodeWithText("Sync schedule").performClick()
-        changes shouldBe 1
+        events shouldBe listOf("schedule")
+    }
+
+    @Test
+    fun aFullStorage_isShownWithWhatsWaiting() {
+        show(ConsumerHomeUiState(listening = true, storageFull = true, waitingForSpace = 40))
+
+        composeRule.onNodeWithText("Storage full").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Free up space on this phone to keep receiving. MediaSync leaves 2 GB free for your other apps. " +
+                "40 photos and videos are waiting.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Free up space").performClick()
+        events shouldBe listOf("storage")
+    }
+
+    @Test
+    fun aVideoTooLargeForTheFreeSpace_isExplained() {
+        show(ConsumerHomeUiState(listening = true, waitingForSpace = 1))
+
+        composeRule.onNodeWithText("Some didn't fit").assertIsDisplayed()
+    }
+
+    @Test
+    fun setupCards_askAndCanBeDismissed() {
+        show(ConsumerHomeUiState(listening = true, askNotifications = true, askBattery = true))
+
+        composeRule.onNodeWithText("Open settings").performClick()
+        composeRule.onAllNodesWithText("Not now")[1].performClick()
+        events shouldBe listOf("settings", "dismiss NOTIFICATIONS")
+    }
+
+    @Test
+    fun screenshot_storageFull_light() {
+        show(ConsumerHomeUiState(listening = true, storageFull = true, waitingForSpace = 40, askBattery = true))
+        composeRule.onRoot().captureScreenshot("consumer_home_storage_full_light")
     }
 
     @Test
@@ -93,15 +125,18 @@ class ConsumerHomeScreenTest {
         composeRule.onRoot().captureScreenshot("consumer_home_receiving_dark")
     }
 
-    private fun show(
-        state: ConsumerHomeUiState,
-        darkTheme: Boolean = false,
-        onAdd: () -> Unit = {},
-        onChangeSchedule: () -> Unit = {},
-    ) {
+    private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false) {
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ConsumerHomeScreen(state = state, onAddProducer = onAdd, onChangeSchedule = onChangeSchedule)
+                ConsumerHomeScreen(
+                    state = state,
+                    onAddProducer = { events += "add" },
+                    onChangeSchedule = { events += "schedule" },
+                    onAllowNotifications = { events += "notifications" },
+                    onOpenSettings = { events += "settings" },
+                    onOpenStorage = { events += "storage" },
+                    onDismiss = { events += "dismiss $it" },
+                )
             }
         }
     }
