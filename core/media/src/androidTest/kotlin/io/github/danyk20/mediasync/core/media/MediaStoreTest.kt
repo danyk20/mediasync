@@ -248,17 +248,20 @@ class MediaStoreTest {
     fun foldersAreListedWithTheirSizeAndNewestItem() {
         val first = jpeg(Color.BLACK)
         val second = jpeg(Color.WHITE)
-        val older = insertInto(TEST_FOLDER, first, "older.jpg")
+        // A folder of its own: other tests' photos in the shared one may still be listed while they're deleted.
+        val name = "MediaSyncFolders${System.nanoTime()}"
+        val path = "Pictures/$name/"
+        val older = insertInto(path, first, "older.jpg")
         Thread.sleep(MODIFIED_TIME_RESOLUTION_MILLIS) // MediaStore keeps modification times in seconds.
-        val newest = insertInto(TEST_FOLDER, second, "newer.jpg")
+        val newest = insertInto(path, second, "newer.jpg")
         // MediaStore fills in sizes when it gets round to indexing new files (on Android 10, not reliably soon).
         rescan(older)
         rescan(newest)
 
-        val folder = MediaStoreLibrary(context).let { runBlocking { it.folders() } }.single { it.path == TEST_FOLDER }
+        val folder = MediaStoreLibrary(context).let { runBlocking { it.folders() } }.single { it.path == path }
 
-        folder shouldBe MediaFolder(TEST_FOLDER, 2, (first.size + second.size).toLong(), newest.toString())
-        folder.name shouldBe "MediaSyncTest"
+        folder shouldBe MediaFolder(path, 2, (first.size + second.size).toLong(), newest.toString())
+        folder.name shouldBe name
     }
 
     @Test
@@ -266,8 +269,13 @@ class MediaStoreTest {
         val library = MediaStoreLibrary(context)
 
         val noticed = async { withTimeoutOrNull(CHANGE_TIMEOUT_MILLIS) { library.changes().first() } }
-        delay(OBSERVER_START_MILLIS) // Let the observer register before the photo arrives.
-        insertInto(TEST_FOLDER, jpeg(Color.GRAY), "noticed.jpg")
+        // A photo added before the observer registers goes unnoticed, and on a busy device that can take a while:
+        // keep adding one until it's noticed.
+        var added = 0
+        while (noticed.isActive) {
+            delay(OBSERVER_START_MILLIS)
+            insertInto(TEST_FOLDER, jpeg(Color.GRAY), "noticed${added++}.jpg")
+        }
 
         noticed.await() shouldBe Unit
     }
@@ -336,6 +344,6 @@ class MediaStoreTest {
         const val TEST_FOLDER = "Pictures/MediaSyncTest/"
         const val MODIFIED_TIME_RESOLUTION_MILLIS = 1_100L
         const val CHANGE_TIMEOUT_MILLIS = 10_000L
-        const val OBSERVER_START_MILLIS = 200L
+        const val OBSERVER_START_MILLIS = 1_000L
     }
 }
