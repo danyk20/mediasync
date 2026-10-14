@@ -11,6 +11,7 @@ dependencies {
     api(projects.sync.engine)
     api(projects.core.database)
     implementation(projects.core.crypto)
+    implementation(projects.core.metadata)
     implementation(projects.core.datastore)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
@@ -19,6 +20,7 @@ dependencies {
     implementation(projects.transport.lan)
 
     testImplementation(testFixtures(projects.sync.engine))
+    testImplementation(testFixtures(projects.core.metadata))
     testImplementation(testFixtures(projects.transport.lan))
     testImplementation(libs.androidx.room.runtime)
     testImplementation(libs.androidx.test.core)

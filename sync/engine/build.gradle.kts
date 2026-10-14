@@ -5,11 +5,13 @@ plugins {
 
 dependencies {
     api(projects.core.model)
+    implementation(projects.core.metadata)
     api(projects.sync.protocol)
     api(projects.transport.api)
 
     // In-memory fakes shared with the transport integration tests.
     testFixturesApi(libs.okio)
+    testImplementation(testFixtures(projects.core.metadata))
 }
 
 // Sync logic decides what is sent and stored: held to a stricter bar than the project-wide 70 %.

@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
@@ -17,9 +18,12 @@ import okio.ByteString.Companion.encodeUtf8
 
 // Small seams around Android services, so the sync runtime can be tested on the JVM.
 
-/** How this phone introduces itself to others. */
+/** How this phone introduces itself to others, and how its user set it up. */
 fun interface DeviceInfo {
     fun local(): LocalDevice
+
+    /** As a sending phone: the details it sends (docs/PLAN.md §6.3). */
+    fun photoDetails(): PhotoDetails = PhotoDetails.Default
 }
 
 /** This phone's addresses on the local network, or none when it isn't on Wi-Fi or Ethernet. */
@@ -47,6 +51,11 @@ enum class PauseReason {
 /** Whether background work should wait; `null` to go ahead. User-started syncs don't ask. */
 fun interface DeviceConditions {
     fun pauseReason(): PauseReason?
+}
+
+/** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
+fun interface PhotoDetailsSource {
+    fun current(): PhotoDetails
 }
 
 /** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */

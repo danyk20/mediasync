@@ -32,6 +32,10 @@ sealed interface Destination : NavKey {
     @Serializable
     data object ProducerFolders : Destination
 
+    /** The sending phone's *Photo details* setting. */
+    @Serializable
+    data object ProducerPhotoDetails : Destination
+
     /** The consumer sets when its producers sync. */
     @Serializable
     data object ConsumerSchedule : Destination

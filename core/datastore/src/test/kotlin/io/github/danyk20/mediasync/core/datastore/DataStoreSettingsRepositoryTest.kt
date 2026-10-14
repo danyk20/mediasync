@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -118,6 +119,19 @@ class DataStoreSettingsRepositoryTest {
         dataStore.edit { it[DataStoreSettingsRepository.SyncScheduleKey] = "fortnightly@03:00" }
 
         DataStoreSettingsRepository(dataStore).syncSchedule.first() shouldBe SyncSchedule.Default
+    }
+
+    @Test
+    fun photosAreSentWithAllTheirDetailsUntilTheUserChooses() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+        repository.photoDetails.first() shouldBe PhotoDetails.KEEP_ALL
+
+        repository.setPhotoDetails(PhotoDetails.REMOVE_LOCATION)
+        repository.photoDetails.first() shouldBe PhotoDetails.REMOVE_LOCATION
+
+        dataStore.edit { it[DataStoreSettingsRepository.PhotoDetailsKey] = "FROM_A_NEWER_VERSION" }
+        repository.photoDetails.first() shouldBe PhotoDetails.KEEP_ALL
     }
 
     @Test

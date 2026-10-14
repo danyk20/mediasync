@@ -18,12 +18,14 @@ import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.android.SyncHistory
@@ -63,9 +65,10 @@ class ProducerHomeViewModelTest {
     private val application: Application = ApplicationProvider.getApplicationContext()
     private val syncState = MutableStateFlow<ProducerState>(ProducerState.Idle())
     private var waiting = 214
+    private var withheld = 0
     private val sync = mockk<ProducerSync>(relaxed = true) {
         every { state } returns syncState
-        coEvery { pendingCount() } answers { waiting }
+        coEvery { pendingCount() } answers { Pending(waiting, withheld) }
     }
     private val library = FakeMediaLibrary()
     private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
@@ -148,6 +151,21 @@ class ProducerHomeViewModelTest {
 
         val state = viewModel.uiState.first { it.pendingCount == 1_030 }
         state.sources shouldBe SourceSelection(SourcePreset.EVERYTHING)
+    }
+
+    @Test
+    fun choosingOtherPhotoDetailsRecountsWhatIsHeldBack() = runTest {
+        grantLibraryAccess()
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.pendingCount == 214 }
+
+        waiting = 200
+        withheld = 14
+        settings.setPhotoDetails(PhotoDetails.REMOVE_ALL)
+
+        val state = viewModel.uiState.first { it.withheldCount == 14 }
+        state.pendingCount shouldBe 200
+        state.photoDetails shouldBe PhotoDetails.REMOVE_ALL
     }
 
     @Test

@@ -544,47 +544,63 @@ Three choices, offered in two places:
 | **Remove location** | GPS in EXIF, location fields in XMP, video location | Everything else |
 | **Remove all details** | EXIF, XMP and IPTC (camera, device, location, edits, captions), video metadata, and the album/favorite sidecar | The image itself, orientation, color profile, and the **capture date** |
 
-- **Producer → Settings → Privacy → "Photo details sent"** (per consumer).
+- **Producer → "Photo details"** on the home screen, opening *Photo details sent*.
+  - One setting per producer, which sends to one consumer.
   - Applied on the producer *before* sending, so the consumer never receives what was removed. This is the strongest guarantee.
 - **Consumer → Cloud backup → Google Photos → "Photo details uploaded"** (per connector account; uploading connectors only, v1.1).
   - Applied only to the cloud copy. The consumer's archive keeps everything it received.
 - **The stricter setting wins.** The consumer can't add back what a producer removed.
 - **Why orientation and color profile always stay:** without them, photos show sideways or with wrong colors, and neither says anything about a person or a place.
 - **Why the capture date stays by default:** without it, Google Photos files the photo under the upload day.
-  - An advanced switch, *Also remove capture date*, warns about this.
+  - An advanced switch, *Also remove capture date*, warns about this (later).
   - It also renames files to neutral names, because camera filenames contain the date.
 - **Motion Photo and Ultra HDR extras depend on XMP.** *Remove all details* therefore turns them into normal still photos, and the UI says so. *Remove location* keeps them working.
 - **Scope:** a changed setting applies to items sent or uploaded afterwards. Already-synced items are not changed.
 
 ### 6.4 How details are removed (lossless and fast)
 
+`:core:metadata` plans each file's edits from its first bytes, not from its name or MIME type. Image and video data are never touched, so nothing is re-encoded. Where something points into the file by absolute offset (video sample tables, HEIC items, Ultra HDR's MPF index, Motion Photo XMP), edits keep the file's size, so those offsets stay valid.
+
 - **JPEG:**
-  - Only the metadata segments are rewritten while the file streams out. Image data is copied byte for byte.
-  - Anything after the image (Motion Photo video, Ultra HDR gain map) is kept under *Remove location*.
-- **PNG and WebP:** the metadata chunks are dropped.
-- **MP4/MOV:** a lossless re-mux keeps the streams and the rotation, and drops the location metadata boxes (or all of them).
-- **HEIC/AVIF:**
-  - The metadata items inside the container are rewritten without touching the image data. This needs a small custom container editor, which is a spike in M2.
-  - Until it's ready, HEIC files are re-encoded at very high quality when a removal setting is on, and the UI says so.
-- **RAW/DNG:**
-  - *Remove location* zeroes the GPS values in place.
-  - Under *Remove all details*, RAW files are skipped with a visible note, because their metadata is structural.
+  - *Remove location*:
+    - GPS in EXIF is emptied in place (an empty GPS directory, its values zeroed), so maker notes and the thumbnail keep their offsets.
+    - XMP location properties (also in extended XMP) are overwritten with spaces of the same length.
+    - IPTC place datasets are dropped. If that shrinks a segment after the MPF segment, the gain map's MPF offset is corrected.
+  - *Remove all*: EXIF is replaced by a minimal one: orientation, colour space, and the capture date with its time zone and sub-seconds. Every other APPn and comment segment goes; JFIF, the ICC profile and Adobe's colour segment stay.
+  - Anything after the image:
+    - Under *Remove location*, an Ultra HDR gain map is cleaned like the photo, and a Motion Photo video (Google, or inside a Samsung trailer) as below.
+    - Under *Remove all*, it is cut.
+- **PNG and WebP:** chunks hold no absolute offsets, so changed chunks are rewritten.
+  - Checksums, chunk sizes and the RIFF size are updated, and so are the WebP `VP8X` flags.
+  - *Remove all* keeps a minimal EXIF and the colour profile.
+- **MP4/MOV/3GP:** no re-mux.
+  - Location boxes (`©xyz`, `loci`, Apple location keys) become `free` boxes full of zeros.
+  - Under *Remove all*, `udta`, `meta` and XMP boxes go the same way. Only `com.android.capture.fps`, which slow-motion playback needs, is kept.
+  - Rotation (`tkhd`) and the creation time (`mvhd`) stay.
+- **HEIC/AVIF:** the EXIF and XMP items, found through `iinf`/`iloc`, are rewritten in place with the same size.
+  - No re-encode is needed, and no container rewrite.
+  - A Motion Photo's video (appended, or in Samsung's `mpvd` box) is cleaned under *Remove location*, and cut under *Remove all*.
+- **RAW/DNG and other TIFF-based files:**
+  - *Remove location* empties the GPS directory and blanks XMP places in place.
+  - Under *Remove all details*, RAW files are withheld with a visible note, because their metadata is structural.
+- **Other files:** GIF and BMP carry no details and are sent as they are. Formats MediaSync can't read, and damaged files, are withheld under a removal setting rather than sent with their details.
 - **Speed impact:**
-  - *Keep all* sends files byte for byte with zero-copy, so there is no speed cost.
-  - JPEG, PNG and WebP removal also streams, so its cost is negligible.
-  - MP4 and HEIC need a random-access pass, but never a re-encode.
-- The content ID is the hash of the bytes actually sent, so dedupe and verification keep working under every setting.
+  - *Keep all* sends files byte for byte, with no extra reads.
+  - Under a removal setting, each file's metadata is read before it's offered. Edits are applied while the file streams out, and resuming works on the edited bytes.
+  - Just before sending, the plan is computed again. A file changed since it was offered isn't sent; it is offered again next time.
+- The content ID is the hash of the bytes actually sent, so dedupe and verification keep working under every setting. Items stay recorded under the original's fingerprint.
 
 ### 6.5 How it is tested
 
-- A license-clean **golden media set** created for the project:
-  - JPEG from a Pixel and a Samsung, HEIC, Motion Photo, Ultra HDR;
-  - a WhatsApp-style JPEG without EXIF, a PNG screenshot, a DNG;
-  - MP4 and MOV with location, and an HDR video.
+- A license-clean **golden media set**, generated by `core/metadata/golden/make_golden.py` with ImageMagick, exiftool and ffmpeg (its colour profile too):
+  - Pixel- and Samsung-style JPEGs (the latter with a trailer holding a video), HEIC, Motion Photo, Ultra HDR;
+  - a WhatsApp-style JPEG without EXIF, a PNG screenshot, a WebP, a DNG;
+  - MP4 and MOV with location, and an HDR (HEVC, PQ) video.
 - **Keep all:** the producer file and the consumer file must be byte-identical.
 - **Removal settings:**
   - An *independent* reader (the metadata-extractor library, not MediaSync's own writer) must find no removed tag anywhere: EXIF, XMP, IPTC, maker notes or embedded thumbnails.
-  - The decoded pixels must equal the original's.
+  - A plain byte search must find no place name or coordinate anywhere in the file either.
+  - The decoded pixels must equal the original's (JPEG, PNG, DNG, Ultra HDR gain maps). Video samples (`mdat`) must be byte-identical.
 - **Upload copies:** date and location must be present after date repair and after Storage saver.
 - **Instrumented tests on API 29 and 36:** the GPS read path with `ACCESS_MEDIA_LOCATION`, and the scanner keeping the capture date.
 

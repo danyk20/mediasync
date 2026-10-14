@@ -19,6 +19,7 @@ import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
@@ -44,11 +45,13 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val device = AndroidDeviceInfo(context) { SyncSchedule.WhileCharging }.local()
+        val info = AndroidDeviceInfo(context, { SyncSchedule.WhileCharging }, { PhotoDetails.REMOVE_LOCATION })
+        val device = info.local()
 
         device.name.shouldNotBeBlank()
         device.appVersion.shouldNotBeBlank()
         device.schedule shouldBe SyncSchedule.WhileCharging
+        info.photoDetails() shouldBe PhotoDetails.REMOVE_LOCATION
     }
 
     @Test

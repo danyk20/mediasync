@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.core.testing
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,14 @@ class FakeSettingsRepository(
 
     override suspend fun setSyncSchedule(schedule: SyncSchedule) {
         syncScheduleState.value = schedule
+    }
+
+    private val photoDetailsState = MutableStateFlow(PhotoDetails.Default)
+
+    override val photoDetails: StateFlow<PhotoDetails> = photoDetailsState
+
+    override suspend fun setPhotoDetails(details: PhotoDetails) {
+        photoDetailsState.value = details
     }
 
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())

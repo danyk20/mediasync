@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +70,7 @@ fun ProducerHomeRoute(
     onPair: () -> Unit,
     onChooseFolders: () -> Unit,
     modifier: Modifier = Modifier,
+    onChooseDetails: () -> Unit = {},
     viewModel: ProducerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -106,6 +108,7 @@ fun ProducerHomeRoute(
             }
         },
         onDismiss = viewModel::dismiss,
+        onChooseDetails = onChooseDetails,
         modifier = modifier,
     )
 }
@@ -123,6 +126,7 @@ fun ProducerHomeScreen(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     onAllowNotifications: () -> Unit = {},
+    onChooseDetails: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
 ) {
     Scaffold(
@@ -154,7 +158,19 @@ fun ProducerHomeScreen(
                         onDismissNotifications = { onDismiss(SetupPrompt.NOTIFICATIONS) },
                         onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
                     )
-                    SourcesRow(state.sources, onChooseFolders)
+                    WithheldNotice(state, onChooseDetails)
+                    SettingRow(
+                        title = stringResource(R.string.producer_sources_title),
+                        summary = sourcesSummary(state.sources),
+                        icon = MediaSyncIcons.Folder,
+                        onClick = onChooseFolders,
+                    )
+                    SettingRow(
+                        title = stringResource(R.string.producer_details_row_title),
+                        summary = stringResource(state.photoDetails.title),
+                        icon = MediaSyncIcons.Info,
+                        onClick = onChooseDetails,
+                    )
                     Hints(state, consumer, onGrantAccess)
                 }
             }
@@ -293,14 +309,14 @@ private fun NextSync(state: ProducerHomeUiState) {
     Text(text = text, style = MaterialTheme.typography.bodyMedium)
 }
 
-/** Which folders are sent, and the way to change them. */
+/** A setting of what is sent (folders, details), and the way to change it. */
 @Composable
-private fun SourcesRow(sources: SourceSelection, onChooseFolders: () -> Unit) {
-    OutlinedCard(onClick = onChooseFolders, modifier = Modifier.fillMaxWidth()) {
+private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, onClick: () -> Unit) {
+    OutlinedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         ListItem(
-            headlineContent = { Text(stringResource(R.string.producer_sources_title)) },
-            supportingContent = { Text(sourcesSummary(sources)) },
-            leadingContent = { Icon(painterResource(MediaSyncIcons.Folder), contentDescription = null) },
+            headlineContent = { Text(title) },
+            supportingContent = { Text(summary) },
+            leadingContent = { Icon(painterResource(icon), contentDescription = null) },
             trailingContent = {
                 Text(
                     text = stringResource(R.string.producer_sources_change),
@@ -311,6 +327,19 @@ private fun SourcesRow(sources: SourceSelection, onChooseFolders: () -> Unit) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
+}
+
+/** Files the *Photo details* setting holds back, and the way to change it (docs/PLAN.md §6.4). */
+@Composable
+private fun WithheldNotice(state: ProducerHomeUiState, onChooseDetails: () -> Unit) {
+    if (state.withheldCount == 0 || state.sync is ProducerState.Syncing) return
+    NoticeCard(
+        title = pluralStringResource(R.plurals.producer_withheld_title, state.withheldCount, state.withheldCount),
+        body = stringResource(R.string.producer_withheld_body),
+        icon = MediaSyncIcons.Info,
+        action = stringResource(R.string.producer_details_row_title),
+        onAction = onChooseDetails,
+    )
 }
 
 /** "Camera only", or the chosen folders' names: "Camera, WhatsApp Images and 2 more". */

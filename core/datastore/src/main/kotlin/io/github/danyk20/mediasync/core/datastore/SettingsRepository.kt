@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.core.datastore
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,11 @@ interface SettingsRepository {
     val syncSchedule: Flow<SyncSchedule>
 
     suspend fun setSyncSchedule(schedule: SyncSchedule)
+
+    /** Which details a sending phone removes before sending (docs/PLAN.md §6.3); [PhotoDetails.Default] at first. */
+    val photoDetails: Flow<PhotoDetails>
+
+    suspend fun setPhotoDetails(details: PhotoDetails)
 
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>

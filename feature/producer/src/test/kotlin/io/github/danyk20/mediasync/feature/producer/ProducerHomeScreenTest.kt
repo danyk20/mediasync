@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
@@ -196,6 +197,24 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun photoDetails_areShownAndCanBeChanged() {
+        show(paired.copy(pendingCount = 0, photoDetails = PhotoDetails.REMOVE_LOCATION))
+
+        composeRule.onNodeWithText("Remove location").assertIsDisplayed()
+        composeRule.onNodeWithText("Photo details").performClick()
+        events shouldBe listOf("details")
+    }
+
+    @Test
+    fun heldBackFiles_pointToPhotoDetails() {
+        show(paired.copy(pendingCount = 0, withheldCount = 3, photoDetails = PhotoDetails.REMOVE_ALL))
+
+        composeRule.onNodeWithText("3 photos and videos aren't sent").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Photo details")[0].performClick()
+        events shouldBe listOf("details")
+    }
+
+    @Test
     fun setupCards_askAndCanBeDismissed() {
         show(paired.copy(pendingCount = 0, askNotifications = true, askBattery = true))
 
@@ -243,6 +262,12 @@ class ProducerHomeScreenTest {
     )
 
     @Test
+    fun screenshot_withheld_light() = screenshot(
+        paired.copy(pendingCount = 0, withheldCount = 3, photoDetails = PhotoDetails.REMOVE_ALL),
+        "producer_home_withheld_light",
+    )
+
+    @Test
     fun screenshot_receiverFull_light() = screenshot(
         paired.copy(pendingCount = 12, waitingForSpace = 12),
         "producer_home_receiver_full_light",
@@ -271,6 +296,7 @@ class ProducerHomeScreenTest {
                     onOpenSettings = { events += "settings" },
                     onAllowNotifications = { events += "notifications" },
                     onDismiss = { events += "dismiss $it" },
+                    onChooseDetails = { events += "details" },
                 )
             }
         }

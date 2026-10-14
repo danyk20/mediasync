@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.sync.android
 import io.github.danyk20.mediasync.core.crypto.IdentityProvider
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.metadata.isWithheld
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
 import io.github.danyk20.mediasync.sync.engine.MediaSource
@@ -63,6 +64,12 @@ sealed interface ProducerState {
 
     data class Failed(val reason: SyncFailure) : ProducerState
 }
+
+/**
+ * What the consumer doesn't have yet: [toSend], and [withheld] by the *Photo details* setting, whose details can't
+ * be removed (RAW photos under *Remove all*, formats MediaSync can't read).
+ */
+data class Pending(val toSend: Int = 0, val withheld: Int = 0)
 
 /** The outcome of scanning a pairing QR code. */
 sealed interface PairingResult {
@@ -155,11 +162,14 @@ class ProducerSync @Inject constructor(
         cancelled = true
     }
 
-    /** How many photos and videos the consumer doesn't have yet. */
-    suspend fun pendingCount(): Int = withContext(Dispatchers.IO) {
-        val consumer = peers.consumer() ?: return@withContext 0
+    /** Photos and videos the consumer doesn't have yet: those that will be sent, and those withheld. */
+    suspend fun pendingCount(): Pending = withContext(Dispatchers.IO) {
+        val consumer = peers.consumer() ?: return@withContext Pending()
         val sent = ledger.sentFingerprints(consumer.id)
-        source.items().count { it.descriptor.fingerprint !in sent }
+        val details = device.photoDetails()
+        val waiting = source.items().filter { it.descriptor.fingerprint !in sent }
+        val withheld = waiting.count { isWithheld(it.descriptor.mimeType, details) }
+        Pending(toSend = waiting.size - withheld, withheld = withheld)
     }
 
     private suspend fun runSync(): ProducerState {
@@ -174,6 +184,7 @@ class ProducerSync @Inject constructor(
                     ledger,
                     progress = { progress -> _state.value = ProducerState.Syncing(progress) },
                     shouldContinue = { !cancelled && !pauseWhen() },
+                    details = device.photoDetails(),
                 ).sync(it)
                 peers.recordAddress(consumer.id, it.remoteAddress)
                 peers.recordSchedule(consumer.id, result.consumerSchedule)

@@ -15,10 +15,15 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.time.Clock
 import java.time.Duration
@@ -46,6 +51,28 @@ class SettingsScheduleSource @Inject constructor(
     private val schedule = settings.syncSchedule.stateIn(scope, SharingStarted.Eagerly, SyncSchedule.Default)
 
     override fun current(): SyncSchedule = schedule.value
+}
+
+/** The sending phone's *Photo details* from its settings, kept current for the sessions that apply them. */
+@Singleton
+class SettingsPhotoDetailsSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : PhotoDetailsSource {
+    private val details = settings.photoDetails.stateIn(scope, SharingStarted.Eagerly, PhotoDetails.Default)
+
+    override fun current(): PhotoDetails = details.value
+}
+
+/** The settings the sync runtime follows as they change. */
+@Module
+@InstallIn(SingletonComponent::class)
+internal abstract class SettingsSourcesModule {
+    @Binds
+    abstract fun bindScheduleSource(impl: SettingsScheduleSource): ScheduleSource
+
+    @Binds
+    abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */
