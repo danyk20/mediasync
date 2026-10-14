@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.SyncRecord
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import java.time.Clock
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -49,6 +50,14 @@ data class ProducerHomeUiState(
     val sync: ProducerState = ProducerState.Idle(),
     /** Photos and videos not yet sent; `null` while counting. */
     val pendingCount: Int? = null,
+    /** Their size. */
+    val pendingBytes: Long = 0,
+    /** Whether Turbo transfer (docs/PLAN.md §8.3) can be used, as far as this phone goes. */
+    val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
+    /** Battery below 30 % and not charging: Turbo uses more power. */
+    val turboBatteryLow: Boolean = false,
+    /** The user declined Turbo's permission: only the app's settings can grant it now. */
+    val turboDeclined: Boolean = false,
     /** Photos and videos the *Photo details* setting holds back: their details can't be removed. */
     val withheldCount: Int = 0,
     val photoDetails: PhotoDetails = PhotoDetails.Default,
@@ -82,6 +91,7 @@ private data class Extras(
     val record: SyncRecord,
     val dismissed: Set<SetupPrompt>,
     val details: PhotoDetails,
+    val turboDeclined: Boolean,
 )
 
 /** What the phone allows MediaSync, as of [checkedAtMillis]. */
@@ -90,6 +100,8 @@ private data class DeviceAccess(
     val location: Boolean,
     val canNotify: Boolean,
     val batteryRestricted: Boolean,
+    val turbo: TurboAvailability,
+    val turboBatteryLow: Boolean,
     val checkedAtMillis: Long,
 )
 
@@ -108,13 +120,14 @@ class ProducerHomeViewModel @Inject constructor(
 
     private val access = MutableStateFlow(checkAccess())
     private val pending = MutableStateFlow<Pending?>(null)
+    private val turboDeclined = MutableStateFlow(false)
 
     val uiState: StateFlow<ProducerHomeUiState> = combine(
         peers.observeConsumer(),
         sync.state,
         pending,
         settings.sourceSelection,
-        combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, ::Extras),
+        combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
     ) { consumer, state, count, sources, extras ->
         val (access, record, dismissed) = extras
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
@@ -125,6 +138,10 @@ class ProducerHomeViewModel @Inject constructor(
             canReadLocation = access.location,
             sync = state,
             pendingCount = count?.toSend,
+            pendingBytes = count?.bytes ?: 0,
+            turbo = access.turbo,
+            turboBatteryLow = access.turboBatteryLow,
+            turboDeclined = extras.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
             withheldCount = count?.withheld ?: 0,
             photoDetails = extras.details,
             sources = sources,
@@ -161,6 +178,18 @@ class ProducerHomeViewModel @Inject constructor(
 
     fun stop() = sync.cancel()
 
+    /** Sends over a direct link (docs/PLAN.md §8.3), in the background like [syncNow]. */
+    fun startTurbo() {
+        access.value = checkAccess()
+        if (access.value.turbo == TurboAvailability.AVAILABLE) scheduler.syncNow(turbo = true)
+    }
+
+    /** The answer to Turbo's permission request; declined, only the app's settings can grant it after that. */
+    fun onTurboPermission(granted: Boolean) {
+        turboDeclined.value = !granted
+        if (granted) startTurbo()
+    }
+
     /** Call when the screen is shown again, e.g. back from settings, and after the user answered a prompt. */
     fun onPermissionsChanged() {
         access.value = checkAccess()
@@ -182,6 +211,8 @@ class ProducerHomeViewModel @Inject constructor(
         location = MediaPermissions.canReadLocation(context),
         canNotify = setup.canNotify(),
         batteryRestricted = setup.batteryRestricted(),
+        turbo = sync.turboAvailability(),
+        turboBatteryLow = sync.turboBatteryLow(),
         checkedAtMillis = clock.millis(), // Also brings the times shown up to date.
     )
 

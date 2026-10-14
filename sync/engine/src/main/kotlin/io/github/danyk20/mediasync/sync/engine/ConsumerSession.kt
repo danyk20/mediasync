@@ -24,6 +24,7 @@ import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
 import io.github.danyk20.mediasync.sync.protocol.PairRequest
 import io.github.danyk20.mediasync.sync.protocol.PairResult
 import io.github.danyk20.mediasync.sync.protocol.ProtocolException
+import io.github.danyk20.mediasync.sync.protocol.TurboRequest
 import io.github.danyk20.mediasync.sync.protocol.Want
 import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
@@ -53,6 +54,9 @@ sealed interface ServeResult {
 
     /** The producer measured the link (docs/PLAN.md §7): [bytes] of filler arrived in [micros]. */
     data class LinkTested(val bytes: Long, val micros: Long) : ServeResult
+
+    /** The producer asked for Turbo transfer (docs/PLAN.md §8.3), and was told this. */
+    data class TurboAnswered(val answer: TurboAnswer) : ServeResult
 }
 
 /**
@@ -71,6 +75,8 @@ class ConsumerSession(
     private val progress: ProgressListener = ProgressListener {},
     /** Shared by the sessions served at once (several connections from one producer, or several producers). */
     private val space: SpaceBudget = SpaceBudget(sink),
+    /** Opens a direct link for Turbo transfer; `null` where there is none. */
+    private val turbo: TurboHost? = null,
 ) {
 
     fun serve(connection: PeerConnection): ServeResult {
@@ -96,6 +102,8 @@ class ConsumerSession(
             first is PairRequest -> pair(channel, producer, hello.deviceName, first)
 
             first is LinkTestBegin && registry.isPaired(producer) -> linkTest(channel)
+
+            first is TurboRequest && registry.isPaired(producer) -> turbo(channel)
 
             registry.isPaired(producer) -> Receiver(channel, producer).run(first)
 
@@ -147,6 +155,14 @@ class ConsumerSession(
         channel.send(LinkTestResult(bytes, micros))
         awaitEnd(channel)
         return ServeResult.LinkTested(bytes, micros)
+    }
+
+    /** Opens the direct link, says how to join it (or why not), and leaves the rest to new sessions over it. */
+    private fun turbo(channel: FrameChannel): ServeResult {
+        val answer = turbo?.open() ?: TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+        channel.send(answer.toWire())
+        awaitEnd(channel)
+        return ServeResult.TurboAnswered(answer)
     }
 
     private fun endsLinkTest(message: ControlMessage?): Boolean = when (message) {

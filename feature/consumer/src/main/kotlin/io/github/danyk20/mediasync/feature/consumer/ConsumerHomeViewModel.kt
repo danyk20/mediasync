@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,10 +49,20 @@ data class ConsumerHomeUiState(
     val askNotifications: Boolean = false,
     /** Android 12+: ask for *Unrestricted* battery use, which receive windows at night need. */
     val askBattery: Boolean = false,
+    /** A direct link for Turbo transfer (docs/PLAN.md §8.3) is open. */
+    val directLinkOpen: Boolean = false,
+    /** A sending phone asked for Turbo transfer, which needs the user's permission (or location on) here. */
+    val askTurbo: Boolean = false,
+    val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
 )
 
 /** What the phone allows MediaSync, and its free space. */
-private data class DeviceAccess(val canNotify: Boolean, val batteryRestricted: Boolean, val freeBytes: Long)
+private data class DeviceAccess(
+    val canNotify: Boolean,
+    val batteryRestricted: Boolean,
+    val freeBytes: Long,
+    val turbo: TurboAvailability,
+)
 
 @HiltViewModel
 class ConsumerHomeViewModel @Inject constructor(
@@ -100,6 +111,9 @@ class ConsumerHomeViewModel @Inject constructor(
             askBattery = access.batteryRestricted &&
                 schedule != SyncSchedule.Manual &&
                 SetupPrompt.BATTERY !in dismissed,
+            directLinkOpen = state.directLinkOpen,
+            askTurbo = state.turboNeedsPermission && access.turbo != TurboAvailability.AVAILABLE,
+            turbo = access.turbo,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
@@ -113,9 +127,20 @@ class ConsumerHomeViewModel @Inject constructor(
         viewModelScope.launch { settings.dismissPrompt(prompt) }
     }
 
+    /** The answer to Turbo's permission request, or *Not now*: the card goes either way. */
+    fun onTurboAnswered() {
+        receiver.turboPermissionHandled()
+        refresh()
+    }
+
     override fun onCleared() = receiver.release(HOLDER)
 
-    private fun checkAccess() = DeviceAccess(setup.canNotify(), setup.batteryRestricted(), receiver.freeBytes())
+    private fun checkAccess() = DeviceAccess(
+        setup.canNotify(),
+        setup.batteryRestricted(),
+        receiver.freeBytes(),
+        receiver.turboAvailability(),
+    )
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L

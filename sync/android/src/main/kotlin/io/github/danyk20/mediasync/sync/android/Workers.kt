@@ -122,13 +122,21 @@ class SyncNowWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result = logged("Sync now") {
-        val consumer = withContext(Dispatchers.IO) { peers.consumer() }
-        send(sync, notifications, consumer?.name) { sync.syncAndWait() }
-        Result.success() // However it went, the home screen shows it.
+    override suspend fun doWork(): Result {
+        val turbo = inputData.getBoolean(TURBO, false)
+        return logged(if (turbo) "Turbo transfer" else "Sync now") {
+            val consumer = withContext(Dispatchers.IO) { peers.consumer() }
+            send(sync, notifications, consumer?.name) { sync.syncAndWait(turbo = turbo) }
+            Result.success() // However it went, the home screen shows it.
+        }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.sending(consumerName = null)
+
+    companion object {
+        /** Input: over a direct link (docs/PLAN.md §8.3). */
+        const val TURBO = "turbo"
+    }
 }
 
 /** Runs [work], noting in the diagnostic log when it starts, how it ends, and why Android stopped it. */

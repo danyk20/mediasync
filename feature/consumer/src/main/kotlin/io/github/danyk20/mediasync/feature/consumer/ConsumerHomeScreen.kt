@@ -54,6 +54,8 @@ import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.TurboPermissions
 
 @Composable
 fun ConsumerHomeRoute(
@@ -68,6 +70,9 @@ fun ConsumerHomeRoute(
     val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (!it) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
         viewModel.refresh()
+    }
+    val requestTurbo = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.onTurboAnswered()
     }
     // Back from settings, or space freed up meanwhile.
     LifecycleResumeEffect(Unit) {
@@ -95,6 +100,15 @@ fun ConsumerHomeRoute(
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
         onDismiss = viewModel::dismiss,
         onOpenDiagnostics = onOpenDiagnostics,
+        onAllowTurbo = {
+            if (state.turbo == TurboAvailability.LOCATION_OFF) {
+                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                viewModel.onTurboAnswered()
+            } else {
+                requestTurbo.launch(TurboPermissions.requested.toTypedArray())
+            }
+        },
+        onDismissTurbo = viewModel::onTurboAnswered,
     )
 }
 
@@ -111,6 +125,8 @@ fun ConsumerHomeScreen(
     onOpenStorage: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onAllowTurbo: () -> Unit = {},
+    onDismissTurbo: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -134,6 +150,7 @@ fun ConsumerHomeScreen(
                 Text(stringResource(R.string.consumer_add_producer))
             }
             StorageNotice(state, onOpenStorage)
+            TurboNotice(state, onAllowTurbo, onDismissTurbo)
             BackgroundSetupNotices(
                 askNotifications = state.askNotifications,
                 askBattery = state.askBattery,
@@ -157,36 +174,34 @@ fun ConsumerHomeScreen(
     }
 }
 
+/** A sending phone asked for Turbo transfer (docs/PLAN.md §8.3), which needs something allowed here first. */
+@Composable
+private fun TurboNotice(state: ConsumerHomeUiState, onAllowTurbo: () -> Unit, onDismissTurbo: () -> Unit) {
+    if (!state.askTurbo) return
+    val locationOff = state.turbo == TurboAvailability.LOCATION_OFF
+    NoticeCard(
+        title = stringResource(R.string.consumer_turbo_title),
+        body = stringResource(if (locationOff) R.string.consumer_turbo_location_off else R.string.consumer_turbo_body),
+        icon = MediaSyncIcons.Turbo,
+        action = stringResource(
+            if (locationOff) R.string.consumer_turbo_location_settings else R.string.consumer_turbo_allow,
+        ),
+        onAction = onAllowTurbo,
+        onDismiss = onDismissTurbo,
+    )
+}
+
 @Composable
 private fun Status(state: ConsumerHomeUiState) {
     val transfer = state.transfer
     when {
-        transfer != null -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusCard(
-                title = stringResource(R.string.consumer_status_receiving_title, transfer.producerName),
-                body = stringResource(
-                    R.string.consumer_status_receiving_body,
-                    transfer.itemsDone,
-                    transfer.itemsTotal,
-                    formatBytes(transfer.bytesDone),
-                    formatBytes(transfer.bytesTotal),
-                ),
-                icon = MediaSyncIcons.Receive,
-                tone = StatusTone.Positive,
-            )
-            LinearProgressIndicator(
-                progress = {
-                    if (transfer.bytesTotal ==
-                        0L
-                    ) {
-                        0f
-                    } else {
-                        transfer.bytesDone.toFloat() / transfer.bytesTotal
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        transfer != null -> Receiving(transfer, overTurbo = state.directLinkOpen)
+
+        state.directLinkOpen -> StatusCard(
+            title = stringResource(R.string.consumer_turbo_open_title),
+            body = stringResource(R.string.consumer_turbo_open_body),
+            icon = MediaSyncIcons.Turbo,
+        )
 
         !state.listening -> StatusCard(
             title = stringResource(R.string.consumer_status_offline_title),
@@ -205,6 +220,34 @@ private fun Status(state: ConsumerHomeUiState) {
             body = stringResource(R.string.consumer_status_waiting_body),
             icon = MediaSyncIcons.Receive,
             tone = StatusTone.Positive,
+        )
+    }
+}
+
+/** Who is sending, and how far it got; [overTurbo] while a direct link is open. */
+@Composable
+private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatusCard(
+            title = stringResource(
+                if (overTurbo) R.string.consumer_turbo_receiving_title else R.string.consumer_status_receiving_title,
+                transfer.producerName,
+            ),
+            body = stringResource(
+                R.string.consumer_status_receiving_body,
+                transfer.itemsDone,
+                transfer.itemsTotal,
+                formatBytes(transfer.bytesDone),
+                formatBytes(transfer.bytesTotal),
+            ),
+            icon = if (overTurbo) MediaSyncIcons.Turbo else MediaSyncIcons.Receive,
+            tone = StatusTone.Positive,
+        )
+        LinearProgressIndicator(
+            progress = {
+                if (transfer.bytesTotal == 0L) 0f else transfer.bytesDone.toFloat() / transfer.bytesTotal
+            },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

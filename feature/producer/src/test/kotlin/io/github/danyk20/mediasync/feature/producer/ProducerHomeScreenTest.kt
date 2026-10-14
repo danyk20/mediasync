@@ -19,6 +19,8 @@ import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import java.time.ZonedDateTime
@@ -283,6 +285,95 @@ class ProducerHomeScreenTest {
         "producer_home_receiver_full_light",
     )
 
+    @Test
+    fun turbo_isOfferedWhileThereIsSomethingToSend() {
+        show(paired.copy(pendingCount = 12, pendingBytes = 40_000_000, turbo = TurboAvailability.AVAILABLE))
+
+        composeRule.onNodeWithText("Turbo transfer").assertIsDisplayed()
+        composeRule.onNodeWithText("Start Turbo").performClick()
+        events shouldBe listOf("turbo")
+    }
+
+    @Test
+    fun turbo_isSuggestedForABigBacklogAndWarnsOnALowBattery() {
+        show(
+            paired.copy(
+                pendingCount = 2_400,
+                pendingBytes = 4_300_000_000,
+                turbo = TurboAvailability.AVAILABLE,
+                turboBatteryLow = true,
+            ),
+        )
+
+        composeRule.onNodeWithText("4.3 GB waiting: try Turbo transfer").assertIsDisplayed()
+        composeRule.onNodeWithText("The battery is low", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun turbo_isntOfferedWithoutWifiDirectOrWithNothingToSend() {
+        show(paired.copy(pendingCount = 12, turbo = TurboAvailability.UNSUPPORTED))
+        composeRule.onAllNodesWithText("Start Turbo").fetchSemanticsNodes().size shouldBe 0
+    }
+
+    @Test
+    fun turbo_saysWhatItNeedsFirst() {
+        show(paired.copy(pendingCount = 12, turbo = TurboAvailability.LOCATION_OFF))
+
+        composeRule.onNodeWithText("Turn on location first", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Location settings").performClick()
+        events shouldBe listOf("location")
+    }
+
+    @Test
+    fun turbo_declinedLeadsToTheSettings() {
+        show(paired.copy(pendingCount = 12, turbo = TurboAvailability.NOT_ALLOWED, turboDeclined = true))
+
+        composeRule.onNodeWithText("Allow it in MediaSync's settings", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Open settings").performClick()
+        events shouldBe listOf("settings")
+    }
+
+    @Test
+    fun turbo_showsItsProgressAndWhyItWasntUsed() {
+        show(paired.copy(sync = ProducerState.SettingUpTurbo))
+        composeRule.onNodeWithText("Setting up Turbo with Pixel 2 XL…").assertIsDisplayed()
+    }
+
+    @Test
+    fun turbo_sendingSaysSo() {
+        show(syncing.copy(sync = ProducerState.Syncing(TransferProgress(1, 9, 1, 9, null), turbo = true)))
+        composeRule.onNodeWithText("Sending to Pixel 2 XL over Turbo").assertIsDisplayed()
+    }
+
+    @Test
+    fun turbo_whyItWasntUsed() {
+        show(paired.copy(sync = ProducerState.Idle(turboProblem = TurboProblem.RECEIVER_NOT_ALLOWED)))
+
+        composeRule.onNodeWithText("Turbo wasn't used").assertIsDisplayed()
+        composeRule.onNodeWithText("Turbo needs your OK on Pixel 2 XL", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun screenshot_turbo_light() = screenshot(
+        paired.copy(pendingCount = 2_400, pendingBytes = 4_300_000_000, turbo = TurboAvailability.AVAILABLE),
+        "producer_home_turbo_light",
+    )
+
+    @Test
+    fun screenshot_turboSending_dark() = screenshot(
+        syncing.copy(
+            sync = ProducerState.Syncing(TransferProgress(300, 2_400, 1_200_000_000, 4_300_000_000, null), true),
+        ),
+        "producer_home_turbo_sending_dark",
+        darkTheme = true,
+    )
+
+    @Test
+    fun screenshot_turboNotUsed_light() = screenshot(
+        paired.copy(sync = ProducerState.Idle(turboProblem = TurboProblem.NO_LINK)),
+        "producer_home_turbo_not_used_light",
+    )
+
     private fun millis(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]").toInstant().toEpochMilli()
 
     private fun missed(problem: SyncProblem?, batteryRestricted: Boolean = false) =
@@ -308,6 +399,8 @@ class ProducerHomeScreenTest {
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
                     onOpenDiagnostics = { events += "diagnostics" },
+                    onStartTurbo = { events += "turbo" },
+                    onOpenLocationSettings = { events += "location" },
                 )
             }
         }

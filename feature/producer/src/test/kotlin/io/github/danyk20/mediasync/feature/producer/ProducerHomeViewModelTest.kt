@@ -31,6 +31,7 @@ import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -66,9 +67,13 @@ class ProducerHomeViewModelTest {
     private val syncState = MutableStateFlow<ProducerState>(ProducerState.Idle())
     private var waiting = 214
     private var withheld = 0
+    private var turbo = TurboAvailability.AVAILABLE
+    private var lowBattery = false
     private val sync = mockk<ProducerSync>(relaxed = true) {
         every { state } returns syncState
-        coEvery { pendingCount() } answers { Pending(waiting, withheld) }
+        coEvery { pendingCount() } answers { Pending(waiting, withheld, bytes = waiting * 3_000_000L) }
+        every { turboAvailability() } answers { turbo }
+        every { turboBatteryLow() } answers { lowBattery }
     }
     private val library = FakeMediaLibrary()
     private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
@@ -89,6 +94,39 @@ class ProducerHomeViewModelTest {
 
     private fun viewModel() =
         ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock)
+
+    @Test
+    fun turboStartsInTheBackgroundWhenThisPhoneCanUseIt() = runTest {
+        grantLibraryAccess()
+        lowBattery = true
+        val viewModel = viewModel()
+
+        val state = viewModel.uiState.first { it.pendingCount != null }
+        state.turbo shouldBe TurboAvailability.AVAILABLE
+        state.turboBatteryLow shouldBe true
+        viewModel.startTurbo()
+
+        verify { scheduler.syncNow(turbo = true) }
+    }
+
+    @Test
+    fun turboWaitsForItsPermission() = runTest {
+        grantLibraryAccess()
+        turbo = TurboAvailability.NOT_ALLOWED
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.pendingCount != null }
+
+        viewModel.onTurboPermission(granted = false)
+
+        viewModel.uiState.first { it.turboDeclined }
+        verify(exactly = 0) { scheduler.syncNow(turbo = true) }
+
+        // Allowed in the settings: back on the screen, it starts.
+        turbo = TurboAvailability.AVAILABLE
+        viewModel.onTurboPermission(granted = true)
+        viewModel.uiState.first { !it.turboDeclined && it.turbo == TurboAvailability.AVAILABLE }
+        verify { scheduler.syncNow(turbo = true) }
+    }
 
     private fun grantLibraryAccess() {
         val library = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -122,6 +160,8 @@ class ProducerHomeViewModelTest {
             canReadLocation = true,
             sync = ProducerState.Idle(),
             pendingCount = 214,
+            pendingBytes = 642_000_000,
+            turbo = TurboAvailability.AVAILABLE,
             schedule = SyncSchedule.Default,
             nextSyncAt = ZonedDateTime.parse("2026-10-15T03:00+02:00[Europe/Zurich]"),
             now = ZonedDateTime.parse("2026-10-14T20:00+02:00[Europe/Zurich]"),
@@ -186,7 +226,7 @@ class ProducerHomeViewModelTest {
         viewModel.syncNow()
         viewModel.stop()
 
-        verify { scheduler.syncNow() } // In the background: it carries on when the user leaves the app.
+        verify { scheduler.syncNow(turbo = false) } // In the background: it carries on when the user leaves the app.
         verify { sync.cancel() }
     }
 
@@ -252,6 +292,6 @@ class ProducerHomeViewModelTest {
         composeRule.onNodeWithText("214 new photos and videos").assertIsDisplayed()
         composeRule.onNodeWithText("Sync now").performClick()
 
-        verify { scheduler.syncNow() }
+        verify { scheduler.syncNow(turbo = false) }
     }
 }

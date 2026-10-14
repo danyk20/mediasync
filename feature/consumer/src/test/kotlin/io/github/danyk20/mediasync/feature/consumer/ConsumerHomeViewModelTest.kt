@@ -21,6 +21,7 @@ import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -49,9 +50,11 @@ class ConsumerHomeViewModelTest {
     private val anna = Peer(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel", DeviceRole.PRODUCER, 0, null, null)
     private val receiverState = MutableStateFlow(ReceiverState(listening = true, port = 47_420))
     private var freeBytes = 20L * 1024 * 1024 * 1024
+    private var turbo = TurboAvailability.AVAILABLE
     private val receiver = mockk<ConsumerReceiver>(relaxed = true) {
         every { state } returns receiverState
         every { freeBytes() } answers { freeBytes }
+        every { turboAvailability() } answers { turbo }
     }
     private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(anna)) }
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
@@ -72,7 +75,12 @@ class ConsumerHomeViewModelTest {
         val state = viewModel.uiState.first { it.listening }
 
         verify { receiver.hold(any()) }
-        state shouldBe ConsumerHomeUiState(listening = true, producers = listOf("Anna's Pixel"), receivedCount = 7)
+        state shouldBe ConsumerHomeUiState(
+            listening = true,
+            producers = listOf("Anna's Pixel"),
+            receivedCount = 7,
+            turbo = TurboAvailability.AVAILABLE,
+        )
     }
 
     @Test
@@ -123,6 +131,31 @@ class ConsumerHomeViewModelTest {
 
         settings.setSyncSchedule(SyncSchedule.Manual) // Nothing runs in the background.
         viewModel.uiState.first { !it.askBattery }
+    }
+
+    @Test
+    fun aTurboRequestAsksForItsPermissionUntilAnswered() = runTest {
+        turbo = TurboAvailability.NOT_ALLOWED
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.listening }
+
+        receiverState.value = receiverState.value.copy(turboNeedsPermission = true)
+        viewModel.uiState.first { it.askTurbo }
+
+        // Allowed: the card goes, and the receiver stops asking.
+        turbo = TurboAvailability.AVAILABLE
+        viewModel.onTurboAnswered()
+        viewModel.uiState.first { !it.askTurbo && it.turbo == TurboAvailability.AVAILABLE }
+        verify { receiver.turboPermissionHandled() }
+    }
+
+    @Test
+    fun anOpenDirectLinkIsShown() = runTest {
+        val viewModel = viewModel()
+
+        receiverState.value = receiverState.value.copy(directLinkOpen = true)
+
+        viewModel.uiState.first { it.directLinkOpen }
     }
 
     @Test
