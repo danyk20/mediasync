@@ -10,14 +10,17 @@ import java.io.IOException
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlin.concurrent.thread
 import okio.Buffer
 import okio.BufferedSink
 import okio.BufferedSource
 import okio.ForwardingSink
 import okio.Pipe
 import okio.Sink
+import okio.Timeout
 import okio.buffer
 
 /** Deterministic device ids for tests. */
@@ -42,6 +45,8 @@ class ConnectionPair(
     consumerId: DeviceId,
     faults: Faults = Faults(),
     timeoutMillis: Long = 10_000,
+    /** Each byte arrives this long after it was written, like a Wi-Fi hop (a round trip is twice this). */
+    latencyMillis: Long = 0,
 ) {
     private val toConsumer = Pipe(PIPE_BUFFER)
     private val toProducer = Pipe(PIPE_BUFFER)
@@ -57,14 +62,14 @@ class ConnectionPair(
     val producerEnd: PeerConnection = End(
         peerId = consumerId,
         source = toProducer.source.buffer(),
-        sink = FaultySink(toConsumer.sink, faults) { closeAll() }.buffer(),
+        sink = FaultySink(toConsumer.sink.delayed(latencyMillis), faults) { closeAll() }.buffer(),
     )
 
     /** The consumer's end; its [PeerConnection.peerId] is the producer. */
     val consumerEnd: PeerConnection = End(
         peerId = producerId,
         source = toConsumer.source.buffer(),
-        sink = toProducer.sink.buffer(),
+        sink = toProducer.sink.delayed(latencyMillis).buffer(),
     )
 
     private fun closeAll() {
@@ -109,8 +114,54 @@ class ConnectionPair(
         }
     }
 
+    /** Delivers what's written [latencyMillis] later, without holding up the writer. */
+    private class DelayedSink(private val delegate: Sink, private val latencyMillis: Long) : Sink {
+        private val queue = LinkedBlockingQueue<Pair<Long, Buffer>>()
+        private val delivery = thread(isDaemon = true, name = "latency") {
+            try {
+                while (true) {
+                    val (due, chunk) = queue.take()
+                    if (chunk.size == 0L) break // Closed.
+                    val wait = due - System.nanoTime() / NANOS_PER_MILLI
+                    if (wait > 0) Thread.sleep(wait)
+                    delegate.write(chunk, chunk.size)
+                    delegate.flush()
+                }
+            } catch (_: IOException) {
+                // The pipe was cancelled.
+            } catch (_: InterruptedException) {
+                // Shut down.
+            }
+        }
+
+        override fun write(source: Buffer, byteCount: Long) {
+            val chunk = Buffer()
+            source.read(chunk, byteCount)
+            queue.put(System.nanoTime() / NANOS_PER_MILLI + latencyMillis to chunk)
+        }
+
+        override fun flush() = Unit
+
+        override fun timeout(): Timeout = Timeout.NONE
+
+        override fun close() {
+            queue.put(0L to Buffer())
+            delivery.join()
+            delegate.close()
+        }
+    }
+
+    private fun Sink.delayed(latencyMillis: Long): Sink = if (latencyMillis >
+        0
+    ) {
+        DelayedSink(this, latencyMillis)
+    } else {
+        this
+    }
+
     private companion object {
         const val PIPE_BUFFER = 4L * 1024 * 1024
+        const val NANOS_PER_MILLI = 1_000_000L
     }
 }
 

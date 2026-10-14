@@ -16,6 +16,7 @@ import io.github.danyk20.mediasync.sync.engine.PairingLink
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
+import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanServer
 import io.github.danyk20.mediasync.transport.lan.PeerTrust
 import java.io.Closeable
@@ -177,6 +178,11 @@ class ConsumerReceiver internal constructor(
         val started = System.currentTimeMillis()
         Diagnostics.log(Area.RECEIVE, "Session from ${producer.short()} at ${connection.remoteAddress}")
         markActivity()
+        addresses.keepingAwake { receive(producer, connection, started) }
+    }
+
+    /** One session with [producer], from its first message to its end. */
+    private fun receive(producer: DeviceId, connection: PeerConnection, started: Long) {
         connection.use {
             val session = ConsumerSession(
                 device.local(),

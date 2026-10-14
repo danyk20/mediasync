@@ -619,13 +619,15 @@ Speed is the top non-functional requirement. The strategy has six parts:
    - Large socket buffers (4–8 MB).
    - 1 MiB chunks.
    - Pipelining: the next file starts immediately, and ACKs are asynchronous and windowed, so there is no round trip per file. This matters a lot for thousands of small photos.
+     - Up to 16 files are in flight. The protocol is unchanged: confirmations already name their file, and consumers already read the next file right after confirming one.
 3. **Keep the CPU out of the way.**
    - TLS 1.3 with AES-GCM, hardware-accelerated on ARMv8 (multi-GB/s), so encryption is never the limit.
    - No compression, because media is already compressed.
    - Hashing and metadata removal happen inline, while streaming.
    - Zero-copy where possible: `FileChannel` and direct buffers.
 4. **Keep the radio awake.**
-   - Hold a low-latency `WifiLock` and a partial wake lock during a session only.
+   - Hold Wi-Fi locks during a session only: low-latency (screen on) and high-performance (screen off at night).
+   - No partial wake lock: background jobs and foreground services already hold one, and another would only risk Play's "excessive wake locks" warning.
    - Turbo groups request the 5 GHz band.
 5. **Never redo work.** Fingerprint dedupe, `HAVE` replies, and byte-offset resume.
 6. **Stay thermally aware.** Watch `PowerManager` thermal status and reduce streams before the SoC throttles. Throttling would cost more speed than backing off.
@@ -635,6 +637,9 @@ Speed is the top non-functional requirement. The strategy has six parts:
 - A built-in **link test** (Diagnostics) measures raw throughput between the paired devices over Wi-Fi and over Turbo. The UI shows achieved speed against link capacity.
 - **Target:** ≥ 85 % of the measured raw link throughput on Wi-Fi and Turbo, for both large videos and 1,000-photo batches.
 - A JVM loopback benchmark runs in CI, and an on-device benchmark runs before each release, to catch regressions.
+  - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency.
+  - The CI job compares each run with the history kept from `main`, and fails when a case runs at half the speed or less (shared CI machines vary too much for a tighter bound).
+  - First results (a 2026 Mac): 487 MB/s for the video, 616 MB/s for the photos, and 92 MB/s with 5 ms latency, where one confirmation per file would allow about 10 MB/s.
 - Internet throughput is usually limited by the uplink. The WebRTC data channel (SCTP) is good enough for that today. A QUIC transport can be added later behind the same `Transport` interface if ever needed.
 
 ---
