@@ -129,6 +129,21 @@ data class FileAck(
     }
 }
 
+/**
+ * Producer → consumer: measures the link (docs/PLAN.md §7). The consumer answers with the same message when it's
+ * ready; `DATA` frames of filler then follow until [LinkTestEnd].
+ */
+@Serializable
+data class LinkTestBegin(@ProtoNumber(1) val reserved: Int = 0) : ControlMessage
+
+/** Producer → consumer: the filler is over; [bytes] were sent. */
+@Serializable
+data class LinkTestEnd(@ProtoNumber(1) val bytes: Long) : ControlMessage
+
+/** Consumer → producer: the filler that arrived, and how long from its first byte to its last. */
+@Serializable
+data class LinkTestResult(@ProtoNumber(1) val bytes: Long, @ProtoNumber(2) val micros: Long) : ControlMessage
+
 /** Either side: the session is over. */
 @Serializable
 data class Bye(@ProtoNumber(1) val reason: Int = Reason.DONE) : ControlMessage {

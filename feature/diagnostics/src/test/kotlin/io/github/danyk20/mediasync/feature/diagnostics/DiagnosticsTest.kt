@@ -9,16 +9,25 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import io.github.danyk20.mediasync.core.database.Peer
+import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.DiagnosticsReport
 import io.github.danyk20.mediasync.sync.android.Fact
+import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.engine.LinkSpeed
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -57,11 +66,20 @@ class DiagnosticsTest {
         coEvery { export() } returns "MediaSync diagnostics"
     }
     private val events = mutableListOf<String>()
+    private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
+    private val consumer = Peer(DeviceId.of(ByteArray(32)), "Pixel 2 XL", DeviceRole.CONSUMER, 0, null, null)
+    private val peers = mockk<PeerStore> { every { observeConsumer() } returns flowOf(consumer) }
+    private var speeds = listOf<LinkSpeed?>(LinkSpeed(240 * MB, 5_000_000), LinkSpeed(300 * MB, 5_000_000))
+    private val sync =
+        mockk<ProducerSync> { coEvery { linkTest(any(), any()) } answers { speeds[firstArg<Int>() / 4] } }
+
+    private fun viewModel() = DiagnosticsViewModel(report, sync, settings, peers)
 
     @Test
     fun itShowsTheReportAndRecentEventsAndClears() = runTest {
-        val viewModel = DiagnosticsViewModel(report)
-        viewModel.uiState.first { it.facts.isNotEmpty() } shouldBe DiagnosticsUiState(facts, recent)
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.facts.isNotEmpty() && it.linkTest != null } shouldBe
+            DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL"))
 
         entries = emptyList()
         viewModel.clear()
@@ -69,6 +87,36 @@ class DiagnosticsTest {
         viewModel.uiState.first { it.recent.isEmpty() }
         coVerify { report.clear() }
         viewModel.export() shouldBe "MediaSync diagnostics"
+    }
+
+    @Test
+    fun theLinkTestMeasuresOneThenFourConnections() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.linkTest != null }
+
+        viewModel.runLinkTest()
+
+        viewModel.uiState.first { it.linkTest?.fourConnections != null }.linkTest shouldBe
+            LinkTestUi("Pixel 2 XL", oneConnection = 48.0, fourConnections = 60.0)
+    }
+
+    @Test
+    fun anUnreachablePhoneIsSaidSo() = runTest {
+        speeds = listOf(null, null)
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.linkTest != null }
+
+        viewModel.runLinkTest()
+
+        viewModel.uiState.first { it.linkTest?.failed == true }.linkTest?.oneConnection shouldBe null
+        coVerify(exactly = 1) { sync.linkTest(any(), any()) } // Four connections aren't tried.
+    }
+
+    @Test
+    fun onlySendingPhonesHaveALinkTest() = runTest {
+        settings.setRole(DeviceRole.CONSUMER)
+
+        viewModel().uiState.first { it.facts.isNotEmpty() }.linkTest shouldBe null
     }
 
     @Test
@@ -93,7 +141,20 @@ class DiagnosticsTest {
     fun screenshot_light() = screenshot(darkTheme = false, "diagnostics_light")
 
     @Test
+    fun screenshot_linkTest_light() {
+        show(DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL", oneConnection = 48.2, fourConnections = 61.0)))
+        composeRule.onNodeWithText("Four connections: 61.0 MB/s").assertIsDisplayed()
+        composeRule.onNodeWithText("Test the connection").performClick()
+        events shouldBe listOf("link test")
+        composeRule.onRoot().captureScreenshot("diagnostics_link_test_light")
+    }
+
+    @Test
     fun screenshot_dark() = screenshot(darkTheme = true, "diagnostics_dark")
+
+    private companion object {
+        const val MB = 1024L * 1024
+    }
 
     private fun screenshot(darkTheme: Boolean, name: String) {
         show(DiagnosticsUiState(facts, recent), darkTheme)
@@ -105,6 +166,7 @@ class DiagnosticsTest {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
                 DiagnosticsScreen(
                     state = state,
+                    onTestLink = { events += "link test" },
                     onShare = { events += "share" },
                     onSave = { events += "save" },
                     onClear = { events += "clear" },

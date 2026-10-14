@@ -61,42 +61,44 @@ class ConnectionPair(
     /** What the producer writes, as it reaches the consumer. */
     private val toConsumerSink = toConsumer.sink.delayed(latencyMillis)
 
+    /** What the consumer writes, as it reaches the producer. */
+    private val toProducerSink = toProducer.sink.delayed(latencyMillis)
+
     /** The producer's end; its [PeerConnection.peerId] is the consumer, as TLS would have authenticated. */
     val producerEnd: PeerConnection = End(
         peerId = consumerId,
         source = toProducer.source.buffer(),
-        sink = FaultySink(toConsumerSink, faults) { drop() }.buffer(),
+        sink = FaultySink(toConsumerSink, faults) { endOf(toConsumerSink, toProducer) }.buffer(),
+        onClose = { endOf(toConsumerSink, toProducer) },
     )
 
     /** The consumer's end; its [PeerConnection.peerId] is the producer. */
     val consumerEnd: PeerConnection = End(
         peerId = producerId,
         source = toConsumer.source.buffer(),
-        sink = toProducer.sink.delayed(latencyMillis).buffer(),
+        sink = toProducerSink.buffer(),
+        onClose = { endOf(toProducerSink, toConsumer) },
     )
 
-    private fun closeAll() {
-        toConsumer.cancel()
-        toProducer.cancel()
-    }
-
     /**
-     * The connection drops: the consumer still reads what was sent before, then the end, as from a socket. Cancelling
-     * that pipe instead would throw away what it hadn't read yet: on a slow machine, everything.
+     * One side's end of the connection, as with a socket, whether it closed it or the connection dropped: the other
+     * side still reads what was sent before, then the end, and this side reads nothing more. Cancelling the outgoing
+     * pipe instead would throw away what the other side hadn't read yet: on a slow machine, everything.
      */
-    private fun drop() {
-        toConsumerSink.close() // After what's still on its way.
-        toProducer.cancel()
+    private fun endOf(outgoing: Sink, incoming: Pipe) {
+        runCatching { outgoing.close() } // After what's still on its way.
+        incoming.cancel()
     }
 
-    private inner class End(
+    private class End(
         override val peerId: DeviceId,
         override val source: BufferedSource,
         override val sink: BufferedSink,
+        private val onClose: () -> Unit,
     ) : PeerConnection {
         override val remoteAddress = "memory"
 
-        override fun close() = closeAll()
+        override fun close() = onClose()
     }
 
     private class FaultySink(delegate: Sink, private val faults: Faults, private val onCut: () -> Unit) :

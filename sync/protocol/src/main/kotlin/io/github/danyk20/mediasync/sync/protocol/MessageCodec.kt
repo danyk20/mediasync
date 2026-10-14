@@ -28,6 +28,9 @@ object MessageCodec {
         FrameType.FILE_END to FileEnd.serializer(),
         FrameType.FILE_ACK to FileAck.serializer(),
         FrameType.BYE to Bye.serializer(),
+        FrameType.LINK_TEST_BEGIN to LinkTestBegin.serializer(),
+        FrameType.LINK_TEST_END to LinkTestEnd.serializer(),
+        FrameType.LINK_TEST_RESULT to LinkTestResult.serializer(),
     )
 
     fun encode(message: ControlMessage): Frame = when (message) {
@@ -40,6 +43,9 @@ object MessageCodec {
         is FileEnd -> frame(FrameType.FILE_END, FileEnd.serializer(), message)
         is FileAck -> frame(FrameType.FILE_ACK, FileAck.serializer(), message)
         is Bye -> frame(FrameType.BYE, Bye.serializer(), message)
+        is LinkTestBegin -> frame(FrameType.LINK_TEST_BEGIN, LinkTestBegin.serializer(), message)
+        is LinkTestEnd -> frame(FrameType.LINK_TEST_END, LinkTestEnd.serializer(), message)
+        is LinkTestResult -> frame(FrameType.LINK_TEST_RESULT, LinkTestResult.serializer(), message)
     }
 
     /**

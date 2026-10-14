@@ -9,4 +9,12 @@
     <string name="diagnostics_share_title">Share MediaSync diagnostics</string>
     <string name="diagnostics_recent">Recent events</string>
     <string name="diagnostics_empty">Nothing logged yet.</string>
+    <string name="diagnostics_link_test">Link test</string>
+    <string name="diagnostics_link_test_intro">Measures how fast this phone can send to %1$s, with MediaSync open on it. Takes about 10 seconds.</string>
+    <string name="diagnostics_link_test_start">Test the connection</string>
+    <string name="diagnostics_link_test_running">Testing…</string>
+    <string name="diagnostics_link_test_failed">%1$s couldn\'t be reached. Open MediaSync on it, on the same Wi-Fi, and try again.</string>
+    <!-- "One connection: 48.2 MB/s" -->
+    <string name="diagnostics_link_test_one">One connection: %1$s MB/s</string>
+    <string name="diagnostics_link_test_four">Four connections: %1$s MB/s</string>
 </resources>
