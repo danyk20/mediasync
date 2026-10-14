@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.sync.engine
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.sync.protocol.Bye
+import io.github.danyk20.mediasync.sync.protocol.ControlMessage
 import io.github.danyk20.mediasync.sync.protocol.FileAck
 import io.github.danyk20.mediasync.sync.protocol.FileBegin
 import io.github.danyk20.mediasync.sync.protocol.FileEnd
@@ -42,7 +43,8 @@ sealed interface ServeResult {
 }
 
 /**
- * Serves one producer connection: pairing for unknown producers, otherwise receiving (docs/PLAN.md §5).
+ * Serves one producer connection (docs/PLAN.md §5). A producer that asks to pair goes through pairing,
+ * even if it's already paired (its QR code was scanned again); a paired producer otherwise sends.
  *
  * Every file is hashed while it's written and only becomes visible after its SHA-256 matches. A dropped
  * connection keeps the partial file so the next session resumes where this one stopped.
@@ -67,19 +69,26 @@ class ConsumerSession(
             return ServeResult.Rejected(Bye.Reason.INCOMPATIBLE_VERSION)
         }
         val producer = connection.peerId
-        return if (registry.isPaired(producer)) {
-            Receiver(channel, producer).run()
-        } else {
-            pair(channel, producer, hello.deviceName)
+        val first = channel.receive()
+        return when {
+            first is PairRequest -> pair(channel, producer, hello.deviceName, first)
+
+            registry.isPaired(producer) -> Receiver(channel, producer).run(first)
+
+            else -> {
+                channel.send(Bye(Bye.Reason.NOT_PAIRED))
+                ServeResult.Rejected(Bye.Reason.NOT_PAIRED)
+            }
         }
     }
 
-    private fun pair(channel: FrameChannel, producer: DeviceId, producerName: String): ServeResult {
-        val request = channel.receive()
-        if (request !is PairRequest) {
-            channel.send(Bye(Bye.Reason.NOT_PAIRED))
-            return ServeResult.Rejected(Bye.Reason.NOT_PAIRED)
-        }
+    /** Re-pairing a known producer only updates its name: what it sent before stays recorded. */
+    private fun pair(
+        channel: FrameChannel,
+        producer: DeviceId,
+        producerName: String,
+        request: PairRequest,
+    ): ServeResult {
         val decision = pairingGate.decide(PairingRequest(producer, producerName, request.token))
         val result = if (decision == PairingDecision.ACCEPTED) {
             val peer = PairedPeer(producer, producerName, DeviceRole.PRODUCER)
@@ -116,14 +125,16 @@ class ConsumerSession(
         private var alreadyHad = 0
         private var failed = 0
 
-        fun run(): ServeResult {
-            while (true) {
-                when (val message = channel.receive()) {
+        /** Receives until `Bye`, starting with [first], the message already read after `Hello`. */
+        fun run(first: ControlMessage): ServeResult {
+            var message = first
+            while (message !is Bye) {
+                when (message) {
                     is Offer -> answer(message)
                     is FileBegin -> receive(message)
-                    is Bye -> break
                     else -> throw ProtocolException("Unexpected ${message::class.simpleName} while syncing")
                 }
+                message = channel.receive()
             }
             return ServeResult.Synced(received, alreadyHad, failed, bytesDone)
         }

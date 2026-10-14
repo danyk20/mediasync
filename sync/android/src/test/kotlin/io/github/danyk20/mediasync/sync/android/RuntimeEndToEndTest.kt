@@ -52,12 +52,13 @@ class RuntimeEndToEndTest {
     // The receiving phone.
     private val consumerDb = database()
     private val consumerPeers = PeerStore(consumerDb.peerDao())
+    private val received = RoomReceivedLedger(consumerDb.receivedItemDao())
     private val sink = FakeMediaSink()
     private val consumerIdentity = testIdentity("Pixel 2 XL")
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
-        ledger = RoomReceivedLedger(consumerDb.receivedItemDao()),
+        ledger = received,
         sink = sink,
         device = { LocalDevice("Pixel 2 XL", "test") },
         addresses = loopback,
@@ -93,11 +94,8 @@ class RuntimeEndToEndTest {
     @Test
     fun pairByLinkThenSyncNow() = runBlocking<Unit> {
         receiver.start()
-        val link = receiver.openPairing().shouldNotBeNull()
-        // The consumer's user approves the request when it appears.
-        scope.launch { receiver.pendingApproval.first { it != null }?.accept() }
 
-        val paired = producer.pair(link)
+        val paired = pairWithApproval()
 
         paired shouldBe PairingResult.Paired("Pixel 2 XL")
         consumerPeers.isPaired(producerIdentity.id) shouldBe true
@@ -121,6 +119,33 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun pairingAgainKeepsWhatWasSentAndSyncsOn() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval() shouldBe PairingResult.Paired("Pixel 2 XL")
+        producer.syncNow()
+        val first = withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        // The QR code is scanned again on the phone that is already paired.
+        pairWithApproval() shouldBe PairingResult.Paired("Pixel 2 XL")
+
+        withTimeout(TIMEOUT) { receiver.state.first { it.lastPaired != null } }.lastPaired?.name shouldBe "Anna's Pixel"
+        consumerPeers.isPaired(producerIdentity.id) shouldBe true
+        received.observeCountFrom(producerIdentity.id).first() shouldBe photos.size
+        producer.pendingCount() shouldBe 0
+
+        val newPhoto = FakeMedia("new", Random(photos.size).nextBytes(200_000))
+        source.put(newPhoto)
+        producer.syncNow()
+        val again = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it != first }
+        }
+
+        again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
+            SyncResult(sent = 1, bytesSent = newPhoto.bytes.size.toLong())
+        sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
+    }
+
+    @Test
     fun anUnpairedPhoneCantSync() = runBlocking<Unit> {
         receiver.start()
         val link = receiver.openPairing().shouldNotBeNull()
@@ -141,6 +166,13 @@ class RuntimeEndToEndTest {
         // The consumer tells it explicitly, so the user knows to pair again.
         (failed as ProducerState.Failed).reason shouldBe SyncFailure.NOT_ALLOWED
         sink.stored.size shouldBe 0
+    }
+
+    /** Shows the consumer's QR code, scans it on the producer, and approves the request on the consumer. */
+    private suspend fun pairWithApproval(): PairingResult {
+        val link = receiver.openPairing().shouldNotBeNull()
+        scope.launch { receiver.pendingApproval.first { it != null }?.accept() }
+        return producer.pair(link)
     }
 
     private fun database() = Room.inMemoryDatabaseBuilder(

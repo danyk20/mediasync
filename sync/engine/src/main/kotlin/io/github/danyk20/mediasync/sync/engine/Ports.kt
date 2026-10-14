@@ -70,6 +70,7 @@ data class PairedPeer(val id: DeviceId, val name: String, val role: DeviceRole)
 interface PeerRegistry {
     fun isPaired(id: DeviceId): Boolean
 
+    /** Also called when a paired device pairs again; that updates it and keeps its ledgers. */
     fun register(peer: PairedPeer)
 }
 
