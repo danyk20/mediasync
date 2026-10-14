@@ -19,6 +19,7 @@ import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
@@ -44,11 +45,13 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val device = AndroidDeviceInfo(context) { SyncSchedule.WhileCharging }.local()
+        val info = AndroidDeviceInfo(context, { SyncSchedule.WhileCharging }, { PhotoDetails.REMOVE_LOCATION })
+        val device = info.local()
 
         device.name.shouldNotBeBlank()
         device.appVersion.shouldNotBeBlank()
         device.schedule shouldBe SyncSchedule.WhileCharging
+        info.photoDetails() shouldBe PhotoDetails.REMOVE_LOCATION
     }
 
     @Test
@@ -73,6 +76,31 @@ class AndroidPlatformTest {
                 socket.connect(target, 5_000)
                 socket.isConnected shouldBe true
             }
+        }
+    }
+
+    @Test
+    fun sessionsKeepTheWifiAwakeAndLetItRestAfterwards() {
+        val network = AndroidLocalNetwork(context)
+
+        val held = network.keepingAwake { wifiLocks() }
+
+        held shouldBe true
+        wifiLocks() shouldBe false
+    }
+
+    /** Whether this app holds a Wi-Fi lock: listed under "Locks held:" (newer Androids also log past ones). */
+    private fun wifiLocks(): Boolean {
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("dumpsys wifi")
+        val dump = ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes().decodeToString() }
+        var held = false
+        return dump.lines().any { line ->
+            val text = line.trim()
+            when {
+                text == "Locks held:" -> held = true
+                text.isEmpty() || text.startsWith("Locks ") || text.startsWith("Active lock owners") -> held = false
+            }
+            held && "MediaSync:session" in text
         }
     }
 

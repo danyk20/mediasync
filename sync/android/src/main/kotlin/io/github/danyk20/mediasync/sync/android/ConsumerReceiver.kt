@@ -6,6 +6,8 @@ package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.crypto.IdentityProvider
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.ConsumerSession
 import io.github.danyk20.mediasync.sync.engine.MediaSink
@@ -14,6 +16,7 @@ import io.github.danyk20.mediasync.sync.engine.PairingLink
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
+import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanServer
 import io.github.danyk20.mediasync.transport.lan.PeerTrust
 import java.io.Closeable
@@ -121,10 +124,12 @@ class ConsumerReceiver internal constructor(
             runCatching { discovery.advertise(server.port, serviceIdOf(identity.identity().id)) }.getOrNull()
         _state.update { it.copy(listening = true, port = server.port) }
         acceptJob = scope.launch(Dispatchers.IO) { acceptLoop(server) }
+        Diagnostics.log(Area.RECEIVE, "Listening on port ${server.port} for ${holders.joinToString()}")
     }
 
     @Synchronized
     fun stop() {
+        if (server != null) Diagnostics.log(Area.RECEIVE, "Stopped listening")
         acceptJob?.cancel()
         server?.close()
         advertisement?.close()
@@ -154,7 +159,8 @@ class ConsumerReceiver internal constructor(
         while (scope.isActive) {
             val pending = try {
                 server.accept()
-            } catch (_: IOException) {
+            } catch (e: IOException) {
+                if (scope.isActive && this.server === server) Diagnostics.log(Area.RECEIVE, "Stopped accepting", e)
                 break // Closed by stop().
             }
             scope.launch(Dispatchers.IO) { serve(pending) }
@@ -164,11 +170,19 @@ class ConsumerReceiver internal constructor(
     private fun serve(pending: LanServer.Pending) {
         val connection = try {
             pending.handshake()
-        } catch (_: IOException) {
+        } catch (e: IOException) {
+            Diagnostics.log(Area.RECEIVE, "A connection failed its handshake", e)
             return // Not a paired phone (or not MediaSync at all).
         }
         val producer = connection.peerId
+        val started = System.currentTimeMillis()
+        Diagnostics.log(Area.RECEIVE, "Session from ${producer.short()} at ${connection.remoteAddress}")
         markActivity()
+        addresses.keepingAwake { receive(producer, connection, started) }
+    }
+
+    /** One session with [producer], from its first message to its end. */
+    private fun receive(producer: DeviceId, connection: PeerConnection, started: Long) {
         connection.use {
             val session = ConsumerSession(
                 device.local(),
@@ -186,8 +200,20 @@ class ConsumerReceiver internal constructor(
                 },
             )
             val result = try {
-                session.serve(it)
-            } catch (_: IOException) {
+                session.serve(it).also { result ->
+                    Diagnostics.log(
+                        Area.RECEIVE,
+                        "Session from ${producer.short()} ended in ${since(started)}: ${result.describe()}",
+                    )
+                }
+            } catch (e: IOException) {
+                val progress = _state.value.transfers[producer]
+                Diagnostics.log(
+                    Area.RECEIVE,
+                    "Session from ${producer.short()} dropped after ${since(started)} at ${progress.describe()}; " +
+                        "free ${bytes(sink.availableBytes())}",
+                    e,
+                )
                 null // Dropped: kept partial files resume next time.
             }
             _state.update { state ->

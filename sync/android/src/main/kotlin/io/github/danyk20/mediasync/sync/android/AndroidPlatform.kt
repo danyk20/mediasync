@@ -15,12 +15,14 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.InetAddress
@@ -41,11 +43,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 class AndroidDeviceInfo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val schedule: ScheduleSource,
+    private val details: PhotoDetailsSource,
 ) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
     /** As a receiving phone, it also tells its current schedule; sending phones ignore that part. */
     override fun local(): LocalDevice = device.copy(schedule = schedule.current())
+
+    override fun photoDetails(): PhotoDetails = details.current()
 
     /** The name the user gave the phone (Settings → About phone), else its model. */
     private fun name(): String =
@@ -121,6 +126,23 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
     AddressProvider,
     LanSockets {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val wifi = context.getSystemService(WifiManager::class.java)
+
+    /**
+     * Holds Wi-Fi locks while a session runs: Wi-Fi power saving would otherwise slow transfers down, the screen
+     * being off at night. No wake lock: background jobs and foreground services already keep the phone awake.
+     */
+    override fun <T> keepingAwake(session: () -> T): T {
+        @Suppress("DEPRECATION") // Low latency needs the screen on; high performance covers the night.
+        val locks = listOf(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, WifiManager.WIFI_MODE_FULL_HIGH_PERF)
+            .map { mode -> wifi.createWifiLock(mode, WIFI_LOCK_TAG).apply { setReferenceCounted(false) } }
+        locks.forEach { it.acquire() }
+        try {
+            return session()
+        } finally {
+            locks.forEach { if (it.isHeld) it.release() }
+        }
+    }
 
     override fun localAddresses(): List<InetAddress> =
         localNetworks().flatMap { (_, links) -> links.linkAddresses.map { it.address } }
@@ -251,3 +273,5 @@ class NsdServiceDiscovery @Inject constructor(@ApplicationContext context: Conte
         const val ID_ATTRIBUTE = "id"
     }
 }
+
+private const val WIFI_LOCK_TAG = "MediaSync:session"

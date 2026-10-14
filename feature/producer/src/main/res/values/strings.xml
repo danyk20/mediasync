@@ -71,6 +71,25 @@
     <string name="producer_status_no_folders_title">No folders chosen</string>
     <string name="producer_status_no_folders_body">Choose which folders to send to %1$s.</string>
 
+    <!-- Photo details: what the sending phone removes before sending (docs/PLAN.md §6.3) -->
+    <string name="producer_details_row_title">Photo details</string>
+    <string name="producer_details_title">Photo details sent</string>
+    <string name="producer_details_intro">Photos and videos carry details: where they were taken, which phone took them, captions. Choose what this phone sends to %1$s.</string>
+    <string name="producer_details_intro_unpaired">Photos and videos carry details: where they were taken, which phone took them, captions. Choose what this phone sends.</string>
+    <string name="producer_details_keep_all">Keep all</string>
+    <string name="producer_details_keep_all_description">Photos and videos arrive exactly as they are on this phone.</string>
+    <string name="producer_details_remove_location">Remove location</string>
+    <string name="producer_details_remove_location_description">Places are removed: GPS, place names and video location. Everything else stays.</string>
+    <string name="producer_details_remove_all">Remove all details</string>
+    <string name="producer_details_remove_all_description">Location, camera, phone, captions, album and favorite are removed. The date, orientation and colours stay.</string>
+    <string name="producer_details_remove_all_note">Motion Photos and Ultra HDR photos arrive as ordinary photos. RAW photos aren\'t sent: their details can\'t be removed.</string>
+    <string name="producer_details_scope">Applies to photos and videos sent from now on. Those already sent keep their details.</string>
+    <plurals name="producer_withheld_title">
+        <item quantity="one">%d photo or video isn\'t sent</item>
+        <item quantity="other">%d photos and videos aren\'t sent</item>
+    </plurals>
+    <string name="producer_withheld_body">MediaSync can\'t remove the details of RAW photos and some other files. Choose another Photo details setting to send them.</string>
+
     <string name="producer_folders_title">Folders to send</string>
     <string name="producer_folders_done">Done</string>
     <string name="producer_folders_intro">Photos and videos in these folders are sent to your receiving phone. Turning a folder off doesn\'t remove what it already received.</string>

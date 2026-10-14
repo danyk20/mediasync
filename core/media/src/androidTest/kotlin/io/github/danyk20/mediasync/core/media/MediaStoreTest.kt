@@ -20,15 +20,21 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
+import io.github.danyk20.mediasync.core.metadata.ByteReader
+import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
+import io.github.danyk20.mediasync.core.metadata.Redaction
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
+import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.Instant
@@ -202,6 +208,27 @@ class MediaStoreTest {
     }
 
     @Test
+    fun theLocationIsReadFromTheOriginalAndRemovedBeforeSending() {
+        val photo = jpeg(Color.CYAN, exifDate = "2026:10:14 09:30:00", location = true)
+        insertIntoCamera(photo, "PXL_20261014_093000000.jpg")
+        val source = MediaStoreSource(context, database.mediaFingerprintDao()) { SourceSelection.Default }
+        val item = source.items().single { it.descriptor.displayName == "PXL_20261014_093000000.jpg" }
+
+        val plan = source.openRanges(item).use { ranges ->
+            ranges.read(0, photo.size).toList() shouldBe photo.toList() // The original, location included.
+            PhotoDetailsRemover.plan(item.descriptor.size, ByteReader(ranges::read), PhotoDetails.REMOVE_LOCATION)
+        }
+        val sent = source.open(item).buffer().inputStream().use {
+            plan.shouldBeInstanceOf<Redaction.Edited>().open(it).readBytes()
+        }
+
+        ExifInterface(photo.inputStream()).latLong.shouldNotBeNull()
+        ExifInterface(sent.inputStream()).latLong.shouldBeNull()
+        ExifInterface(sent.inputStream()).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) shouldBe
+            "2026:10:14 09:30:00"
+    }
+
+    @Test
     fun onlyTheChosenFoldersAreSent() {
         insertIntoCamera(jpeg(Color.DKGRAY), "camera-choice.jpg")
         insertInto(TEST_FOLDER, jpeg(Color.LTGRAY), "other-choice.jpg")
@@ -299,13 +326,14 @@ class MediaStoreTest {
         )
 
     /** A real JPEG; without [exifDate] it has no capture date, as WhatsApp images don't. */
-    private fun jpeg(color: Int, exifDate: String? = null): ByteArray {
+    private fun jpeg(color: Int, exifDate: String? = null, location: Boolean = false): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
         val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
-        if (exifDate == null) return bytes
+        if (exifDate == null && !location) return bytes
         val file = File.createTempFile("dated", ".jpg", context.cacheDir).apply { writeBytes(bytes) }
         ExifInterface(file).apply {
-            setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, exifDate)
+            exifDate?.let { setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, it) }
+            if (location) setLatLong(47.3769, 8.5417)
             saveAttributes()
         }
         return file.readBytes().also { file.delete() }

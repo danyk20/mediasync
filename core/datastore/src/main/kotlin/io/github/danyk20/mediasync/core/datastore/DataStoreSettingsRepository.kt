@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -57,6 +58,17 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[SyncScheduleKey] = schedule.encode() }
     }
 
+    override val photoDetails: Flow<PhotoDetails> = dataStore.data
+        .map { preferences ->
+            preferences[PhotoDetailsKey]?.let { name -> PhotoDetails.entries.firstOrNull { it.name == name } }
+                ?: PhotoDetails.Default
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setPhotoDetails(details: PhotoDetails) {
+        dataStore.edit { it[PhotoDetailsKey] = details.name }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -75,6 +87,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val SourcePresetKey = stringPreferencesKey("source_preset")
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
         val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
+        val PhotoDetailsKey = stringPreferencesKey("photo_details")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

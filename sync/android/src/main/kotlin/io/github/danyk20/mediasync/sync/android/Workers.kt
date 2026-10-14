@@ -10,12 +10,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
+import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -23,6 +25,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -32,6 +36,7 @@ import java.time.Duration
 import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -62,12 +67,13 @@ class ScheduledSyncWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
-        val consumer = withContext(Dispatchers.IO) { peers.consumer() } ?: return Result.success() // Unpaired.
-        val problem = sync(consumer) ?: return Result.success()
+    override suspend fun doWork(): Result = logged("Scheduled sync") {
+        val consumer = withContext(Dispatchers.IO) { peers.consumer() } ?: return@logged Result.success() // Unpaired.
+        val problem = sync(consumer) ?: return@logged Result.success()
         // Tries again while charging; the home screen says why if the sync is late.
+        Diagnostics.log(Area.WORK, "Scheduled sync waits: ${problem.name.lowercase()}")
         history.recordProblem(problem)
-        return Result.retry()
+        Result.retry()
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.sending(consumerName = null)
@@ -116,13 +122,31 @@ class SyncNowWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = logged("Sync now") {
         val consumer = withContext(Dispatchers.IO) { peers.consumer() }
         send(sync, notifications, consumer?.name) { sync.syncAndWait() }
-        return Result.success() // However it went, the home screen shows it.
+        Result.success() // However it went, the home screen shows it.
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.sending(consumerName = null)
+}
+
+/** Runs [work], noting in the diagnostic log when it starts, how it ends, and why Android stopped it. */
+private suspend fun CoroutineWorker.logged(
+    name: String,
+    work: suspend () -> ListenableWorker.Result,
+): ListenableWorker.Result {
+    Diagnostics.log(Area.WORK, "$name started (try ${runAttemptCount + 1})")
+    return try {
+        work().also { result ->
+            val outcome = if (result == ListenableWorker.Result.retry()) "tries again later" else "done"
+            Diagnostics.log(Area.WORK, "$name $outcome")
+        }
+    } catch (e: CancellationException) {
+        val why = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason(stopReason) else "reason unknown"
+        Diagnostics.log(Area.WORK, "$name stopped by Android: $why")
+        throw e
+    }
 }
 
 /** Runs [syncing] in the foreground where Android allows it, with live progress and a note of what was sent. */
@@ -165,10 +189,16 @@ class ReceiveWindowWorker @AssistedInject constructor(
     private val clock: Clock,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
-        if (conditions.pauseReason() != null) return Result.retry()
+    override suspend fun doWork(): Result = logged("Receive window") { receive() }
+
+    private suspend fun receive(): Result {
+        conditions.pauseReason()?.let { reason ->
+            Diagnostics.log(Area.WORK, "Receive window waits: ${reason.name.lowercase()}")
+            return Result.retry()
+        }
         val schedule = settings.syncSchedule.first()
         val due = scheduler.servedDue(DeviceRole.CONSUMER, schedule)
+        Diagnostics.log(Area.WORK, "Receive window open for ${due ?: "whenever charging"}")
         notifications.runInForeground(this, notifications.receiving())
         val opened = clock.millis()
         val paused = coroutineScope {
@@ -185,7 +215,11 @@ class ReceiveWindowWorker @AssistedInject constructor(
                 receiver.release(HOLDER)
             }
         }
-        if (paused) return Result.retry()
+        if (paused) {
+            Diagnostics.log(Area.WORK, "Receive window closes early: ${conditions.pauseReason()?.name?.lowercase()}")
+            return Result.retry()
+        }
+        Diagnostics.log(Area.WORK, "Receive window closes: everyone's done")
         scheduler.finished(DeviceRole.CONSUMER, due)
         return Result.success()
     }
@@ -252,8 +286,9 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
     suspend fun runInForeground(worker: CoroutineWorker, info: ForegroundInfo) {
         try {
             worker.setForeground(info)
-        } catch (_: IllegalStateException) {
+        } catch (e: IllegalStateException) {
             // ForegroundServiceStartNotAllowedException is one.
+            Diagnostics.log(Area.WORK, "Android didn't allow a foreground service; running in the background", e)
         }
     }
 

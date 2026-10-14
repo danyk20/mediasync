@@ -62,9 +62,6 @@ internal abstract class SyncModule {
     abstract fun bindServiceDiscovery(impl: NsdServiceDiscovery): ServiceDiscovery
 
     @Binds
-    abstract fun bindScheduleSource(impl: SettingsScheduleSource): ScheduleSource
-
-    @Binds
     abstract fun bindDeviceConditions(impl: AndroidDeviceConditions): DeviceConditions
 
     companion object {

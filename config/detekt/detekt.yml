@@ -26,6 +26,7 @@ style:
     # Protobuf field tags (@ProtoNumber) are numbers by nature.
     ignoreAnnotation: true
     ignoreAnnotated: ['Composable', 'Preview']
-    excludes: ['**/test/**', '**/androidTest/**', '**/designsystem/**']
+    # core:metadata parses binary file formats, whose offsets and sizes are numbers by definition (in their specs).
+    excludes: ['**/test/**', '**/androidTest/**', '**/designsystem/**', '**/core/metadata/src/main/**']
   UnusedPrivateMember:
     ignoreAnnotated: ['Preview']

@@ -32,6 +32,14 @@ sealed interface Destination : NavKey {
     @Serializable
     data object ProducerFolders : Destination
 
+    /** What to share when something doesn't work (docs/PLAN.md §3.3). */
+    @Serializable
+    data object Diagnostics : Destination
+
+    /** The sending phone's *Photo details* setting. */
+    @Serializable
+    data object ProducerPhotoDetails : Destination
+
     /** The consumer sets when its producers sync. */
     @Serializable
     data object ConsumerSchedule : Destination

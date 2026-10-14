@@ -15,10 +15,17 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.time.Clock
 import java.time.Duration
@@ -46,6 +53,28 @@ class SettingsScheduleSource @Inject constructor(
     private val schedule = settings.syncSchedule.stateIn(scope, SharingStarted.Eagerly, SyncSchedule.Default)
 
     override fun current(): SyncSchedule = schedule.value
+}
+
+/** The sending phone's *Photo details* from its settings, kept current for the sessions that apply them. */
+@Singleton
+class SettingsPhotoDetailsSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : PhotoDetailsSource {
+    private val details = settings.photoDetails.stateIn(scope, SharingStarted.Eagerly, PhotoDetails.Default)
+
+    override fun current(): PhotoDetails = details.value
+}
+
+/** The settings the sync runtime follows as they change. */
+@Module
+@InstallIn(SingletonComponent::class)
+internal abstract class SettingsSourcesModule {
+    @Binds
+    abstract fun bindScheduleSource(impl: SettingsScheduleSource): ScheduleSource
+
+    @Binds
+    abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */
@@ -106,6 +135,7 @@ class SyncScheduler @Inject constructor(
             .addTag(TAG)
             .build()
         workManager.enqueueUniqueWork(SYNC_NOW, ExistingWorkPolicy.KEEP, request)
+        Diagnostics.log(Area.SCHEDULE, "Sync now requested")
     }
 
     /**
@@ -136,7 +166,9 @@ class SyncScheduler @Inject constructor(
         due?.let { state.markHandled(role, it.toInstant().toEpochMilli()) }
         val plan = plans().first() ?: return
         if (plan.role != role || plan.schedule == SyncSchedule.Manual) return
-        workManager.enqueueUniqueWork(nameOf(role), ExistingWorkPolicy.APPEND_OR_REPLACE, request(plan))
+        val delay = delayOf(plan)
+        workManager.enqueueUniqueWork(nameOf(role), ExistingWorkPolicy.APPEND_OR_REPLACE, request(plan, delay))
+        Diagnostics.log(Area.SCHEDULE, "Done with ${due ?: "this charge"}; next ${describe(plan, delay)}")
     }
 
     /** The current plan: the producer follows its consumer's schedule, the consumer its own. */
@@ -154,26 +186,38 @@ class SyncScheduler @Inject constructor(
 
     internal suspend fun apply(plan: BackgroundPlan?) {
         DeviceRole.entries.filter { it != plan?.role }.forEach { workManager.cancelUniqueWork(nameOf(it)) }
-        if (plan == null) return
+        if (plan == null) {
+            Diagnostics.log(Area.SCHEDULE, "Nothing runs in the background: no role, or not paired")
+            return
+        }
         if (plan.schedule == SyncSchedule.Manual) {
             workManager.cancelUniqueWork(nameOf(plan.role))
+            Diagnostics.log(Area.SCHEDULE, "Nothing runs in the background: ${plan.role.name.lowercase()}, manual")
             return
         }
         // A run in progress queues the next one itself when it ends, with the schedule as it is then.
-        if (isRunning(plan.role)) return
-        workManager.enqueueUniqueWork(nameOf(plan.role), ExistingWorkPolicy.REPLACE, request(plan))
+        if (isRunning(plan.role)) {
+            Diagnostics.log(Area.SCHEDULE, "A ${plan.role.name.lowercase()} run is in progress; it queues the next")
+            return
+        }
+        val delay = delayOf(plan)
+        workManager.enqueueUniqueWork(nameOf(plan.role), ExistingWorkPolicy.REPLACE, request(plan, delay))
+        Diagnostics.log(Area.SCHEDULE, "Next ${describe(plan, delay)}")
     }
+
+    private fun describe(plan: BackgroundPlan, delay: Duration): String =
+        "${plan.role.name.lowercase()} run (${plan.schedule.encode()}) in ${duration(delay)}, while charging"
 
     private suspend fun isRunning(role: DeviceRole) =
         workManager.getWorkInfosForUniqueWorkFlow(nameOf(role)).first().any { it.state == WorkInfo.State.RUNNING }
 
-    internal fun request(plan: BackgroundPlan): OneTimeWorkRequest {
+    internal fun request(plan: BackgroundPlan, delay: Duration = delayOf(plan)): OneTimeWorkRequest {
         val worker: Class<out ListenableWorker> = when (plan.role) {
             DeviceRole.PRODUCER -> ScheduledSyncWorker::class.java
             DeviceRole.CONSUMER -> ReceiveWindowWorker::class.java
         }
         return OneTimeWorkRequest.Builder(worker)
-            .setInitialDelay(delayOf(plan).toMillis(), TimeUnit.MILLISECONDS)
+            .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
             .setConstraints(constraintsOf(plan))
             // Unreachable consumer (its receive window may start late, see receiveWindowDone), or no Wi-Fi:
             // try again while charging (docs/PLAN.md §10.1).
@@ -225,6 +269,9 @@ class SyncScheduler @Inject constructor(
         val RETRY_INTERVAL: Duration = Duration.ofMinutes(15)
         private val MISSED_AFTER: Duration = Duration.ofHours(1)
         private const val SYNC_NOW = "sync-now"
+
+        /** Every background job MediaSync has, for diagnostics. */
+        val WORK_NAMES = listOf(nameOf(DeviceRole.PRODUCER), nameOf(DeviceRole.CONSUMER), SYNC_NOW)
         private const val WINDOW_LEAD_MINUTES = 5L
         private const val STAGGER_SECONDS = 180L
     }

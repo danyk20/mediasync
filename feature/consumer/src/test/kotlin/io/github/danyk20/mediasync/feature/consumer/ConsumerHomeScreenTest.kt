@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.feature.consumer
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -102,6 +103,15 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
+    fun diagnostics_areInTheMenu() {
+        show(ConsumerHomeUiState(listening = true))
+
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Diagnostics").performClick()
+        events shouldBe listOf("diagnostics")
+    }
+
+    @Test
     fun screenshot_storageFull_light() {
         show(ConsumerHomeUiState(listening = true, storageFull = true, waitingForSpace = 40, askBattery = true))
         composeRule.onRoot().captureScreenshot("consumer_home_storage_full_light")
@@ -136,6 +146,7 @@ class ConsumerHomeScreenTest {
                     onOpenSettings = { events += "settings" },
                     onOpenStorage = { events += "storage" },
                     onDismiss = { events += "dismiss $it" },
+                    onOpenDiagnostics = { events += "diagnostics" },
                 )
             }
         }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_done">Done</string>
+    <string name="diagnostics_intro">If MediaSync doesn\'t work as expected, share this log with whoever helps you. It stays on this phone until you share it. It lists what MediaSync did and how this phone is set up, without photos, file names or places.</string>
+    <string name="diagnostics_share">Share log</string>
+    <string name="diagnostics_save">Save to a file</string>
+    <string name="diagnostics_clear">Clear log</string>
+    <string name="diagnostics_share_title">Share MediaSync diagnostics</string>
+    <string name="diagnostics_recent">Recent events</string>
+    <string name="diagnostics_empty">Nothing logged yet.</string>
+</resources>

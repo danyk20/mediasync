@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
@@ -59,6 +60,7 @@ fun ConsumerHomeRoute(
     onAddProducer: () -> Unit,
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenDiagnostics: () -> Unit = {},
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -92,6 +94,7 @@ fun ConsumerHomeRoute(
         },
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
         onDismiss = viewModel::dismiss,
+        onOpenDiagnostics = onOpenDiagnostics,
     )
 }
 
@@ -107,10 +110,16 @@ fun ConsumerHomeScreen(
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.consumer_home_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.consumer_home_title)) },
+                actions = { MoreMenu(onOpenDiagnostics) },
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier

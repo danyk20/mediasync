@@ -54,6 +54,7 @@ dependencies {
     implementation(projects.core.designsystem)
     implementation(projects.core.model)
     implementation(projects.feature.consumer)
+    implementation(projects.feature.diagnostics)
     implementation(projects.feature.onboarding)
     implementation(projects.feature.pairing)
     implementation(projects.feature.producer)

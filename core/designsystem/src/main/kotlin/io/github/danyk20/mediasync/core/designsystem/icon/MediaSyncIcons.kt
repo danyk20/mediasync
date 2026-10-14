@@ -22,4 +22,6 @@ object MediaSyncIcons {
     @DrawableRes val Notifications: Int = R.drawable.ic_notifications
 
     @DrawableRes val Battery: Int = R.drawable.ic_battery
+
+    @DrawableRes val More: Int = R.drawable.ic_more
 }

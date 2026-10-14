@@ -10,6 +10,8 @@ import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.database.RoomSentLedger
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.SyncResult
@@ -19,6 +21,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
 import io.github.danyk20.mediasync.transport.lan.testIdentity
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
@@ -29,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -77,12 +81,17 @@ class RuntimeEndToEndTest {
     private val source = FakeMediaSource(photos)
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
+    private var photoDetails = PhotoDetails.KEEP_ALL
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
         ledger = RoomSentLedger(producerDb.sentItemDao()),
         source = source,
-        device = { LocalDevice("Anna's Pixel", "test") },
+        device = object : DeviceInfo {
+            override fun local() = LocalDevice("Anna's Pixel", "test")
+
+            override fun photoDetails() = photoDetails
+        },
         discovery = noDiscovery,
         sockets = { SocketFactory.getDefault() },
         history = history,
@@ -120,7 +129,7 @@ class RuntimeEndToEndTest {
         paired shouldBe PairingResult.Paired("Pixel 2 XL")
         consumerPeers.isPaired(producerIdentity.id) shouldBe true
         receiver.state.value.lastPaired?.name shouldBe "Anna's Pixel"
-        producer.pendingCount() shouldBe 4
+        producer.pendingCount() shouldBe Pending(toSend = 4)
 
         producer.syncNow()
         val done = withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
@@ -132,7 +141,7 @@ class RuntimeEndToEndTest {
                 consumerSchedule = SyncSchedule.Default,
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
-        producer.pendingCount() shouldBe 0
+        producer.pendingCount() shouldBe Pending()
         history.record.value.lastSyncMillis.shouldNotBeNull()
 
         // Nothing new: the next sync transfers nothing.
@@ -157,7 +166,7 @@ class RuntimeEndToEndTest {
         withTimeout(TIMEOUT) { receiver.state.first { it.lastPaired != null } }.lastPaired?.name shouldBe "Anna's Pixel"
         consumerPeers.isPaired(producerIdentity.id) shouldBe true
         received.observeCountFrom(producerIdentity.id).first() shouldBe photos.size
-        producer.pendingCount() shouldBe 0
+        producer.pendingCount() shouldBe Pending()
 
         val newPhoto = FakeMedia("new", Random(photos.size).nextBytes(200_000))
         source.put(newPhoto)
@@ -184,6 +193,71 @@ class RuntimeEndToEndTest {
         history.record.value.waitingForSpace shouldBe photos.size - 1
         withTimeout(TIMEOUT) { receiver.state.first { it.waitingForSpace > 0 } }.waitingForSpace shouldBe
             photos.size - 1
+    }
+
+    @Test
+    fun theChosenPhotoDetailsApplyToWhatIsSentAndCounted() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        val golden = { name: String -> javaClass.getResourceAsStream("/golden/$name")!!.use { it.readBytes() } }
+        source.put(FakeMedia("located", golden("pixel.jpg")))
+        source.put(FakeMedia("raw", golden("raw.dng"), displayName = "raw.dng", mimeType = "image/x-adobe-dng"))
+        photoDetails = PhotoDetails.REMOVE_ALL
+
+        producer.pendingCount() shouldBe Pending(toSend = 1, withheld = 1)
+        producer.syncNow()
+        val done = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.withheld == 1 }
+        }
+
+        (done as ProducerState.Idle).lastResult?.sent shouldBe 1
+        val stored = sink.stored.values.map { String(it, Charsets.ISO_8859_1) }
+        stored.any { "Zurich" in it || "Pixel 8" in it } shouldBe false
+        stored.size shouldBe photos.size + 1
+    }
+
+    @Test
+    fun theDiagnosticLogSaysWhatHappenedWithoutNamingFilesOrPhones() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+            producer.syncNow()
+            withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+            withTimeout(TIMEOUT) {
+                while (entries.none { it.startsWith("receive Session from") && "received" in it }) delay(POLL)
+            }
+
+            entries.single { it.startsWith("send Sync done") } shouldContain "sent 4"
+            entries.single { it.startsWith("receive Session from") && "received" in it } shouldContain "received 4"
+            entries.any { it.startsWith("receive Listening on port") } shouldBe true
+            val everything = synchronized(entries) { entries.joinToString("\n") }
+            listOf("photo0", ".jpg", "Pixel 2 XL", "Anna's Pixel").filter { it in everything } shouldBe emptyList()
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
+    }
+
+    @Test
+    fun aFailedSyncIsLoggedWithWhatWentWrong() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+            receiver.stop() // The receiving phone is gone.
+
+            producer.syncNow()
+            withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Failed } }
+
+            entries.any { it.startsWith("send Couldn't connect to 127.0.0.x:") } shouldBe true
+            entries.any { it.startsWith("send Not found on the network") } shouldBe true
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
     }
 
     @Test
@@ -223,5 +297,6 @@ class RuntimeEndToEndTest {
 
     private companion object {
         const val TIMEOUT = 20_000L
+        const val POLL = 20L
     }
 }
