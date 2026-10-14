@@ -138,6 +138,13 @@ class ProducerSync @Inject constructor(
     private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
     private var job: Job? = null
 
+    /**
+     * A sync is running: set until just before its outcome shows, so whoever sees that outcome may start the next
+     * one right away. Its job finishes a moment later; asked again in between, *Sync now* would otherwise be ignored.
+     */
+    @Volatile
+    private var syncing = false
+
     @Volatile
     private var cancelled = false
 
@@ -199,11 +206,20 @@ class ProducerSync @Inject constructor(
 
     @Synchronized
     private fun launchSync(pauseWhen: () -> Boolean, turbo: Boolean): Job {
-        job?.takeIf { it.isActive }?.let { return it }
+        job?.takeIf { syncing }?.let { return it }
+        syncing = true
         cancelled = false
         this.pauseWhen = pauseWhen
         _state.value = ProducerState.Connecting
-        return scope.launch(Dispatchers.IO) { _state.value = runSync(turbo) }.also { job = it }
+        return scope.launch(Dispatchers.IO) {
+            try {
+                val end = runSync(turbo)
+                syncing = false
+                _state.value = end
+            } finally {
+                syncing = false // Also when it failed unexpectedly: never block later syncs.
+            }
+        }.also { job = it }
     }
 
     /** Stops after the current file; everything confirmed so far stays recorded. */
