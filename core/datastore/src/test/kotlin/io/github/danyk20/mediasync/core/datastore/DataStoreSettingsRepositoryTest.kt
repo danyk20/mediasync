@@ -120,6 +120,29 @@ class DataStoreSettingsRepositoryTest {
         DataStoreSettingsRepository(dataStore).syncSchedule.first() shouldBe SyncSchedule.Default
     }
 
+    @Test
+    fun aDismissedSetupCardStaysDismissed() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+        repository.dismissedPrompts.first() shouldBe emptySet()
+
+        repository.dismissPrompt(SetupPrompt.NOTIFICATIONS)
+        repository.dismissPrompt(SetupPrompt.BATTERY)
+        repository.dismissPrompt(SetupPrompt.NOTIFICATIONS)
+
+        repository.dismissedPrompts.first() shouldBe setOf(SetupPrompt.NOTIFICATIONS, SetupPrompt.BATTERY)
+    }
+
+    @Test
+    fun ignoresSetupCardsItDoesntKnow() = runTest {
+        val dataStore = dataStore()
+        dataStore.edit {
+            it[DataStoreSettingsRepository.DismissedPromptsKey] = setOf("BATTERY", "FROM_A_NEWER_VERSION")
+        }
+
+        DataStoreSettingsRepository(dataStore).dismissedPrompts.first() shouldBe setOf(SetupPrompt.BATTERY)
+    }
+
     private fun TestScope.dataStore(): DataStore<Preferences> = PreferenceDataStoreFactory.create(
         scope = backgroundScope,
         produceFile = { File(tempFolder.root, "settings.preferences_pb") },

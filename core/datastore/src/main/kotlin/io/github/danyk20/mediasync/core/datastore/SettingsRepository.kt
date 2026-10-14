@@ -25,4 +25,18 @@ interface SettingsRepository {
     val syncSchedule: Flow<SyncSchedule>
 
     suspend fun setSyncSchedule(schedule: SyncSchedule)
+
+    /** The setup cards the user answered with *Not now*; they don't come back. */
+    val dismissedPrompts: Flow<Set<SetupPrompt>>
+
+    suspend fun dismissPrompt(prompt: SetupPrompt)
+}
+
+/** A home-screen card that asks the user to allow something background syncs need (docs/PLAN.md §10.3). */
+enum class SetupPrompt {
+    /** Android 13+: show sync progress. */
+    NOTIFICATIONS,
+
+    /** Android 12+: set battery use to *Unrestricted*. */
+    BATTERY,
 }

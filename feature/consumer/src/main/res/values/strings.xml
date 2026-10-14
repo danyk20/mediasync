@@ -10,6 +10,20 @@
     <string name="consumer_status_receiving_body">%1$d of %2$d · %3$s of %4$s</string>
     <string name="consumer_add_producer">Add sending phone</string>
     <string name="consumer_producers_heading">Sending phones</string>
+
+    <!-- Storage guard: MediaSync keeps 2 GB free. -->
+    <string name="consumer_storage_full_title">Storage full</string>
+    <string name="consumer_storage_full_body">Free up space on this phone to keep receiving. MediaSync leaves 2 GB free for your other apps.</string>
+    <plurals name="consumer_waiting">
+        <item quantity="one">%d photo or video is waiting.</item>
+        <item quantity="other">%d photos and videos are waiting.</item>
+    </plurals>
+    <string name="consumer_storage_didnt_fit_title">Some didn\'t fit</string>
+    <plurals name="consumer_storage_didnt_fit_body">
+        <item quantity="one">%d photo or video was too large for the free space. It arrives with a later sync once there\'s room.</item>
+        <item quantity="other">%d photos and videos were too large for the free space. They arrive with a later sync once there\'s room.</item>
+    </plurals>
+    <string name="consumer_storage_open">Free up space</string>
     <plurals name="consumer_received_count">
         <item quantity="one">%d photo or video received so far. They\'re saved in DCIM/MediaSync, where Google Photos backs them up.</item>
         <item quantity="other">%d photos and videos received so far. They\'re saved in DCIM/MediaSync, where Google Photos backs them up.</item>

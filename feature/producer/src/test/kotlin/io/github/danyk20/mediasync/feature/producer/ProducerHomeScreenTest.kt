@@ -16,6 +16,7 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
+import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import java.time.ZonedDateTime
@@ -144,6 +145,67 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun theLastSyncIsShown() {
+        show(paired.copy(pendingCount = 0, lastSyncMillis = millis("2026-10-14T03:04+02:00")))
+
+        composeRule.onNodeWithText("Last sync today at 3:04 AM").assertIsDisplayed()
+    }
+
+    @Test
+    fun aMissedSync_saysWhy() {
+        show(paired.copy(pendingCount = 0, missedSync = missed(SyncProblem.UNREACHABLE)))
+
+        composeRule.onNodeWithText("The sync planned for today at 3:00 AM didn't run").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Pixel 2 XL couldn't be found on the Wi-Fi. This phone tries again while charging.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun aMissedSyncOnALowBattery_saysSo() {
+        show(paired.copy(pendingCount = 0, missedSync = missed(SyncProblem.LOW_BATTERY)))
+
+        composeRule.onNodeWithText(
+            "The battery was below 20%. This phone tries again once it has charged more.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun aMissedSyncWithRestrictedBattery_leadsToTheSettings() {
+        show(paired.copy(pendingCount = 0, missedSync = missed(null, batteryRestricted = true)))
+
+        composeRule.onNodeWithText("Open settings").performClick()
+        events shouldBe listOf("settings")
+    }
+
+    @Test
+    fun aFullReceivingPhone_isPointedOut() {
+        show(paired.copy(pendingCount = 12, waitingForSpace = 12))
+
+        composeRule.onNodeWithText("Pixel 2 XL is full").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "12 photos and videos are waiting. They're sent once there's space on Pixel 2 XL.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun whileSending_noticesWait() {
+        show(syncing.copy(waitingForSpace = 12, missedSync = missed(null)))
+
+        composeRule.onAllNodesWithText("Pixel 2 XL is full").fetchSemanticsNodes() shouldBe emptyList()
+    }
+
+    @Test
+    fun setupCards_askAndCanBeDismissed() {
+        show(paired.copy(pendingCount = 0, askNotifications = true, askBattery = true))
+
+        composeRule.onNodeWithText("Let syncs run at night").assertIsDisplayed()
+        composeRule.onNodeWithText("Allow").performClick()
+        composeRule.onAllNodesWithText("Not now")[0].performClick()
+        events shouldBe listOf("notifications", "dismiss BATTERY")
+    }
+
+    @Test
     fun screenshot_notPaired_light() = screenshot(ProducerHomeUiState(), "producer_home_not_paired_light")
 
     @Test
@@ -167,6 +229,30 @@ class ProducerHomeScreenTest {
         "producer_home_no_folders_light",
     )
 
+    @Test
+    fun screenshot_missed_light() = screenshot(
+        paired.copy(pendingCount = 37, missedSync = missed(SyncProblem.UNREACHABLE), askNotifications = true),
+        "producer_home_missed_light",
+    )
+
+    @Test
+    fun screenshot_setup_dark() = screenshot(
+        paired.copy(pendingCount = 0, lastSyncMillis = millis("2026-10-14T03:04+02:00"), askBattery = true),
+        "producer_home_setup_dark",
+        darkTheme = true,
+    )
+
+    @Test
+    fun screenshot_receiverFull_light() = screenshot(
+        paired.copy(pendingCount = 12, waitingForSpace = 12),
+        "producer_home_receiver_full_light",
+    )
+
+    private fun millis(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]").toInstant().toEpochMilli()
+
+    private fun missed(problem: SyncProblem?, batteryRestricted: Boolean = false) =
+        MissedSync(ZonedDateTime.parse("2026-10-14T03:00+02:00[Europe/Zurich]"), problem, batteryRestricted)
+
     private fun screenshot(state: ProducerHomeUiState, name: String, darkTheme: Boolean = false) {
         show(state, darkTheme)
         composeRule.onRoot().captureScreenshot(name)
@@ -183,6 +269,8 @@ class ProducerHomeScreenTest {
                     onStop = { events += "stop" },
                     onGrantAccess = { events += "grant" },
                     onOpenSettings = { events += "settings" },
+                    onAllowNotifications = { events += "notifications" },
+                    onDismiss = { events += "dismiss $it" },
                 )
             }
         }

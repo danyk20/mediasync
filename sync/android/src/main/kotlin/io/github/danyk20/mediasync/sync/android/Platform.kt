@@ -35,6 +35,20 @@ fun interface LanSockets {
     fun factoryFor(address: InetSocketAddress): SocketFactory
 }
 
+/** Why background work waits for better conditions (docs/PLAN.md §10.5). */
+enum class PauseReason {
+    /** The phone is hot: transfers would heat it further. */
+    HOT,
+
+    /** Below 20 %, even while charging: slow chargers exist. */
+    LOW_BATTERY,
+}
+
+/** Whether background work should wait; `null` to go ahead. User-started syncs don't ask. */
+fun interface DeviceConditions {
+    fun pauseReason(): PauseReason?
+}
+
 /** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */
 fun interface ScheduleSource {
     fun current(): SyncSchedule

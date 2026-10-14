@@ -4,7 +4,10 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
@@ -12,7 +15,9 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
@@ -56,6 +61,53 @@ class AndroidDeviceInfo @Inject constructor(
         }
         return info.versionName ?: "unknown"
     }
+}
+
+/** Battery level and temperature from Android, for the background guards (docs/PLAN.md §10.5). */
+@ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
+@Singleton
+class AndroidDeviceConditions @Inject constructor(@ApplicationContext private val context: Context) :
+    DeviceConditions {
+
+    override fun pauseReason(): PauseReason? {
+        val power = context.getSystemService(PowerManager::class.java)
+        return when {
+            power.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> PauseReason.HOT
+            (batteryPercent() ?: PERCENT) < MIN_BATTERY_PERCENT -> PauseReason.LOW_BATTERY
+            else -> null
+        }
+    }
+
+    /** From the last battery broadcast: what the system shows, unlike a direct reading from the battery. */
+    private fun batteryPercent(): Int? {
+        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+        val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        return if (level < 0 || scale <= 0) null else level * PERCENT / scale
+    }
+
+    private companion object {
+        const val MIN_BATTERY_PERCENT = 20
+        const val PERCENT = 100
+    }
+}
+
+/**
+ * What background syncs need the user to allow (docs/PLAN.md §10.3); the home screens ask for it.
+ *
+ * - Android 12+ starts a foreground service from the background, which a sync at night needs to run longer
+ *   than 10 minutes, only for apps whose battery use is *Unrestricted*.
+ * - Android 13+ shows the progress notification only with the user's permission.
+ */
+@ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
+@Singleton
+class BackgroundSetup @Inject constructor(@ApplicationContext private val context: Context) {
+
+    fun batteryRestricted(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+
+    fun canNotify(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 }
 
 /**

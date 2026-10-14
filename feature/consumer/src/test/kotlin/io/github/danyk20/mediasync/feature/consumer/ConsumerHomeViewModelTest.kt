@@ -11,11 +11,14 @@ import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
+import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -45,13 +48,26 @@ class ConsumerHomeViewModelTest {
 
     private val anna = Peer(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel", DeviceRole.PRODUCER, 0, null, null)
     private val receiverState = MutableStateFlow(ReceiverState(listening = true, port = 47_420))
-    private val receiver = mockk<ConsumerReceiver>(relaxed = true) { every { state } returns receiverState }
+    private var freeBytes = 20L * 1024 * 1024 * 1024
+    private val receiver = mockk<ConsumerReceiver>(relaxed = true) {
+        every { state } returns receiverState
+        every { freeBytes() } answers { freeBytes }
+    }
     private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(anna)) }
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
+    private val settings = FakeSettingsRepository()
+    private var canNotify = true
+    private var batteryRestricted = false
+    private val setup = mockk<BackgroundSetup> {
+        every { canNotify() } answers { canNotify }
+        every { batteryRestricted() } answers { batteryRestricted }
+    }
+
+    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup)
 
     @Test
     fun startsReceivingAndListsSendingPhones() = runTest {
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
+        val viewModel = viewModel()
 
         val state = viewModel.uiState.first { it.listening }
 
@@ -61,7 +77,7 @@ class ConsumerHomeViewModelTest {
 
     @Test
     fun showsWhoIsSendingRightNow() = runTest {
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
+        val viewModel = viewModel()
 
         receiverState.value = receiverState.value.copy(
             transfers = mapOf(anna.id to TransferProgress(2, 5, 1_000, 9_000, "PXL_1.jpg")),
@@ -72,9 +88,47 @@ class ConsumerHomeViewModelTest {
     }
 
     @Test
+    fun aFullStorageIsNoticedWhenASyncRunsIntoIt() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.listening }.storageFull shouldBe false
+
+        freeBytes = 0
+        receiverState.value = receiverState.value.copy(waitingForSpace = 40)
+
+        val state = viewModel.uiState.first { it.storageFull }
+        state.waitingForSpace shouldBe 40
+    }
+
+    @Test
+    fun freeingUpSpaceIsNoticedWhenTheUserComesBack() = runTest {
+        freeBytes = 0
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.storageFull }
+
+        freeBytes = 5L * 1024 * 1024 * 1024
+        viewModel.refresh()
+
+        viewModel.uiState.first { !it.storageFull }
+    }
+
+    @Test
+    fun itAsksForWhatReceiveWindowsNeedUntilAnsweredWithNotNow() = runTest {
+        canNotify = false
+        batteryRestricted = true
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.askNotifications && it.askBattery }
+
+        viewModel.dismiss(SetupPrompt.NOTIFICATIONS)
+        viewModel.uiState.first { !it.askNotifications }.askBattery shouldBe true
+
+        settings.setSyncSchedule(SyncSchedule.Manual) // Nothing runs in the background.
+        viewModel.uiState.first { !it.askBattery }
+    }
+
+    @Test
     fun theRouteOffersAddingAPhone() {
         var added = false
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
+        val viewModel = viewModel()
 
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {

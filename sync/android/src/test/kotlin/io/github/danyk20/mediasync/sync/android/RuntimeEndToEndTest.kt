@@ -76,6 +76,7 @@ class RuntimeEndToEndTest {
     private val photos = List(4) { FakeMedia("photo$it", Random(it).nextBytes(300_000 + it)) }
     private val source = FakeMediaSource(photos)
     private val producerIdentity = testIdentity("Anna's Pixel")
+    private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
@@ -84,6 +85,7 @@ class RuntimeEndToEndTest {
         device = { LocalDevice("Anna's Pixel", "test") },
         discovery = noDiscovery,
         sockets = { SocketFactory.getDefault() },
+        history = history,
         scope = scope,
     )
 
@@ -131,6 +133,7 @@ class RuntimeEndToEndTest {
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe 0
+        history.record.value.lastSyncMillis.shouldNotBeNull()
 
         // Nothing new: the next sync transfers nothing.
         producer.syncNow()
@@ -166,6 +169,21 @@ class RuntimeEndToEndTest {
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
             SyncResult(sent = 1, bytesSent = newPhoto.bytes.size.toLong(), consumerSchedule = SyncSchedule.Default)
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
+    }
+
+    @Test
+    fun aFullReceivingPhoneIsShownOnBothPhones() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        sink.availableBytes = photos.first().bytes.size.toLong() // Room for one photo only.
+
+        producer.syncNow()
+        val done = withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        (done as ProducerState.Idle).lastResult?.sent shouldBe 1
+        history.record.value.waitingForSpace shouldBe photos.size - 1
+        withTimeout(TIMEOUT) { receiver.state.first { it.waitingForSpace > 0 } }.waitingForSpace shouldBe
+            photos.size - 1
     }
 
     @Test
