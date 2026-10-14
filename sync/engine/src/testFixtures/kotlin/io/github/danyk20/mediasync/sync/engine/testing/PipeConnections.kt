@@ -57,7 +57,7 @@ class ConnectionPair(
     val producerEnd: PeerConnection = End(
         peerId = consumerId,
         source = toProducer.source.buffer(),
-        sink = FaultySink(toConsumer.sink, faults) { closeAll() }.buffer(),
+        sink = FaultySink(toConsumer.sink, faults) { drop() }.buffer(),
     )
 
     /** The consumer's end; its [PeerConnection.peerId] is the producer. */
@@ -69,6 +69,15 @@ class ConnectionPair(
 
     private fun closeAll() {
         toConsumer.cancel()
+        toProducer.cancel()
+    }
+
+    /**
+     * The connection drops: the consumer still reads what was sent before, then the end, as from a socket. Cancelling
+     * that pipe instead would throw away what it hadn't read yet: on a slow machine, everything.
+     */
+    private fun drop() {
+        toConsumer.sink.close()
         toProducer.cancel()
     }
 
