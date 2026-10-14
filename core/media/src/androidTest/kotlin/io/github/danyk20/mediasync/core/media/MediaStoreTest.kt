@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import okio.buffer
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -113,8 +112,7 @@ class MediaStoreTest {
 
     @Test
     fun aRescanKeepsTheCaptureDateOfAPhotoWithoutTimeZone() {
-        assumeTrue("Android 10 can't set file times", Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-        // Taken at 10:00 local time in UTC+2 and saved 3 s later; the EXIF has no zone, like most cameras'.
+        // Taken at 10:00 local time in UTC+2 and saved 3 s later; the EXIF has no zone, like many cameras'.
         val photo = jpeg(Color.CYAN, exifDate = "2024:06:01 10:00:00")
         val takenAt = Instant.parse("2024-06-01T08:00:00Z").toEpochMilli()
         val descriptor = descriptorOf(photo, "no-zone.jpg", capturedAt = takenAt, modifiedAt = takenAt + 3_000)
@@ -127,8 +125,18 @@ class MediaStoreTest {
         ).also { created += it }
         rescan(uri)
 
-        readBytes(uri).toList() shouldBe photo.toList()
         dateTaken(uri) shouldBe takenAt
+        val stored = readBytes(uri)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // The file keeps the producer's modification time, so it stays byte for byte.
+            stored.toList() shouldBe photo.toList()
+        } else {
+            // Android 10 can't set file times: the zone is written into the EXIF, the image is untouched.
+            ExifInterface(stored.inputStream()).getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL) shouldBe "+02:00"
+            BitmapFactory.decodeByteArray(stored, 0, stored.size).sameAs(
+                BitmapFactory.decodeByteArray(photo, 0, photo.size),
+            ) shouldBe true
+        }
     }
 
     @Test

@@ -150,11 +150,13 @@ class MediaStoreSink internal constructor(
             close()
             val meta = descriptor.meta
             resolver.openFileDescriptor(uri, "rw")?.use { complete ->
-                CaptureDates.addIfMissing(
+                CaptureDates.complete(
                     complete.fileDescriptor,
                     descriptor.mimeType,
                     meta.capturedAtMillis,
                     meta.utcOffsetMinutes,
+                    // Android 11+ keeps the file byte for byte, and its modification time, instead.
+                    addTimeZone = Build.VERSION.SDK_INT < Build.VERSION_CODES.R,
                 )
             }
             meta.modifiedAtMillis?.let(::keepModifiedTime)
@@ -171,7 +173,7 @@ class MediaStoreSink internal constructor(
          * Gives the stored file the producer's modification time, as the file's own metadata. Most photos
          * record their capture time without a time zone, and Android's media scanner estimates the zone from
          * the modification time; a file that looked modified on arrival would shift by the delay
-         * (docs/PLAN.md §6.2). Android 10 offers no file paths, so there the explicit DATE_TAKEN stands in.
+         * (docs/PLAN.md §6.2). Android 10 gives apps no file paths; there the EXIF gets the time zone instead.
          */
         private fun keepModifiedTime(modifiedAtMillis: Long) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return

@@ -529,8 +529,9 @@ In v1.0 the consumer's files are removed by the connector app (Google Photos) af
 6. **Consumer gallery date.**
    - The consumer sets the capture date when it inserts each file into the gallery.
    - Android's media scanner recomputes it whenever it scans the file. Most cameras record the capture time without a time zone, so the scanner estimates the zone from the file's **modification time**, rounded to 15 minutes. A file modified "now" on arrival would shift by the sync delay, and lose its date entirely after 24 hours. Found in the two-emulator test of M1.
-   - So the consumer gives each stored file the producer's modification time (Android 11+). The scanner then makes the same estimate as on the producer. An instrumented test forces a rescan and checks the date.
-   - On Android 10, apps can't set it. The explicit capture date stays until something rescans the file.
+   - So on Android 11+ the consumer gives each stored file the producer's modification time. The scanner then makes the same estimate as on the producer, and the file stays byte-identical.
+   - Android 10 doesn't let apps set file times. There the consumer writes the producer's UTC offset into the photo's EXIF (`OffsetTimeOriginal`) when the date has none: a lossless EXIF change, computed from the producer's capture instant and the EXIF local time. This works for JPEG, PNG and WebP; ExifInterface can't write HEIC, so HEIC photos without a zone may still shift on Android 10 consumers.
+   - An instrumented test forces a rescan and checks the date on every API level in CI (29 and 36).
    - Files without an internal date get the lossless date insert from point 3.
 
 ### 6.3 Privacy setting: "Photo details"
