@@ -66,8 +66,11 @@ data class PairingLink(
             }.getOrNull()
         }
 
-        private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8)
+        // The charset-name overloads: the Charset ones need Android 13.
+        private fun encode(value: String) = URLEncoder.encode(value, UTF_8)
 
-        private fun decode(value: String) = URLDecoder.decode(value, Charsets.UTF_8)
+        private fun decode(value: String) = URLDecoder.decode(value, UTF_8)
+
+        private const val UTF_8 = "UTF-8"
     }
 }

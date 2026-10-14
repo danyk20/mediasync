@@ -42,7 +42,7 @@ class AndroidPlatformTest {
     @Test
     fun connectionsToTheWifiGoThroughTheWifi() {
         val network = AndroidLocalNetwork(context)
-        val wifiAddress = network.localAddresses().first()
+        val wifiAddress = pairingAddresses(network.localAddresses()).first() // What a pairing code would list.
 
         ServerSocket(0, 1, wifiAddress).use { server ->
             val target = InetSocketAddress(wifiAddress, server.localPort)
