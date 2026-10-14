@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.android
 
 import androidx.work.WorkInfo
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.sync.engine.LinkSpeed
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -63,7 +64,20 @@ internal fun ServeResult.describe(): String = when (this) {
     is ServeResult.PairingRefused -> "pairing refused (${decision.name.lowercase()})"
 
     is ServeResult.Rejected -> "rejected (reason $byeReason)"
+
+    is ServeResult.LinkTested -> "link test, ${LinkSpeed(bytes, micros).describe()}"
 }
+
+internal fun LinkSpeed.describe(): String = String.format(
+    Locale.ROOT,
+    "%.1f MB/s (%s in %s)",
+    megabytesPerSecond,
+    bytes(bytes),
+    since(
+        0,
+        micros / MICROS_PER_MILLI,
+    ),
+)
 
 /** Why Android stopped background work, from [WorkInfo]'s stop reasons. */
 internal fun stopReason(reason: Int): String = when (reason) {
@@ -88,3 +102,4 @@ private const val MB = KB * 1024
 private const val GB = MB * 1024
 private const val MILLIS_PER_SECOND = 1000.0
 private const val MINUTES_PER_HOUR = 60L
+private const val MICROS_PER_MILLI = 1000L

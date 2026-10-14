@@ -15,6 +15,9 @@ import io.github.danyk20.mediasync.sync.protocol.FrameCodec
 import io.github.danyk20.mediasync.sync.protocol.FrameType
 import io.github.danyk20.mediasync.sync.protocol.Have
 import io.github.danyk20.mediasync.sync.protocol.Hello
+import io.github.danyk20.mediasync.sync.protocol.LinkTestBegin
+import io.github.danyk20.mediasync.sync.protocol.LinkTestEnd
+import io.github.danyk20.mediasync.sync.protocol.LinkTestResult
 import io.github.danyk20.mediasync.sync.protocol.Offer
 import io.github.danyk20.mediasync.sync.protocol.OfferResponse
 import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
@@ -47,6 +50,9 @@ sealed interface ServeResult {
 
     /** The peer wasn't allowed to sync, or speaks an incompatible protocol. */
     data class Rejected(val byeReason: Int) : ServeResult
+
+    /** The producer measured the link (docs/PLAN.md §7): [bytes] of filler arrived in [micros]. */
+    data class LinkTested(val bytes: Long, val micros: Long) : ServeResult
 }
 
 /**
@@ -87,6 +93,8 @@ class ConsumerSession(
         return when {
             first is PairRequest -> pair(channel, producer, hello.deviceName, first)
 
+            first is LinkTestBegin && registry.isPaired(producer) -> linkTest(channel)
+
             registry.isPaired(producer) -> Receiver(channel, producer).run(first)
 
             else -> {
@@ -115,6 +123,39 @@ class ConsumerSession(
         }
         awaitEnd(channel)
         return result
+    }
+
+    /** Takes filler as fast as it comes and says how fast that was. Nothing is stored. */
+    private fun linkTest(channel: FrameChannel): ServeResult {
+        channel.send(LinkTestBegin()) // Ready.
+        val buffer = ByteArray(CHUNK_SIZE)
+        var bytes = 0L
+        var firstByteAt = 0L
+        var ended = false
+        while (!ended) {
+            val header = channel.nextHeader()
+            if (header.type == FrameType.DATA) {
+                if (bytes == 0L) firstByteAt = System.nanoTime()
+                bytes += channel.readData(header, buffer)
+            } else {
+                ended = endsLinkTest(channel.readControl(header))
+            }
+        }
+        val micros = if (bytes == 0L) 0L else (System.nanoTime() - firstByteAt) / NANOS_PER_MICRO
+        channel.send(LinkTestResult(bytes, micros))
+        awaitEnd(channel)
+        return ServeResult.LinkTested(bytes, micros)
+    }
+
+    private fun endsLinkTest(message: ControlMessage?): Boolean = when (message) {
+        is LinkTestEnd -> true
+
+        is Bye -> throw PeerEndedSessionException(message.reason)
+
+        null -> false
+
+        // A message type this version doesn't know.
+        else -> throw ProtocolException("Unexpected ${message::class.simpleName} in a link test")
     }
 
     private fun awaitEnd(channel: FrameChannel) {
@@ -317,3 +358,5 @@ internal fun Int.toPairingDecision(): PairingDecision = when (this) {
     PairResult.Reason.TIMED_OUT -> PairingDecision.TIMED_OUT
     else -> PairingDecision.DECLINED
 }
+
+private const val NANOS_PER_MICRO = 1_000L

@@ -41,6 +41,9 @@ class MessageCodecTest {
             FileEnd(offerId = 7, sha256 = sha),
             FileAck(offerId = 7, status = FileAck.Status.OK, contentId = sha),
             Bye(Bye.Reason.CANCELLED),
+            LinkTestBegin(),
+            LinkTestEnd(bytes = 1_234_567_890),
+            LinkTestResult(bytes = 1_234_567_890, micros = 5_000_123),
         )
 
         messages.forEach { message ->

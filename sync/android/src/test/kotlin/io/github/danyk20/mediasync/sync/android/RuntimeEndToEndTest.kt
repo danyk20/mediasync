@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
 import io.github.danyk20.mediasync.transport.lan.testIdentity
+import io.kotest.matchers.doubles.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -255,6 +256,27 @@ class RuntimeEndToEndTest {
 
             entries.any { it.startsWith("send Couldn't connect to 127.0.0.x:") } shouldBe true
             entries.any { it.startsWith("send Not found on the network") } shouldBe true
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
+    }
+
+    @Test
+    fun theLinkTestMeasuresOverSeveralConnectionsAndStoresNothing() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+
+            val speed = producer.linkTest(streams = 2, durationMillis = 300).shouldNotBeNull()
+
+            speed.megabytesPerSecond shouldBeGreaterThan 0.0
+            sink.stored.size shouldBe 0
+            entries.any { it.startsWith("send Link test over 2 connection(s)") } shouldBe true
+            withTimeout(TIMEOUT) {
+                while (entries.count { it.startsWith("receive Session from") && "link test" in it } < 2) delay(POLL)
+            }
         } finally {
             Diagnostics.install { _, _ -> }
         }

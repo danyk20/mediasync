@@ -635,6 +635,9 @@ Speed is the top non-functional requirement. The strategy has six parts:
 **Measuring:**
 
 - A built-in **link test** (Diagnostics) measures raw throughput between the paired devices over Wi-Fi and over Turbo. The UI shows achieved speed against link capacity.
+  - On a sending phone, *Diagnostics → Link test* sends incompressible filler for 5 seconds over one connection, then over four at once.
+  - The receiving phone measures it from the first to the last byte and stores nothing. Only paired phones may run it.
+  - Both results go into the diagnostic log.
 - **Target:** ≥ 85 % of the measured raw link throughput on Wi-Fi and Turbo, for both large videos and 1,000-photo batches.
 - A JVM loopback benchmark runs in CI, and an on-device benchmark runs before each release, to catch regressions.
   - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency.

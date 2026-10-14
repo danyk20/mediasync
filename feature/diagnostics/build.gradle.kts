@@ -8,5 +8,6 @@ android {
 
 dependencies {
     implementation(projects.sync.android)
+    implementation(projects.core.datastore)
     implementation(libs.androidx.core.ktx)
 }

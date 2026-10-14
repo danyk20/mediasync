@@ -13,6 +13,8 @@ import io.github.danyk20.mediasync.core.metadata.isWithheld
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
+import io.github.danyk20.mediasync.sync.engine.LinkSpeed
+import io.github.danyk20.mediasync.sync.engine.LinkTest
 import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.PairingClient
 import io.github.danyk20.mediasync.sync.engine.PairingDecision
@@ -27,6 +29,8 @@ import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanClient
 import io.github.danyk20.mediasync.transport.lan.LanTimeouts
 import java.io.IOException
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
@@ -165,6 +169,37 @@ class ProducerSync @Inject constructor(
         cancelled = true
     }
 
+    /**
+     * The link test (docs/PLAN.md §7): how fast this phone can send to the receiving phone over [streams] connections
+     * at once, for [durationMillis]. `null` if it couldn't be reached; the diagnostic log says why.
+     */
+    suspend fun linkTest(streams: Int, durationMillis: Long = LINK_TEST_MILLIS): LinkSpeed? =
+        withContext(Dispatchers.IO) {
+            val consumer = peers.consumer() ?: return@withContext null
+            val first = connect(consumer) ?: return@withContext null
+            val connections =
+                listOf(first) + List(streams - 1) { connectToFirst(listOf(first.remoteAddress), consumer.id) }
+                    .filterNotNull()
+            val pool = Executors.newFixedThreadPool(connections.size)
+            try {
+                sockets.keepingAwake {
+                    connections.map { connection ->
+                        pool.submit<LinkSpeed> { LinkTest(device.local(), durationMillis).run(connection) }
+                    }
+                        .map { it.get() }
+                        .reduce(LinkSpeed::plus)
+                }.also { speed ->
+                    Diagnostics.log(Area.SEND, "Link test over ${connections.size} connection(s): ${speed.describe()}")
+                }
+            } catch (e: ExecutionException) {
+                Diagnostics.log(Area.SEND, "Link test failed", e.cause ?: e)
+                null
+            } finally {
+                pool.shutdownNow()
+                connections.forEach { runCatching { it.close() } }
+            }
+        }
+
     /** Photos and videos the consumer doesn't have yet: those that will be sent, and those withheld. */
     suspend fun pendingCount(): Pending = withContext(Dispatchers.IO) {
         val consumer = peers.consumer() ?: return@withContext Pending()
@@ -252,6 +287,7 @@ class ProducerSync @Inject constructor(
 
     private companion object {
         const val DISCOVERY_TIMEOUT_MILLIS = 5_000L
+        const val LINK_TEST_MILLIS = 5_000L
         val TIMEOUTS = LanTimeouts(connectMillis = 3_000)
     }
 }
