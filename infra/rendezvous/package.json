@@ -1,0 +1,20 @@
+{
+  "name": "mediasync-rendezvous",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MediaSync rendezvous Worker: signaling mailbox, TURN credentials, FCM wake-up and relay usage meter",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.0",
+    "@cloudflare/workers-types": "5.20261006.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.149.0"
+  }
+}
