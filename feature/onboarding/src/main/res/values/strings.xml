@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Welcome to MediaSync</string>
+    <string name="onboarding_subtitle">Move photos and videos from your phones to one place, quickly and privately. How will you use this phone?</string>
+    <string name="onboarding_role_producer_title">This phone sends</string>
+    <string name="onboarding_role_producer_description">Sends its photos and videos to your receiving phone.</string>
+    <string name="onboarding_role_consumer_title">This phone receives</string>
+    <string name="onboarding_role_consumer_description">Collects photos and videos from your other phones and hands them to Google Photos.</string>
+    <string name="onboarding_change_later">You can change this later.</string>
+</resources>

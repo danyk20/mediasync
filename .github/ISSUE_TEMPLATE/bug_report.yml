@@ -1,0 +1,45 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: MediaSync version
+      placeholder: e.g. 0.3.1
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Device role
+      options:
+        - Producer (sends)
+        - Consumer (receives)
+        - Both / not sure
+  - type: input
+    id: device
+    attributes:
+      label: Phone model and Android version
+      placeholder: e.g. Pixel 2 XL, Android 11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics log
+      description: If possible, attach the log from Settings → Diagnostics → Export logs. Logs contain no photos or locations.

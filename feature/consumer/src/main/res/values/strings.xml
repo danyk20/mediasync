@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="consumer_home_title">This phone receives</string>
+    <string name="consumer_status_ready_title">Ready to receive</string>
+    <string name="consumer_status_ready_body">No sending phones yet. You\'ll add one by showing it a pairing QR code.</string>
+    <string name="consumer_backup_hint">Received photos and videos are saved to the MediaSync folder, where Google Photos backs them up.</string>
+</resources>

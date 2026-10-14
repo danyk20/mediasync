@@ -1,0 +1,29 @@
+/*
+ * Copyright 2026 The MediaSync Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.danyk20.mediasync.navigation
+
+import androidx.navigation3.runtime.NavKey
+import io.github.danyk20.mediasync.core.model.DeviceRole
+import kotlinx.serialization.Serializable
+
+/** Every screen in the app. Keys are serializable so the back stack survives process death. */
+@Serializable
+sealed interface Destination : NavKey {
+    @Serializable
+    data object RoleChoice : Destination
+
+    @Serializable
+    data object ProducerHome : Destination
+
+    @Serializable
+    data object ConsumerHome : Destination
+}
+
+/** Where the app starts for a device with the given role. */
+fun startDestinationFor(role: DeviceRole?): Destination = when (role) {
+    null -> Destination.RoleChoice
+    DeviceRole.PRODUCER -> Destination.ProducerHome
+    DeviceRole.CONSUMER -> Destination.ConsumerHome
+}
