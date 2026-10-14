@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.PairingClient
 import io.github.danyk20.mediasync.sync.engine.PairingDecision
 import io.github.danyk20.mediasync.sync.engine.PairingLink
+import io.github.danyk20.mediasync.sync.engine.ParallelSync
 import io.github.danyk20.mediasync.sync.engine.PeerEndedSessionException
 import io.github.danyk20.mediasync.sync.engine.ProducerSession
 import io.github.danyk20.mediasync.sync.engine.SentLedger
@@ -245,13 +246,13 @@ class ProducerSync @Inject constructor(
 
     private fun session(consumer: Peer, connection: PeerConnection, details: PhotoDetails, started: Long) =
         connection.use {
-            val result = ProducerSession(
-                device.local(),
-                source,
-                ledger,
+            val result = ParallelSync(
+                session = { progress ->
+                    ProducerSession(device.local(), source, ledger, progress, { !cancelled && !pauseWhen() }, details)
+                },
+                connect = { connectToFirst(listOf(it.remoteAddress), consumer.id) },
                 progress = { progress -> _state.value = ProducerState.Syncing(progress) },
-                shouldContinue = { !cancelled && !pauseWhen() },
-                details = details,
+                mayAddStream = sockets::canUseMoreConnections,
             ).sync(it)
             peers.recordAddress(consumer.id, it.remoteAddress)
             peers.recordSchedule(consumer.id, result.consumerSchedule)

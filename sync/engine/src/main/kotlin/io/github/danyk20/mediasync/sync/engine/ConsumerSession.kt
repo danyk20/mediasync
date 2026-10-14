@@ -69,6 +69,8 @@ class ConsumerSession(
     private val sink: MediaSink,
     private val pairingGate: PairingGate,
     private val progress: ProgressListener = ProgressListener {},
+    /** Shared by the sessions served at once (several connections from one producer, or several producers). */
+    private val space: SpaceBudget = SpaceBudget(sink),
 ) {
 
     fun serve(connection: PeerConnection): ServeResult {
@@ -181,22 +183,28 @@ class ConsumerSession(
         private var failed = 0
         private var waitingForSpace = 0
 
+        /** Space reserved for wanted items, by offer: what's still to be written. */
+        private val reserved = HashMap<Int, Long>()
+
         /** Receives until `Bye`, starting with [first], the message already read after `Hello`. */
         fun run(first: ControlMessage): ServeResult {
-            var message = first
-            while (message !is Bye) {
-                when (message) {
-                    is Offer -> answer(message)
-                    is FileBegin -> receive(message)
-                    else -> throw ProtocolException("Unexpected ${message::class.simpleName} while syncing")
+            try {
+                var message = first
+                while (message !is Bye) {
+                    when (message) {
+                        is Offer -> answer(message)
+                        is FileBegin -> receive(message)
+                        else -> throw ProtocolException("Unexpected ${message::class.simpleName} while syncing")
+                    }
+                    message = channel.receive()
                 }
-                message = channel.receive()
+            } finally {
+                space.release(reserved.values.sum()) // Wanted but never (fully) sent.
             }
             return ServeResult.Synced(received, alreadyHad, failed, bytesDone, waitingForSpace)
         }
 
         private fun answer(offer: Offer) {
-            var budget = sink.availableBytes()
             val want = mutableListOf<Want>()
             val have = mutableListOf<Have>()
             for (item in offer.items) {
@@ -216,10 +224,10 @@ class ConsumerSession(
                     else -> {
                         val resumeAt = sink.partialSize(producer, descriptor.fingerprint).coerceIn(0, descriptor.size)
                         val needed = descriptor.size - resumeAt
-                        if (needed <= budget) {
+                        if (space.tryReserve(needed)) {
                             want += Want(item.offerId, resumeAt)
                             wantedThisSession += descriptor.fingerprint
-                            budget -= needed
+                            reserved[item.offerId] = needed
                             itemsTotal++
                             bytesTotal += descriptor.size
                         } else {
@@ -282,6 +290,7 @@ class ConsumerSession(
             fun append(byteCount: Int) {
                 length += byteCount
                 bytesDone += byteCount
+                unreserve(byteCount.toLong())
                 if (length <= descriptor.size) {
                     digest.update(buffer, 0, byteCount)
                     if (writable) writable = writeOrFail(byteCount)
@@ -293,6 +302,7 @@ class ConsumerSession(
 
             fun finish(end: FileEnd) {
                 if (end.offerId != offerId) throw ProtocolException("FILE_END for offer ${end.offerId}, not $offerId")
+                unreserve(Long.MAX_VALUE) // Done with this file, however much arrived.
                 itemsDone++
                 val sha256 = digest.digest().toByteString()
                 val status = when {
@@ -304,6 +314,14 @@ class ConsumerSession(
                 if (status != FileAck.Status.OK) file?.discard()
                 file?.close()
                 channel.send(FileAck(offerId, status, if (status == FileAck.Status.OK) sha256 else ByteString.EMPTY))
+            }
+
+            /** Written bytes now take real space: what was reserved for them goes back. */
+            private fun unreserve(bytes: Long) {
+                val left = reserved[offerId] ?: return
+                val released = minOf(left, bytes)
+                space.release(released)
+                if (left == released) reserved.remove(offerId) else reserved[offerId] = left - released
             }
 
             /** The connection broke: keep what was written so the next session can resume. */
@@ -360,3 +378,24 @@ internal fun Int.toPairingDecision(): PairingDecision = when (this) {
 }
 
 private const val NANOS_PER_MICRO = 1_000L
+
+/**
+ * The free space that the sessions a consumer serves at once share (docs/PLAN.md §2.2, storage guard): each reserves
+ * what it asks for, so together they never ask for more than fits. A reservation shrinks as its bytes are written
+ * (they then take real space), and what's left of it ends with the session.
+ */
+class SpaceBudget(private val sink: MediaSink) {
+    private var reserved = 0L
+
+    @Synchronized
+    fun tryReserve(bytes: Long): Boolean {
+        if (bytes > sink.availableBytes() - reserved) return false
+        reserved += bytes
+        return true
+    }
+
+    @Synchronized
+    fun release(bytes: Long) {
+        reserved = (reserved - bytes).coerceAtLeast(0)
+    }
+}

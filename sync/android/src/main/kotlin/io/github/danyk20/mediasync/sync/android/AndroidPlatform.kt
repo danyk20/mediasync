@@ -127,11 +127,14 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
     LanSockets {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val wifi = context.getSystemService(WifiManager::class.java)
+    private val power = context.getSystemService(PowerManager::class.java)
 
     /**
      * Holds Wi-Fi locks while a session runs: Wi-Fi power saving would otherwise slow transfers down, the screen
      * being off at night. No wake lock: background jobs and foreground services already keep the phone awake.
      */
+    override fun canUseMoreConnections(): Boolean = power.currentThermalStatus < PowerManager.THERMAL_STATUS_MODERATE
+
     override fun <T> keepingAwake(session: () -> T): T {
         @Suppress("DEPRECATION") // Low latency needs the screen on; high performance covers the night.
         val locks = listOf(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, WifiManager.WIFI_MODE_FULL_HIGH_PERF)
