@@ -20,7 +20,15 @@ interface MediaSource {
 
     /** Opens the original bytes (location metadata included). */
     fun open(item: SourceItem): Source
+
+    /** Opens the original bytes for reading anywhere, to find their metadata before sending (docs/PLAN.md §6.4). */
+    fun openRanges(item: SourceItem): RangeReader
 }
+
+/** Reads parts of one file; close it when done. */
+interface RangeReader :
+    ByteRangeReader,
+    Closeable
 
 /** Producer side: what each consumer has confirmed (docs/PLAN.md §5.6). */
 interface SentLedger {

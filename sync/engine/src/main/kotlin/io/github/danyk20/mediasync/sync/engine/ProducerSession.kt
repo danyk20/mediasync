@@ -4,7 +4,11 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
+import io.github.danyk20.mediasync.core.metadata.ByteReader
+import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
+import io.github.danyk20.mediasync.core.metadata.Redaction
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.FileAck
@@ -24,6 +28,7 @@ import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import okio.buffer
+import okio.source
 
 /** The outcome of one producer session. */
 data class SyncResult(
@@ -39,10 +44,16 @@ data class SyncResult(
     val cancelled: Boolean = false,
     /** The schedule the consumer asked its producers to follow; `null` if it didn't say (an older version). */
     val consumerSchedule: SyncSchedule? = null,
+    /**
+     * Not sent under the chosen *Photo details*: their details can't be removed (RAW photos under *Remove all*,
+     * formats MediaSync can't read). They're sent once the setting allows it.
+     */
+    val withheld: Int = 0,
 )
 
 /**
- * Sends everything the consumer hasn't confirmed yet, newest first (docs/PLAN.md §5).
+ * Sends everything the consumer hasn't confirmed yet, newest first (docs/PLAN.md §5), with the [details] the user
+ * chose to send (docs/PLAN.md §6.3): removed details never leave this phone.
  *
  * The session is blocking: run it on an I/O thread. Closing the connection aborts it; everything
  * already confirmed stays recorded, and a partly sent file resumes next time.
@@ -53,6 +64,7 @@ class ProducerSession(
     private val ledger: SentLedger,
     private val progress: ProgressListener = ProgressListener {},
     private val shouldContinue: () -> Boolean = { true },
+    private val details: PhotoDetails = PhotoDetails.KEEP_ALL,
 ) {
 
     fun sync(connection: PeerConnection): SyncResult {
@@ -100,49 +112,84 @@ class ProducerSession(
         private var alreadyOnConsumer = 0
         private var failed = 0
         private var deferred = 0
+        private var withheld = 0
         private var bytesSent = 0L
         var cancelled = false
 
         fun offerBatch(batch: List<SourceItem>) {
-            val offered = batch.associateBy { nextOfferId++ }
-            channel.send(Offer(offered.map { (id, item) -> item.descriptor.toOfferItem(id) }))
+            val offered = batch.mapNotNull(::prepare).associateBy { nextOfferId++ }
+            if (offered.isEmpty()) return
+            channel.send(Offer(offered.map { (id, prepared) -> prepared.descriptor.toOfferItem(id) }))
             val response = channel.expect<OfferResponse>()
 
             for (have in response.have) {
-                val item = offered[have.offerId] ?: throw ProtocolException("HAVE for unknown offer ${have.offerId}")
-                ledger.markSent(consumer, item.descriptor.fingerprint, have.contentId)
+                val prepared =
+                    offered[have.offerId] ?: throw ProtocolException("HAVE for unknown offer ${have.offerId}")
+                ledger.markSent(consumer, prepared.descriptor.fingerprint, have.contentId)
                 alreadyOnConsumer++
-                completeItem(item)
+                completeItem(prepared.item)
             }
             for (want in response.want) {
                 if (!shouldContinue()) {
                     cancelled = true
                     return
                 }
-                val item = offered[want.offerId] ?: throw ProtocolException("WANT for unknown offer ${want.offerId}")
-                if (sendFile(want.offerId, item, want.resumeOffset)) sent++ else failed++
-                completeItem(item)
+                val prepared =
+                    offered[want.offerId] ?: throw ProtocolException("WANT for unknown offer ${want.offerId}")
+                if (sendFile(want.offerId, prepared, want.resumeOffset)) sent++ else failed++
+                completeItem(prepared.item)
             }
-            deferred += batch.size - response.want.size - response.have.size
+            deferred += offered.size - response.want.size - response.have.size
+        }
+
+        /** How [item] is sent under the chosen details; `null` if it isn't, now. */
+        private fun prepare(item: SourceItem): Prepared? {
+            if (details == PhotoDetails.KEEP_ALL) return Prepared(item, item.descriptor, Redaction.None)
+            val redaction = plan(item)
+            if (redaction == null || redaction is Redaction.Withheld) {
+                if (redaction == null) failed++ else withheld++ // Unreadable now: offered again next time.
+                completeItem(item)
+                return null
+            }
+            val meta = item.descriptor.meta
+            // The album and favorite travel beside the file; *Remove all* removes them too.
+            val kept = if (details == PhotoDetails.REMOVE_ALL) meta.copy(album = null, favorite = false) else meta
+            val size = (redaction as? Redaction.Edited)?.outputSize ?: item.descriptor.size
+            return Prepared(item, item.descriptor.copy(size = size, meta = kept), redaction)
+        }
+
+        private fun plan(item: SourceItem): Redaction? = try {
+            source.openRanges(item).use { file ->
+                PhotoDetailsRemover.plan(item.descriptor.size, ByteReader(file::read), details)
+            }
+        } catch (_: IOException) {
+            null
         }
 
         /** @return whether the consumer confirmed the file. */
-        private fun sendFile(offerId: Int, item: SourceItem, offset: Long): Boolean {
-            if (offset !in 0..item.descriptor.size) throw ProtocolException("Resume offset $offset out of range")
+        private fun sendFile(offerId: Int, prepared: Prepared, offset: Long): Boolean {
+            if (offset !in 0..prepared.descriptor.size) throw ProtocolException("Resume offset $offset out of range")
+            // Changed since it was offered: its details may have too. It's offered again next time.
+            if (details != PhotoDetails.KEEP_ALL && plan(prepared.item) != prepared.redaction) return false
             // Deleted or unreadable since indexing: skip it; it's re-indexed next time.
-            val input = openOrNull(item) ?: return false
-            val sha256 = input.use { stream(offerId, item, offset, it) }
+            val input = openOrNull(prepared) ?: return false
+            val sha256 = input.use { stream(offerId, prepared.item, offset, it) }
             channel.send(FileEnd(offerId, sha256))
 
             val ack = channel.expect<FileAck>()
             if (ack.offerId != offerId) throw ProtocolException("ACK for offer ${ack.offerId}, expected $offerId")
             val confirmed = ack.status == FileAck.Status.OK
-            if (confirmed) ledger.markSent(consumer, item.descriptor.fingerprint, ack.contentId)
+            if (confirmed) ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
             return confirmed
         }
 
-        private fun openOrNull(item: SourceItem): BufferedSource? = try {
-            source.open(item).buffer()
+        /** The bytes sent: the original, or the original with its details removed. */
+        private fun openOrNull(prepared: Prepared): BufferedSource? = try {
+            val original = source.open(prepared.item)
+            when (val redaction = prepared.redaction) {
+                is Redaction.Edited -> redaction.open(original.buffer().inputStream()).source().buffer()
+                else -> original.buffer()
+            }
         } catch (_: IOException) {
             null
         }
@@ -187,8 +234,12 @@ class ProducerSession(
 
         var consumerSchedule: SyncSchedule? = null
 
-        fun result() = SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled, consumerSchedule)
+        fun result() =
+            SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled, consumerSchedule, withheld)
     }
+
+    /** An item as it's offered: with the size and gallery details of what is actually sent. */
+    private class Prepared(val item: SourceItem, val descriptor: MediaDescriptor, val redaction: Redaction)
 }
 
 internal fun MediaDescriptor.toOfferItem(offerId: Int) = OfferItem(

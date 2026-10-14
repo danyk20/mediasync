@@ -14,13 +14,16 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.SyncRecord
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import java.time.Clock
 import java.time.ZonedDateTime
@@ -46,6 +49,9 @@ data class ProducerHomeUiState(
     val sync: ProducerState = ProducerState.Idle(),
     /** Photos and videos not yet sent; `null` while counting. */
     val pendingCount: Int? = null,
+    /** Photos and videos the *Photo details* setting holds back: their details can't be removed. */
+    val withheldCount: Int = 0,
+    val photoDetails: PhotoDetails = PhotoDetails.Default,
     val sources: SourceSelection = SourceSelection.Default,
     /** The receiving phone's schedule, which this phone follows; `null` until paired. */
     val schedule: SyncSchedule? = null,
@@ -70,6 +76,14 @@ data class ProducerHomeUiState(
  */
 data class MissedSync(val due: ZonedDateTime, val problem: SyncProblem?, val batteryRestricted: Boolean)
 
+/** What the home screen shows besides the sync itself. */
+private data class Extras(
+    val access: DeviceAccess,
+    val record: SyncRecord,
+    val dismissed: Set<SetupPrompt>,
+    val details: PhotoDetails,
+)
+
 /** What the phone allows MediaSync, as of [checkedAtMillis]. */
 private data class DeviceAccess(
     val library: Boolean,
@@ -93,15 +107,16 @@ class ProducerHomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
-    private val pending = MutableStateFlow<Int?>(null)
+    private val pending = MutableStateFlow<Pending?>(null)
 
     val uiState: StateFlow<ProducerHomeUiState> = combine(
         peers.observeConsumer(),
         sync.state,
         pending,
         settings.sourceSelection,
-        combine(access, history.record, settings.dismissedPrompts, ::Triple),
-    ) { consumer, state, count, sources, (access, record, dismissed) ->
+        combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, ::Extras),
+    ) { consumer, state, count, sources, extras ->
+        val (access, record, dismissed) = extras
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
         val now = ZonedDateTime.now(clock)
         ProducerHomeUiState(
@@ -109,7 +124,9 @@ class ProducerHomeViewModel @Inject constructor(
             canReadLibrary = access.library,
             canReadLocation = access.location,
             sync = state,
-            pendingCount = count,
+            pendingCount = count?.toSend,
+            withheldCount = count?.withheld ?: 0,
+            photoDetails = extras.details,
             sources = sources,
             schedule = schedule,
             nextSyncAt = schedule?.nextDue(now),
@@ -131,7 +148,7 @@ class ProducerHomeViewModel @Inject constructor(
         @OptIn(FlowPreview::class)
         val reasons = merge(
             uiState.distinctUntilChangedBy {
-                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources)
+                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources, it.photoDetails)
             }
                 .map { },
             library.changes().debounce(LIBRARY_SETTLE_MILLIS),

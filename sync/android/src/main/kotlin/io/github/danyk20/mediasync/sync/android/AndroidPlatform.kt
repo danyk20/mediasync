@@ -21,6 +21,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.InetAddress
@@ -41,11 +42,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 class AndroidDeviceInfo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val schedule: ScheduleSource,
+    private val details: PhotoDetailsSource,
 ) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
     /** As a receiving phone, it also tells its current schedule; sending phones ignore that part. */
     override fun local(): LocalDevice = device.copy(schedule = schedule.current())
+
+    override fun photoDetails(): PhotoDetails = details.current()
 
     /** The name the user gave the phone (Settings → About phone), else its model. */
     private fun name(): String =

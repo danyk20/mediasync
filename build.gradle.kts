@@ -37,6 +37,7 @@ dependencies {
     kover(projects.core.datastore)
     kover(projects.core.designsystem)
     kover(projects.core.media)
+    kover(projects.core.metadata)
     kover(projects.core.model)
     kover(projects.feature.consumer)
     kover(projects.feature.onboarding)

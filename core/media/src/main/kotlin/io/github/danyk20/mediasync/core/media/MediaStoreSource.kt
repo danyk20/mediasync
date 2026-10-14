@@ -24,6 +24,7 @@ import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.MediaSource
+import io.github.danyk20.mediasync.sync.engine.RangeReader
 import io.github.danyk20.mediasync.sync.engine.SourceItem
 import java.io.FileInputStream
 import java.io.FileNotFoundException
@@ -83,6 +84,24 @@ class MediaStoreSource internal constructor(
 
     override fun open(item: SourceItem): Source =
         resolver.openInputStream(item.key.toUri())?.source() ?: throw FileNotFoundException(item.key)
+
+    override fun openRanges(item: SourceItem): RangeReader {
+        val descriptor = try {
+            resolver.openFileDescriptor(item.key.toUri(), "r") ?: throw FileNotFoundException(item.key)
+        } catch (e: SecurityException) {
+            throw IOException("No access to ${item.key}", e) // Permission revoked since indexing.
+        }
+        val channel = FileInputStream(descriptor.fileDescriptor).channel
+        return object : RangeReader {
+            override fun read(offset: Long, byteCount: Int): ByteArray =
+                ByteArray(byteCount).also { channel.readFully(ByteBuffer.wrap(it), offset) }
+
+            override fun close() {
+                channel.close()
+                descriptor.close()
+            }
+        }
+    }
 
     private fun <T : Any> query(collection: Uri, map: (Cursor) -> T?): List<T> {
         val cursor = resolver.query(
