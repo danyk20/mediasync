@@ -100,7 +100,8 @@ class PipeliningTest {
 
         val second = sync(source).getOrThrow()
 
-        second.sent shouldBe 30 - confirmed
+        // A file stored just before the drop, whose confirmation was lost with it, is recognised, not sent again.
+        second.sent + second.alreadyOnConsumer shouldBe 30 - confirmed
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         received.items.size shouldBe 30
     }
