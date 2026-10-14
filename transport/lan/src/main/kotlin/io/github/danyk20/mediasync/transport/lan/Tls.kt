@@ -66,6 +66,8 @@ private class IdentityKeyManager(private val identity: DeviceIdentity) : X509Ext
  * Trusts a certificate only if its hash is a known device (certificate pinning). There are no certificate
  * authorities: pairing exchanges the pins in person, through the QR code.
  */
+// Lint warns about custom trust managers because most disable validation; this one replaces it with pinning.
+@Suppress("CustomX509TrustManager")
 private class PinningTrustManager(private val trust: PeerTrust) : X509ExtendedTrustManager() {
 
     private fun verify(chain: Array<out X509Certificate>?) {

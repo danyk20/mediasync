@@ -33,6 +33,9 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             }
             compileOptions.configureJava()
             lint.configureLint()
+            // Also check the pure Kotlin modules the app runs, against its minSdk: the JDK they compile
+            // against has APIs that older Android versions lack (docs/PLAN.md §12).
+            lint.checkDependencies = true
             testOptions {
                 unitTests.configureUnitTests()
                 animationsDisabled = true
