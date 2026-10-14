@@ -69,13 +69,11 @@ required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_
 
 # ---------------------------------------------------------------------------------------------------------
 # Staging: deployed by CI on every push to main.
-# Bindings, vars and secrets aren't inherited by environments, so each one repeats them.
+# Durable Object and rate-limit bindings, vars and secrets aren't inherited by environments, so each one
+# repeats them; the rest (compatibility date, observability, cron trigger, migrations) is inherited.
 
 [env.staging]
 name = "mediasync-rendezvous-staging"
-
-[env.staging.observability]
-enabled = false
 
 [[env.staging.durable_objects.bindings]]
 name = "PAIRS"
@@ -117,9 +115,6 @@ required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_
 
 [env.production]
 name = "mediasync-rendezvous"
-
-[env.production.observability]
-enabled = false
 
 [[env.production.durable_objects.bindings]]
 name = "PAIRS"

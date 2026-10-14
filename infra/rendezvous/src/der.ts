@@ -89,7 +89,7 @@ export function subjectPublicKeyInfo(certificate: Uint8Array): Uint8Array {
     return certificate.slice(spki.start, spki.end);
 }
 
-/** The unsigned big-endian integer in `bytes`, left-padded to `size` bytes. */
+/** The non-negative INTEGER [element], left-padded to [size] bytes. */
 function fixedWidth(der: Uint8Array, element: Element, size: number): Uint8Array {
     let start = element.contentStart;
     if (element.end === start) throw new DerError("Empty INTEGER");

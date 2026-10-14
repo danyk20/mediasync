@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { vi } from "vitest";
 import { derivePairId } from "../../src/identity.ts";
@@ -48,17 +49,44 @@ export function meterStub() {
     return env.METER.get(env.METER.idFromName(METER_NAME));
 }
 
-export type FetchHandler = (request: Request) => Response | Promise<Response>;
+/**
+ * Empties the deployment's single meter between tests. Rows are deleted rather than the whole storage,
+ * because the running object created its tables once, in its constructor.
+ */
+export async function resetMeter(): Promise<void> {
+    await runInDurableObject(meterStub(), async (_, state) => {
+        for (const table of ["live_usage", "live_sessions", "nonces"]) state.storage.sql.exec(`DELETE FROM ${table}`);
+        await state.storage.delete(["settings", "snapshot"]);
+    });
+}
+
+export type FetchHandler =(request: Request) => Response | Promise<Response>;
+
+/** An outbound request as the Worker made it. Bodies are read eagerly: I/O objects can't cross contexts. */
+export interface RecordedRequest {
+    method: string;
+    url: string;
+    headers: Headers;
+    body: string;
+    json<T = unknown>(): T;
+}
 
 /**
  * Replaces the global `fetch`, which the Worker and its Durable Objects share with the tests in this
- * runtime, and records every outbound request. Unexpected requests fail loudly instead of going out.
+ * runtime, and records every outbound request. Nothing reaches the network.
  */
 export function mockFetch(handler: FetchHandler) {
-    const requests: Request[] = [];
+    const requests: RecordedRequest[] = [];
     const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
         const request = new Request(input as RequestInfo, init as RequestInit);
-        requests.push(request.clone());
+        const body = await request.clone().text();
+        requests.push({
+            method: request.method,
+            url: request.url,
+            headers: new Headers(request.headers),
+            body,
+            json: <T>() => JSON.parse(body) as T,
+        });
         return handler(request);
     });
     return { requests, spy };

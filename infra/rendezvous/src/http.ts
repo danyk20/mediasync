@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { concatBytes } from "./encoding.ts";
+
 /**
  * HTTP plumbing: the JSON error format every endpoint uses, body limits and small input validators.
  *
@@ -64,11 +66,22 @@ export async function readBody(request: Request, maxBytes = MAX_BODY_BYTES): Pro
     if (declared !== null && Number(declared) > maxBytes) {
         throw new ApiError(413, "payload_too_large", `Request bodies are limited to ${maxBytes} bytes`);
     }
-    const body = new Uint8Array(await request.arrayBuffer());
-    if (body.length > maxBytes) {
-        throw new ApiError(413, "payload_too_large", `Request bodies are limited to ${maxBytes} bytes`);
+    if (request.body === null) return new Uint8Array();
+    // Read incrementally, so a body without Content-Length can't make the Worker buffer megabytes.
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > maxBytes) {
+            await reader.cancel();
+            throw new ApiError(413, "payload_too_large", `Request bodies are limited to ${maxBytes} bytes`);
+        }
+        chunks.push(value);
     }
-    return body;
+    return concatBytes(...chunks);
 }
 
 /** Parses a JSON object body; an empty body counts as `{}`. */

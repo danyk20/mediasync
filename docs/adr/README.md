@@ -12,5 +12,6 @@ Each record captures one significant decision: the context, what was decided, an
 | [0006](0006-metadata-kept-privacy-at-source.md) | Metadata kept by default; privacy removal at the source | Accepted |
 | [0007](0007-turbo-is-manual.md) | Turbo transfer (Wi-Fi Direct) is manual only | Accepted |
 | [0008](0008-apache-2-license.md) | Apache-2.0 license | Accepted |
+| [0009](0009-rendezvous-device-authentication.md) | Rendezvous Worker: device authentication, pair mailboxes and API | Accepted |
 
 New records copy the structure of an existing one: Status, Context, Decision, Consequences.

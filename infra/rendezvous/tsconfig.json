@@ -5,6 +5,7 @@
     "module": "es2022",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
     "strict": true,
     "noUncheckedIndexedAccess": true,

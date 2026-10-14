@@ -80,6 +80,12 @@ export interface SignOptions {
 }
 
 export class TestDevice {
+    /**
+     * The client address Cloudflare would report for this device. Each test device gets its own, so the
+     * per-address rate limit only trips in the test that means to trip it.
+     */
+    clientAddress = `10.${Array.from(crypto.getRandomValues(new Uint8Array(3))).join(".")}`;
+
     private constructor(
         readonly privateKey: CryptoKey,
         readonly certificate: Uint8Array,
@@ -147,7 +153,11 @@ export class TestDevice {
         const url = path.startsWith("http") ? path : `${BASE_URL}${path}`;
         const bytes =
             body === undefined ? new Uint8Array() : body instanceof Uint8Array ? body : utf8(JSON.stringify(body));
-        const headers = { ...(await this.authHeaders(method, url, bytes, options)), ...options.headers };
+        const headers: Record<string, string> = {
+            "cf-connecting-ip": this.clientAddress,
+            ...(await this.authHeaders(method, url, bytes, options)),
+            ...options.headers,
+        };
         if (body !== undefined) headers["content-type"] = "application/json";
         return new Request(url, { method, headers, ...(body === undefined ? {} : { body: bytes }) });
     }

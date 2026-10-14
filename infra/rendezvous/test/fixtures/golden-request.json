@@ -1,0 +1,16 @@
+{
+  "description": "A request signed by OpenSSL (SHA-256 ECDSA, DER signature) with an OpenSSL-made P-256 certificate (ADR 0009).",
+  "method": "POST",
+  "url": "https://rendezvous.example.com/v1/pairs/0bad1f82c8a4124c9c5e77c7cdf65a8e86b1eed827c484d0385cd6f564c81333/relay-usage",
+  "body": "{\"session\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"relayedBytes\":1048576}",
+  "deviceId": "a89e12b464b1f1cc17ef75bc31fe204efc1e0f0c0d2ce58aac4f11f85dfabc67",
+  "producerId": "2222222222222222222222222222222222222222222222222222222222222222",
+  "pairId": "0bad1f82c8a4124c9c5e77c7cdf65a8e86b1eed827c484d0385cd6f564c81333",
+  "canonicalString": "MEDIASYNC-AUTH-V1\nPOST\nrendezvous.example.com\n/v1/pairs/0bad1f82c8a4124c9c5e77c7cdf65a8e86b1eed827c484d0385cd6f564c81333/relay-usage\n\n1792000000\nAAECAwQFBgcICQoLDA0ODw\ne75c9e2aa3fbd15b8283a9865e038468e3e0b78cb1dc361a16e1472cdfd87b65",
+  "headers": {
+    "X-MediaSync-Certificate": "MIIBazCCARKgAwIBAgIUQzzsmJDI-WVNCAvtGopOZhqLpMQwCgYIKoZIzj0EAwIwGzEZMBcGA1UEAwwQTWVkaWFTeW5jIGRldmljZTAgFw0yNjEwMTQyMjI2MjlaGA8yMDU2MTAwNjIyMjYyOVowGzEZMBcGA1UEAwwQTWVkaWFTeW5jIGRldmljZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABL57WcoKnToTiX-_txNlaIRBMhwSjnh5Li98qBKiRzzUdJdC7ciuQzNzBGNWLP5ZdgMjLNDU5G-dc7qdAezvDKWjMjAwMB0GA1UdDgQWBBQRWrpZt4K-A4O-6nWxhkzym1VK_zAPBgNVHRMBAf8EBTADAQH_MAoGCCqGSM49BAMCA0cAMEQCIBRb2z3oXAigH8UsSQW3k4IqwedSe8w46Qagz-_oFT70AiAz_ttxvUiu5omVKecgihn5N8EmFlr44cobHyQcGnK3oQ",
+    "X-MediaSync-Timestamp": "1792000000",
+    "X-MediaSync-Nonce": "AAECAwQFBgcICQoLDA0ODw",
+    "X-MediaSync-Signature": "MEQCIH4p2xYvr2ORPnN1N9PMmr7WJ3svJRed-CcLZ6I5QGJxAiBcboaDU6cvKdq68j1kX8BQym1mVLzcPZymBjBLqCFdhw"
+  }
+}

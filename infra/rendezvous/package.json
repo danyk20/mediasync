@@ -5,9 +5,16 @@
   "description": "MediaSync rendezvous Worker: signaling mailbox, TURN credentials, FCM wake-up and relay usage meter",
   "license": "Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:headers": "node scripts/check-license-headers.mjs",
+    "types": "wrangler types --include-runtime=false --strict-vars=false",
+    "check:types": "wrangler types --include-runtime=false --strict-vars=false --check",
+    "bundle": "wrangler deploy --dry-run --env production --outdir dist",
     "dev": "wrangler dev"
   },
   "devDependencies": {

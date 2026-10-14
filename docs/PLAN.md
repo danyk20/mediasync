@@ -685,7 +685,7 @@ interface SecureSession : Closeable {
 ### 8.4 Internet
 
 - **Signaling.**
-  - At pairing time the devices derive a pair-specific mailbox ID and key.
+  - Each pair has a mailbox ID derived from the two device IDs, `SHA-256("mediasync-pair-v1" || consumer || producer)`, which the consumer registers with the Worker after pairing ([ADR 0009](adr/0009-rendezvous-device-authentication.md)). The pair key for encrypting signaling is agreed between the phones; the Worker never sees it.
   - They exchange WebRTC SDP and ICE candidates through the Worker's Durable Object mailbox, using a WebSocket with the hibernation API (cheap and idle-friendly).
   - Every blob is encrypted with the pair key (Tink AEAD), so the Worker sees opaque bytes only.
 - **ICE servers.**
@@ -695,8 +695,10 @@ interface SecureSession : Closeable {
 - **Direct address candidate (advanced).**
   - The user can add a fixed address, such as a Tailscale or other VPN IP, or an IPv6 address.
   - That address is then tried with the Wi-Fi transport (TLS/TCP). This gives zero-infrastructure internet sync for VPN users, and it never uses the relay.
+- **Device authentication.** No accounts: every request is signed with the phone's keystore identity key and carries its certificate, whose hash is the device ID the paired phone already pins. A timestamp and a nonce stop replays. Only the pair's two devices can use its mailbox and credentials; only the consumer registers a pair, and only the producer can wake the consumer ([ADR 0009](adr/0009-rendezvous-device-authentication.md) specifies the scheme and the API).
 - The Worker lives in `infra/rendezvous/`. It has unit tests (Vitest with the Workers pool), rate limiting, and **no logging of IPs beyond Cloudflare defaults**.
 - It is deployed by CI to a `staging` environment on main, and to `production` on release with manual approval.
+- *Built in M5 (server side):* the Worker with one Durable Object mailbox per pair (WebSocket hibernation, a 10-minute queue while the other phone is offline), signed requests with nonce replay protection, 1 h TURN credentials tagged per pair, FCM wake-ups, rate limits per address, device and credential request, and the deploy workflow (skipped until Cloudflare credentials are set up). See `infra/rendezvous/README.md`. The Android transport follows.
 
 ### 8.5 Relay usage meter and budget guard
 
@@ -727,7 +729,7 @@ Only data that passes through the relay counts against the **1,000 GB free month
 
 **Budget guard**
 
-- **Monthly budget:** default **950 GB**, a 5 % margin for analytics delay and sampling. Adjustable in Settings.
+- **Monthly budget:** default **950 GB**, a 5 % margin for analytics delay and sampling. Adjustable in Settings, from devices listed as admins in the Worker secret `RELAY_ADMIN_DEVICE_IDS`; otherwise in `wrangler.toml`.
 - **At the budget:**
   - The Worker stops issuing relay credentials. Credentials live only 1 h, so any overshoot is bounded.
   - Wi-Fi, Turbo and direct internet connections keep working.
@@ -735,6 +737,8 @@ Only data that passes through the relay counts against the **1,000 GB free month
 - **Paid usage:** *Allow paid relay usage beyond the free allowance* is off by default. Turning it on shows the price ($0.05/GB) and requires a monthly cost cap.
 - **Billing period:** the period start is configurable to match the Cloudflare billing date (default: the 1st of the month, UTC).
 - **Analytics access:** the Worker needs a Cloudflare API token with *Account Analytics: Read*, stored as a Worker secret.
+
+*Built in M5 (server side):* the usage meter Durable Object, the 15-minute cron refresh (one GraphQL request: the summed total plus a breakdown by credential tag), live reports (cumulative per WebRTC session, so repeats don't count twice; live bytes from the 10 minutes before each analytics read count again, never missing traffic), and the guard: at the limit, `ice-servers` returns STUN only with the reset date. The app side (Settings → Data usage, notifications) follows.
 
 ---
 
@@ -959,7 +963,7 @@ How a scheduled sync runs:
 
 - **Trigger:** a producer user taps **Sync now**, or starts **Turbo** while on the same network, outside the consumer's receive window.
 - **Wake-up:** the producer asks the Worker to send a **high-priority FCM** message to the consumer. That message is an allowed background-start trigger, so the consumer opens a short receive window even when MediaSync isn't running.
-- **Token:** the consumer registers its FCM token with the Worker at pairing.
+- **Token:** the consumer registers its FCM token with the Worker at pairing, together with the pair (ADR 0009). *The Worker's sending side is built (M5): FCM HTTP v1 with a service-account JWT, one wake-up per pair every 20 s.*
 - **Retries:** scheduled producers that can't reach the consumer use the same wake-up.
 - **Data path:** only a tiny wake-up signal goes over the internet. The data path can still be LAN-only.
 - **Without internet:** the user opens MediaSync on the consumer, which listens while it's open.
@@ -977,7 +981,7 @@ How a scheduled sync runs:
 
 - **Device identity:** an EC P-256 key pair in the Android Keystore (StrongBox when available) and a self-signed certificate. There are no user accounts.
 - **Pairing (in person, QR):**
-  - The consumer shows `mediasync://pair?v=1&fp=<cert SHA-256>&t=<128-bit one-time token>&e=<LAN endpoints>&m=<mailbox seed>`.
+  - The consumer shows `mediasync://pair?v=1&fp=<cert SHA-256>&t=<128-bit one-time token>&e=<LAN endpoints>`. (The internet mailbox ID is derived from the two device IDs, so it needs no QR field; ADR 0009.)
   - The QR code expires after 5 minutes and is single-use.
   - The producer connects with TLS 1.3, pins `fp`, presents its own certificate and proves it knows `t`.
   - **The consumer user confirms** "Allow *Anna's Pixel* to send photos?".
@@ -1070,7 +1074,7 @@ mediasync/
 | `codeql.yml` | PRs, weekly | CodeQL for Kotlin/Java and TypeScript |
 | `release.yml` | Push to `main` | **release-please** keeps a release PR with the changelog built from Conventional Commits. Merging it creates the `vX.Y.Z` tag and GitHub Release. The same workflow then builds the signed AAB and APK (`release` environment, with approval), SHA-256 checksums and a **build provenance attestation**, and attaches them. Play **internal** track upload is added in M6. |
 | `dependency-graph.yml` | Push to `main` | Submits the resolved Gradle dependency graph, so Dependabot alerts cover vulnerable libraries |
-| `rendezvous-deploy.yml` (from M2) | `main` (staging), release (production, manual approval) | `wrangler deploy` (Worker, Durable Object migrations, cron schedule) |
+| `rendezvous-deploy.yml` (M5) | Push to `main` touching the Worker (staging); called by `release.yml` on release (production, approval in the `rendezvous-production` environment); manual | `wrangler deploy` (Worker, Durable Object migrations, cron schedule). Skipped with a notice while the environment has no Cloudflare credentials |
 | `nightly.yml` | Cron | Full instrumented matrix (API 29, 31, 34, 36); Jazzer fuzzing (from M1) and benchmarks (from M3) |
 | `pr-hygiene.yml` | PRs | Conventional Commit title lint, labeler, size labels |
 
@@ -1140,7 +1144,7 @@ Estimates assume one developer working full-time with AI assistance. They are ro
 | **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
 | **M3** | Speed + Turbo | Parallel adaptive streams, pipelining, path switching, **Turbo transfer** (Wi-Fi Direct, Wi-Fi Aware when available), link test, benchmarks | ≥ 85 % of raw link throughput on Wi-Fi and Turbo. Turbo starts with one tap and no system dialogs. CI benchmark trend in place. | 2 wks |
 | **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
-| **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service), Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
+| **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service) *(Worker built: mailbox, device authentication, TURN credentials, FCM sending, meter and guard, CI and deploy workflow; ADR 0009)*, Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
 | **M6** | Polish and release | Onboarding polish, accessibility pass, widget + Quick Settings tile, translations scaffold, Play listing/policies/data safety, **closed test with ≥ 12 testers for 14 continuous days**, production rollout, first GitHub Release | The closed test passes with no data-loss bugs. Production access is granted, and v1.0 is live on Play and GitHub. | 3 wks |
 | **v1.1** | Google Photos API connector | OAuth verification (submitted during M6), upload pipeline that backs up as soon as items are received (§9.6), per-connector *Photo details*, metadata-preserving Storage saver, ledger and verification, MediaSync's own Free-up flow (trash on 11+, permanent delete on 10), `MANAGE_MEDIA` | End to end: received → uploaded → verified → trashed. Remote deletion blocks the local delete. | 3 wks |
 

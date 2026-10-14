@@ -29,6 +29,9 @@ export const AUTH_HEADERS = {
     signature: "X-MediaSync-Signature",
 } as const;
 
+/** Sent with `auth_clock_skew`: the Worker's time in Unix seconds, so the app can correct its clock. */
+export const SERVER_TIME_HEADER = "X-MediaSync-Server-Time";
+
 export const MAX_CLOCK_SKEW_SECONDS = 300;
 export const NONCE_BYTES = 16;
 /** Keystore certificates are around 400–600 bytes; anything far bigger isn't one. */
@@ -102,8 +105,10 @@ export async function authenticate(request: Request, body: Uint8Array, nowMillis
     }
     const timestamp = Number(timestampText);
     if (Math.abs(nowMillis / 1000 - timestamp) > MAX_CLOCK_SKEW_SECONDS) {
-        // The app can correct for a wrong phone clock with the response's Date header and retry.
-        throw unauthorized("auth_clock_skew", `The timestamp is more than ${MAX_CLOCK_SKEW_SECONDS} s off`);
+        // The app can correct for a wrong phone clock with the Worker's time and retry once.
+        throw new ApiError(401, "auth_clock_skew", `The timestamp is more than ${MAX_CLOCK_SKEW_SECONDS} s off`, {
+            [SERVER_TIME_HEADER]: `${Math.floor(nowMillis / 1000)}`,
+        });
     }
 
     let key: CryptoKey;

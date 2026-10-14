@@ -33,6 +33,19 @@ updates:
           - "org.jetbrains.kotlinx.kover*"
           - "app.cash.licensee*"
 
+  # The rendezvous Worker (infra/rendezvous). Wrangler, the Vitest plugin, the Workers types and Vitest
+  # move together: the plugin pins Wrangler and Miniflare, and the types follow the runtime.
+  - package-ecosystem: npm
+    directory: /infra/rendezvous
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      rendezvous:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
