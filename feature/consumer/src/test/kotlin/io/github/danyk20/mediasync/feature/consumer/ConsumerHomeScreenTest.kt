@@ -10,8 +10,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.kotest.matchers.shouldBe
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,6 +63,19 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
+    fun theScheduleIsShownAndCanBeChanged() {
+        var changes = 0
+        show(
+            ConsumerHomeUiState(listening = true, schedule = SyncSchedule.EveryHours(4, LocalTime.of(1, 0))),
+            onChangeSchedule = { changes++ },
+        )
+
+        composeRule.onNodeWithText("Every 4 hours from 1:00 AM").assertIsDisplayed()
+        composeRule.onNodeWithText("Sync schedule").performClick()
+        changes shouldBe 1
+    }
+
+    @Test
     fun screenshot_ready_light() {
         show(ConsumerHomeUiState(listening = true))
         composeRule.onRoot().captureScreenshot("consumer_home_ready_light")
@@ -78,10 +93,15 @@ class ConsumerHomeScreenTest {
         composeRule.onRoot().captureScreenshot("consumer_home_receiving_dark")
     }
 
-    private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false, onAdd: () -> Unit = {}) {
+    private fun show(
+        state: ConsumerHomeUiState,
+        darkTheme: Boolean = false,
+        onAdd: () -> Unit = {},
+        onChangeSchedule: () -> Unit = {},
+    ) {
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ConsumerHomeScreen(state = state, onAddProducer = onAdd)
+                ConsumerHomeScreen(state = state, onAddProducer = onAdd, onChangeSchedule = onChangeSchedule)
             }
         }
     }

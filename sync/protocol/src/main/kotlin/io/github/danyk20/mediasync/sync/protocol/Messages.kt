@@ -32,6 +32,8 @@ data class Hello(
     @ProtoNumber(4) val appVersion: String = "",
     /** Consumer only: bytes it can still accept. */
     @ProtoNumber(5) val freeSpaceBytes: Long = 0,
+    /** Consumer only: its sync schedule (`SyncSchedule.encode`), which its producers follow; empty if none. */
+    @ProtoNumber(6) val schedule: String = "",
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */

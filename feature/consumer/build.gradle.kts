@@ -7,5 +7,6 @@ android {
 }
 
 dependencies {
+    implementation(projects.core.datastore)
     implementation(projects.sync.android)
 }

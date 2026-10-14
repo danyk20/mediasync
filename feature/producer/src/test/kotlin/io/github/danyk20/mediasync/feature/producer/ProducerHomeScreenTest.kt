@@ -12,11 +12,13 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
+import java.time.ZonedDateTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,7 +34,14 @@ class ProducerHomeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val paired = ProducerHomeUiState(consumerName = "Pixel 2 XL", canReadLibrary = true, canReadLocation = true)
+    private val paired = ProducerHomeUiState(
+        consumerName = "Pixel 2 XL",
+        canReadLibrary = true,
+        canReadLocation = true,
+        schedule = SyncSchedule.Default,
+        nextSyncAt = ZonedDateTime.parse("2026-10-15T03:00+02:00[Europe/Zurich]"),
+        now = ZonedDateTime.parse("2026-10-14T20:00+02:00[Europe/Zurich]"),
+    )
     private val syncing = paired.copy(
         sync = ProducerState.Syncing(TransferProgress(12, 40, 145_000_000, 830_000_000, "PXL_1.jpg")),
     )
@@ -87,6 +96,24 @@ class ProducerHomeScreenTest {
         show(paired.copy(canReadLocation = false, pendingCount = 0))
 
         composeRule.onNodeWithText("Keep locations").assertIsDisplayed()
+    }
+
+    @Test
+    fun theNextSyncFollowsTheReceivingPhonesSchedule() {
+        show(paired.copy(pendingCount = 0))
+        composeRule.onNodeWithText("Next sync tomorrow at 3:00 AM, while charging.").assertIsDisplayed()
+    }
+
+    @Test
+    fun chargingAndManualSchedulesAreExplained() {
+        show(paired.copy(pendingCount = 0, schedule = SyncSchedule.WhileCharging, nextSyncAt = null))
+        composeRule.onNodeWithText("Syncs whenever this phone is charging and has new photos.").assertIsDisplayed()
+    }
+
+    @Test
+    fun aManualScheduleIsExplained() {
+        show(paired.copy(pendingCount = 0, schedule = SyncSchedule.Manual, nextSyncAt = null))
+        composeRule.onNodeWithText("Syncs only when you tap Sync now.").assertIsDisplayed()
     }
 
     @Test

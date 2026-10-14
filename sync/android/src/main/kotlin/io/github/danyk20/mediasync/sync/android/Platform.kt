@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.Inet4Address
@@ -32,6 +33,11 @@ fun interface AddressProvider {
  */
 fun interface LanSockets {
     fun factoryFor(address: InetSocketAddress): SocketFactory
+}
+
+/** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */
+fun interface ScheduleSource {
+    fun current(): SyncSchedule
 }
 
 /** Advertising and finding MediaSync receivers on the local network (mDNS / DNS-SD). */

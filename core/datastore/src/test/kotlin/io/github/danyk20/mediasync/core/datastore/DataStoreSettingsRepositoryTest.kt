@@ -11,9 +11,11 @@ import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.io.File
+import java.time.LocalTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -98,6 +100,24 @@ class DataStoreSettingsRepositoryTest {
         dataStore.edit { it[DataStoreSettingsRepository.SourcePresetKey] = "PRESET_FROM_A_NEWER_VERSION" }
 
         DataStoreSettingsRepository(dataStore).sourceSelection.first() shouldBe SourceSelection.Default
+    }
+
+    @Test
+    fun theScheduleIsDailyAtThreeUntilChanged() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+
+        repository.syncSchedule.first() shouldBe SyncSchedule.Default
+
+        repository.setSyncSchedule(SyncSchedule.EveryHours(4, LocalTime.of(1, 0)))
+        repository.syncSchedule.first() shouldBe SyncSchedule.EveryHours(4, LocalTime.of(1, 0))
+    }
+
+    @Test
+    fun anUnreadableStoredScheduleFallsBackToTheDefault() = runTest {
+        val dataStore = dataStore()
+        dataStore.edit { it[DataStoreSettingsRepository.SyncScheduleKey] = "fortnightly@03:00" }
+
+        DataStoreSettingsRepository(dataStore).syncSchedule.first() shouldBe SyncSchedule.Default
     }
 
     private fun TestScope.dataStore(): DataStore<Preferences> = PreferenceDataStoreFactory.create(

@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.Hello
 import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
@@ -15,7 +16,12 @@ import io.github.danyk20.mediasync.transport.PeerConnection
 import okio.ByteString
 
 /** The outcome of pairing: on success, the consumer to remember. */
-data class PairingOutcome(val decision: PairingDecision, val consumer: PairedPeer?)
+data class PairingOutcome(
+    val decision: PairingDecision,
+    val consumer: PairedPeer?,
+    /** The schedule the consumer asks its producers to follow; `null` if it didn't say. */
+    val consumerSchedule: SyncSchedule? = null,
+)
 
 /**
  * Producer side of pairing (docs/PLAN.md §11).
@@ -40,6 +46,7 @@ class PairingClient(private val local: LocalDevice) {
             PairingOutcome(
                 PairingDecision.ACCEPTED,
                 PairedPeer(connection.peerId, hello.deviceName, DeviceRole.CONSUMER),
+                SyncSchedule.decode(hello.schedule),
             )
         } else {
             PairingOutcome(result.reason.toPairingDecision(), consumer = null)

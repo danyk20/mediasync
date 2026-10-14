@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.io.Closeable
 import okio.ByteString
 import okio.Source
@@ -86,5 +87,9 @@ fun interface PairingGate {
     fun decide(request: PairingRequest): PairingDecision
 }
 
-/** How this device introduces itself in `Hello`. */
-data class LocalDevice(val name: String, val appVersion: String)
+/**
+ * How this device introduces itself in `Hello`.
+ *
+ * @property schedule consumer only: the sync schedule its producers follow (docs/PLAN.md §10.1).
+ */
+data class LocalDevice(val name: String, val appVersion: String, val schedule: SyncSchedule? = null)

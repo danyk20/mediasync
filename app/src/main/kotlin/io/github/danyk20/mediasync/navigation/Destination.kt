@@ -31,6 +31,10 @@ sealed interface Destination : NavKey {
     /** The producer chooses which folders to send. */
     @Serializable
     data object ProducerFolders : Destination
+
+    /** The consumer sets when its producers sync. */
+    @Serializable
+    data object ConsumerSchedule : Destination
 }
 
 /** Where the app starts for a device with the given role. */

@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.ProducerState
@@ -29,6 +30,10 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -59,8 +64,11 @@ class ProducerHomeViewModelTest {
     }
     private val library = FakeMediaLibrary()
     private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
+
+    /** 20:00 in Zurich: the next scheduled sync is at 03:00. */
+    private val clock = Clock.fixed(Instant.parse("2026-10-14T18:00:00Z"), ZoneId.of("Europe/Zurich"))
     private val consumer = Peer(DeviceId.of(ByteArray(32)), "Pixel 2 XL", DeviceRole.CONSUMER, 0, null, null)
-    private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(consumer)) }
+    private val peers = mockk<PeerStore> { every { observeConsumer() } returns flowOf(consumer) }
 
     private fun grantLibraryAccess() {
         val library = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -73,7 +81,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun withoutAccessItAsksForPhotosFirst() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
 
         val state = viewModel.uiState.first { it.consumerName != null }
 
@@ -84,17 +92,26 @@ class ProducerHomeViewModelTest {
     @Test
     fun withAccessItCountsWhatsWaiting() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
 
         val state = viewModel.uiState.first { it.pendingCount != null }
 
-        state shouldBe ProducerHomeUiState("Pixel 2 XL", true, true, ProducerState.Idle(), 214)
+        state shouldBe ProducerHomeUiState(
+            consumerName = "Pixel 2 XL",
+            canReadLibrary = true,
+            canReadLocation = true,
+            sync = ProducerState.Idle(),
+            pendingCount = 214,
+            schedule = SyncSchedule.Default,
+            nextSyncAt = ZonedDateTime.parse("2026-10-15T03:00+02:00[Europe/Zurich]"),
+            now = ZonedDateTime.parse("2026-10-14T20:00+02:00[Europe/Zurich]"),
+        )
     }
 
     @Test
     fun newPhotosAreCountedWhileTheScreenIsOpen() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
         viewModel.uiState.first { it.pendingCount == 214 }
 
         waiting = 215
@@ -106,7 +123,7 @@ class ProducerHomeViewModelTest {
     @Test
     fun choosingOtherFoldersRecounts() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
         viewModel.uiState.first { it.pendingCount == 214 }
 
         waiting = 1_030
@@ -118,7 +135,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun grantingAccessLaterIsPickedUp() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
         viewModel.uiState.first { it.consumerName != null }
 
         grantLibraryAccess()
@@ -129,7 +146,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun buttonsReachTheSyncRuntime() {
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
 
         viewModel.syncNow()
         viewModel.stop()
@@ -142,7 +159,7 @@ class ProducerHomeViewModelTest {
     fun theRouteShowsTheStateAndSyncs() {
         grantLibraryAccess()
         syncState.value = ProducerState.Idle(SyncResult(sent = 3), finishedAtMillis = 0)
-        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings, clock)
 
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {

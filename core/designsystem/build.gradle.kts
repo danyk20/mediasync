@@ -8,5 +8,6 @@ android {
 }
 
 dependencies {
+    api(projects.core.model)
     testImplementation(projects.core.testing)
 }

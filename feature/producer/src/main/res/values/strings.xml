@@ -39,7 +39,11 @@
 
     <string name="producer_location_missing">Locations won\'t be included in your photos until you allow MediaSync to read them.</string>
     <string name="producer_location_grant">Keep locations</string>
-    <string name="producer_keep_open_hint">For now, keep MediaSync open on both phones while syncing. Automatic sync while charging is coming.</string>
+    <string name="producer_keep_open_hint">Sync now reaches %1$s while MediaSync is open on it, or during its scheduled sync.</string>
+    <!-- "Next sync tomorrow at 3:00 AM, while charging." -->
+    <string name="producer_next_sync">Next sync %1$s, while charging.</string>
+    <string name="producer_sync_while_charging">Syncs whenever this phone is charging and has new photos.</string>
+    <string name="producer_sync_manual">Syncs only when you tap Sync now.</string>
     <!-- Folders to send -->
     <string name="producer_sources_title">Folders to send</string>
     <string name="producer_sources_change">Change</string>

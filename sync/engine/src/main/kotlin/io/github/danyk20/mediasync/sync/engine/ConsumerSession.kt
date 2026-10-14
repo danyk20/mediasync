@@ -62,7 +62,14 @@ class ConsumerSession(
         val channel = FrameChannel(connection)
         val hello = channel.expect<Hello>()
         channel.send(
-            Hello(PROTOCOL_VERSION, local.name, WireRole.CONSUMER, local.appVersion, sink.availableBytes()),
+            Hello(
+                PROTOCOL_VERSION,
+                local.name,
+                WireRole.CONSUMER,
+                local.appVersion,
+                sink.availableBytes(),
+                local.schedule?.encode().orEmpty(),
+            ),
         )
         if (hello.protocolVersion != PROTOCOL_VERSION || hello.role != WireRole.PRODUCER) {
             channel.send(Bye(Bye.Reason.INCOMPATIBLE_VERSION))

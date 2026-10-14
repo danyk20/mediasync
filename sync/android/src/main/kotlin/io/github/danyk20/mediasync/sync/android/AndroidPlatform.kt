@@ -33,10 +33,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
 @Singleton
-class AndroidDeviceInfo @Inject constructor(@ApplicationContext private val context: Context) : DeviceInfo {
+class AndroidDeviceInfo @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val schedule: ScheduleSource,
+) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
-    override fun local(): LocalDevice = device
+    /** As a receiving phone, it also tells its current schedule; sending phones ignore that part. */
+    override fun local(): LocalDevice = device.copy(schedule = schedule.current())
 
     /** The name the user gave the phone (Settings → About phone), else its model. */
     private fun name(): String =

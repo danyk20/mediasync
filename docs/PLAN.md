@@ -910,14 +910,15 @@ How a scheduled sync runs:
   - If it isn't, the sync stays due and runs the next time the phone is plugged in. A night away from the charger never skips a day's photos.
 - **Receive window on the consumer.**
   - The consumer opens a receive window a few minutes before the due time if it's charging, or as soon as it's plugged in afterwards.
-  - The window stays open until every producer is done and 30 minutes pass without activity. The default maximum is 4 h.
+  - The window stays open until every producer is done and an hour passes without activity. The default maximum is 4 h.
+  - Android 14+ batches background jobs, so a window or a producer's sync may start up to ~31 minutes after its time (seen on API 36: `max_cpu_only_job_batch_delay_ms`). Producers that arrive too early retry every 15 minutes; the hour of quiet leaves each at least two tries while the window is open.
 - **Staggered starts.** Producers spread their start over a few random minutes so they don't all connect at once. The consumer still shares bandwidth fairly (§5.4).
 - **Retries.**
-  - If a due producer can't reach the consumer, it retries every 30 minutes while charging, and asks the Worker to wake the consumer (§10.4).
+  - If a due producer can't reach the consumer, it retries every 15 minutes while charging. From M5 it also asks the Worker to wake the consumer (§10.4).
   - Each attempt is a short job. The foreground service starts only once a transfer actually begins.
 - **Timing accuracy.**
   - Scheduling uses WorkManager: one-time work delayed to the next due time, with `requiresCharging`, re-enqueued after each run.
-  - Doze doesn't apply while a phone is charging, and app-standby limits are relaxed, so the sync typically starts within minutes of 03:00.
+  - Doze doesn't apply while a phone is charging, and app-standby limits are relaxed. Job batching can still start the sync up to ~31 minutes after 03:00 on Android 14+ (see the receive window above).
   - No exact-alarm permission is needed. Google Play restricts that permission to apps such as alarm clocks and calendars.
 - **Time zones and daylight saving.**
   - The next due time is computed in local time with `java.time`.
@@ -954,7 +955,7 @@ How a scheduled sync runs:
   - A missed 03:00 run is detected and reported, e.g. "Last night's sync didn't run", with manufacturer-specific instructions (dontkillmyapp.com style).
   - The manual test matrix includes Samsung and Xiaomi devices.
 
-### 10.4 Waking the consumer outside its window (v1)
+### 10.4 Waking the consumer outside its window (M5)
 
 - **Trigger:** a producer user taps **Sync now**, or starts **Turbo** while on the same network, outside the consumer's receive window.
 - **Wake-up:** the producer asks the Worker to send a **high-priority FCM** message to the consumer. That message is an allowed background-start trigger, so the consumer opens a short receive window even when MediaSync isn't running.
@@ -1135,10 +1136,10 @@ Estimates assume one developer working full-time with AI assistance. They are ro
 |---|---|---|---|---|
 | **M0** | Foundations | Repo, CI/CD (all workflows green), module skeleton, convention plugins, design system, DI, empty app shell with role choice, golden media set | A PR to `main` runs the full pipeline (including API 29 tests). A tag produces a signed GitHub Release. | 1 wk |
 | **M1** | Wi-Fi MVP | Identity keys, QR pairing, mDNS + last-known IP, TLS session, protocol v1, MediaStore indexing (with the Android 10 fallback), outbox/receive, **full metadata preservation** (unredacted GPS, sidecar, album folders), manual *Sync now* | Two real phones (one on Android 10) pair and transfer 1,000 photos + 5 videos with zero loss and **byte-identical metadata**. Resume works after killing either app. | 3 wks |
-| **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, **Worker skeleton + FCM wake-up**, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
+| **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
 | **M3** | Speed + Turbo | Parallel adaptive streams, pipelining, path switching, **Turbo transfer** (Wi-Fi Direct, Wi-Fi Aware when available), link test, benchmarks | ≥ 85 % of raw link throughput on Wi-Fi and Turbo. Turbo starts with one tap and no system dialogs. CI benchmark trend in place. | 2 wks |
 | **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
-| **M5** | Internet sync | Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
+| **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service), Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
 | **M6** | Polish and release | Onboarding polish, accessibility pass, widget + Quick Settings tile, translations scaffold, Play listing/policies/data safety, **closed test with ≥ 12 testers for 14 continuous days**, production rollout, first GitHub Release | The closed test passes with no data-loss bugs. Production access is granted, and v1.0 is live on Play and GitHub. | 3 wks |
 | **v1.1** | Google Photos API connector | OAuth verification (submitted during M6), upload pipeline that backs up as soon as items are received (§9.6), per-connector *Photo details*, metadata-preserving Storage saver, ledger and verification, MediaSync's own Free-up flow (trash on 11+, permanent delete on 10), `MANAGE_MEDIA` | End to end: received → uploaded → verified → trashed. Remote deletion blocks the local delete. | 3 wks |
 

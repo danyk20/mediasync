@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.transport.lan.LanTimeouts
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -103,6 +104,8 @@ class ProducerSync @Inject constructor(
                     PairingResult.Refused(outcome.decision)
                 } else {
                     peers.register(consumer, it.remoteAddress)
+                    peers.keepOnlyConsumer(consumer.id)
+                    peers.recordSchedule(consumer.id, outcome.consumerSchedule)
                     PairingResult.Paired(consumer.name)
                 }
             }
@@ -114,12 +117,31 @@ class ProducerSync @Inject constructor(
     }
 
     /** Starts sending to the paired consumer, unless a sync is already running. */
-    @Synchronized
     fun syncNow() {
-        if (job?.isActive == true) return
+        launchSync()
+    }
+
+    /**
+     * Syncs now, or joins the sync already running, and returns how it ended. For background work: if the
+     * caller is cancelled (the charger was unplugged), the sync stops after the current file.
+     */
+    suspend fun syncAndWait(): ProducerState {
+        val running = launchSync()
+        try {
+            running.join()
+        } catch (e: CancellationException) {
+            cancel()
+            throw e
+        }
+        return _state.value
+    }
+
+    @Synchronized
+    private fun launchSync(): Job {
+        job?.takeIf { it.isActive }?.let { return it }
         cancelled = false
         _state.value = ProducerState.Connecting
-        job = scope.launch(Dispatchers.IO) { _state.value = runSync() }
+        return scope.launch(Dispatchers.IO) { _state.value = runSync() }.also { job = it }
     }
 
     /** Stops after the current file; everything confirmed so far stays recorded. */
@@ -148,6 +170,7 @@ class ProducerSync @Inject constructor(
                     shouldContinue = { !cancelled },
                 ).sync(it)
                 peers.recordAddress(consumer.id, it.remoteAddress)
+                peers.recordSchedule(consumer.id, result.consumerSchedule)
                 ProducerState.Idle(result, System.currentTimeMillis())
             }
         } catch (e: PeerEndedSessionException) {

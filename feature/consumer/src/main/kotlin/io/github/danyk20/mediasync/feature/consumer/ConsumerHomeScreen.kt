@@ -16,13 +16,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -34,23 +37,36 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
+import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 
 @Composable
 fun ConsumerHomeRoute(
     onAddProducer: () -> Unit,
+    onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ConsumerHomeScreen(state = state, onAddProducer = onAddProducer, modifier = modifier)
+    ConsumerHomeScreen(
+        state = state,
+        onAddProducer = onAddProducer,
+        onChangeSchedule = onChangeSchedule,
+        modifier = modifier,
+    )
 }
 
 /** Home screen of the phone that receives. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConsumerHomeScreen(state: ConsumerHomeUiState, onAddProducer: () -> Unit, modifier: Modifier = Modifier) {
+fun ConsumerHomeScreen(
+    state: ConsumerHomeUiState,
+    onAddProducer: () -> Unit,
+    onChangeSchedule: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = { TopAppBar(title = { Text(stringResource(R.string.consumer_home_title)) }) },
@@ -67,6 +83,7 @@ fun ConsumerHomeScreen(state: ConsumerHomeUiState, onAddProducer: () -> Unit, mo
             Button(onClick = onAddProducer, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.consumer_add_producer))
             }
+            ScheduleRow(state.schedule, onChangeSchedule)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
                 text = pluralStringResource(
@@ -133,6 +150,25 @@ private fun Status(state: ConsumerHomeUiState) {
     }
 }
 
+/** When the sending phones sync, and the way to change it. */
+@Composable
+private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
+    OutlinedCard(onClick = onChangeSchedule, modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.consumer_schedule_row_title)) },
+            supportingContent = { Text(scheduleSummary(schedule)) },
+            trailingContent = {
+                Text(
+                    text = stringResource(R.string.consumer_schedule_change),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
 @Composable
 private fun Producers(names: List<String>) {
     Column {
@@ -162,6 +198,7 @@ private fun ConsumerHomeScreenPreview() {
                 receivedCount = 1234,
             ),
             onAddProducer = {},
+            onChangeSchedule = {},
         )
     }
 }

@@ -24,11 +24,20 @@ interface PeerDao {
     @Query("SELECT * FROM peers WHERE role = :role ORDER BY pairedAtMillis DESC")
     fun withRole(role: String): List<PeerEntity>
 
+    @Query("SELECT * FROM peers WHERE role = :role ORDER BY pairedAtMillis DESC")
+    fun observeWithRole(role: String): Flow<List<PeerEntity>>
+
+    @Query("DELETE FROM peers WHERE role = :role AND deviceId != :keep")
+    fun deleteOthersWithRole(role: String, keep: String)
+
     @Upsert
     fun upsert(peer: PeerEntity)
 
     @Query("UPDATE peers SET lastAddress = :address, lastSeenMillis = :seenAtMillis WHERE deviceId = :deviceId")
     fun recordAddress(deviceId: String, address: String, seenAtMillis: Long)
+
+    @Query("UPDATE peers SET schedule = :schedule WHERE deviceId = :deviceId")
+    fun recordSchedule(deviceId: String, schedule: String?)
 
     @Query("DELETE FROM peers WHERE deviceId = :deviceId")
     fun delete(deviceId: String)

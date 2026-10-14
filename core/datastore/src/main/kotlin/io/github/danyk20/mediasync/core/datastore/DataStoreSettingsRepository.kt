@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -48,8 +49,17 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         }
     }
 
+    override val syncSchedule: Flow<SyncSchedule> = dataStore.data
+        .map { preferences -> preferences[SyncScheduleKey]?.let(SyncSchedule::decode) ?: SyncSchedule.Default }
+        .distinctUntilChanged()
+
+    override suspend fun setSyncSchedule(schedule: SyncSchedule) {
+        dataStore.edit { it[SyncScheduleKey] = schedule.encode() }
+    }
+
     internal companion object {
         val RoleKey = stringPreferencesKey("device_role")
+        val SyncScheduleKey = stringPreferencesKey("sync_schedule")
         val SourcePresetKey = stringPreferencesKey("source_preset")
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
 

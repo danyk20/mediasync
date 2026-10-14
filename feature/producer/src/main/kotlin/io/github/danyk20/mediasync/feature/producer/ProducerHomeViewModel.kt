@@ -13,10 +13,12 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
-import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import java.time.Clock
+import java.time.ZonedDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,11 @@ data class ProducerHomeUiState(
     /** Photos and videos not yet sent; `null` while counting. */
     val pendingCount: Int? = null,
     val sources: SourceSelection = SourceSelection.Default,
+    /** The receiving phone's schedule, which this phone follows; `null` until paired. */
+    val schedule: SyncSchedule? = null,
+    /** When the next scheduled sync is due, as of [now]; `null` without a timed schedule. */
+    val nextSyncAt: ZonedDateTime? = null,
+    val now: ZonedDateTime? = null,
 )
 
 @HiltViewModel
@@ -49,19 +56,32 @@ class ProducerHomeViewModel @Inject constructor(
     peers: PeerStore,
     library: MediaLibrary,
     settings: SettingsRepository,
+    private val clock: Clock,
 ) : ViewModel() {
 
     private val permissions = MutableStateFlow(currentPermissions())
     private val pending = MutableStateFlow<Int?>(null)
 
     val uiState: StateFlow<ProducerHomeUiState> = combine(
-        peers.observeAll().map { all -> all.firstOrNull { it.role == DeviceRole.CONSUMER }?.name },
+        peers.observeConsumer(),
         permissions,
         sync.state,
         pending,
         settings.sourceSelection,
     ) { consumer, (library, location), state, count, sources ->
-        ProducerHomeUiState(consumer, library, location, state, count, sources)
+        val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
+        val now = ZonedDateTime.now(clock)
+        ProducerHomeUiState(
+            consumerName = consumer?.name,
+            canReadLibrary = library,
+            canReadLocation = location,
+            sync = state,
+            pendingCount = count,
+            sources = sources,
+            schedule = schedule,
+            nextSyncAt = schedule?.nextDue(now),
+            now = now,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
     init {
