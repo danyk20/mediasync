@@ -43,6 +43,9 @@ fun interface LanSockets {
 
     /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a sending phone. */
     fun <T> keepingAwake(session: () -> T): T = session()
+
+    /** Whether a sync may open another connection: not on a warm phone, as more mean more radio and CPU work. */
+    fun canUseMoreConnections(): Boolean = true
 }
 
 /** Why background work waits for better conditions (docs/PLAN.md §10.5). */

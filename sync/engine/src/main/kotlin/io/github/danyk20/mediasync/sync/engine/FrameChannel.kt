@@ -86,4 +86,9 @@ internal class FrameChannel(connection: PeerConnection) {
 }
 
 internal const val CHUNK_SIZE: Int = 1024 * 1024
-internal const val OFFER_BATCH_SIZE: Int = 500
+
+/** Small enough that parallel connections share the work; a round trip per batch is negligible with pipelining. */
+internal const val OFFER_BATCH_SIZE: Int = 64
+
+/** A batch also ends at this size, so one connection doesn't claim every big video before another joins. */
+internal const val OFFER_BATCH_BYTES: Long = 32L * 1024 * 1024

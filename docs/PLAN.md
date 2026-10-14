@@ -616,6 +616,9 @@ Speed is the top non-functional requirement. The strategy has six parts:
    - **Turbo transfer** (§8.3) is the manual fast lane: a direct Wi-Fi link between the two phones. Through a router, every byte crosses the air twice (phone → router → phone). A direct link sends it once and can use a clean 5 GHz channel.
 2. **Saturate the link.**
    - N parallel streams (adaptive 1 → 4, increased while throughput keeps rising).
+     - Each connection runs an ordinary session. They share one work queue and take items in batches of 64 or 32 MiB, whichever comes first, so each item goes exactly once and big videos are left for connections added later.
+     - A sync starts with one connection. Every 3 seconds another is added, as long as the last one added made the total at least 10 % faster.
+     - On the receiving phone, all connections share one space budget. Each file reserves its size before it is accepted, so together they never take more space than there is.
    - Large socket buffers (4–8 MB).
    - 1 MiB chunks.
    - Pipelining: the next file starts immediately, and ACKs are asynchronous and windowed, so there is no round trip per file. This matters a lot for thousands of small photos.
@@ -631,6 +634,7 @@ Speed is the top non-functional requirement. The strategy has six parts:
    - Turbo groups request the 5 GHz band.
 5. **Never redo work.** Fingerprint dedupe, `HAVE` replies, and byte-offset resume.
 6. **Stay thermally aware.** Watch `PowerManager` thermal status and reduce streams before the SoC throttles. Throttling would cost more speed than backing off.
+   - From "moderate" upward, no connection is added. The ones already open finish their items.
 
 **Measuring:**
 
@@ -640,9 +644,9 @@ Speed is the top non-functional requirement. The strategy has six parts:
   - Both results go into the diagnostic log.
 - **Target:** ≥ 85 % of the measured raw link throughput on Wi-Fi and Turbo, for both large videos and 1,000-photo batches.
 - A JVM loopback benchmark runs in CI, and an on-device benchmark runs before each release, to catch regressions.
-  - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency.
+  - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency, over one connection and over up to four.
   - The CI job compares each run with the history kept from `main`, and fails when a case runs at half the speed or less (shared CI machines vary too much for a tighter bound).
-  - First results (a 2026 Mac): 487 MB/s for the video, 616 MB/s for the photos, and 92 MB/s with 5 ms latency, where one confirmation per file would allow about 10 MB/s.
+  - First results (a 2026 Mac): 487 MB/s for the video, 616 MB/s for the photos, and 92 MB/s with 5 ms latency, where one confirmation per file would allow about 10 MB/s. Up to four connections raised that to 115 MB/s. Between two emulators (about 2 MB/s through adb), 40 photos of 3 MB took 38 s over four connections instead of 45 s over one.
 - Internet throughput is usually limited by the uplink. The WebRTC data channel (SCTP) is good enough for that today. A QUIC transport can be added later behind the same `Transport` interface if ever needed.
 
 ---

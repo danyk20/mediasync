@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PairingLink
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
+import io.github.danyk20.mediasync.sync.engine.SpaceBudget
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanServer
@@ -22,6 +23,8 @@ import io.github.danyk20.mediasync.transport.lan.PeerTrust
 import java.io.Closeable
 import java.io.IOException
 import java.net.BindException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +90,13 @@ class ConsumerReceiver internal constructor(
     private var advertisement: Closeable? = null
     private var acceptJob: Job? = null
     private val holders = mutableSetOf<String>()
+
+    /** One budget for every session at once: a sender's parallel connections, or several senders. */
+    private val space = SpaceBudget(sink)
+
+    /** Progress of each session running now, by session; a sender may have several (docs/PLAN.md §7). */
+    private val sessions = ConcurrentHashMap<Long, Pair<DeviceId, TransferProgress>>()
+    private val nextSession = AtomicLong()
 
     val state: StateFlow<ReceiverState> = _state.asStateFlow()
 
@@ -183,6 +193,7 @@ class ConsumerReceiver internal constructor(
 
     /** One session with [producer], from its first message to its end. */
     private fun receive(producer: DeviceId, connection: PeerConnection, started: Long) {
+        val id = nextSession.incrementAndGet()
         connection.use {
             val session = ConsumerSession(
                 device.local(),
@@ -191,13 +202,10 @@ class ConsumerReceiver internal constructor(
                 sink,
                 gate,
                 progress = { progress ->
-                    _state.update {
-                        it.copy(
-                            transfers = it.transfers + (producer to progress),
-                            lastActivityMillis = System.currentTimeMillis(),
-                        )
-                    }
+                    sessions[id] = producer to progress
+                    _state.update { it.copy(transfers = transfers(), lastActivityMillis = System.currentTimeMillis()) }
                 },
+                space = space,
             )
             val result = try {
                 session.serve(it).also { result ->
@@ -216,9 +224,10 @@ class ConsumerReceiver internal constructor(
                 )
                 null // Dropped: kept partial files resume next time.
             }
+            sessions.remove(id)
             _state.update { state ->
                 state.copy(
-                    transfers = state.transfers - producer,
+                    transfers = transfers(),
                     lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
                     lastActivityMillis = System.currentTimeMillis(),
                     waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
@@ -226,6 +235,20 @@ class ConsumerReceiver internal constructor(
             }
         }
     }
+
+    /** Each sender's sessions, added up. */
+    private fun transfers(): Map<DeviceId, TransferProgress> = sessions.values.groupBy({ it.first }, { it.second })
+        .mapValues { (_, parts) ->
+            parts.reduce { a, b ->
+                TransferProgress(
+                    itemsDone = a.itemsDone + b.itemsDone,
+                    itemsTotal = a.itemsTotal + b.itemsTotal,
+                    bytesDone = a.bytesDone + b.bytesDone,
+                    bytesTotal = a.bytesTotal + b.bytesTotal,
+                    currentItem = b.currentItem ?: a.currentItem,
+                )
+            }
+        }
 
     private fun markActivity() = _state.update { it.copy(lastActivityMillis = System.currentTimeMillis()) }
 
