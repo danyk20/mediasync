@@ -23,7 +23,7 @@ spotless {
         licenseHeader("/*\n * Copyright \$YEAR The MediaSync Authors\n * SPDX-License-Identifier: Apache-2.0\n */\n")
     }
     kotlinGradle {
-        target("*.kts", "build-logic/**/*.kts")
+        target("*.kts", "gradle/*.kts", "build-logic/**/*.kts")
         targetExclude("**/build/**")
         ktlint(libs.versions.ktlint.get())
     }
