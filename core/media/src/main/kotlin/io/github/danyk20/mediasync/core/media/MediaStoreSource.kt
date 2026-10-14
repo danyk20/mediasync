@@ -17,7 +17,9 @@ import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintEntity
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
@@ -31,15 +33,17 @@ import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
 import okio.Source
 import okio.source
 
 /**
- * The producer's photos and videos, read from MediaStore.
+ * The producer's photos and videos, read from MediaStore: those in the folders the user chose to send
+ * (docs/PLAN.md §2.2), read again before every listing so a new choice applies right away.
  *
- * In v1.0 that's the camera folder (`DCIM/Camera`); choosing other albums arrives in M2 (docs/PLAN.md §2.2).
  * Files are read as originals whenever the user granted `ACCESS_MEDIA_LOCATION`. Otherwise Android strips
  * the location from what the app can read (docs/PLAN.md §6.2).
  */
@@ -48,12 +52,15 @@ import okio.source
 class MediaStoreSource internal constructor(
     private val context: Context,
     private val fingerprints: MediaFingerprintDao,
-    private val folders: List<String>,
+    private val selection: suspend () -> SourceSelection,
 ) : MediaSource {
 
     @Inject
-    constructor(@ApplicationContext context: Context, fingerprints: MediaFingerprintDao) :
-        this(context, fingerprints, listOf(CAMERA_FOLDER))
+    constructor(
+        @ApplicationContext context: Context,
+        fingerprints: MediaFingerprintDao,
+        settings: SettingsRepository,
+    ) : this(context, fingerprints, { settings.sourceSelection.first() })
 
     private val resolver: ContentResolver = context.contentResolver
 
@@ -61,21 +68,28 @@ class MediaStoreSource internal constructor(
     fun canReadLocation(): Boolean =
         context.checkSelfPermission(Manifest.permission.ACCESS_MEDIA_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+    /** Called on I/O threads, which may wait for the stored choice. */
     override fun items(): List<SourceItem> {
+        val chosen = runBlocking { selection() }
         val original = canReadLocation()
-        return COLLECTIONS.flatMap { collection -> query(collection) { row -> toItem(collection, row, original) } }
+        return COLLECTIONS.flatMap { collection ->
+            query(collection) { row ->
+                row.stringOrNull(MediaStore.MediaColumns.RELATIVE_PATH)
+                    ?.takeIf(chosen::includes)
+                    ?.let { toItem(collection, row, original) }
+            }
+        }
     }
 
     override fun open(item: SourceItem): Source =
         resolver.openInputStream(item.key.toUri())?.source() ?: throw FileNotFoundException(item.key)
 
     private fun <T : Any> query(collection: Uri, map: (Cursor) -> T?): List<T> {
-        val selection = folders.joinToString(" OR ") { "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?" }
         val cursor = resolver.query(
             collection,
             PROJECTION,
-            "($selection) AND ${MediaStore.MediaColumns.IS_PENDING} = 0",
-            folders.map { "$it%" }.toTypedArray(),
+            "${MediaStore.MediaColumns.IS_PENDING} = 0",
+            null,
             "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
         ) ?: return emptyList()
         return cursor.use { generateSequence { if (it.moveToNext()) it else null }.mapNotNull(map).toList() }
@@ -147,18 +161,15 @@ class MediaStoreSource internal constructor(
         }
     }
 
-    companion object {
-        /** Where phone cameras save photos and videos. */
-        const val CAMERA_FOLDER = "DCIM/Camera/"
+    private companion object {
+        const val MILLIS_PER_MINUTE = 60_000
 
-        private const val MILLIS_PER_MINUTE = 60_000
-
-        private val COLLECTIONS = listOf(
+        val COLLECTIONS = listOf(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
         )
 
-        private val PROJECTION = buildList {
+        val PROJECTION = buildList {
             add(MediaStore.MediaColumns._ID)
             add(MediaStore.MediaColumns.DISPLAY_NAME)
             add(MediaStore.MediaColumns.MIME_TYPE)
@@ -166,6 +177,7 @@ class MediaStoreSource internal constructor(
             add(MediaStore.MediaColumns.DATE_TAKEN)
             add(MediaStore.MediaColumns.DATE_MODIFIED)
             add(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+            add(MediaStore.MediaColumns.RELATIVE_PATH)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) add(MediaStore.MediaColumns.IS_FAVORITE)
         }.toTypedArray()
     }

@@ -10,6 +10,7 @@ android {
 dependencies {
     api(projects.sync.engine)
     implementation(projects.core.database)
+    implementation(projects.core.datastore)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)
 

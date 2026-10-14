@@ -9,4 +9,5 @@ android {
 dependencies {
     implementation(projects.sync.android)
     implementation(projects.core.media)
+    implementation(projects.core.datastore)
 }

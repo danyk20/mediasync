@@ -21,6 +21,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.SourcePreset
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
@@ -32,6 +34,11 @@ import java.io.File
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.buffer
 import org.junit.After
 import org.junit.Rule
@@ -176,7 +183,7 @@ class MediaStoreTest {
     fun cameraPhotosAreListedWithFingerprintsOfTheirOriginalBytes() {
         val photo = jpeg(Color.YELLOW)
         val uri = insertIntoCamera(photo, "PXL_20260101_120000000.jpg")
-        val source = MediaStoreSource(context, database.mediaFingerprintDao(), listOf("DCIM/Camera/"))
+        val source = MediaStoreSource(context, database.mediaFingerprintDao()) { SourceSelection.Default }
 
         val item = source.items().single { it.descriptor.displayName == "PXL_20260101_120000000.jpg" }
 
@@ -194,11 +201,65 @@ class MediaStoreTest {
         source.items().single { it.key == item.key }.descriptor.fingerprint shouldBe item.descriptor.fingerprint
     }
 
-    private fun insertIntoCamera(bytes: ByteArray, name: String): Uri {
+    @Test
+    fun onlyTheChosenFoldersAreSent() {
+        insertIntoCamera(jpeg(Color.DKGRAY), "camera-choice.jpg")
+        insertInto(TEST_FOLDER, jpeg(Color.LTGRAY), "other-choice.jpg")
+        fun sentWith(selection: SourceSelection) =
+            MediaStoreSource(context, database.mediaFingerprintDao()) { selection }.items()
+                .map { it.descriptor.displayName }
+                .filter { it.endsWith("-choice.jpg") }
+                .sorted()
+
+        sentWith(SourceSelection.Default) shouldBe listOf("camera-choice.jpg")
+        sentWith(SourceSelection(SourcePreset.EVERYTHING)) shouldBe listOf("camera-choice.jpg", "other-choice.jpg")
+        sentWith(SourceSelection.of(setOf(TEST_FOLDER))) shouldBe listOf("other-choice.jpg")
+        sentWith(SourceSelection.of(emptySet())) shouldBe emptyList()
+    }
+
+    @Test
+    fun foldersAreListedWithTheirSizeAndNewestItem() = runBlocking<Unit> {
+        val first = jpeg(Color.BLACK)
+        val second = jpeg(Color.WHITE)
+        insertInto(TEST_FOLDER, first, "older.jpg")
+        Thread.sleep(MODIFIED_TIME_RESOLUTION_MILLIS) // MediaStore keeps modification times in seconds.
+        val newest = insertInto(TEST_FOLDER, second, "newer.jpg")
+
+        // MediaStore fills in sizes shortly after a file is written; a change notification follows.
+        val expectedBytes = (first.size + second.size).toLong()
+        val folder = withTimeoutOrNull(CHANGE_TIMEOUT_MILLIS) {
+            var listed = MediaStoreLibrary(context).folders().single { it.path == TEST_FOLDER }
+            while (listed.byteCount != expectedBytes) {
+                delay(OBSERVER_START_MILLIS)
+                listed = MediaStoreLibrary(context).folders().single { it.path == TEST_FOLDER }
+            }
+            listed
+        }.shouldNotBeNull()
+
+        folder.name shouldBe "MediaSyncTest"
+        folder.itemCount shouldBe 2
+        folder.byteCount shouldBe expectedBytes
+        folder.coverUri shouldBe newest.toString()
+    }
+
+    @Test
+    fun newPhotosAreNoticed() = runBlocking<Unit> {
+        val library = MediaStoreLibrary(context)
+
+        val noticed = async { withTimeoutOrNull(CHANGE_TIMEOUT_MILLIS) { library.changes().first() } }
+        delay(OBSERVER_START_MILLIS) // Let the observer register before the photo arrives.
+        insertInto(TEST_FOLDER, jpeg(Color.GRAY), "noticed.jpg")
+
+        noticed.await() shouldBe Unit
+    }
+
+    private fun insertIntoCamera(bytes: ByteArray, name: String): Uri = insertInto("DCIM/Camera/", bytes, name)
+
+    private fun insertInto(folder: String, bytes: ByteArray, name: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "DCIM/Camera")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
         created += uri
@@ -252,5 +313,9 @@ class MediaStoreTest {
 
     private companion object {
         const val SCAN_TIMEOUT_SECONDS = 10L
+        const val TEST_FOLDER = "Pictures/MediaSyncTest/"
+        const val MODIFIED_TIME_RESOLUTION_MILLIS = 1_100L
+        const val CHANGE_TIMEOUT_MILLIS = 10_000L
+        const val OBSERVER_START_MILLIS = 200L
     }
 }

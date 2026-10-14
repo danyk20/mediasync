@@ -10,17 +10,24 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
 import javax.inject.Inject
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -32,6 +39,7 @@ data class ProducerHomeUiState(
     val sync: ProducerState = ProducerState.Idle(),
     /** Photos and videos not yet sent; `null` while counting. */
     val pendingCount: Int? = null,
+    val sources: SourceSelection = SourceSelection.Default,
 )
 
 @HiltViewModel
@@ -39,6 +47,8 @@ class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
     peers: PeerStore,
+    library: MediaLibrary,
+    settings: SettingsRepository,
 ) : ViewModel() {
 
     private val permissions = MutableStateFlow(currentPermissions())
@@ -49,16 +59,23 @@ class ProducerHomeViewModel @Inject constructor(
         permissions,
         sync.state,
         pending,
-    ) { consumer, (library, location), state, count ->
-        ProducerHomeUiState(consumer, library, location, state, count)
+        settings.sourceSelection,
+    ) { consumer, (library, location), state, count, sources ->
+        ProducerHomeUiState(consumer, library, location, state, count, sources)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
     init {
-        // Recount whenever a sync ends or the receiving phone changes.
-        viewModelScope.launch {
-            uiState.distinctUntilChangedBy { Triple(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle) }
-                .collect { refreshPendingCount() }
-        }
+        // Recount whenever a sync ends, the receiving phone or the chosen folders change, or photos are added,
+        // edited or deleted. A newer reason cancels a count still running.
+        @OptIn(FlowPreview::class)
+        val reasons = merge(
+            uiState.distinctUntilChangedBy {
+                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources)
+            }
+                .map { },
+            library.changes().debounce(LIBRARY_SETTLE_MILLIS),
+        )
+        viewModelScope.launch { reasons.collectLatest { countPending() } }
     }
 
     fun syncNow() = sync.syncNow()
@@ -70,10 +87,10 @@ class ProducerHomeViewModel @Inject constructor(
         permissions.value = currentPermissions()
     }
 
-    private fun refreshPendingCount() {
+    private suspend fun countPending() {
         val state = uiState.value
         if (state.consumerName == null || !state.canReadLibrary || state.sync !is ProducerState.Idle) return
-        viewModelScope.launch { pending.value = sync.pendingCount() }
+        pending.value = sync.pendingCount()
     }
 
     private fun currentPermissions() =

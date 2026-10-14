@@ -17,6 +17,9 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SourcePreset
+import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
@@ -49,10 +52,13 @@ class ProducerHomeViewModelTest {
 
     private val application: Application = ApplicationProvider.getApplicationContext()
     private val syncState = MutableStateFlow<ProducerState>(ProducerState.Idle())
+    private var waiting = 214
     private val sync = mockk<ProducerSync>(relaxed = true) {
         every { state } returns syncState
-        coEvery { pendingCount() } returns 214
+        coEvery { pendingCount() } answers { waiting }
     }
+    private val library = FakeMediaLibrary()
+    private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
     private val consumer = Peer(DeviceId.of(ByteArray(32)), "Pixel 2 XL", DeviceRole.CONSUMER, 0, null, null)
     private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(consumer)) }
 
@@ -67,7 +73,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun withoutAccessItAsksForPhotosFirst() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
 
         val state = viewModel.uiState.first { it.consumerName != null }
 
@@ -78,7 +84,7 @@ class ProducerHomeViewModelTest {
     @Test
     fun withAccessItCountsWhatsWaiting() = runTest {
         grantLibraryAccess()
-        val viewModel = ProducerHomeViewModel(application, sync, peers)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
 
         val state = viewModel.uiState.first { it.pendingCount != null }
 
@@ -86,8 +92,33 @@ class ProducerHomeViewModelTest {
     }
 
     @Test
+    fun newPhotosAreCountedWhileTheScreenIsOpen() = runTest {
+        grantLibraryAccess()
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        viewModel.uiState.first { it.pendingCount == 214 }
+
+        waiting = 215
+        library.change()
+
+        viewModel.uiState.first { it.pendingCount == 215 }
+    }
+
+    @Test
+    fun choosingOtherFoldersRecounts() = runTest {
+        grantLibraryAccess()
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
+        viewModel.uiState.first { it.pendingCount == 214 }
+
+        waiting = 1_030
+        settings.setSourceSelection(SourceSelection(SourcePreset.EVERYTHING))
+
+        val state = viewModel.uiState.first { it.pendingCount == 1_030 }
+        state.sources shouldBe SourceSelection(SourcePreset.EVERYTHING)
+    }
+
+    @Test
     fun grantingAccessLaterIsPickedUp() = runTest {
-        val viewModel = ProducerHomeViewModel(application, sync, peers)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
         viewModel.uiState.first { it.consumerName != null }
 
         grantLibraryAccess()
@@ -98,7 +129,7 @@ class ProducerHomeViewModelTest {
 
     @Test
     fun buttonsReachTheSyncRuntime() {
-        val viewModel = ProducerHomeViewModel(application, sync, peers)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
 
         viewModel.syncNow()
         viewModel.stop()
@@ -111,10 +142,12 @@ class ProducerHomeViewModelTest {
     fun theRouteShowsTheStateAndSyncs() {
         grantLibraryAccess()
         syncState.value = ProducerState.Idle(SyncResult(sent = 3), finishedAtMillis = 0)
-        val viewModel = ProducerHomeViewModel(application, sync, peers)
+        val viewModel = ProducerHomeViewModel(application, sync, peers, library, settings)
 
         composeRule.setContent {
-            MediaSyncTheme(dynamicColor = false) { ProducerHomeRoute(onPair = {}, viewModel = viewModel) }
+            MediaSyncTheme(dynamicColor = false) {
+                ProducerHomeRoute(onPair = {}, onChooseFolders = {}, viewModel = viewModel)
+            }
         }
         composeRule.onNodeWithText("214 new photos and videos").assertIsDisplayed()
         composeRule.onNodeWithText("Sync now").performClick()

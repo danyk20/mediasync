@@ -6,10 +6,12 @@ package io.github.danyk20.mediasync.feature.producer
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
@@ -88,6 +90,33 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun theChosenFoldersAreShownAndCanBeChanged() {
+        show(paired.copy(pendingCount = 0))
+
+        composeRule.onNodeWithText("Camera only").assertIsDisplayed()
+        composeRule.onNodeWithText("Folders to send").performClick()
+        events shouldBe listOf("folders")
+    }
+
+    @Test
+    fun handPickedFoldersAreSummarisedByName() {
+        val folders =
+            setOf("DCIM/Camera/", "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/", "Pictures/Instagram/")
+        show(paired.copy(pendingCount = 0, sources = SourceSelection.of(folders)))
+
+        composeRule.onNodeWithText("Camera, Instagram and 1 more").assertIsDisplayed()
+    }
+
+    @Test
+    fun withoutFolders_nothingIsSent() {
+        show(paired.copy(pendingCount = 0, sources = SourceSelection.of(emptySet())))
+
+        composeRule.onNodeWithText("No folders chosen").assertIsDisplayed()
+        composeRule.onNodeWithText("None chosen").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Sync now").fetchSemanticsNodes() shouldBe emptyList()
+    }
+
+    @Test
     fun screenshot_notPaired_light() = screenshot(ProducerHomeUiState(), "producer_home_not_paired_light")
 
     @Test
@@ -105,6 +134,12 @@ class ProducerHomeScreenTest {
         "producer_home_failed_light",
     )
 
+    @Test
+    fun screenshot_noFolders_light() = screenshot(
+        paired.copy(pendingCount = 0, sources = SourceSelection.of(emptySet())),
+        "producer_home_no_folders_light",
+    )
+
     private fun screenshot(state: ProducerHomeUiState, name: String, darkTheme: Boolean = false) {
         show(state, darkTheme)
         composeRule.onRoot().captureScreenshot(name)
@@ -116,6 +151,7 @@ class ProducerHomeScreenTest {
                 ProducerHomeScreen(
                     state = state,
                     onPair = { events += "pair" },
+                    onChooseFolders = { events += "folders" },
                     onSyncNow = { events += "sync" },
                     onStop = { events += "stop" },
                     onGrantAccess = { events += "grant" },

@@ -27,6 +27,10 @@ sealed interface Destination : NavKey {
     /** The producer scans the consumer's pairing code, or confirms an [openedLink]. */
     @Serializable
     data class ProducerPairing(val openedLink: String? = null) : Destination
+
+    /** The producer chooses which folders to send. */
+    @Serializable
+    data object ProducerFolders : Destination
 }
 
 /** Where the app starts for a device with the given role. */

@@ -21,7 +21,10 @@
         <item quantity="one">%d new photo or video</item>
         <item quantity="other">%d new photos and videos</item>
     </plurals>
-    <string name="producer_status_pending_body">Tap Sync now to send them to %1$s.</string>
+    <plurals name="producer_status_pending_body">
+        <item quantity="one">Tap Sync now to send it to %1$s.</item>
+        <item quantity="other">Tap Sync now to send them to %1$s.</item>
+    </plurals>
     <string name="producer_status_connecting_title">Looking for %1$s…</string>
     <string name="producer_status_connecting_body">Both phones need to be on the same Wi-Fi, with MediaSync open.</string>
     <string name="producer_status_sending_title">Sending to %1$s</string>
@@ -37,4 +40,31 @@
     <string name="producer_location_missing">Locations won\'t be included in your photos until you allow MediaSync to read them.</string>
     <string name="producer_location_grant">Keep locations</string>
     <string name="producer_keep_open_hint">For now, keep MediaSync open on both phones while syncing. Automatic sync while charging is coming.</string>
+    <!-- Folders to send -->
+    <string name="producer_sources_title">Folders to send</string>
+    <string name="producer_sources_change">Change</string>
+    <string name="producer_sources_none">None chosen</string>
+    <plurals name="producer_sources_more">
+        <item quantity="one">%1$s and %2$d more</item>
+        <item quantity="other">%1$s and %2$d more</item>
+    </plurals>
+    <string name="producer_status_no_folders_title">No folders chosen</string>
+    <string name="producer_status_no_folders_body">Choose which folders to send to %1$s.</string>
+
+    <string name="producer_folders_title">Folders to send</string>
+    <string name="producer_folders_done">Done</string>
+    <string name="producer_folders_intro">Photos and videos in these folders are sent to your receiving phone. Turning a folder off doesn\'t remove what it already received.</string>
+    <string name="producer_folders_preset_camera">Camera only</string>
+    <string name="producer_folders_preset_camera_screenshots">Camera + screenshots</string>
+    <string name="producer_folders_preset_everything">All folders</string>
+    <string name="producer_folders_hint_preset">Matching folders added later are included automatically.</string>
+    <string name="producer_folders_hint_chosen">Only the folders you check are sent.</string>
+    <string name="producer_folders_empty">No photos or videos on this phone yet.</string>
+    <!-- The count is already formatted for the locale: "2,814". -->
+    <plurals name="producer_folders_items">
+        <item quantity="one">%1$s item</item>
+        <item quantity="other">%1$s items</item>
+    </plurals>
+    <!-- "214 items · 1.2 GB · DCIM/Camera" -->
+    <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
 </resources>

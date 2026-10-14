@@ -18,9 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +32,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +48,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaPermissions
+import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -51,6 +58,7 @@ import java.util.Date
 @Composable
 fun ProducerHomeRoute(
     onPair: () -> Unit,
+    onChooseFolders: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProducerHomeViewModel = hiltViewModel(),
 ) {
@@ -67,6 +75,7 @@ fun ProducerHomeRoute(
     ProducerHomeScreen(
         state = state,
         onPair = onPair,
+        onChooseFolders = onChooseFolders,
         onSyncNow = viewModel::syncNow,
         onStop = viewModel::stop,
         onGrantAccess = { requestPermissions.launch(MediaPermissions.required.toTypedArray()) },
@@ -88,6 +97,7 @@ fun ProducerHomeRoute(
 fun ProducerHomeScreen(
     state: ProducerHomeUiState,
     onPair: () -> Unit,
+    onChooseFolders: () -> Unit,
     onSyncNow: () -> Unit,
     onStop: () -> Unit,
     onGrantAccess: () -> Unit,
@@ -109,8 +119,14 @@ fun ProducerHomeScreen(
             val consumer = state.consumerName
             when {
                 consumer == null -> NotPaired(onPair)
+
                 !state.canReadLibrary -> NeedsAccess(consumer, onGrantAccess, onOpenSettings)
-                else -> Paired(consumer, state, onSyncNow, onStop, onGrantAccess)
+
+                else -> {
+                    Paired(consumer, state, onSyncNow, onStop)
+                    SourcesRow(state.sources, onChooseFolders)
+                    Hints(state.canReadLocation, onGrantAccess)
+                }
             }
         }
     }
@@ -142,13 +158,7 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
 }
 
 @Composable
-private fun Paired(
-    consumer: String,
-    state: ProducerHomeUiState,
-    onSyncNow: () -> Unit,
-    onStop: () -> Unit,
-    onGrantAccess: () -> Unit,
-) {
+private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -> Unit, onStop: () -> Unit) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
             Sending(consumer, sync.progress)
@@ -173,11 +183,69 @@ private fun Paired(
         }
 
         is ProducerState.Idle -> {
-            IdleStatus(consumer, state.pendingCount, sync.finishedAtMillis)
-            SyncNowButton(onSyncNow)
+            if (state.sources.isEmpty()) {
+                StatusCard(
+                    title = stringResource(R.string.producer_status_no_folders_title),
+                    body = stringResource(R.string.producer_status_no_folders_body, consumer),
+                    icon = MediaSyncIcons.Info,
+                )
+            } else {
+                IdleStatus(consumer, state.pendingCount, sync.finishedAtMillis)
+                SyncNowButton(onSyncNow)
+            }
         }
     }
-    if (!state.canReadLocation) {
+}
+
+/** Which folders are sent, and the way to change them. */
+@Composable
+private fun SourcesRow(sources: SourceSelection, onChooseFolders: () -> Unit) {
+    OutlinedCard(onClick = onChooseFolders, modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.producer_sources_title)) },
+            supportingContent = { Text(sourcesSummary(sources)) },
+            leadingContent = { Icon(painterResource(MediaSyncIcons.Folder), contentDescription = null) },
+            trailingContent = {
+                Text(
+                    text = stringResource(R.string.producer_sources_change),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** "Camera only", or the chosen folders' names: "Camera, WhatsApp Images and 2 more". */
+@Composable
+private fun sourcesSummary(sources: SourceSelection): String {
+    sources.preset?.let { return presetName(it) }
+    val names = sources.folders.map(SourceSelection::nameOf).sortedWith(String.CASE_INSENSITIVE_ORDER)
+    return when {
+        names.isEmpty() -> stringResource(R.string.producer_sources_none)
+
+        names.size <= SUMMARY_NAMES -> names.joinToString(", ")
+
+        else -> {
+            val more = names.size - SUMMARY_NAMES
+            pluralStringResource(
+                R.plurals.producer_sources_more,
+                more,
+                names.take(SUMMARY_NAMES).joinToString(", "),
+                more,
+            )
+        }
+    }
+}
+
+private const val SUMMARY_NAMES = 2
+
+private fun SourceSelection.isEmpty() = preset == null && folders.isEmpty()
+
+@Composable
+private fun Hints(canReadLocation: Boolean, onGrantAccess: () -> Unit) {
+    if (!canReadLocation) {
         Text(
             text = stringResource(R.string.producer_location_missing),
             style = MaterialTheme.typography.bodyMedium,
@@ -248,7 +316,7 @@ private fun IdleStatus(consumer: String, pending: Int?, finishedAtMillis: Long?)
 
         else -> StatusCard(
             title = pluralStringResource(R.plurals.producer_status_pending_title, pending, pending),
-            body = stringResource(R.string.producer_status_pending_body, consumer),
+            body = pluralStringResource(R.plurals.producer_status_pending_body, pending, consumer),
             icon = MediaSyncIcons.Send,
         )
     }
@@ -275,6 +343,7 @@ private fun ProducerHomeScreenPreview() {
                 sync = ProducerState.Syncing(TransferProgress(12, 40, 145_000_000, 830_000_000, "PXL_1.jpg")),
             ),
             onPair = {},
+            onChooseFolders = {},
             onSyncNow = {},
             onStop = {},
             onGrantAccess = {},
