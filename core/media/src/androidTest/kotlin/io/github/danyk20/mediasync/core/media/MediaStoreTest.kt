@@ -218,28 +218,20 @@ class MediaStoreTest {
     }
 
     @Test
-    fun foldersAreListedWithTheirSizeAndNewestItem() = runBlocking<Unit> {
+    fun foldersAreListedWithTheirSizeAndNewestItem() {
         val first = jpeg(Color.BLACK)
         val second = jpeg(Color.WHITE)
-        insertInto(TEST_FOLDER, first, "older.jpg")
+        val older = insertInto(TEST_FOLDER, first, "older.jpg")
         Thread.sleep(MODIFIED_TIME_RESOLUTION_MILLIS) // MediaStore keeps modification times in seconds.
         val newest = insertInto(TEST_FOLDER, second, "newer.jpg")
+        // MediaStore fills in sizes when it gets round to indexing new files (on Android 10, not reliably soon).
+        rescan(older)
+        rescan(newest)
 
-        // MediaStore fills in sizes shortly after a file is written; a change notification follows.
-        val expectedBytes = (first.size + second.size).toLong()
-        val folder = withTimeoutOrNull(CHANGE_TIMEOUT_MILLIS) {
-            var listed = MediaStoreLibrary(context).folders().single { it.path == TEST_FOLDER }
-            while (listed.byteCount != expectedBytes) {
-                delay(OBSERVER_START_MILLIS)
-                listed = MediaStoreLibrary(context).folders().single { it.path == TEST_FOLDER }
-            }
-            listed
-        }.shouldNotBeNull()
+        val folder = MediaStoreLibrary(context).let { runBlocking { it.folders() } }.single { it.path == TEST_FOLDER }
 
+        folder shouldBe MediaFolder(TEST_FOLDER, 2, (first.size + second.size).toLong(), newest.toString())
         folder.name shouldBe "MediaSyncTest"
-        folder.itemCount shouldBe 2
-        folder.byteCount shouldBe expectedBytes
-        folder.coverUri shouldBe newest.toString()
     }
 
     @Test
