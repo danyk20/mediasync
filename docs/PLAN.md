@@ -551,9 +551,7 @@ Three choices, offered in two places:
   - Applied only to the cloud copy. The consumer's archive keeps everything it received.
 - **The stricter setting wins.** The consumer can't add back what a producer removed.
 - **Why orientation and color profile always stay:** without them, photos show sideways or with wrong colors, and neither says anything about a person or a place.
-- **Why the capture date stays by default:** without it, Google Photos files the photo under the upload day.
-  - An advanced switch, *Also remove capture date*, warns about this (later).
-  - It also renames files to neutral names, because camera filenames contain the date.
+- **Why the capture date always stays:** without it, Google Photos files the photo under the upload day. There is no option to remove it (decided against: it's rarely sensitive, and it would scramble the timeline).
 - **Motion Photo and Ultra HDR extras depend on XMP.** *Remove all details* therefore turns them into normal still photos, and the UI says so. *Remove location* keeps them working.
 - **Scope:** a changed setting applies to items sent or uploaded afterwards. Already-synced items are not changed.
 
@@ -611,6 +609,7 @@ Three choices, offered in two places:
 Speed is the top non-functional requirement. The strategy has six parts:
 
 1. **Pick the fastest path automatically, and switch paths mid-session.**
+   - Built so far (M3): when Turbo's direct link drops, the rest goes over Wi-Fi. Switching from the internet to Wi-Fi comes with the internet paths (M5).
    - Automatic sync uses **normal Wi-Fi**, plus the internet if the user allows it. The ranking is: same Wi-Fi network > internet direct > relay.
    - When a better path appears, the session switches between files. Example: a producer that started over the internet comes home and switches to Wi-Fi.
    - **Turbo transfer** (§8.3) is the manual fast lane: a direct Wi-Fi link between the two phones. Through a router, every byte crosses the air twice (phone → router → phone). A direct link sends it once and can use a clean 5 GHz channel.
@@ -698,16 +697,20 @@ interface SecureSession : Closeable {
   - It is user-started, so it works anytime, not only while charging.
   - It ends by itself when everything is sent, or when the user taps **Stop**.
 - **One tap, no system pairing dialogs:**
-  - The consumer creates the Wi-Fi Direct group. The network name and passphrase come from the pairing secret plus a fresh per-session value, set through `WifiP2pConfig.Builder` (Android 10+).
-  - The producer joins with the same derived values.
+  - The consumer creates the Wi-Fi Direct group through `WifiP2pConfig.Builder` (Android 10+), on 5 GHz where it can, otherwise on any band. The network name (`DIRECT-xy-MediaSync`) and a 24-character passphrase are random for each Turbo transfer.
+  - They reach the producer inside the encrypted session that asked for them (`TURBO_REQUEST` → `TURBO_READY`, with where the consumer listens on the link). The producer joins with them.
   - Mutual TLS then authenticates both phones, as on any other path.
+  - Only groups whose name ends in `-MediaSync` are ever removed. If another app's group is up (Android Auto, say), Turbo isn't used.
 - **Signaling the consumer:**
-  - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session.
-  - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**.
-- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster.
+  - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session. *Built (M3).*
+  - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**. *Not built yet:* without a session, the network name and passphrase would have to come from a secret the two phones share since pairing, and pairing doesn't keep one yet.
+- **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.
+- **Closing:** the consumer removes the group a minute after the last session over it; the producer leaves it when its sync ends.
+- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster. *Not built yet.*
 - **Fallbacks:**
-  - If the direct group fails, the transfer continues over normal Wi-Fi automatically.
+  - If the direct group fails, the transfer continues over normal Wi-Fi automatically: when the consumer can't open a group, when the producer can't join it within 30 seconds, and when the link drops mid-transfer (the rest goes over Wi-Fi). The home screen says why Turbo wasn't used.
   - If the phone isn't charging, a warning appears when the battery is below 30 %.
+- **Testing:** unit tests cover the request, and runtime tests cover every fallback over loopback. API 36 emulators run Wi-Fi Direct between each other: there, the consumer created the group, the producer joined it within 4 seconds, and the photos went over it. Speeds and 5 GHz need real phones (the emulators refused 5 GHz and fell back to any band).
 - **Protocol:** Turbo is just another `Transport`, running the same TLS/TCP protocol and parallel streams. Relay usage is unaffected.
 
 ### 8.4 Internet

@@ -44,6 +44,9 @@ class MessageCodecTest {
             LinkTestBegin(),
             LinkTestEnd(bytes = 1_234_567_890),
             LinkTestResult(bytes = 1_234_567_890, micros = 5_000_123),
+            TurboRequest(),
+            TurboReady(TurboReady.Status.OK, "DIRECT-ab-MediaSync", "passphrase-1234", "192.168.49.1", 47_420),
+            TurboReady(TurboReady.Status.NOT_ALLOWED),
         )
 
         messages.forEach { message ->

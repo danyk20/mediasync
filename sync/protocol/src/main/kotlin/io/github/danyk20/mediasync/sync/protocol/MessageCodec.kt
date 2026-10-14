@@ -31,8 +31,11 @@ object MessageCodec {
         FrameType.LINK_TEST_BEGIN to LinkTestBegin.serializer(),
         FrameType.LINK_TEST_END to LinkTestEnd.serializer(),
         FrameType.LINK_TEST_RESULT to LinkTestResult.serializer(),
+        FrameType.TURBO_REQUEST to TurboRequest.serializer(),
+        FrameType.TURBO_READY to TurboReady.serializer(),
     )
 
+    @Suppress("CyclomaticComplexMethod") // One branch per message type, checked to be exhaustive by the compiler.
     fun encode(message: ControlMessage): Frame = when (message) {
         is Hello -> frame(FrameType.HELLO, Hello.serializer(), message)
         is PairRequest -> frame(FrameType.PAIR_REQUEST, PairRequest.serializer(), message)
@@ -46,6 +49,8 @@ object MessageCodec {
         is LinkTestBegin -> frame(FrameType.LINK_TEST_BEGIN, LinkTestBegin.serializer(), message)
         is LinkTestEnd -> frame(FrameType.LINK_TEST_END, LinkTestEnd.serializer(), message)
         is LinkTestResult -> frame(FrameType.LINK_TEST_RESULT, LinkTestResult.serializer(), message)
+        is TurboRequest -> frame(FrameType.TURBO_REQUEST, TurboRequest.serializer(), message)
+        is TurboReady -> frame(FrameType.TURBO_READY, TurboReady.serializer(), message)
     }
 
     /**

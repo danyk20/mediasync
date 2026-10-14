@@ -83,9 +83,17 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
         }
     }
 
+    override fun lowForTurbo(): Boolean {
+        val battery = battery() ?: return false
+        val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        return !plugged && (batteryPercent() ?: PERCENT) < TURBO_WARNING_PERCENT
+    }
+
+    private fun battery(): Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
     /** From the last battery broadcast: what the system shows, unlike a direct reading from the battery. */
     private fun batteryPercent(): Int? {
-        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+        val battery = battery() ?: return null
         val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         return if (level < 0 || scale <= 0) null else level * PERCENT / scale
@@ -93,6 +101,7 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
 
     private companion object {
         const val MIN_BATTERY_PERCENT = 20
+        const val TURBO_WARNING_PERCENT = 30
         const val PERCENT = 100
     }
 }

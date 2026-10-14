@@ -58,4 +58,14 @@
     <string name="consumer_schedule_time_cancel">Cancel</string>
     <string name="consumer_schedule_window_hint">While it\'s charging, this phone gets ready to receive 5 minutes before each time and stays ready until your phones are done.</string>
     <string name="consumer_schedule_open_hint">While MediaSync is open, your phones can sync with this phone at any time.</string>
+
+    <!-- Turbo transfer (docs/PLAN.md §8.3): a direct Wi-Fi link between the two phones. -->
+    <string name="consumer_turbo_title">A sending phone asked for Turbo transfer</string>
+    <string name="consumer_turbo_body">Allow MediaSync to connect to nearby devices, so the two phones can link up directly. Then start Turbo on the sending phone again. MediaSync doesn\'t use your location.</string>
+    <string name="consumer_turbo_allow">Allow</string>
+    <string name="consumer_turbo_location_off">Turn on location, so the two phones can link up directly: before Android 13, direct Wi-Fi links need it. Then start Turbo on the sending phone again.</string>
+    <string name="consumer_turbo_location_settings">Location settings</string>
+    <string name="consumer_turbo_open_title">Ready for Turbo</string>
+    <string name="consumer_turbo_open_body">The sending phone is joining a direct Wi-Fi link to this phone. Keep the two phones close together.</string>
+    <string name="consumer_turbo_receiving_title">Receiving from %1$s over Turbo</string>
 </resources>

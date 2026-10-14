@@ -13,8 +13,11 @@ import io.github.danyk20.mediasync.core.database.RoomSentLedger
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
@@ -63,16 +66,17 @@ class RuntimeEndToEndTest {
     private val sink = FakeMediaSink()
     private val consumerIdentity = testIdentity("Pixel 2 XL")
     private var consumerSchedule: SyncSchedule = SyncSchedule.Default
+    private val consumerLinks = FakeDirectLinks()
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
         ledger = received,
         sink = sink,
         device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule) },
-        addresses = loopback,
-        discovery = noDiscovery,
+        network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, consumerLinks),
         scope = scope,
         preferredPort = 0,
+        directLinkIdleMillis = 300,
     )
 
     // The sending phone.
@@ -80,6 +84,7 @@ class RuntimeEndToEndTest {
     private val producerPeers = PeerStore(producerDb.peerDao())
     private val photos = List(4) { FakeMedia("photo$it", Random(it).nextBytes(300_000 + it)) }
     private val source = FakeMediaSource(photos)
+    private val producerLinks = FakeDirectLinks()
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private var photoDetails = PhotoDetails.KEEP_ALL
@@ -93,9 +98,9 @@ class RuntimeEndToEndTest {
 
             override fun photoDetails() = photoDetails
         },
-        discovery = noDiscovery,
-        sockets = { SocketFactory.getDefault() },
+        network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, producerLinks),
         history = history,
+        conditions = { null },
         scope = scope,
     )
 
@@ -130,7 +135,7 @@ class RuntimeEndToEndTest {
         paired shouldBe PairingResult.Paired("Pixel 2 XL")
         consumerPeers.isPaired(producerIdentity.id) shouldBe true
         receiver.state.value.lastPaired?.name shouldBe "Anna's Pixel"
-        producer.pendingCount() shouldBe Pending(toSend = 4)
+        producer.pendingCount() shouldBe Pending(toSend = 4, bytes = photos.sumOf { it.bytes.size.toLong() })
 
         producer.syncNow()
         val done = withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
@@ -207,7 +212,8 @@ class RuntimeEndToEndTest {
         source.put(FakeMedia("raw", golden("raw.dng"), displayName = "raw.dng", mimeType = "image/x-adobe-dng"))
         photoDetails = PhotoDetails.REMOVE_ALL
 
-        producer.pendingCount() shouldBe Pending(toSend = 1, withheld = 1)
+        // What's sent counts, as it is on the phone: the RAW photo is held back.
+        producer.pendingCount() shouldBe Pending(toSend = 1, withheld = 1, bytes = golden("pixel.jpg").size.toLong())
         producer.syncNow()
         val done = withTimeout(TIMEOUT) {
             producer.state.first { it is ProducerState.Idle && it.lastResult?.withheld == 1 }
@@ -305,6 +311,73 @@ class RuntimeEndToEndTest {
         sink.stored.size shouldBe 0
     }
 
+    @Test
+    fun turboSendsOverTheDirectLinkTheReceivingPhoneOpenedAndClosesItAfterwards() = runBlocking<Unit> {
+        val entries = java.util.Collections.synchronizedList(mutableListOf<String>())
+        Diagnostics.install { area, message -> entries += "${area.label} $message" }
+        try {
+            receiver.start()
+            pairWithApproval()
+            // On the phones, a Wi-Fi Direct group; here, the receiving phone's loopback address.
+            consumerLinks.answer =
+                { port -> TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port)) }
+
+            val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+            done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 4
+            done.turboProblem shouldBe null
+            producerLinks.joined?.networkName shouldBe "DIRECT-ab-MediaSync"
+            producerLinks.left shouldBe true
+            entries.any { it.startsWith("send Sync done over Turbo") } shouldBe true
+            // The receiving phone closes the link once nothing has come over it for a while.
+            withTimeout(TIMEOUT) { receiver.state.first { !it.directLinkOpen } }
+            withTimeout(TIMEOUT) { while (consumerLinks.closed == 0) delay(POLL) }
+        } finally {
+            Diagnostics.install { _, _ -> }
+        }
+    }
+
+    @Test
+    fun turboFallsBackToWifiAndSaysWhy() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+
+        // The receiving phone's user hasn't allowed it: everything goes over Wi-Fi, and it asks there.
+        consumerLinks.answer = { TurboAnswer.Unavailable(TurboUnavailable.NOT_ALLOWED) }
+        val refused = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        refused.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.RECEIVER_NOT_ALLOWED
+        refused.lastResult?.sent shouldBe 4
+        receiver.state.value.turboNeedsPermission shouldBe true
+        producerLinks.joined shouldBe null
+
+        // The link is there, but this phone can't join it.
+        source.put(FakeMedia("new", Random(9).nextBytes(100_000)))
+        consumerLinks.answer =
+            { port -> TurboAnswer.Ready(DirectLink("DIRECT-cd-MediaSync", "pass", "127.0.0.1", port)) }
+        producerLinks.joins = false
+        val notJoined = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        notJoined.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
+        notJoined.lastResult?.sent shouldBe 1
+        receiver.state.value.turboNeedsPermission shouldBe false
+    }
+
+    @Test
+    fun aDirectLinkThatDropsLeavesTheRestToWifi() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        // The direct link: a relay to the receiving phone that breaks after 500 kB.
+        DroppingRelay(target = receiver.state.value.port!!, dropAfterBytes = 500_000).use { relay ->
+            consumerLinks.answer =
+                { TurboAnswer.Ready(DirectLink("DIRECT-ef-MediaSync", "pass", "127.0.0.1", relay.port)) }
+
+            val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+            done.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.DROPPED
+            sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
+            producerLinks.left shouldBe true
+        }
+    }
+
     /** Shows the consumer's QR code, scans it on the producer, and approves the request on the consumer. */
     private suspend fun pairWithApproval(): PairingResult {
         val link = receiver.openPairing().shouldNotBeNull()
@@ -320,5 +393,77 @@ class RuntimeEndToEndTest {
     private companion object {
         const val TIMEOUT = 20_000L
         const val POLL = 20L
+    }
+}
+
+/** Wi-Fi Direct as the test wants it: on the phones, a direct link; here, loopback. */
+private class FakeDirectLinks : DirectLinks {
+    var answer: (Int) -> TurboAnswer = { TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED) }
+    var joins = true
+    var joined: DirectLink? = null
+    var left = false
+
+    @Volatile
+    var closed = 0
+
+    override fun availability() = TurboAvailability.AVAILABLE
+
+    override fun open(port: Int) = answer(port)
+
+    override fun close() {
+        closed++
+    }
+
+    override suspend fun join(link: DirectLink, timeoutMillis: Long): Boolean {
+        joined = link.takeIf { joins }
+        return joins
+    }
+
+    override fun leave() {
+        left = true
+    }
+}
+
+/** Forwards connections to [target] on loopback, and breaks every one once [dropAfterBytes] went through. */
+private class DroppingRelay(private val target: Int, private val dropAfterBytes: Long) : Closeable {
+    private val server = java.net.ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+    private val sockets = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+    val port: Int = server.localPort
+
+    init {
+        kotlin.concurrent.thread(isDaemon = true) {
+            while (!server.isClosed) {
+                val client = runCatching { server.accept() }.getOrNull() ?: break
+                val upstream = java.net.Socket(InetAddress.getLoopbackAddress(), target)
+                sockets += listOf(client, upstream)
+                pump(client, upstream, dropAfterBytes)
+                pump(upstream, client, Long.MAX_VALUE)
+            }
+        }
+    }
+
+    private fun pump(from: java.net.Socket, to: java.net.Socket, limit: Long) =
+        kotlin.concurrent.thread(isDaemon = true) {
+            val buffer = ByteArray(BUFFER)
+            var total = 0L
+            runCatching {
+                while (total < limit) {
+                    val read = from.getInputStream().read(buffer)
+                    if (read < 0) break
+                    to.getOutputStream().write(buffer, 0, read)
+                    total += read
+                }
+            }
+            from.close()
+            to.close()
+        }
+
+    override fun close() {
+        server.close()
+        sockets.forEach { runCatching { it.close() } }
+    }
+
+    private companion object {
+        const val BUFFER = 64 * 1024
     }
 }

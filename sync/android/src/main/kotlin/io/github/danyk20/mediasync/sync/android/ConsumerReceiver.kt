@@ -17,6 +17,9 @@ import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SpaceBudget
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboHost
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanServer
 import io.github.danyk20.mediasync.transport.lan.PeerTrust
@@ -24,12 +27,15 @@ import java.io.Closeable
 import java.io.IOException
 import java.net.BindException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +55,10 @@ data class ReceiverState(
     val lastActivityMillis: Long? = null,
     /** Photos and videos the last sync offered that didn't fit in the free space. */
     val waitingForSpace: Int = 0,
+    /** A direct link for Turbo transfer (docs/PLAN.md §8.3) is open. */
+    val directLinkOpen: Boolean = false,
+    /** A sending phone asked for Turbo transfer, which needs the user's permission here. */
+    val turboNeedsPermission: Boolean = false,
 )
 
 /**
@@ -65,10 +75,11 @@ class ConsumerReceiver internal constructor(
     private val ledger: ReceivedLedger,
     private val sink: MediaSink,
     private val device: DeviceInfo,
-    private val addresses: AddressProvider,
-    private val discovery: ServiceDiscovery,
+    network: Connectivity,
     private val scope: CoroutineScope,
     private val preferredPort: Int,
+    /** A direct link closes after this long without a session over it (or anywhere). */
+    private val directLinkIdleMillis: Long = DIRECT_LINK_IDLE_MILLIS,
 ) {
     @Inject
     constructor(
@@ -77,11 +88,13 @@ class ConsumerReceiver internal constructor(
         ledger: ReceivedLedger,
         sink: MediaSink,
         device: DeviceInfo,
-        addresses: AddressProvider,
-        discovery: ServiceDiscovery,
+        network: Connectivity,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(identity, peers, ledger, sink, device, addresses, discovery, scope, PREFERRED_PORT)
+    ) : this(identity, peers, ledger, sink, device, network, scope, PREFERRED_PORT)
 
+    private val addresses = network.addresses
+    private val discovery = network.discovery
+    private val directLinks = network.directLinks
     private val window = PairingWindow()
     private val approvals = PairingApprovals()
     private val gate = pairingGate(window, approvals)
@@ -97,6 +110,14 @@ class ConsumerReceiver internal constructor(
     /** Progress of each session running now, by session; a sender may have several (docs/PLAN.md §7). */
     private val sessions = ConcurrentHashMap<Long, Pair<DeviceId, TransferProgress>>()
     private val nextSession = AtomicLong()
+    private val activeSessions = AtomicInteger()
+
+    /** The direct link open now, for every sending phone that asks; `null` while there's none. */
+    private val directLink = AtomicReference<TurboAnswer.Ready?>(null)
+
+    /** One link opened at a time. Never held while calling into this class's synchronized methods. */
+    private val opening = Any()
+    private val turbo = TurboHost { openDirectLink() }
 
     val state: StateFlow<ReceiverState> = _state.asStateFlow()
 
@@ -139,6 +160,7 @@ class ConsumerReceiver internal constructor(
 
     @Synchronized
     fun stop() {
+        closeDirectLink()
         if (server != null) Diagnostics.log(Area.RECEIVE, "Stopped listening")
         acceptJob?.cancel()
         server?.close()
@@ -165,6 +187,63 @@ class ConsumerReceiver internal constructor(
     /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
     fun freeBytes(): Long = sink.availableBytes()
 
+    /** Whether sending phones can use Turbo transfer (docs/PLAN.md §8.3) with this one now. */
+    fun turboAvailability(): TurboAvailability = directLinks.availability()
+
+    /** The user allowed Turbo here, or dismissed the request: stop asking. */
+    fun turboPermissionHandled() = _state.update { it.copy(turboNeedsPermission = false) }
+
+    /**
+     * Opens a direct link for a sending phone that asked for Turbo transfer, or hands out the one already open. It
+     * stays open, and this phone keeps listening, until a while after the last session.
+     */
+    private fun openDirectLink(): TurboAnswer {
+        var opened = false
+        val answer = synchronized(opening) {
+            directLink.get() ?: run {
+                val port = _state.value.port ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+                directLinks.open(port).also { answer ->
+                    Diagnostics.log(Area.RECEIVE, "Turbo: ${answer.describe()}")
+                    if (answer is TurboAnswer.Ready) {
+                        directLink.set(answer)
+                        opened = true
+                    }
+                }
+            }
+        }
+        markActivity()
+        when {
+            opened -> {
+                hold(DIRECT_LINK_HOLDER)
+                _state.update { it.copy(directLinkOpen = true, turboNeedsPermission = false) }
+                scope.launch { closeWhenIdle() }
+            }
+
+            answer is TurboAnswer.Unavailable -> _state.update {
+                it.copy(turboNeedsPermission = answer.reason == TurboUnavailable.NOT_ALLOWED)
+            }
+        }
+        return answer
+    }
+
+    private suspend fun closeWhenIdle() {
+        while (true) {
+            delay(minOf(directLinkIdleMillis, IDLE_CHECK_MILLIS))
+            val quietFor = System.currentTimeMillis() - (_state.value.lastActivityMillis ?: 0L)
+            if (activeSessions.get() == 0 && quietFor >= directLinkIdleMillis) break
+        }
+        closeDirectLink()
+    }
+
+    /** Never waits: [stop] calls it, on the main thread too. */
+    private fun closeDirectLink() {
+        directLink.getAndSet(null) ?: return
+        scope.launch(Dispatchers.IO) { directLinks.close() } // Waits for Wi-Fi Direct: never on the main thread.
+        Diagnostics.log(Area.RECEIVE, "Turbo: direct link closed")
+        _state.update { it.copy(directLinkOpen = false) }
+        release(DIRECT_LINK_HOLDER)
+    }
+
     private suspend fun acceptLoop(server: LanServer) {
         while (scope.isActive) {
             val pending = try {
@@ -188,7 +267,13 @@ class ConsumerReceiver internal constructor(
         val started = System.currentTimeMillis()
         Diagnostics.log(Area.RECEIVE, "Session from ${producer.short()} at ${connection.remoteAddress}")
         markActivity()
-        addresses.keepingAwake { receive(producer, connection, started) }
+        activeSessions.incrementAndGet()
+        try {
+            addresses.keepingAwake { receive(producer, connection, started) }
+        } finally {
+            activeSessions.decrementAndGet()
+            markActivity()
+        }
     }
 
     /** One session with [producer], from its first message to its end. */
@@ -206,6 +291,7 @@ class ConsumerReceiver internal constructor(
                     _state.update { it.copy(transfers = transfers(), lastActivityMillis = System.currentTimeMillis()) }
                 },
                 space = space,
+                turbo = turbo,
             )
             val result = try {
                 session.serve(it).also { result ->
@@ -256,5 +342,10 @@ class ConsumerReceiver internal constructor(
         /** Fixed when possible, so a phone's last known address keeps working. */
         const val PREFERRED_PORT = 47_420
         private const val MAX_NAME = 64
+        private const val DIRECT_LINK_HOLDER = "turbo"
+
+        /** Time for the sending phone to join the link, and to come back after a short break. */
+        private const val DIRECT_LINK_IDLE_MILLIS = 60_000L
+        private const val IDLE_CHECK_MILLIS = 5_000L
     }
 }

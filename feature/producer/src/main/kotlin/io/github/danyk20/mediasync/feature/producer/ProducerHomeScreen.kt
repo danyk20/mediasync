@@ -62,6 +62,9 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.TurboPermissions
+import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -79,6 +82,10 @@ fun ProducerHomeRoute(
     val context = LocalContext.current
     val requestPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onPermissionsChanged()
+    }
+    val requestTurbo = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.onPermissionsChanged()
+        viewModel.onTurboPermission(granted = it.isNotEmpty() && it.values.all { granted -> granted })
     }
     val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (!it) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
@@ -112,6 +119,14 @@ fun ProducerHomeRoute(
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
         onOpenDiagnostics = onOpenDiagnostics,
+        onStartTurbo = {
+            if (state.turbo == TurboAvailability.NOT_ALLOWED) {
+                requestTurbo.launch(TurboPermissions.requested.toTypedArray())
+            } else {
+                viewModel.startTurbo()
+            }
+        },
+        onOpenLocationSettings = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
         modifier = modifier,
     )
 }
@@ -132,6 +147,8 @@ fun ProducerHomeScreen(
     onChooseDetails: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onStartTurbo: () -> Unit = {},
+    onOpenLocationSettings: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -168,6 +185,7 @@ fun ProducerHomeScreen(
                         onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
                     )
                     WithheldNotice(state, onChooseDetails)
+                    TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
                     SettingRow(
                         title = stringResource(R.string.producer_sources_title),
                         summary = sourcesSummary(state.sources),
@@ -216,7 +234,7 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
 private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -> Unit, onStop: () -> Unit) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync.progress)
+            Sending(consumer, sync.progress, sync.turbo)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
@@ -226,6 +244,12 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
             title = stringResource(R.string.producer_status_connecting_title, consumer),
             body = stringResource(R.string.producer_status_connecting_body),
             icon = MediaSyncIcons.Send,
+        )
+
+        ProducerState.SettingUpTurbo -> StatusCard(
+            title = stringResource(R.string.producer_turbo_setting_up_title, consumer),
+            body = stringResource(R.string.producer_turbo_setting_up_body),
+            icon = MediaSyncIcons.Turbo,
         )
 
         is ProducerState.Failed -> {
@@ -255,7 +279,24 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
 /** What needs the user's attention while nothing is being sent: a missed sync, a full receiving phone. */
 @Composable
 private fun Notices(state: ProducerHomeUiState, consumer: String, onOpenSettings: () -> Unit) {
-    if (state.sync is ProducerState.Syncing || state.sync == ProducerState.Connecting) return
+    val sync = state.sync
+    if (sync !is ProducerState.Idle && sync !is ProducerState.Failed) return
+    (sync as? ProducerState.Idle)?.turboProblem?.let { problem ->
+        NoticeCard(
+            title = stringResource(R.string.producer_turbo_problem_title),
+            body = stringResource(
+                when (problem) {
+                    TurboProblem.RECEIVER_UNSUPPORTED -> R.string.producer_turbo_problem_unsupported
+                    TurboProblem.RECEIVER_NOT_ALLOWED -> R.string.producer_turbo_problem_not_allowed
+                    TurboProblem.NO_LINK -> R.string.producer_turbo_problem_no_link
+                    TurboProblem.DROPPED -> R.string.producer_turbo_problem_dropped
+                },
+                consumer,
+            ),
+            icon = MediaSyncIcons.Turbo,
+            warning = problem != TurboProblem.RECEIVER_UNSUPPORTED,
+        )
+    }
     state.missedSync?.let { missed -> MissedSyncNotice(missed, consumer, state.now ?: missed.due, onOpenSettings) }
     if (state.waitingForSpace > 0) {
         NoticeCard(
@@ -351,6 +392,50 @@ private fun WithheldNotice(state: ProducerHomeUiState, onChooseDetails: () -> Un
     )
 }
 
+/**
+ * Turbo transfer (docs/PLAN.md §8.3), while there's something to send and this phone has Wi-Fi Direct. Suggested
+ * when more than 2 GB are waiting; says what it needs first: location on, or permission from the app's settings.
+ */
+@Composable
+private fun TurboCard(
+    state: ProducerHomeUiState,
+    consumer: String,
+    onStartTurbo: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenLocationSettings: () -> Unit,
+) {
+    val idle = state.sync is ProducerState.Idle || state.sync is ProducerState.Failed
+    if (!idle || (state.pendingCount ?: 0) == 0 || state.turbo == TurboAvailability.UNSUPPORTED) return
+    val body = buildList {
+        add(stringResource(R.string.producer_turbo_body, consumer))
+        if (state.turboBatteryLow) add(stringResource(R.string.producer_turbo_battery_low))
+        if (state.turbo == TurboAvailability.LOCATION_OFF) add(stringResource(R.string.producer_turbo_location_off))
+        if (state.turboDeclined) add(stringResource(R.string.producer_turbo_declined))
+    }.joinToString("\n\n")
+    val (action, onAction) = when {
+        state.turbo == TurboAvailability.LOCATION_OFF ->
+            stringResource(R.string.producer_turbo_location_settings) to onOpenLocationSettings
+
+        state.turboDeclined -> stringResource(R.string.producer_access_settings) to onOpenSettings
+
+        else -> stringResource(R.string.producer_turbo_start) to onStartTurbo
+    }
+    NoticeCard(
+        title = if (state.pendingBytes > TURBO_SUGGESTED_BYTES) {
+            stringResource(R.string.producer_turbo_suggestion_title, formatBytes(state.pendingBytes))
+        } else {
+            stringResource(R.string.producer_turbo_title)
+        },
+        body = body,
+        icon = MediaSyncIcons.Turbo,
+        action = action,
+        onAction = onAction,
+    )
+}
+
+/** More than this waiting, Turbo is worth suggesting: a first sync, or after a holiday. */
+private const val TURBO_SUGGESTED_BYTES = 2_000_000_000L
+
 /** "Camera only", or the chosen folders' names: "Camera, WhatsApp Images and 2 more". */
 @Composable
 private fun sourcesSummary(sources: SourceSelection): String {
@@ -401,10 +486,13 @@ private fun SyncNowButton(onSyncNow: () -> Unit) {
 }
 
 @Composable
-private fun Sending(consumer: String, progress: TransferProgress?) {
+private fun Sending(consumer: String, progress: TransferProgress?, turbo: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusCard(
-            title = stringResource(R.string.producer_status_sending_title, consumer),
+            title = stringResource(
+                if (turbo) R.string.producer_turbo_sending_title else R.string.producer_status_sending_title,
+                consumer,
+            ),
             body = if (progress == null) {
                 stringResource(R.string.producer_status_sending_preparing)
             } else {
@@ -416,7 +504,7 @@ private fun Sending(consumer: String, progress: TransferProgress?) {
                     formatBytes(progress.bytesTotal),
                 )
             },
-            icon = MediaSyncIcons.Send,
+            icon = if (turbo) MediaSyncIcons.Turbo else MediaSyncIcons.Send,
             tone = StatusTone.Positive,
         )
         if (progress == null || progress.bytesTotal == 0L) {

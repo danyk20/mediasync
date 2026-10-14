@@ -64,6 +64,9 @@ internal abstract class SyncModule {
     @Binds
     abstract fun bindDeviceConditions(impl: AndroidDeviceConditions): DeviceConditions
 
+    @Binds
+    abstract fun bindDirectLinks(impl: WifiDirect): DirectLinks
+
     companion object {
         @Provides
         @Singleton

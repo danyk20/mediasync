@@ -144,6 +144,40 @@ data class LinkTestEnd(@ProtoNumber(1) val bytes: Long) : ControlMessage
 @Serializable
 data class LinkTestResult(@ProtoNumber(1) val bytes: Long, @ProtoNumber(2) val micros: Long) : ControlMessage
 
+/**
+ * Producer → consumer: asks for Turbo transfer (docs/PLAN.md §8.3), a direct Wi-Fi link between the two phones. The
+ * consumer answers with [TurboReady].
+ */
+@Serializable
+data class TurboRequest(@ProtoNumber(1) val reserved: Int = 0) : ControlMessage
+
+/**
+ * Consumer → producer: the direct link to join, when [status] is [Status.OK]: its Wi-Fi Direct [networkName] and
+ * [passphrase], fresh for each Turbo transfer, and where this phone listens on it. They travel inside the encrypted
+ * session, so only the paired phone learns them.
+ */
+@Serializable
+data class TurboReady(
+    @ProtoNumber(1) val status: Int,
+    @ProtoNumber(2) val networkName: String = "",
+    @ProtoNumber(3) val passphrase: String = "",
+    @ProtoNumber(4) val host: String = "",
+    @ProtoNumber(5) val port: Int = 0,
+) : ControlMessage {
+    object Status {
+        const val OK = 1
+
+        /** This phone has no Wi-Fi Direct. */
+        const val UNSUPPORTED = 2
+
+        /** Its user hasn't allowed MediaSync to use Wi-Fi Direct (nearby devices, or location before Android 13). */
+        const val NOT_ALLOWED = 3
+
+        /** Wi-Fi Direct is there, but the link couldn't be set up now (Wi-Fi off, or busy). */
+        const val FAILED = 4
+    }
+}
+
 /** Either side: the session is over. */
 @Serializable
 data class Bye(@ProtoNumber(1) val reason: Int = Reason.DONE) : ControlMessage {

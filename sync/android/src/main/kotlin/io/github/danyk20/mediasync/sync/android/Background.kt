@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import androidx.core.content.edit
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
@@ -128,14 +129,18 @@ class SyncScheduler @Inject constructor(
         scope.launch { plans().distinctUntilChanged().collect { apply(it) } }
     }
 
-    /** Sends now as a foreground job that carries on when the user leaves the app (docs/PLAN.md §10.2). */
-    fun syncNow() {
+    /**
+     * Sends now as a foreground job that carries on when the user leaves the app (docs/PLAN.md §10.2). With
+     * [turbo], over a direct link (§8.3).
+     */
+    fun syncNow(turbo: Boolean = false) {
         val request = OneTimeWorkRequest.Builder(SyncNowWorker::class.java)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setInputData(Data.Builder().putBoolean(SyncNowWorker.TURBO, turbo).build())
             .addTag(TAG)
             .build()
         workManager.enqueueUniqueWork(SYNC_NOW, ExistingWorkPolicy.KEEP, request)
-        Diagnostics.log(Area.SCHEDULE, "Sync now requested")
+        Diagnostics.log(Area.SCHEDULE, if (turbo) "Turbo transfer requested" else "Sync now requested")
     }
 
     /**
