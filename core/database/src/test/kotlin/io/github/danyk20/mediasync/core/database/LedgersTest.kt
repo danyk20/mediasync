@@ -39,6 +39,20 @@ class LedgersTest {
     fun tearDown() = database.close()
 
     @Test
+    fun theCurrentConsumerIsTheMostRecentlyPairedAndPairingReplacesOlderOnes() = runTest {
+        val peers = PeerStore(database.peerDao())
+        peers.register(PairedPeer(deviceId(2), "Old Pixel", DeviceRole.CONSUMER), "192.168.1.20:47420")
+        Thread.sleep(2) // Paired a moment later.
+        peers.register(PairedPeer(deviceId(3), "Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.21:47420")
+
+        peers.consumer()?.name shouldBe "Pixel 2 XL"
+        peers.observeConsumer().first()?.name shouldBe "Pixel 2 XL"
+
+        peers.keepOnlyConsumer(deviceId(3))
+        peers.observeAll().first().map { it.name } shouldBe listOf("Pixel 2 XL")
+    }
+
+    @Test
     fun sentLedgerRemembersPerConsumer() {
         val ledger = RoomSentLedger(database.sentItemDao())
 

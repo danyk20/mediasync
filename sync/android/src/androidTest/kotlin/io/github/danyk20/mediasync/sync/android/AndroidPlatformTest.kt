@@ -15,6 +15,7 @@ import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -39,10 +40,11 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val device = AndroidDeviceInfo(context).local()
+        val device = AndroidDeviceInfo(context) { SyncSchedule.WhileCharging }.local()
 
         device.name.shouldNotBeBlank()
         device.appVersion.shouldNotBeBlank()
+        device.schedule shouldBe SyncSchedule.WhileCharging
     }
 
     @Test

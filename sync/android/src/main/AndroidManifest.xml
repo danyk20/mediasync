@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Encrypted connections between paired phones on the local network. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -8,5 +9,18 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Finding the receiving phone on the network (mDNS). -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Scheduled syncs and receive windows run as foreground services while charging (docs/PLAN.md §10.2). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- The ongoing notification of a background sync (Android 13+ asks the user). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- WorkManager's foreground service, declared with the type our long-running work uses. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+    </application>
 
 </manifest>

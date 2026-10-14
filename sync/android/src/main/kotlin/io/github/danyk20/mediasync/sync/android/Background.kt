@@ -1,0 +1,204 @@
+/*
+ * Copyright 2026 The MediaSync Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.danyk20.mediasync.sync.android
+
+import android.content.Context
+import android.provider.MediaStore
+import androidx.core.content.edit
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
+import java.time.Clock
+import java.time.Duration
+import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.random.Random
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/** The receiving phone's schedule from its settings, kept current for the sessions that tell it. */
+@Singleton
+class SettingsScheduleSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : ScheduleSource {
+    private val schedule = settings.syncSchedule.stateIn(scope, SharingStarted.Eagerly, SyncSchedule.Default)
+
+    override fun current(): SyncSchedule = schedule.value
+}
+
+/** What runs in the background for one role, and when. `null` schedule: nothing runs. */
+internal data class BackgroundPlan(val role: DeviceRole, val schedule: SyncSchedule)
+
+/**
+ * Remembers the latest due time each role has handled. A due time missed while the phone wasn't charging
+ * therefore still runs at the next charge, even if the app is opened (and everything rescheduled) in between.
+ */
+@Singleton
+class ScheduleState @Inject constructor(@ApplicationContext context: Context) {
+    private val preferences = context.getSharedPreferences("sync_schedule_state", Context.MODE_PRIVATE)
+
+    fun lastHandledDue(role: DeviceRole): Long? = preferences.getLong(key(role), NONE).takeIf { it != NONE }
+
+    /** Only ever moves forward. */
+    fun markHandled(role: DeviceRole, dueMillis: Long) {
+        if (dueMillis > (lastHandledDue(role) ?: Long.MIN_VALUE)) preferences.edit { putLong(key(role), dueMillis) }
+    }
+
+    private fun key(role: DeviceRole) = "last_handled_due_${role.name}"
+
+    private companion object {
+        const val NONE = Long.MIN_VALUE
+    }
+}
+
+/**
+ * Keeps one background job per role in WorkManager, following the sync schedule (docs/PLAN.md §10.1, §10.2):
+ *
+ * - A sending phone syncs at each due time while charging. One that isn't charging then syncs at its next
+ *   charge. Starts are spread over a few minutes so phones don't all connect at once.
+ * - A receiving phone opens a receive window a few minutes before each due time while charging.
+ * - *Whenever charging*: a sending phone syncs when it's charging and has new photos; a receiving phone
+ *   listens while it's charging. *Manual*: nothing runs in the background.
+ *
+ * A finished run queues the next one behind itself, so changing the schedule never cancels a transfer.
+ */
+@Singleton
+class SyncScheduler @Inject constructor(
+    private val workManager: WorkManager,
+    private val settings: SettingsRepository,
+    private val peers: PeerStore,
+    private val state: ScheduleState,
+    private val clock: Clock,
+    @ApplicationScope private val scope: CoroutineScope,
+) {
+    /** Follows the role and the schedule while the app runs. Call once, at start-up. */
+    fun start() {
+        scope.launch { plans().distinctUntilChanged().collect { apply(it) } }
+    }
+
+    /** The due time a run starting now serves, or `null` for *whenever charging*. */
+    fun servedDue(role: DeviceRole, schedule: SyncSchedule): ZonedDateTime? {
+        if (schedule !is SyncSchedule.Timed) return null
+        val now = ZonedDateTime.now(clock)
+        val next = schedule.nextDue(now)
+        // A receive window opens a little early: it serves the due time just ahead.
+        return if (next != null && Duration.between(now, next) <= leadOf(role)) next else schedule.previousDue(now)
+    }
+
+    /** Called by a run that did its job: [due] won't run again, and the next run is queued behind this one. */
+    suspend fun finished(role: DeviceRole, due: ZonedDateTime?) {
+        due?.let { state.markHandled(role, it.toInstant().toEpochMilli()) }
+        val plan = plans().first() ?: return
+        if (plan.role != role || plan.schedule == SyncSchedule.Manual) return
+        workManager.enqueueUniqueWork(nameOf(role), ExistingWorkPolicy.APPEND_OR_REPLACE, request(plan))
+    }
+
+    /** The current plan: the producer follows its consumer's schedule, the consumer its own. */
+    internal fun plans(): Flow<BackgroundPlan?> = combine(
+        settings.role,
+        settings.syncSchedule,
+        peers.observeConsumer().map { consumer -> consumer?.let { it.schedule ?: SyncSchedule.Default } },
+    ) { role, own, consumers ->
+        when (role) {
+            DeviceRole.PRODUCER -> consumers?.let { BackgroundPlan(DeviceRole.PRODUCER, it) }
+            DeviceRole.CONSUMER -> BackgroundPlan(DeviceRole.CONSUMER, own)
+            null -> null
+        }
+    }
+
+    internal suspend fun apply(plan: BackgroundPlan?) {
+        DeviceRole.entries.filter { it != plan?.role }.forEach { workManager.cancelUniqueWork(nameOf(it)) }
+        if (plan == null) return
+        if (plan.schedule == SyncSchedule.Manual) {
+            workManager.cancelUniqueWork(nameOf(plan.role))
+            return
+        }
+        // A run in progress queues the next one itself when it ends, with the schedule as it is then.
+        if (isRunning(plan.role)) return
+        workManager.enqueueUniqueWork(nameOf(plan.role), ExistingWorkPolicy.REPLACE, request(plan))
+    }
+
+    private suspend fun isRunning(role: DeviceRole) =
+        workManager.getWorkInfosForUniqueWorkFlow(nameOf(role)).first().any { it.state == WorkInfo.State.RUNNING }
+
+    internal fun request(plan: BackgroundPlan): OneTimeWorkRequest {
+        val worker: Class<out ListenableWorker> = when (plan.role) {
+            DeviceRole.PRODUCER -> ScheduledSyncWorker::class.java
+            DeviceRole.CONSUMER -> ReceiveWindowWorker::class.java
+        }
+        return OneTimeWorkRequest.Builder(worker)
+            .setInitialDelay(delayOf(plan).toMillis(), TimeUnit.MILLISECONDS)
+            .setConstraints(constraintsOf(plan))
+            // Unreachable consumer (its receive window may start late, see receiveWindowDone), or no Wi-Fi:
+            // try again while charging (docs/PLAN.md §10.1).
+            .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
+            .addTag(TAG)
+            .build()
+    }
+
+    private fun delayOf(plan: BackgroundPlan): Duration {
+        val schedule = plan.schedule as? SyncSchedule.Timed ?: return Duration.ZERO
+        val now = ZonedDateTime.now(clock)
+        val previous = schedule.previousDue(now)?.toInstant()?.toEpochMilli()
+        // First schedule on this phone: the current period counts as done, the first run is the next due time.
+        val handled = state.lastHandledDue(plan.role) ?: previous?.also { state.markHandled(plan.role, it) }
+        if (previous != null && handled != null && previous > handled) return Duration.ZERO // Missed: catch up.
+        val next = schedule.nextDue(now) ?: return Duration.ZERO
+        val stagger = when (plan.role) {
+            DeviceRole.PRODUCER -> Duration.ofSeconds(Random.nextLong(STAGGER_SECONDS))
+            DeviceRole.CONSUMER -> Duration.ZERO
+        }
+        return Duration.between(now, next).minus(leadOf(plan.role)).plus(stagger).coerceAtLeast(Duration.ZERO)
+    }
+
+    private fun constraintsOf(plan: BackgroundPlan): Constraints = Constraints.Builder()
+        // No network constraint: Android only counts Wi-Fi with verified internet as a network, and phones on
+        // a Wi-Fi without internet still reach each other. The workers check for a local network themselves.
+        .setRequiresCharging(true)
+        .apply {
+            if (plan.role == DeviceRole.CONSUMER) setRequiresStorageNotLow(true)
+            if (plan.role == DeviceRole.PRODUCER && plan.schedule == SyncSchedule.WhileCharging) {
+                addContentUriTrigger(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true)
+                addContentUriTrigger(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
+            }
+        }
+        .build()
+
+    companion object {
+        const val TAG = "mediasync-background"
+
+        fun nameOf(role: DeviceRole) = when (role) {
+            DeviceRole.PRODUCER -> "scheduled-sync"
+            DeviceRole.CONSUMER -> "receive-window"
+        }
+
+        /** How long before a due time a receive window opens. */
+        fun leadOf(role: DeviceRole): Duration =
+            if (role == DeviceRole.CONSUMER) Duration.ofMinutes(WINDOW_LEAD_MINUTES) else Duration.ZERO
+
+        val RETRY_INTERVAL: Duration = Duration.ofMinutes(15)
+        private const val WINDOW_LEAD_MINUTES = 5L
+        private const val STAGGER_SECONDS = 180L
+    }
+}

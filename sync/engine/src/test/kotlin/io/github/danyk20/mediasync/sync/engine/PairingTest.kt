@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
@@ -18,6 +19,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import java.time.LocalTime
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
@@ -32,6 +34,7 @@ class PairingTest {
     private val registry = FakePeerRegistry()
     private val received = FakeReceivedLedger()
     private val sink = FakeMediaSink()
+    private var consumerSchedule: SyncSchedule? = null
 
     private fun pair(
         gate: FakePairingGate,
@@ -60,7 +63,23 @@ class PairingTest {
     }
 
     private fun consumerSession(gate: PairingGate) =
-        ConsumerSession(LocalDevice("Pixel 2 XL", "1.0"), registry, received, sink, gate)
+        ConsumerSession(LocalDevice("Pixel 2 XL", "1.0", consumerSchedule), registry, received, sink, gate)
+
+    @Test
+    fun `the producer learns the consumer's schedule when pairing and in every sync`() {
+        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+
+        pair(FakePairingGate(token)).first.consumerSchedule shouldBe consumerSchedule
+
+        // Changed on the consumer since: the next session brings the new one.
+        consumerSchedule = SyncSchedule.WhileCharging
+        sync(FakeMediaSource(), FakeSentLedger()).first.consumerSchedule shouldBe SyncSchedule.WhileCharging
+    }
+
+    @Test
+    fun `a consumer that doesn't share a schedule leaves the producer's choice open`() {
+        pair(FakePairingGate(token)).first.consumerSchedule shouldBe null
+    }
 
     @Test
     fun `a valid token and the user's approval pair both phones`() {

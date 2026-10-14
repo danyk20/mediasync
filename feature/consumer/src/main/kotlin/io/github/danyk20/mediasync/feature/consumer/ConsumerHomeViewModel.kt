@@ -9,7 +9,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,25 +33,28 @@ data class ConsumerHomeUiState(
     val transfer: IncomingTransfer? = null,
     val producers: List<String> = emptyList(),
     val receivedCount: Int = 0,
+    val schedule: SyncSchedule = SyncSchedule.Default,
 )
 
 @HiltViewModel
 class ConsumerHomeViewModel @Inject constructor(
-    receiver: ConsumerReceiver,
+    private val receiver: ConsumerReceiver,
     peers: PeerStore,
     received: RoomReceivedLedger,
+    settings: SettingsRepository,
 ) : ViewModel() {
 
     init {
-        // v1.0 receives while the app is running; background receiving arrives in M2.
-        receiver.start()
+        // Receives while this screen is open; scheduled receive windows also run in the background.
+        receiver.hold(HOLDER)
     }
 
     val uiState: StateFlow<ConsumerHomeUiState> = combine(
         receiver.state,
         peers.observeAll(),
         received.observeCount(),
-    ) { state, allPeers, count ->
+        settings.syncSchedule,
+    ) { state, allPeers, count, schedule ->
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
             IncomingTransfer(
@@ -60,10 +65,13 @@ class ConsumerHomeViewModel @Inject constructor(
                 bytesTotal = progress.bytesTotal,
             )
         }
-        ConsumerHomeUiState(state.listening, transfer, producers.map { it.name }, count)
+        ConsumerHomeUiState(state.listening, transfer, producers.map { it.name }, count, schedule)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
+
+    override fun onCleared() = receiver.release(HOLDER)
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
+        const val HOLDER = "home-screen"
     }
 }

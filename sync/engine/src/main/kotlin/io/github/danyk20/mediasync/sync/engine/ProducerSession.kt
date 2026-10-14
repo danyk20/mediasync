@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.FileAck
 import io.github.danyk20.mediasync.sync.protocol.FileBegin
@@ -36,6 +37,8 @@ data class SyncResult(
     val deferred: Int = 0,
     val bytesSent: Long = 0,
     val cancelled: Boolean = false,
+    /** The schedule the consumer asked its producers to follow; `null` if it didn't say (an older version). */
+    val consumerSchedule: SyncSchedule? = null,
 )
 
 /**
@@ -64,6 +67,7 @@ class ProducerSession(
 
         val pending = pendingFor(consumer)
         val run = Run(channel, consumer, itemsTotal = pending.size, bytesTotal = pending.sumOf { it.descriptor.size })
+        run.consumerSchedule = SyncSchedule.decode(hello.schedule)
         for (batch in pending.chunked(OFFER_BATCH_SIZE)) {
             if (!shouldContinue()) run.cancelled = true
             if (run.cancelled) break
@@ -181,7 +185,9 @@ class ProducerSession(
             TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, item.descriptor.displayName),
         )
 
-        fun result() = SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled)
+        var consumerSchedule: SyncSchedule? = null
+
+        fun result() = SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled, consumerSchedule)
     }
 }
 

@@ -45,10 +45,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
+import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -125,7 +127,7 @@ fun ProducerHomeScreen(
                 else -> {
                     Paired(consumer, state, onSyncNow, onStop)
                     SourcesRow(state.sources, onChooseFolders)
-                    Hints(state.canReadLocation, onGrantAccess)
+                    Hints(state, consumer, onGrantAccess)
                 }
             }
         }
@@ -197,6 +199,24 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
     }
 }
 
+/** When this phone syncs next, following the receiving phone's schedule. */
+@Composable
+private fun NextSync(state: ProducerHomeUiState) {
+    val text = when (val schedule = state.schedule) {
+        null -> return
+
+        is SyncSchedule.Timed -> {
+            val at = state.nextSyncAt ?: return
+            stringResource(R.string.producer_next_sync, relativeMoment(at, state.now ?: at))
+        }
+
+        SyncSchedule.WhileCharging -> stringResource(R.string.producer_sync_while_charging)
+
+        SyncSchedule.Manual -> stringResource(R.string.producer_sync_manual)
+    }
+    Text(text = text, style = MaterialTheme.typography.bodyMedium)
+}
+
 /** Which folders are sent, and the way to change them. */
 @Composable
 private fun SourcesRow(sources: SourceSelection, onChooseFolders: () -> Unit) {
@@ -244,8 +264,9 @@ private const val SUMMARY_NAMES = 2
 private fun SourceSelection.isEmpty() = preset == null && folders.isEmpty()
 
 @Composable
-private fun Hints(canReadLocation: Boolean, onGrantAccess: () -> Unit) {
-    if (!canReadLocation) {
+private fun Hints(state: ProducerHomeUiState, consumer: String, onGrantAccess: () -> Unit) {
+    NextSync(state)
+    if (!state.canReadLocation) {
         Text(
             text = stringResource(R.string.producer_location_missing),
             style = MaterialTheme.typography.bodyMedium,
@@ -254,7 +275,7 @@ private fun Hints(canReadLocation: Boolean, onGrantAccess: () -> Unit) {
         TextButton(onClick = onGrantAccess) { Text(stringResource(R.string.producer_location_grant)) }
     }
     Text(
-        text = stringResource(R.string.producer_keep_open_hint),
+        text = stringResource(R.string.producer_keep_open_hint, consumer),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

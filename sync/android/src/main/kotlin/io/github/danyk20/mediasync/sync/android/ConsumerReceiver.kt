@@ -39,14 +39,16 @@ data class ReceiverState(
     val transfers: Map<DeviceId, TransferProgress> = emptyMap(),
     /** The phone paired most recently in this run, for the pairing screen's success message. */
     val lastPaired: PairedPeer? = null,
+    /** When a phone last connected or sent something; a receive window closes after a quiet spell. */
+    val lastActivityMillis: Long? = null,
 )
 
 /**
  * The receiving side: listens for paired phones on the local network and stores what they send
  * (docs/PLAN.md §5, §8.2).
  *
- * In v1.0 it runs while the app is running. Running in the background, while charging and on a schedule,
- * arrives in M2.
+ * It listens while something needs it ([hold]): an open screen, or a scheduled receive window running in the
+ * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule.
  */
 @Singleton
 class ConsumerReceiver internal constructor(
@@ -79,11 +81,25 @@ class ConsumerReceiver internal constructor(
     private var server: LanServer? = null
     private var advertisement: Closeable? = null
     private var acceptJob: Job? = null
+    private val holders = mutableSetOf<String>()
 
     val state: StateFlow<ReceiverState> = _state.asStateFlow()
 
     /** A pairing request the user has to answer. */
     val pendingApproval = approvals.pending
+
+    /** Keeps listening until every [holder] (e.g. `"screen"`, `"window"`) has called [release]. */
+    @Synchronized
+    fun hold(holder: String) {
+        holders += holder
+        start()
+    }
+
+    @Synchronized
+    fun release(holder: String) {
+        holders -= holder
+        if (holders.isEmpty()) stop()
+    }
 
     /** Starts listening, if it isn't already. */
     @Synchronized
@@ -147,6 +163,7 @@ class ConsumerReceiver internal constructor(
             return // Not a paired phone (or not MediaSync at all).
         }
         val producer = connection.peerId
+        markActivity()
         connection.use {
             val session = ConsumerSession(
                 device.local(),
@@ -154,7 +171,14 @@ class ConsumerReceiver internal constructor(
                 ledger,
                 sink,
                 gate,
-                progress = { progress -> _state.update { it.copy(transfers = it.transfers + (producer to progress)) } },
+                progress = { progress ->
+                    _state.update {
+                        it.copy(
+                            transfers = it.transfers + (producer to progress),
+                            lastActivityMillis = System.currentTimeMillis(),
+                        )
+                    }
+                },
             )
             val result = try {
                 session.serve(it)
@@ -165,10 +189,13 @@ class ConsumerReceiver internal constructor(
                 state.copy(
                     transfers = state.transfers - producer,
                     lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
+                    lastActivityMillis = System.currentTimeMillis(),
                 )
             }
         }
     }
+
+    private fun markActivity() = _state.update { it.copy(lastActivityMillis = System.currentTimeMillis()) }
 
     companion object {
         /** Fixed when possible, so a phone's last known address keeps working. */

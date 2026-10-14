@@ -14,6 +14,7 @@ import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
@@ -50,17 +51,17 @@ class ConsumerHomeViewModelTest {
 
     @Test
     fun startsReceivingAndListsSendingPhones() = runTest {
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received)
+        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
 
         val state = viewModel.uiState.first { it.listening }
 
-        verify { receiver.start() }
+        verify { receiver.hold(any()) }
         state shouldBe ConsumerHomeUiState(listening = true, producers = listOf("Anna's Pixel"), receivedCount = 7)
     }
 
     @Test
     fun showsWhoIsSendingRightNow() = runTest {
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received)
+        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
 
         receiverState.value = receiverState.value.copy(
             transfers = mapOf(anna.id to TransferProgress(2, 5, 1_000, 9_000, "PXL_1.jpg")),
@@ -73,11 +74,11 @@ class ConsumerHomeViewModelTest {
     @Test
     fun theRouteOffersAddingAPhone() {
         var added = false
-        val viewModel = ConsumerHomeViewModel(receiver, peers, received)
+        val viewModel = ConsumerHomeViewModel(receiver, peers, received, FakeSettingsRepository())
 
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {
-                ConsumerHomeRoute(onAddProducer = { added = true }, viewModel = viewModel)
+                ConsumerHomeRoute(onAddProducer = { added = true }, onChangeSchedule = {}, viewModel = viewModel)
             }
         }
         composeRule.onNodeWithText("Anna's Pixel").assertIsDisplayed()

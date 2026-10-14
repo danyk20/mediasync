@@ -164,7 +164,7 @@ class PairingViewModelsTest {
         val viewModel = ConsumerPairingViewModel(receiver)
 
         viewModel.uiState.value.shouldBeInstanceOf<ConsumerPairingUiState.Showing>().link shouldBe link.toString()
-        verify { receiver.start() }
+        verify { receiver.hold(any()) }
     }
 
     @Test

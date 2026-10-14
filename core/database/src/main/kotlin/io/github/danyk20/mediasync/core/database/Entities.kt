@@ -22,6 +22,8 @@ data class PeerEntity(
     /** Where the peer was last reached, e.g. `192.168.1.20:47420`; tried first next time. */
     val lastAddress: String? = null,
     val lastSeenMillis: Long? = null,
+    /** Producer side: the consumer's sync schedule (`SyncSchedule.encode`), as it last said. Since version 2. */
+    val schedule: String? = null,
 )
 
 /** Producer side: what a consumer has confirmed (docs/PLAN.md §5.6). */

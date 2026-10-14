@@ -10,6 +10,7 @@ import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.database.RoomSentLedger
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
@@ -21,6 +22,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
+import java.time.LocalTime
 import javax.net.SocketFactory
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -55,12 +57,13 @@ class RuntimeEndToEndTest {
     private val received = RoomReceivedLedger(consumerDb.receivedItemDao())
     private val sink = FakeMediaSink()
     private val consumerIdentity = testIdentity("Pixel 2 XL")
+    private var consumerSchedule: SyncSchedule = SyncSchedule.Default
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
         ledger = received,
         sink = sink,
-        device = { LocalDevice("Pixel 2 XL", "test") },
+        device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule) },
         addresses = loopback,
         discovery = noDiscovery,
         scope = scope,
@@ -69,12 +72,13 @@ class RuntimeEndToEndTest {
 
     // The sending phone.
     private val producerDb = database()
+    private val producerPeers = PeerStore(producerDb.peerDao())
     private val photos = List(4) { FakeMedia("photo$it", Random(it).nextBytes(300_000 + it)) }
     private val source = FakeMediaSource(photos)
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val producer = ProducerSync(
         identity = { producerIdentity },
-        peers = PeerStore(producerDb.peerDao()),
+        peers = producerPeers,
         ledger = RoomSentLedger(producerDb.sentItemDao()),
         source = source,
         device = { LocalDevice("Anna's Pixel", "test") },
@@ -92,6 +96,20 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun theSendingPhoneFollowsTheReceivingPhonesSchedule() = runBlocking<Unit> {
+        receiver.start()
+        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+
+        pairWithApproval()
+        producerPeers.consumer()?.schedule shouldBe SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+
+        // Changed on the receiving phone: the next sync, as background work runs it, brings it along.
+        consumerSchedule = SyncSchedule.WhileCharging
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        producerPeers.consumer()?.schedule shouldBe SyncSchedule.WhileCharging
+    }
+
+    @Test
     fun pairByLinkThenSyncNow() = runBlocking<Unit> {
         receiver.start()
 
@@ -106,7 +124,11 @@ class RuntimeEndToEndTest {
         val done = withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
 
         done.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(sent = 4, bytesSent = photos.sumOf { it.bytes.size.toLong() })
+            SyncResult(
+                sent = 4,
+                bytesSent = photos.sumOf { it.bytes.size.toLong() },
+                consumerSchedule = SyncSchedule.Default,
+            )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe 0
 
@@ -115,7 +137,8 @@ class RuntimeEndToEndTest {
         val again = withTimeout(TIMEOUT) {
             producer.state.first { it is ProducerState.Idle && it.lastResult != done.lastResult }
         }
-        again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe SyncResult()
+        again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
+            SyncResult(consumerSchedule = SyncSchedule.Default)
     }
 
     @Test
@@ -141,7 +164,7 @@ class RuntimeEndToEndTest {
         }
 
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(sent = 1, bytesSent = newPhoto.bytes.size.toLong())
+            SyncResult(sent = 1, bytesSent = newPhoto.bytes.size.toLong(), consumerSchedule = SyncSchedule.Default)
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
     }
 

@@ -32,6 +32,7 @@ class MessageCodecTest {
         val messages = listOf(
             Hello(PROTOCOL_VERSION, "Anna's Pixel", WireRole.PRODUCER, "0.2.0"),
             Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, freeSpaceBytes = 12_345_678_901),
+            Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, schedule = "hours:6@03:00"),
             PairRequest(token = "0123456789abcdef".encodeUtf8()),
             PairResult(accepted = false, reason = PairResult.Reason.DECLINED),
             Offer(listOf(offerItem(1), offerItem(2).copy(capturedAtMillis = null, album = null))),
