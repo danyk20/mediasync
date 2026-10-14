@@ -130,18 +130,34 @@ jobs:
         run: >
           ./gradlew :app:api29Setup :app:api36Setup --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-      # Each test task boots its own emulator; at most two at a time, or the runner runs out of memory and
-      # systemd-oomd stops the job (exit code 143).
+      # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
+      # alive: each test task boots its own, and they keep running for a while after it ends. Fewer parallel
+      # tasks keep fewer alive. The cause wasn't visible, so memory, disk and emulators are now logged.
+      - name: Record memory and disk while testing
+        run: |
+          nohup bash -c 'while true; do
+            echo "$(date -u +%T) $(free -m | awk "/^Mem:/ {print \"used=\" \$3 \"MB available=\" \$7 \"MB\"}") disk_free=$(df -m / | awk "NR==2 {print \$4}")MB emulators=$(pgrep -c qemu-system || true)"
+            sleep 10
+          done' > memory.log 2>&1 &
       - name: Run on Gradle Managed Devices
+        id: device-tests
         run: >
           ./gradlew ciGroupDebugAndroidTest --max-workers=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+      # always(): when the runner is stopped from outside, failure() steps are skipped.
+      - name: Show why the tests stopped
+        if: always() && steps.device-tests.outcome != 'success'
+        run: |
+          tail -n 40 memory.log || true
+          sudo dmesg -T | grep -iE 'out of memory|oom|killed process' || echo "No kernel out-of-memory messages."
+          journalctl -u systemd-oomd --no-pager 2>/dev/null | tail -n 20 || true
       - name: Upload reports
-        if: failure()
+        if: always() && steps.device-tests.outcome != 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: instrumented-test-reports
           path: |
             **/build/reports/androidTests/
             **/build/outputs/androidTest-results/
+            memory.log
           if-no-files-found: ignore
