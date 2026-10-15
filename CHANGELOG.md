@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.0](https://github.com/danyk20/mediasync/compare/v0.1.0...v0.2.0) (2026-10-15)
+
+
+### Features
+
+* households' Workers wake phones through the wake relay ([#24](https://github.com/danyk20/mediasync/issues/24)) ([86bddcd](https://github.com/danyk20/mediasync/commit/86bddcd2e9aeee37c9425fb68a5f06d933f3be5e))
+* internet sync on Android, through the household's own Cloudflare Worker ([#21](https://github.com/danyk20/mediasync/issues/21)) ([7084230](https://github.com/danyk20/mediasync/commit/70842309035e64f2a7878f7778f35f7a487d4a6f))
+* wake the receiving phone over the internet ([#23](https://github.com/danyk20/mediasync/issues/23)) ([980861f](https://github.com/danyk20/mediasync/commit/980861fbfda8a57aec771f981d8908385eb8d818))
+
 ## 0.1.0 (2026-10-15)
 
 
