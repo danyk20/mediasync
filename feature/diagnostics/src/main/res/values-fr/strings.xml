@@ -16,4 +16,13 @@
     <string name="diagnostics_link_test_failed">Impossible de joindre %1$s. Ouvrez MediaSync dessus, sur le même Wi-Fi, puis réessayez.</string>
     <string name="diagnostics_link_test_one">Une connexion : %1$s Mo/s</string>
     <string name="diagnostics_link_test_four">Quatre connexions : %1$s Mo/s</string>
+    <string name="diagnostics_updates_title">Mises à jour</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, installée depuis GitHub.</string>
+    <string name="diagnostics_updates_check">Rechercher des mises à jour</string>
+    <string name="diagnostics_updates_checking">Recherche en cours…</string>
+    <string name="diagnostics_updates_latest">Vous avez la dernière version.</string>
+    <string name="diagnostics_updates_newer">MediaSync %1$s est disponible.</string>
+    <string name="diagnostics_updates_download">Télécharger</string>
+    <string name="diagnostics_updates_failed">GitHub est injoignable. Réessayez plus tard.</string>
+    <string name="diagnostics_updates_note">La vérification demande à GitHub quelle version est la plus récente. MediaSync n\'envoie rien d\'autre et ne vérifie jamais de lui-même.</string>
 </resources>

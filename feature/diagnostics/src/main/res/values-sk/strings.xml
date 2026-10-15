@@ -16,4 +16,13 @@
     <string name="diagnostics_link_test_failed">Na %1$s sa nedá dostať. Otvorte na ňom MediaSync, na rovnakej Wi-Fi, a skúste to znova.</string>
     <string name="diagnostics_link_test_one">Jedno spojenie: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Štyri spojenia: %1$s MB/s</string>
+    <string name="diagnostics_updates_title">Aktualizácie</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, nainštalovaný z GitHubu.</string>
+    <string name="diagnostics_updates_check">Skontrolovať aktualizácie</string>
+    <string name="diagnostics_updates_checking">Kontrolujem…</string>
+    <string name="diagnostics_updates_latest">Toto je najnovšia verzia.</string>
+    <string name="diagnostics_updates_newer">MediaSync %1$s je k dispozícii.</string>
+    <string name="diagnostics_updates_download">Stiahnuť</string>
+    <string name="diagnostics_updates_failed">Nepodarilo sa dostať k GitHubu. Skúste to neskôr.</string>
+    <string name="diagnostics_updates_note">Kontrola sa GitHubu opýta, ktoré vydanie je najnovšie. MediaSync neodosiela nič iné a nikdy nekontroluje sám od seba.</string>
 </resources>

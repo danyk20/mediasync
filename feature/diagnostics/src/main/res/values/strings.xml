@@ -17,4 +17,13 @@
     <!-- "One connection: 48.2 MB/s" -->
     <string name="diagnostics_link_test_one">One connection: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Four connections: %1$s MB/s</string>
+    <string name="diagnostics_updates_title">Updates</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, installed from GitHub.</string>
+    <string name="diagnostics_updates_check">Check for updates</string>
+    <string name="diagnostics_updates_checking">Checking…</string>
+    <string name="diagnostics_updates_latest">This is the latest version.</string>
+    <string name="diagnostics_updates_newer">MediaSync %1$s is available.</string>
+    <string name="diagnostics_updates_download">Download</string>
+    <string name="diagnostics_updates_failed">GitHub couldn\'t be reached. Try again later.</string>
+    <string name="diagnostics_updates_note">Checking asks GitHub which release is the latest. MediaSync sends nothing else, and never checks on its own.</string>
 </resources>

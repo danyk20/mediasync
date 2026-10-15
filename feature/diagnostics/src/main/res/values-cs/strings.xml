@@ -16,4 +16,13 @@
     <string name="diagnostics_link_test_failed">Na %1$s nelze dosáhnout. Otevřete na něm MediaSync, na stejné Wi-Fi, a zkuste to znovu.</string>
     <string name="diagnostics_link_test_one">Jedno spojení: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Čtyři spojení: %1$s MB/s</string>
+    <string name="diagnostics_updates_title">Aktualizace</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, nainstalovaný z GitHubu.</string>
+    <string name="diagnostics_updates_check">Zkontrolovat aktualizace</string>
+    <string name="diagnostics_updates_checking">Kontroluji…</string>
+    <string name="diagnostics_updates_latest">Toto je nejnovější verze.</string>
+    <string name="diagnostics_updates_newer">MediaSync %1$s je k dispozici.</string>
+    <string name="diagnostics_updates_download">Stáhnout</string>
+    <string name="diagnostics_updates_failed">GitHub nelze kontaktovat. Zkuste to později.</string>
+    <string name="diagnostics_updates_note">Kontrola se GitHubu zeptá, která verze je nejnovější. MediaSync neodesílá nic dalšího a nikdy nekontroluje sám od sebe.</string>
 </resources>

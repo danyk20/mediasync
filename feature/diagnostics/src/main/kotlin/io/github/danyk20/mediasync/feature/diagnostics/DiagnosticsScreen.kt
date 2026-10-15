@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -71,7 +72,24 @@ data class DiagnosticsUiState(
     val recent: List<String> = emptyList(),
     /** On a paired sending phone only. */
     val linkTest: LinkTestUi? = null,
+    /** Installed from GitHub only: from Google Play, Play updates it. */
+    val updates: UpdatesUi? = null,
 )
+
+/** This copy's version, and how checking GitHub for a newer one went. */
+data class UpdatesUi(val installed: String, val check: UpdateCheck = UpdateCheck.Idle)
+
+sealed interface UpdateCheck {
+    data object Idle : UpdateCheck
+
+    data object Checking : UpdateCheck
+
+    data object Latest : UpdateCheck
+
+    data class Newer(val release: Release) : UpdateCheck
+
+    data object Failed : UpdateCheck
+}
 
 /** The link test (docs/PLAN.md §7): speeds in MB/s once it ran. */
 data class LinkTestUi(
@@ -88,8 +106,11 @@ class DiagnosticsViewModel @Inject constructor(
     private val sync: ProducerSync,
     settings: SettingsRepository,
     peers: PeerStore,
+    private val releases: Releases,
 ) : ViewModel() {
-    private val state = MutableStateFlow(DiagnosticsUiState())
+    private val state = MutableStateFlow(
+        DiagnosticsUiState(updates = UpdatesUi(releases.installed()).takeUnless { releases.fromPlay() }),
+    )
     val uiState: StateFlow<DiagnosticsUiState> = state.asStateFlow()
 
     init {
@@ -134,6 +155,21 @@ class DiagnosticsViewModel @Inject constructor(
         }
     }
 
+    /** Asks GitHub for the latest release, only when the user taps *Check for updates*. */
+    fun checkForUpdates() {
+        val updates = state.value.updates?.takeIf { it.check != UpdateCheck.Checking } ?: return
+        state.update { it.copy(updates = updates.copy(check = UpdateCheck.Checking)) }
+        viewModelScope.launch {
+            val latest = releases.latest()
+            val check = when {
+                latest == null -> UpdateCheck.Failed
+                isNewer(latest.version, updates.installed) -> UpdateCheck.Newer(latest)
+                else -> UpdateCheck.Latest
+            }
+            state.update { it.copy(updates = updates.copy(check = check)) }
+        }
+    }
+
     /** The report and the whole log, as one text. */
     suspend fun export(): String = report.export()
 
@@ -158,6 +194,7 @@ fun DiagnosticsRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val links = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) scope.launch { save(context, uri, viewModel.export()) }
@@ -170,6 +207,8 @@ fun DiagnosticsRoute(
         onClear = viewModel::clear,
         onDone = onDone,
         modifier = modifier,
+        onCheckUpdates = viewModel::checkForUpdates,
+        onOpenRelease = { links.openUri(it) },
     )
 }
 
@@ -187,6 +226,8 @@ fun DiagnosticsScreen(
     onClear: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    onCheckUpdates: () -> Unit = {},
+    onOpenRelease: (String) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -216,11 +257,51 @@ fun DiagnosticsScreen(
             OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.diagnostics_save))
             }
+            state.updates?.let { UpdatesSection(it, onCheckUpdates, onOpenRelease) }
             state.linkTest?.let { LinkTestSection(it, onTestLink) }
             Facts(state.facts)
             Recent(state.recent)
             TextButton(onClick = onClear) { Text(stringResource(R.string.diagnostics_clear)) }
         }
+    }
+}
+
+/** A copy installed from GitHub: its version, and a check for a newer one, only when asked (docs/PLAN.md §14.4). */
+@Composable
+private fun UpdatesSection(updates: UpdatesUi, onCheck: () -> Unit, onOpenRelease: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.diagnostics_updates_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(stringResource(R.string.diagnostics_updates_installed, updates.installed))
+        when (val check = updates.check) {
+            UpdateCheck.Idle -> OutlinedButton(onClick = onCheck) {
+                Text(stringResource(R.string.diagnostics_updates_check))
+            }
+
+            UpdateCheck.Checking -> Text(stringResource(R.string.diagnostics_updates_checking))
+
+            UpdateCheck.Latest -> Text(stringResource(R.string.diagnostics_updates_latest))
+
+            is UpdateCheck.Newer -> {
+                Text(stringResource(R.string.diagnostics_updates_newer, check.release.version))
+                Button(onClick = { onOpenRelease(check.release.url) }) {
+                    Text(stringResource(R.string.diagnostics_updates_download))
+                }
+            }
+
+            UpdateCheck.Failed -> {
+                Text(stringResource(R.string.diagnostics_updates_failed), color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = onCheck) { Text(stringResource(R.string.diagnostics_updates_check)) }
+            }
+        }
+        Text(
+            text = stringResource(R.string.diagnostics_updates_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
