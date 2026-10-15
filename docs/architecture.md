@@ -45,3 +45,16 @@ The plan adds `sync:engine`, `transport:*`, `connector:*`, `core:metadata`, `cor
 | Coverage | Kover: ≥ 70 % overall, ≥ 85 % for `sync:*` | aggregated at the root |
 | UI regressions | Roborazzi screenshot tests | design system and feature screens |
 | Compiler warnings | `allWarningsAsErrors` | every Kotlin compilation |
+
+## Rendezvous Worker
+
+`infra/rendezvous/` is a separate TypeScript project: the Cloudflare Worker for internet sync (PLAN §8.4, §8.5). It has no code in common with the app; the two meet only at the HTTP API in [ADR 0009](adr/0009-rendezvous-device-authentication.md).
+
+| Part | Purpose |
+|---|---|
+| Worker (`src/router.ts`) | Rate limits, verifies each request's signature (the phone's keystore key), routes |
+| `PairMailbox` Durable Object | One per pair: who belongs to it, the consumer's FCM token, the signaling WebSockets |
+| `UsageMeter` Durable Object | One per deployment: relay usage from analytics and live reports, the budget guard |
+| Cron trigger | Every 15 minutes, reads relay usage from Cloudflare's analytics |
+
+Its gates run in CI's `Rendezvous Worker` job: license headers, strict type check, Vitest in the Workers runtime, and a dry-run bundle.

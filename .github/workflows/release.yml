@@ -29,6 +29,19 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  # The rendezvous Worker goes to production with each release, after approval in the
+  # `rendezvous-production` environment; skipped while its Cloudflare secrets aren't set up.
+  rendezvous:
+    name: Deploy the rendezvous Worker
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/rendezvous-deploy.yml
+    with:
+      environment: production
+    secrets: inherit
+
   publish:
     name: Build, sign and attach artifacts
     needs: release-please

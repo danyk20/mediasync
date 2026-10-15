@@ -147,6 +147,36 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
 
+  rendezvous:
+    name: Rendezvous Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/rendezvous
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: infra/rendezvous/package-lock.json
+      - name: Install the exact versions from package-lock.json
+        run: npm ci
+      - name: License headers
+        run: npm run check:headers
+      - name: Binding types match wrangler.toml
+        run: npm run check:types
+      - name: Type check
+        run: npm run typecheck
+      # Vitest runs inside the Workers runtime (workerd); outbound calls to Cloudflare and Google are mocked.
+      - name: Tests
+        run: npm test
+      - name: Bundle as for deployment (dry run, no Cloudflare account needed)
+        run: npm run bundle
+
   instrumented-tests:
     name: Instrumented tests (API 29, 36)
     runs-on: ubuntu-latest
