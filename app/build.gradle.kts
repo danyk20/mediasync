@@ -69,6 +69,7 @@ android {
 // The Google Play store graphics (docs/play) are rendered by a test that runs only with -Pmediasync.storeGraphics.
 tasks.withType<Test>().configureEach {
     systemProperty("mediasync.storeGraphics", providers.gradleProperty("mediasync.storeGraphics").isPresent)
+    systemProperty("mediasync.largeFont", providers.gradleProperty("mediasync.largeFont").isPresent)
 }
 
 dependencies {

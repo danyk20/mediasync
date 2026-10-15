@@ -25,6 +25,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -59,7 +61,11 @@ class InternetSyncActions(
 internal fun CloudflareSetupCard(setup: CloudflareSetup, actions: InternetSyncActions) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.consumer_cloudflare_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.consumer_cloudflare_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
             when (setup) {
                 is CloudflareSetup.Running -> Progress(setup.step)
                 is CloudflareSetup.Finished -> Outcome(setup.result, actions.dismissSetup)

@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -108,6 +110,7 @@ private fun AppSetup(app: AppBackup, actions: BackupActions) {
             Text(
                 stringResource(R.string.backup_setup_title, profile.appName),
                 style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
                 stringResource(R.string.backup_setup_body, profile.appName),
@@ -159,6 +162,7 @@ private fun AppStatus(app: AppBackup, actions: BackupActions) {
             Text(
                 stringResource(R.string.backup_status_title, profile.appName),
                 style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
             )
             Text(stringResource(R.string.backup_status_today, count.format(overview.today)))
             Text(stringResource(R.string.backup_status_handed_over, count.format(overview.handedOver), profile.appName))
@@ -185,7 +189,13 @@ private fun AppStatus(app: AppBackup, actions: BackupActions) {
 /** The other app's own cleanup, and the phone's: MediaSync never deletes these files itself (docs/PLAN.md §9.3.1). */
 @Composable
 private fun FreeUpSpace(profile: DeviceAppProfile, actions: BackupActions) {
-    Text(stringResource(R.string.backup_free_up_title), style = MaterialTheme.typography.titleSmall)
+    Text(
+        stringResource(R.string.backup_free_up_title),
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.semantics {
+            heading()
+        },
+    )
     if (CleanupShortcut.APP_FREE_UP_SPACE in profile.cleanup) {
         Text(stringResource(R.string.backup_free_up_app, profile.appName), style = MaterialTheme.typography.bodyMedium)
         Button(onClick = { actions.openApp(profile) }) {

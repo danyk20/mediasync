@@ -17,8 +17,10 @@ private val screenshotOptions = RoborazziOptions(
 
 /**
  * Records (with `-Proborazzi.test.record=true`) or verifies a screenshot of this node
- * against `src/test/screenshots/<name>.png` in the calling module.
+ * against `src/test/screenshots/<name>.png` in the calling module. What it shows is checked for accessibility first
+ * ([assertAccessible]).
  */
 fun SemanticsNodeInteraction.captureScreenshot(name: String) {
+    assertAccessible()
     captureRoboImage(filePath = "src/test/screenshots/$name.png", roborazziOptions = screenshotOptions)
 }
