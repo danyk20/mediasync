@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Refreshed every 30 minutes; while MediaSync runs, QuickAccess keeps it current. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/quick_widget_description"
+    android:initialLayout="@layout/sync_widget"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:previewLayout="@layout/sync_widget"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s" />

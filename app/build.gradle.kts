@@ -83,6 +83,7 @@ dependencies {
     implementation(projects.feature.onboarding)
     implementation(projects.feature.pairing)
     implementation(projects.feature.producer)
+    implementation(projects.feature.quickaccess)
     implementation(projects.sync.android)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.work.runtime)

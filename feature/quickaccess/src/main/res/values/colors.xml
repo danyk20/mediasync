@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher icon's colour: the widget looks the same on light and dark home screens. -->
+    <color name="quick_widget_brand">#FF006A63</color>
+    <color name="quick_widget_text">#FFFFFFFF</color>
+    <color name="quick_widget_button_disabled">#B3FFFFFF</color>
+</resources>
