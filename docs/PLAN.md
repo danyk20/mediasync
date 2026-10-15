@@ -713,7 +713,7 @@ interface SecureSession : Closeable {
     - *Turbo receive* opens a group whose name (`DIRECT-xy-MediaSync-abcdef`) and passphrase are an HMAC of the key and the 15-minute epoch, so the name changes on its own and isn't a lasting trace of the phone.
     - A producer that can't reach the consumer over Wi-Fi derives the same for the current and the previous epoch, joins, and sends. If it hasn't learned the key yet, it says one sync on the same Wi-Fi is needed first.
     - The group stays until the user taps **Stop**, or 10 minutes without a session over it.
-    - *To do once phones can be unpaired:* a new key on unpairing, so a removed phone can't find the link any more.
+    - Removing a sending phone gives the receiving phone a new key, so the removed phone can't find the link any more. The phones still paired learn it in their next session over Wi-Fi or the internet. *Built (M6).*
 - **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.
 - **Closing:** the consumer removes the group a minute after the last session over it; the producer leaves it when its sync ends.
 - **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster and it disturbs the normal Wi-Fi less. *Planned for M6:* it needs real phones to test (emulators don't have it), and Wi-Fi Direct stays as the fallback.

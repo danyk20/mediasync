@@ -28,6 +28,7 @@ import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.TurboKeyStore
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -70,6 +71,7 @@ class ConsumerHomeViewModelTest {
         every { relayUsage() } returns RelayUsage(812_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null)
     }
     private val peers = mockk<PeerStore>(relaxUnitFun = true) { every { observeAll() } returns flowOf(listOf(anna)) }
+    private val turboKeys = mockk<TurboKeyStore>(relaxUnitFun = true)
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
     private val settings = FakeSettingsRepository()
     private var canNotify = true
@@ -85,13 +87,14 @@ class ConsumerHomeViewModelTest {
         every { deviceApps } returns listOf(FakeDeviceAppFactory())
     }
 
-    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup, backup)
+    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, turboKeys, received, settings, setup, backup)
 
     @Test
     fun removingASendingPhoneForgetsItAndStopsListeningForIt() {
         viewModel().removeProducer(anna.id)
 
         verify(timeout = WAIT_MILLIS) { peers.forget(anna.id) }
+        verify(timeout = WAIT_MILLIS) { turboKeys.renew() } // So it can't find Turbo receive either.
         verify(timeout = WAIT_MILLIS) { receiver.refreshInternet() }
     }
 
