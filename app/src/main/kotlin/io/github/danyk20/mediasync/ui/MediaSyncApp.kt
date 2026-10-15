@@ -17,6 +17,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.danyk20.mediasync.MainUiState
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.feature.backup.BackupRoute
 import io.github.danyk20.mediasync.feature.consumer.ConsumerHomeRoute
 import io.github.danyk20.mediasync.feature.consumer.InternetSyncRoute
 import io.github.danyk20.mediasync.feature.consumer.SyncScheduleRoute
@@ -93,11 +94,13 @@ private fun MediaSyncNavDisplay(
                     onAddProducer = { backStack.add(Destination.ConsumerPairing) },
                     onChangeSchedule = { backStack.add(Destination.ConsumerSchedule) },
                     onSetUpInternet = { backStack.add(Destination.ConsumerInternet) },
+                    onOpenBackup = { backStack.add(Destination.ConsumerBackup) },
                     onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                 )
             }
             entry<Destination.ConsumerSchedule> { SyncScheduleRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ConsumerInternet> { InternetSyncRoute(onDone = { backStack.removeLastOrNull() }) }
+            entry<Destination.ConsumerBackup> { BackupRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ConsumerPairing> { ConsumerPairingRoute(onDone = { backStack.removeLastOrNull() }) }
         },
     )

@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.feature.consumer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.danyk20.mediasync.connector.android.CloudBackup
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
@@ -20,6 +21,7 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,7 +67,18 @@ data class ConsumerHomeUiState(
     val internetSync: Boolean = false,
     /** This month's relay usage (docs/PLAN.md §8.5), for the one-line meter; `null` until known. */
     val relay: RelayUsage? = null,
+    /** Cloud backup (docs/PLAN.md §9.3.1); `null` in a build without any. */
+    val backup: BackupLine? = null,
 )
+
+/** Cloud backup, as the home screen's row shows it. */
+sealed interface BackupLine {
+    /** Not set up: received photos stay on this phone only. */
+    data object Off : BackupLine
+
+    /** [app] on this phone backs up what's received; [today] were handed to it since midnight. */
+    data class On(val app: String, val today: Int) : BackupLine
+}
 
 /** What the phone allows MediaSync, and its free space. */
 private data class DeviceAccess(
@@ -82,6 +95,7 @@ class ConsumerHomeViewModel @Inject constructor(
     received: RoomReceivedLedger,
     private val settings: SettingsRepository,
     private val setup: BackgroundSetup,
+    backup: CloudBackup,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -109,8 +123,8 @@ class ConsumerHomeViewModel @Inject constructor(
         peers.observeAll(),
         received.observeCount(),
         combine(settings.syncSchedule, settings.rendezvousUrl, relay, ::Triple),
-        combine(access, settings.dismissedPrompts, ::Pair),
-    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed) ->
+        combine(access, settings.dismissedPrompts, backupLine(backup), ::Triple),
+    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed, backupLine) ->
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
             IncomingTransfer(
@@ -139,6 +153,7 @@ class ConsumerHomeViewModel @Inject constructor(
             turboReceiving = state.turboReceiving,
             internetSync = worker != null,
             relay = relay?.takeIf { worker != null },
+            backup = backupLine,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
@@ -171,6 +186,16 @@ class ConsumerHomeViewModel @Inject constructor(
     }
 
     override fun onCleared() = receiver.release(HOLDER)
+
+    /** The first account backing up: v1.0 has one, the Google Photos app (docs/PLAN.md §9.3.1). */
+    private fun backupLine(backup: CloudBackup): Flow<BackupLine?> = backup.overviews().map { overviews ->
+        val first = overviews.firstOrNull()
+        when {
+            first != null -> BackupLine.On(first.account.displayName, first.today)
+            backup.deviceApps.isEmpty() -> null
+            else -> BackupLine.Off
+        }
+    }
 
     private fun checkAccess() = DeviceAccess(
         setup.canNotify(),

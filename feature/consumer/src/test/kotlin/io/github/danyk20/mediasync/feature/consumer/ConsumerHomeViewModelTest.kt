@@ -9,6 +9,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import io.github.danyk20.mediasync.connector.android.BackupOverview
+import io.github.danyk20.mediasync.connector.android.CloudBackup
+import io.github.danyk20.mediasync.connector.testing.FakeDeviceAppFactory
+import io.github.danyk20.mediasync.connector.testing.account
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -75,7 +79,31 @@ class ConsumerHomeViewModelTest {
         every { batteryRestricted() } answers { batteryRestricted }
     }
 
-    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup)
+    private val backupOverviews = MutableStateFlow<List<BackupOverview>>(emptyList())
+    private val backup = mockk<CloudBackup> {
+        every { overviews() } returns backupOverviews
+        every { deviceApps } returns listOf(FakeDeviceAppFactory())
+    }
+
+    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup, backup)
+
+    @Test
+    fun theBackupRowSaysWhetherAndHowMuchIsHandedOver() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.listening }.backup shouldBe BackupLine.Off
+
+        backupOverviews.value =
+            listOf(BackupOverview(account("google-photos-app").copy(displayName = "Google Photos"), today = 214))
+
+        viewModel.uiState.first { it.backup is BackupLine.On }.backup shouldBe BackupLine.On("Google Photos", 214)
+    }
+
+    @Test
+    fun aBuildWithoutBackupHasNoBackupRow() = runTest {
+        every { backup.deviceApps } returns emptyList()
+
+        viewModel().uiState.first { it.listening }.backup shouldBe null
+    }
 
     @Test
     fun theRelayMeterIsShownWhileInternetSyncIsOn() = runTest {
@@ -102,6 +130,7 @@ class ConsumerHomeViewModelTest {
             producers = listOf("Anna's Pixel"),
             receivedCount = 7,
             turbo = TurboAvailability.AVAILABLE,
+            backup = BackupLine.Off,
         )
     }
 

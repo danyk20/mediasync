@@ -7,6 +7,9 @@ android {
 }
 
 dependencies {
+    implementation(projects.connector.android)
     implementation(projects.core.datastore)
     implementation(projects.sync.android)
+
+    testImplementation(testFixtures(projects.connector.api))
 }

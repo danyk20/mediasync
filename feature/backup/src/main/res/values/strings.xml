@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Cloud backup</string>
+    <string name="backup_done">Done</string>
+    <string name="backup_intro">Everything this phone receives is kept in its MediaSync folder. A backup app on this phone can upload it from there.</string>
+    <string name="backup_none">This version of MediaSync has no backup to set up.</string>
+
+    <string name="backup_setup_title">Back up with %1$s</string>
+    <string name="backup_setup_body">%1$s backs up the MediaSync folder on its own. On Pixel 2 to 5 that\'s free and unlimited in Storage saver. MediaSync uploads nothing itself.</string>
+    <string name="backup_not_installed">%1$s isn\'t installed on this phone.</string>
+    <string name="backup_install">Install %1$s</string>
+    <string name="backup_steps_heading">Set it up in %1$s, once:</string>
+    <string name="backup_step_folder">Turn on backup for the %1$s folder: tap your profile picture, then Photos settings → Backup → Back up device folders. The folder is listed once the first photo has arrived.</string>
+    <string name="backup_step_storage_saver">Choose Storage saver: Photos settings → Backup → Backup quality. On Pixel 2 to 5 it doesn\'t use your Google storage.</string>
+    <string name="backup_open_app">Open %1$s</string>
+    <string name="backup_set_up_done">It\'s set up</string>
+
+    <string name="backup_status_title">Backed up by the %1$s app</string>
+    <string name="backup_status_today">%1$s handed over today</string>
+    <string name="backup_status_handed_over">%1$s on this phone, for %2$s to back up</string>
+    <string name="backup_status_removed">%1$s backed up and removed from this phone</string>
+    <string name="backup_status_waiting">%1$s received, not handed over yet</string>
+    <string name="backup_status_note">%1$s backs them up on its own, usually within minutes on Wi-Fi. MediaSync can\'t see when that\'s done. Once %1$s removes them to free up space, they count as backed up.</string>
+
+    <string name="backup_free_up_title">Free up space</string>
+    <string name="backup_free_up_app">In %1$s, tap your profile picture, then Free up space. It removes only what\'s backed up.</string>
+    <string name="backup_free_up_open">Open %1$s</string>
+    <string name="backup_free_up_smart_storage">Or let the phone do it: Smart Storage, in the storage settings, removes backed-up photos and videos when space runs low.</string>
+    <string name="backup_free_up_storage_settings">Storage settings</string>
+    <string name="backup_never_deletes">MediaSync never deletes these files itself.</string>
+    <string name="backup_stop">Stop backing up</string>
+</resources>

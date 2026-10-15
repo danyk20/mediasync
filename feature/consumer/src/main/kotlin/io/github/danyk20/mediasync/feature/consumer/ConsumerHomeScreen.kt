@@ -63,6 +63,7 @@ import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboPermissions
 import io.github.danyk20.mediasync.sync.android.level
+import java.text.NumberFormat
 
 @Composable
 fun ConsumerHomeRoute(
@@ -71,6 +72,7 @@ fun ConsumerHomeRoute(
     modifier: Modifier = Modifier,
     onSetUpInternet: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +101,7 @@ fun ConsumerHomeRoute(
         onChangeSchedule = onChangeSchedule,
         modifier = modifier,
         onSetUpInternet = onSetUpInternet,
+        onOpenBackup = onOpenBackup,
         onAllowNotifications = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -146,6 +149,7 @@ fun ConsumerHomeScreen(
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
     onSetUpInternet: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     onAllowNotifications: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
@@ -194,6 +198,7 @@ fun ConsumerHomeScreen(
             )
             ScheduleRow(state.schedule, onChangeSchedule)
             InternetRow(state.internetSync, state.relay, onSetUpInternet)
+            state.backup?.let { BackupRow(it, onOpenBackup) }
             TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
@@ -368,6 +373,42 @@ private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
             trailingContent = {
                 Text(
                     text = stringResource(R.string.consumer_schedule_change),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** Cloud backup (docs/PLAN.md §9.3.1): whether, and by what, what's received is backed up. */
+@Composable
+private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
+    OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.consumer_backup_row_title)) },
+            supportingContent = {
+                Text(
+                    when (backup) {
+                        BackupLine.Off -> stringResource(R.string.consumer_backup_row_off)
+
+                        is BackupLine.On -> stringResource(
+                            R.string.consumer_backup_row_on,
+                            backup.app,
+                            NumberFormat.getIntegerInstance().format(backup.today),
+                        )
+                    },
+                )
+            },
+            trailingContent = {
+                val action = if (backup is BackupLine.On) {
+                    R.string.consumer_backup_row_open
+                } else {
+                    R.string.consumer_internet_set_up
+                }
+                Text(
+                    text = stringResource(action),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
