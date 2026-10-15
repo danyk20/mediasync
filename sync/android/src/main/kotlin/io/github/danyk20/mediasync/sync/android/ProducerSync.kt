@@ -99,8 +99,9 @@ sealed interface ProducerState {
     /** Asking the receiving phone for a direct link, and joining it. */
     data object SettingUpTurbo : ProducerState
 
-    /** [turbo]: over the direct link of Turbo transfer. */
-    data class Syncing(val progress: TransferProgress?, val turbo: Boolean = false) : ProducerState
+    /** [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4). */
+    data class Syncing(val progress: TransferProgress?, val turbo: Boolean = false, val internet: Boolean = false) :
+        ProducerState
 
     data class Failed(val reason: SyncFailure) : ProducerState
 }
@@ -136,6 +137,7 @@ class ProducerSync @Inject constructor(
     private val discovery = network.discovery
     private val sockets = network.sockets
     private val directLinks = network.directLinks
+    private val internet = network.internet
     private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
     private var job: Job? = null
 
@@ -281,7 +283,7 @@ class ProducerSync @Inject constructor(
                 connection != null && turbo -> run.overTurbo(connection)
                 connection != null -> run.overWifi(connection)
                 turbo -> run.overTurboReceive()
-                else -> ProducerState.Failed(SyncFailure.UNREACHABLE)
+                else -> run.overInternet() ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
             }
         } catch (e: IOException) {
             // Where it stopped tells which side stalled: during a file, or waiting for the other phone.
@@ -296,7 +298,7 @@ class ProducerSync @Inject constructor(
 
         fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
             _state.value = ProducerState.Syncing(progress = null)
-            return sockets.keepingAwake { send(connection, direct = false) }.copy(turboProblem = turboProblem)
+            return sockets.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
         }
 
         /**
@@ -367,7 +369,7 @@ class ProducerSync @Inject constructor(
             Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at $owner:${link.port}")
             _state.value = ProducerState.Syncing(progress = null, turbo = true)
             return try {
-                sockets.keepingAwake { send(direct, direct = true) }
+                sockets.keepingAwake { send(direct, Path.DIRECT) }
             } catch (e: IOException) {
                 if (failureOf(e) != SyncFailure.CONNECTION_LOST) throw e
                 Diagnostics.log(Area.SEND, "Turbo: the direct link dropped; going on over Wi-Fi", e)
@@ -381,20 +383,51 @@ class ProducerSync @Inject constructor(
             return overWifi(connection, problem)
         }
 
-        private fun send(connection: PeerConnection, direct: Boolean): ProducerState.Idle = connection.use {
-            val turbo = if (direct) " over Turbo" else ""
+        /**
+         * Not on a network with the consumer: through its rendezvous Worker (docs/PLAN.md §8.4), if it has one and
+         * this phone isn't on mobile data. `null` if there's no way to it that way.
+         */
+        fun overInternet(): ProducerState? {
+            val worker = consumer.rendezvousUrl ?: return null
+            val secret = consumer.pairSecret ?: return null
+            if (!internet.allowed()) {
+                Diagnostics.log(Area.SEND, "Internet: not over mobile data")
+                return null
+            }
+            val connection = try {
+                internet.connect(consumer.id, worker, secret)
+            } catch (e: IOException) {
+                Diagnostics.log(Area.SEND, "Internet: no connection to the receiving phone", e)
+                return null
+            }
+            Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone")
+            _state.value = ProducerState.Syncing(progress = null, internet = true)
+            return sockets.keepingAwake { send(connection, Path.INTERNET) }
+        }
+
+        private fun send(connection: PeerConnection, path: Path): ProducerState.Idle = connection.use {
+            val direct = path == Path.DIRECT
+            val over = when (path) {
+                Path.WIFI -> ""
+                Path.DIRECT -> " over Turbo"
+                Path.INTERNET -> " over the internet"
+            }
             val result = ParallelSync(
                 session = { progress ->
                     ProducerSession(device.local(), source, ledger, progress, { !cancelled && !pauseWhen() }, details)
                 },
                 connect = { connectToFirst(listOf(it.remoteAddress), consumer.id, direct) },
-                progress = { progress -> _state.value = ProducerState.Syncing(progress, turbo = direct) },
-                mayAddStream = sockets::canUseMoreConnections,
+                progress = { progress ->
+                    _state.value = ProducerState.Syncing(progress, turbo = direct, internet = path == Path.INTERNET)
+                },
+                // Over the internet, one connection carries it all.
+                mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
             ).sync(it)
             peers.recordConsumer(
                 consumer.id,
                 ConsumerFacts(
-                    address = it.remoteAddress.takeUnless { direct }, // A direct link's address is fleeting.
+                    // A direct link's address is fleeting; over the internet, there's none.
+                    address = it.remoteAddress.takeIf { path == Path.WIFI },
                     schedule = result.consumerSchedule,
                     turboKey = result.consumerTurboKey,
                     pairSecret = result.consumerPairSecret,
@@ -402,7 +435,7 @@ class ProducerSync @Inject constructor(
                 ),
             )
             if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
-            Diagnostics.log(Area.SEND, "Sync done$turbo in ${since(started)}: ${result.describe()}")
+            Diagnostics.log(Area.SEND, "Sync done$over in ${since(started)}: ${result.describe()}")
             ProducerState.Idle(result)
         }
     }
@@ -465,3 +498,6 @@ private fun TurboUnavailable.toProblem() = when (this) {
     TurboUnavailable.NOT_ALLOWED -> TurboProblem.RECEIVER_NOT_ALLOWED
     TurboUnavailable.FAILED -> TurboProblem.NO_LINK
 }
+
+/** How a sync reaches the consumer (docs/PLAN.md §8). */
+private enum class Path { WIFI, DIRECT, INTERNET }

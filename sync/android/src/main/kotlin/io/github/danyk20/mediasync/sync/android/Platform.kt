@@ -11,13 +11,16 @@ import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
+import io.github.danyk20.mediasync.transport.PeerConnection
 import java.io.Closeable
+import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import javax.inject.Inject
 import javax.net.SocketFactory
+import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 
 // Small seams around Android services, so the sync runtime can be tested on the JVM.
@@ -52,13 +55,52 @@ fun interface LanSockets {
     fun canUseMoreConnections(): Boolean = true
 }
 
-/** How this phone reaches other phones: its local network, mDNS on it, and direct links (docs/PLAN.md §8). */
+/**
+ * How this phone reaches other phones: its local network, mDNS on it, direct links, and the internet
+ * (docs/PLAN.md §8).
+ */
 class Connectivity @Inject constructor(
     val addresses: AddressProvider,
     val sockets: LanSockets,
     val discovery: ServiceDiscovery,
     val directLinks: DirectLinks,
+    val internet: InternetLinks = InternetLinks.None,
 )
+
+/**
+ * Internet sync (docs/PLAN.md §8.4): connections between the paired phones through the receiving phone's
+ * rendezvous Worker, when they share no network.
+ */
+interface InternetLinks {
+    /** As a sending phone: whether it may sync over the internet now: over Wi-Fi, not over mobile data. */
+    fun allowed(): Boolean
+
+    /**
+     * As a sending phone: a connection to [consumer] through its Worker at [worker], with their [pairSecret].
+     * Blocks.
+     *
+     * @throws IOException if there's no way to it now; the message says why.
+     */
+    fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection
+
+    /**
+     * As a receiving phone: answers the sending phones in [pairs] (each with its pair secret) that connect
+     * through the Worker at [worker]. Each connection goes to [serve] on a thread of its own, until the
+     * returned handle is closed.
+     */
+    fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable
+
+    /** Without internet sync. */
+    object None : InternetLinks {
+        override fun allowed() = false
+
+        override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection =
+            throw IOException("No internet sync on this phone")
+
+        override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit) =
+            Closeable {}
+    }
+}
 
 /** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
 enum class TurboAvailability {

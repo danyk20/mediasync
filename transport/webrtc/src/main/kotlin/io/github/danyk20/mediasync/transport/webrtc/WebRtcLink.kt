@@ -10,11 +10,12 @@ import io.github.danyk20.mediasync.transport.rendezvous.ChannelPeerConnection
 import io.github.danyk20.mediasync.transport.rendezvous.ChannelStream
 import io.github.danyk20.mediasync.transport.rendezvous.IceServer
 import io.github.danyk20.mediasync.transport.rendezvous.MessageChannel
+import io.github.danyk20.mediasync.transport.rendezvous.PeerLinks
 import io.github.danyk20.mediasync.transport.rendezvous.Signal
+import io.github.danyk20.mediasync.transport.rendezvous.SignalPipe
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.UUID
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.webrtc.DataChannel
@@ -27,21 +28,13 @@ import org.webrtc.RtpReceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 
-/** How the two phones' signals travel: through the Worker's mailbox, sealed (PLAN §8.4). */
-interface SignalPipe {
-    fun send(signal: Signal)
-
-    /** Signals from the other phone, as they arrive. */
-    val incoming: BlockingQueue<Signal>
-}
-
 /**
  * Internet sync's connection (PLAN §8.4): WebRTC between the two phones, direct where their networks allow, through the
  * TURN relay otherwise. One ordered, reliable data channel carries an ordinary sync session, so the sync engine runs as
  * on Wi-Fi. The signals that set it up are sealed with the pair's key, which also vouches for the DTLS fingerprints in
  * them: nobody in between can take part.
  */
-class WebRtcLink(context: Context) {
+class WebRtcLink(context: Context) : PeerLinks {
     private val factory: PeerConnectionFactory by lazy {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(
@@ -52,7 +45,7 @@ class WebRtcLink(context: Context) {
     }
 
     /** As the producer: offers, and returns the connection once its data channel is open. Blocks. */
-    fun connect(
+    override fun connect(
         peer: DeviceId,
         iceServers: List<IceServer>,
         pipe: SignalPipe,
@@ -65,7 +58,7 @@ class WebRtcLink(context: Context) {
     }
 
     /** As the consumer: answers [offer] and returns the connection once the producer's data channel is open. Blocks. */
-    fun accept(
+    override fun accept(
         peer: DeviceId,
         offer: Signal.Offer,
         iceServers: List<IceServer>,

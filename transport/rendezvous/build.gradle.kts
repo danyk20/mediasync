@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.mediasync.jvm.library)
     alias(libs.plugins.kotlin.serialization)
+    `java-test-fixtures`
 }
 
 dependencies {
@@ -10,6 +11,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
 
-    testImplementation(libs.okhttp.mockwebserver)
+    // A fake Worker, shared with the device tests of internet sync.
+    testFixturesApi(libs.okhttp.mockwebserver)
     testImplementation(testFixtures(projects.sync.engine))
 }

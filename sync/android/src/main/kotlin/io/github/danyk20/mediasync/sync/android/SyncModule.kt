@@ -36,6 +36,7 @@ annotation class ApplicationScope
 
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("TooManyFunctions") // One binding each.
 internal abstract class SyncModule {
     @Binds
     abstract fun bindMediaSource(impl: MediaStoreSource): MediaSource
@@ -66,6 +67,9 @@ internal abstract class SyncModule {
 
     @Binds
     abstract fun bindDirectLinks(impl: WifiDirect): DirectLinks
+
+    @Binds
+    abstract fun bindInternetLinks(impl: AndroidInternetLinks): InternetLinks
 
     companion object {
         @Provides

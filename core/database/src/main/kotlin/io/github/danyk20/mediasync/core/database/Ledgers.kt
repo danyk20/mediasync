@@ -61,6 +61,7 @@ data class ConsumerFacts(
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
 @Singleton
+@Suppress("TooManyFunctions") // One question about the paired phones each.
 class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
     override fun isPaired(id: DeviceId): Boolean = dao.get(id.hex) != null
 
@@ -77,6 +78,9 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
 
     /** The consumer this producer sends to (one in v1.0): the most recently paired. */
     fun consumer(): Peer? = dao.withRole(DeviceRole.CONSUMER.name).firstOrNull()?.toPeer()
+
+    /** As a receiving phone: the sending phones paired with it. */
+    fun producers(): List<Peer> = dao.withRole(DeviceRole.PRODUCER.name).map { it.toPeer() }
 
     /** [consumer], as it changes. */
     fun observeConsumer(): Flow<Peer?> =

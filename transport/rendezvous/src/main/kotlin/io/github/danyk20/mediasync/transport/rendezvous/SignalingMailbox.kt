@@ -68,7 +68,7 @@ class SignalingMailbox(
             signer.headers("GET", url).forEach { (name, value) -> header(name, value) }
         }.build()
         val socket = client.newWebSocket(request, Events(listener))
-        val pinger = PINGS.scheduleAtFixedRate(
+        val pinger = PINGS.scheduleWithFixedDelay(
             { socket.send(PING) },
             pingIntervalMillis,
             pingIntervalMillis,

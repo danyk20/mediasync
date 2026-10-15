@@ -49,6 +49,9 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
         extensions.configure<LicenseeExtension> {
             allow("Apache-2.0")
             allow("BSD-3-Clause") // protobuf, bundled by DataStore
+            allowUrl("https://opensource.org/license/bsd-3-clause/") {
+                because("BSD-3-Clause, as WebRTC (io.github.webrtc-sdk) names it")
+            }
         }
 
         configureKotlin()

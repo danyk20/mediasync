@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "io.github.danyk20.mediasync.transport.webrtc"
+    defaultConfig {
+        consumerProguardFiles("consumer-rules.pro")
+    }
 }
 
 dependencies {
