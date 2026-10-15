@@ -28,6 +28,8 @@ data class PeerEntity(
     val turboKey: String? = null,
     /** The pair's secret for internet signaling (hex): made by the consumer, told to the producer. Since version 5. */
     val pairSecret: String? = null,
+    /** Producer side: the consumer's rendezvous Worker for internet sync, as it last said. Since version 5. */
+    val rendezvousUrl: String? = null,
 )
 
 /** Producer side: what a consumer has confirmed (docs/PLAN.md §5.6). */

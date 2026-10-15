@@ -62,7 +62,7 @@ class MigrationTest {
             RoomSentLedger(database.sentItemDao()).sentFingerprints(consumer) shouldBe setOf(fingerprint)
 
             val everySix = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
-            peers.recordConsumer(consumer, schedule = everySix)
+            peers.recordConsumer(consumer, ConsumerFacts(schedule = everySix))
             peers.consumer()!!.schedule shouldBe everySix
         } finally {
             database.close()
@@ -91,9 +91,9 @@ class MigrationTest {
             peers.consumer()!!.turboKey.shouldBeNull()
 
             val key = ByteArray(32) { 5 }.toByteString()
-            peers.recordConsumer(consumer, schedule = null, turboKey = key)
+            peers.recordConsumer(consumer, ConsumerFacts(schedule = null, turboKey = key))
             // An older consumer that didn't say: the key known stays.
-            peers.recordConsumer(consumer, schedule = null, turboKey = null)
+            peers.recordConsumer(consumer, ConsumerFacts(schedule = null, turboKey = null))
             peers.consumer()!!.turboKey shouldBe key
         } finally {
             database.close()
@@ -153,7 +153,8 @@ class MigrationTest {
             secret.size shouldBe 32
             peers.pairSecret(producer) shouldBe secret // Kept.
             peers.pairSecret(deviceId(9)).shouldBeNull() // Not paired.
-            peers.recordConsumer(consumer, pairSecret = secret) // The producer's side keeps what it was told.
+            // The producer's side keeps what it was told.
+            peers.recordConsumer(consumer, ConsumerFacts(pairSecret = secret))
         } finally {
             database.close()
         }

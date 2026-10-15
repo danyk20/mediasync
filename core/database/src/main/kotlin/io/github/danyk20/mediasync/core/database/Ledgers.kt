@@ -36,9 +36,27 @@ data class Peer(
     val turboKey: ByteString? = null,
     /** The pair's secret for internet signaling (ADR 0009 §4); `null` until known. */
     val pairSecret: ByteString? = null,
+    /** Producer side: the consumer's rendezvous Worker for internet sync; `null` until it says. */
+    val rendezvousUrl: String? = null,
 ) {
     /** Never the key: this may end up in logs. */
     override fun toString() = "Peer($id, $name, $role, paired at $pairedAtMillis, last at $lastAddress)"
+}
+
+/**
+ * What a producer learns about its consumer in a session: where it was reached ([address], on the local network only),
+ * its [schedule], its *Turbo receive* [turboKey] (docs/PLAN.md §8.3), their [pairSecret] and its [rendezvousUrl] for
+ * internet sync (ADR 0009). A `null` (not said, or an older consumer) changes nothing.
+ */
+data class ConsumerFacts(
+    val address: String? = null,
+    val schedule: SyncSchedule? = null,
+    val turboKey: ByteString? = null,
+    val pairSecret: ByteString? = null,
+    val rendezvousUrl: String? = null,
+) {
+    /** Never the keys: this may end up in logs. */
+    override fun toString() = "ConsumerFacts(address=$address, schedule=$schedule, rendezvousUrl=$rendezvousUrl)"
 }
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
@@ -67,21 +85,15 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
     /** Producer side: pairing with a consumer replaces any earlier one (one in v1.0); what was sent stays recorded. */
     fun keepOnlyConsumer(id: DeviceId) = dao.deleteOthersWithRole(DeviceRole.CONSUMER.name, id.hex)
 
-    /**
-     * Producer side: keeps what it learned about the consumer in a session: where it was reached ([address]), its
-     * [schedule], its *Turbo receive* [turboKey] (docs/PLAN.md §8.3) and their [pairSecret] (ADR 0009 §4). A `null`
-     * (not reached on the local network, or an older consumer that didn't say) changes nothing.
-     */
-    fun recordConsumer(
-        id: DeviceId,
-        address: String? = null,
-        schedule: SyncSchedule? = null,
-        turboKey: ByteString? = null,
-        pairSecret: ByteString? = null,
-    ) {
-        address?.let { dao.recordAddress(id.hex, it, System.currentTimeMillis()) }
-        schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
-        if (turboKey != null || pairSecret != null) dao.recordKeys(id.hex, turboKey?.hex(), pairSecret?.hex())
+    /** Producer side: keeps what it learned about the consumer in a session; what [facts] leaves `null` stays. */
+    fun recordConsumer(id: DeviceId, facts: ConsumerFacts) {
+        facts.address?.let { dao.recordAddress(id.hex, it, System.currentTimeMillis()) }
+        facts.schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
+        with(facts) {
+            if (turboKey != null || pairSecret != null || rendezvousUrl != null) {
+                dao.recordFacts(id.hex, turboKey?.hex(), pairSecret?.hex(), rendezvousUrl)
+            }
+        }
     }
 
     /** Consumer side: the secret shared with [producer], made on first use; `null` if it isn't paired. */
@@ -90,7 +102,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         val peer = dao.get(producer.hex) ?: return null
         peer.pairSecret?.let { return it.decodeHex() }
         val secret = ByteArray(PAIR_SECRET_BYTES).also(SecureRandom()::nextBytes).toByteString()
-        dao.recordKeys(producer.hex, turboKey = null, pairSecret = secret.hex())
+        dao.recordFacts(producer.hex, turboKey = null, pairSecret = secret.hex(), rendezvousUrl = null)
         return secret
     }
 
@@ -106,6 +118,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         schedule?.let(SyncSchedule::decode),
         turboKey?.decodeHex(),
         pairSecret?.decodeHex(),
+        rendezvousUrl,
     )
 }
 

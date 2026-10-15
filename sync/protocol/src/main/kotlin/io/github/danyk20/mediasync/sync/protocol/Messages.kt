@@ -44,6 +44,11 @@ data class Hello(
      * §4), the same in every session. Empty otherwise.
      */
     @ProtoNumber(8) @Serializable(with = ByteStringSerializer::class) val pairSecret: ByteString = ByteString.EMPTY,
+    /**
+     * Consumer only, and only to a paired producer: the address of its rendezvous Worker, through which the two sync
+     * over the internet (PLAN §8.4); empty when it has none.
+     */
+    @ProtoNumber(9) val rendezvousUrl: String = "",
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "3287d7cad16cb3489d49a89127e5a908",
+    "identityHash": "32b1f48a101f214c932236834175b762",
     "entities": [
       {
         "tableName": "peers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceId` TEXT NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, `pairedAtMillis` INTEGER NOT NULL, `lastAddress` TEXT, `lastSeenMillis` INTEGER, `schedule` TEXT, `turboKey` TEXT, `pairSecret` TEXT, PRIMARY KEY(`deviceId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceId` TEXT NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, `pairedAtMillis` INTEGER NOT NULL, `lastAddress` TEXT, `lastSeenMillis` INTEGER, `schedule` TEXT, `turboKey` TEXT, `pairSecret` TEXT, `rendezvousUrl` TEXT, PRIMARY KEY(`deviceId`))",
         "fields": [
           {
             "fieldPath": "deviceId",
@@ -55,6 +55,11 @@
           {
             "fieldPath": "pairSecret",
             "columnName": "pairSecret",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rendezvousUrl",
+            "columnName": "rendezvousUrl",
             "affinity": "TEXT"
           }
         ],
@@ -399,7 +404,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3287d7cad16cb3489d49a89127e5a908')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '32b1f48a101f214c932236834175b762')"
     ]
   }
 }

@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.crypto.IdentityProvider
+import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
@@ -165,7 +166,7 @@ class ProducerSync @Inject constructor(
                 } else {
                     peers.register(consumer, it.remoteAddress)
                     peers.keepOnlyConsumer(consumer.id)
-                    peers.recordConsumer(consumer.id, schedule = outcome.consumerSchedule)
+                    peers.recordConsumer(consumer.id, ConsumerFacts(schedule = outcome.consumerSchedule))
                     PairingResult.Paired(consumer.name)
                 }
             }
@@ -392,10 +393,13 @@ class ProducerSync @Inject constructor(
             ).sync(it)
             peers.recordConsumer(
                 consumer.id,
-                address = it.remoteAddress.takeUnless { direct }, // A direct link's address is fleeting.
-                schedule = result.consumerSchedule,
-                turboKey = result.consumerTurboKey,
-                pairSecret = result.consumerPairSecret,
+                ConsumerFacts(
+                    address = it.remoteAddress.takeUnless { direct }, // A direct link's address is fleeting.
+                    schedule = result.consumerSchedule,
+                    turboKey = result.consumerTurboKey,
+                    pairSecret = result.consumerPairSecret,
+                    rendezvousUrl = result.consumerRendezvousUrl,
+                ),
             )
             if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
             Diagnostics.log(Area.SEND, "Sync done$turbo in ${since(started)}: ${result.describe()}")
