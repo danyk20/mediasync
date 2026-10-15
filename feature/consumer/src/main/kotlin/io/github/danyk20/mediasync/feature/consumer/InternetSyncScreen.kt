@@ -349,7 +349,7 @@ private fun RelayMeter(relay: RelayUsage) {
 }
 
 /** Relay amounts as Cloudflare states its allowance: "312 GB", "1,000 GB"; below a gigabyte, as file sizes. */
-private fun gigabytes(bytes: Long): String = if (bytes < BYTES_PER_GB) {
+internal fun gigabytes(bytes: Long): String = if (bytes < BYTES_PER_GB) {
     formatBytes(bytes)
 } else {
     "${NumberFormat.getIntegerInstance().format(bytes / BYTES_PER_GB)} GB"

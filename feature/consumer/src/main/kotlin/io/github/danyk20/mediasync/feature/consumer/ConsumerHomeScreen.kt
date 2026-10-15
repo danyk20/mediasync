@@ -58,8 +58,11 @@ import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.android.RelayLevel
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboPermissions
+import io.github.danyk20.mediasync.sync.android.level
 
 @Composable
 fun ConsumerHomeRoute(
@@ -190,7 +193,7 @@ fun ConsumerHomeScreen(
                 onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
             )
             ScheduleRow(state.schedule, onChangeSchedule)
-            InternetRow(state.internetSync, onSetUpInternet)
+            InternetRow(state.internetSync, state.relay, onSetUpInternet)
             TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
@@ -376,12 +379,33 @@ private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
 
 /** Internet sync (docs/PLAN.md §8.4): whether sending phones away from this Wi-Fi can sync. */
 @Composable
-private fun InternetRow(on: Boolean, onSetUp: () -> Unit) {
+private fun InternetRow(on: Boolean, relay: RelayUsage?, onSetUp: () -> Unit) {
     OutlinedCard(onClick = onSetUp, modifier = Modifier.fillMaxWidth()) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.consumer_internet_row_title)) },
             supportingContent = {
-                Text(stringResource(if (on) R.string.consumer_internet_row_on else R.string.consumer_internet_row_off))
+                Column {
+                    Text(
+                        stringResource(
+                            if (on) R.string.consumer_internet_row_on else R.string.consumer_internet_row_off,
+                        ),
+                    )
+                    // The one-line meter (docs/PLAN.md §8.5): accented from 80 %, red once the relay stopped.
+                    relay?.let {
+                        Text(
+                            text = stringResource(
+                                R.string.consumer_internet_row_relay,
+                                gigabytes(it.usedBytes),
+                                gigabytes(it.freeBytes),
+                            ),
+                            color = when (it.level) {
+                                RelayLevel.FINE -> MaterialTheme.colorScheme.onSurfaceVariant
+                                RelayLevel.HIGH, RelayLevel.NEARLY_USED_UP -> MaterialTheme.colorScheme.tertiary
+                                RelayLevel.USED_UP -> MaterialTheme.colorScheme.error
+                            },
+                        )
+                    }
+                }
             },
             trailingContent = {
                 Text(

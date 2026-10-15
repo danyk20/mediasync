@@ -22,16 +22,20 @@ import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,6 +63,7 @@ class ConsumerHomeViewModelTest {
         every { state } returns receiverState
         every { freeBytes() } answers { freeBytes }
         every { turbo } returns this@ConsumerHomeViewModelTest.turbo
+        every { relayUsage() } returns RelayUsage(812_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null)
     }
     private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(anna)) }
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
@@ -71,6 +76,19 @@ class ConsumerHomeViewModelTest {
     }
 
     private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup)
+
+    @Test
+    fun theRelayMeterIsShownWhileInternetSyncIsOn() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.listening }.relay shouldBe null
+        verify(exactly = 0) { receiver.relayUsage() }
+
+        settings.setRendezvousUrl("https://mediasync.anna.workers.dev")
+
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { viewModel.uiState.first { it.relay != null } }
+        }.relay?.usedBytes shouldBe 812_000_000_000
+    }
 
     @Test
     fun startsReceivingAndListsSendingPhones() = runTest {

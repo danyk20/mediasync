@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.kotest.matchers.shouldBe
 import java.time.LocalTime
@@ -122,6 +123,19 @@ class ConsumerHomeScreenTest {
     fun screenshot_ready_light() {
         show(ConsumerHomeUiState(listening = true))
         composeRule.onRoot().captureScreenshot("consumer_home_ready_light")
+    }
+
+    @Test
+    fun screenshot_internet_light() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                internetSync = true,
+                relay = RelayUsage(812_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null),
+            ),
+        )
+        composeRule.onNodeWithText("Relay this month: 812 GB of 1,000 GB free").assertIsDisplayed()
+        composeRule.onRoot().captureScreenshot("consumer_home_internet_light")
     }
 
     @Test

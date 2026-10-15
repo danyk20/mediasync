@@ -34,6 +34,7 @@ class AndroidInternetLinks @Inject internal constructor(
     @ApplicationContext private val context: Context,
     private val identity: IdentityProvider,
     private val mobileData: MobileDataSource,
+    private val alerts: RelayAlerts,
 ) : InternetLinks {
     private val links by lazy { WebRtcLink(context) }
     private val signer by lazy {
@@ -69,7 +70,7 @@ class AndroidInternetLinks @Inject internal constructor(
                 available = meter.relayAvailable,
                 resetsAt = runCatching { Instant.parse(meter.period.end) }.getOrNull(),
             )
-        }
+        }.also(alerts::check) // Whenever the meter is read: the user hears when it runs low.
 
     private fun path(area: Area) = InternetPath(signer, links, log = { message, error ->
         val entry = "Internet: $message"
