@@ -46,6 +46,10 @@ Firebase Analytics is switched off. [Google's privacy policy](https://policies.g
 
 MediaSync doesn't upload anything to Google Photos. It keeps received files in the *MediaSync* folder, and **the Google Photos app on that phone** backs them up if you turn that on in Google Photos. [Google's privacy policy](https://policies.google.com/privacy) applies.
 
+## Checking for updates (copies from GitHub only)
+
+A copy of MediaSync installed from GitHub can't be updated by Google Play. Its *Diagnostics* screen has a *Check for updates* button that asks GitHub which release is the latest. MediaSync checks only when you tap the button, and sends nothing but that request; GitHub sees the phone's IP address, as with any web request. [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) applies. Copies installed from Google Play don't have the button and never contact GitHub.
+
 ## Permissions
 
 | Permission | Why |

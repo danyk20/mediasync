@@ -16,4 +16,13 @@
     <string name="diagnostics_link_test_failed">Не удалось связаться с %1$s. Откройте на нём MediaSync, в той же сети Wi-Fi, и попробуйте снова.</string>
     <string name="diagnostics_link_test_one">Одно соединение: %1$s МБ/с</string>
     <string name="diagnostics_link_test_four">Четыре соединения: %1$s МБ/с</string>
+    <string name="diagnostics_updates_title">Обновления</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, установлен с GitHub.</string>
+    <string name="diagnostics_updates_check">Проверить обновления</string>
+    <string name="diagnostics_updates_checking">Проверка…</string>
+    <string name="diagnostics_updates_latest">Это последняя версия.</string>
+    <string name="diagnostics_updates_newer">Доступна версия MediaSync %1$s.</string>
+    <string name="diagnostics_updates_download">Скачать</string>
+    <string name="diagnostics_updates_failed">Не удалось связаться с GitHub. Попробуйте позже.</string>
+    <string name="diagnostics_updates_note">При проверке GitHub сообщает, какой релиз последний. MediaSync больше ничего не отправляет и никогда не проверяет сам.</string>
 </resources>

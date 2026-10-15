@@ -16,4 +16,13 @@
     <string name="diagnostics_link_test_failed">Não foi possível acessar %1$s. Abra o MediaSync nele, na mesma rede Wi-Fi, e tente de novo.</string>
     <string name="diagnostics_link_test_one">Uma conexão: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Quatro conexões: %1$s MB/s</string>
+    <string name="diagnostics_updates_title">Atualizações</string>
+    <string name="diagnostics_updates_installed">MediaSync %1$s, instalado pelo GitHub.</string>
+    <string name="diagnostics_updates_check">Verificar atualizações</string>
+    <string name="diagnostics_updates_checking">Verificando…</string>
+    <string name="diagnostics_updates_latest">Esta é a versão mais recente.</string>
+    <string name="diagnostics_updates_newer">MediaSync %1$s está disponível.</string>
+    <string name="diagnostics_updates_download">Baixar</string>
+    <string name="diagnostics_updates_failed">Não foi possível acessar o GitHub. Tente de novo mais tarde.</string>
+    <string name="diagnostics_updates_note">Verificar pergunta ao GitHub qual é a versão mais recente. O MediaSync não envia mais nada e nunca verifica por conta própria.</string>
 </resources>
