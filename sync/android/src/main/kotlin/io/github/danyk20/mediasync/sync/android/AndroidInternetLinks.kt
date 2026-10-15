@@ -32,6 +32,7 @@ import okio.ByteString
 class AndroidInternetLinks @Inject internal constructor(
     @ApplicationContext private val context: Context,
     private val identity: IdentityProvider,
+    private val mobileData: MobileDataSource,
 ) : InternetLinks {
     private val links by lazy { WebRtcLink(context) }
     private val signer by lazy {
@@ -49,7 +50,7 @@ class AndroidInternetLinks @Inject internal constructor(
 
     override fun allowed(): Boolean {
         val network = context.getSystemService(ConnectivityManager::class.java)
-        return network.activeNetwork != null && !network.isActiveNetworkMetered
+        return network.activeNetwork != null && (!network.isActiveNetworkMetered || mobileData.allowed())
     }
 
     override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection =

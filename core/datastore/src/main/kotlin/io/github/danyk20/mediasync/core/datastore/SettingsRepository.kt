@@ -37,6 +37,11 @@ interface SettingsRepository {
 
     suspend fun setRendezvousUrl(url: String?)
 
+    /** A sending phone: internet sync (PLAN §8.4) also over mobile data, not only over Wi-Fi; off at first. */
+    val internetOverMobileData: Flow<Boolean>
+
+    suspend fun setInternetOverMobileData(allowed: Boolean)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

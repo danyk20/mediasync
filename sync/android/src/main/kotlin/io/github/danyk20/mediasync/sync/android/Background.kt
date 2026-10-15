@@ -78,6 +78,17 @@ class SettingsRendezvousSource @Inject constructor(
     override fun current(): String? = url.value
 }
 
+/** Whether the sending phone's internet sync may use mobile data, from its settings. */
+@Singleton
+class SettingsMobileDataSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : MobileDataSource {
+    private val allowed = settings.internetOverMobileData.stateIn(scope, SharingStarted.Eagerly, false)
+
+    override fun allowed(): Boolean = allowed.value
+}
+
 /** The settings the sync runtime follows as they change. */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -90,6 +101,9 @@ internal abstract class SettingsSourcesModule {
 
     @Binds
     abstract fun bindRendezvousSource(impl: SettingsRendezvousSource): RendezvousSource
+
+    @Binds
+    abstract fun bindMobileDataSource(impl: SettingsMobileDataSource): MobileDataSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */

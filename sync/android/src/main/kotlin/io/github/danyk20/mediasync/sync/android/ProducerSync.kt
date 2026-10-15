@@ -391,7 +391,7 @@ class ProducerSync @Inject constructor(
             val worker = consumer.rendezvousUrl ?: return null
             val secret = consumer.pairSecret ?: return null
             if (!internet.allowed()) {
-                Diagnostics.log(Area.SEND, "Internet: not over mobile data")
+                Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed")
                 return null
             }
             val connection = try {

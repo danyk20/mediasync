@@ -279,6 +279,21 @@ class ProducerHomeViewModelTest {
     }
 
     @Test
+    fun internetSyncIsOfferedOnceTheReceivingPhoneHasAWorker() = runTest {
+        grantLibraryAccess()
+        viewModel().uiState.first { it.consumerName != null }.internetSync shouldBe false
+
+        every { peers.observeConsumer() } returns
+            flowOf(consumer.copy(rendezvousUrl = "https://mediasync.anna.workers.dev"))
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.consumerName != null }.internetSync shouldBe true
+
+        viewModel.setInternetOverMobileData(true)
+        settings.internetOverMobileData.value shouldBe true
+        viewModel.uiState.first { it.internetOverMobileData } // Shown as on.
+    }
+
+    @Test
     fun theRouteShowsTheStateAndSyncs() {
         grantLibraryAccess()
         syncState.value = ProducerState.Idle(SyncResult(sent = 3))

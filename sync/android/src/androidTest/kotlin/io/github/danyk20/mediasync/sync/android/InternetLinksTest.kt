@@ -86,8 +86,8 @@ class InternetLinksTest {
 
     @Test
     fun aSyncGoesThroughTheWorkerOverWebRtc() {
-        val consumer = AndroidInternetLinks(context) { consumerIdentity }
-        val producer = AndroidInternetLinks(context) { producerIdentity }
+        val consumer = AndroidInternetLinks(context, { consumerIdentity }, { false })
+        val producer = AndroidInternetLinks(context, { producerIdentity }, { false })
         val photos = List(4) { FakeMedia("p$it", Random(it).nextBytes(400_000)) }
         val sink = FakeMediaSink()
         val local = LocalDevice("Test phone", "test")

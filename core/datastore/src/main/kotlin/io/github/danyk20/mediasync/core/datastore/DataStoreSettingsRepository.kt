@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.core.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -75,6 +76,13 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { if (url == null) it.remove(RendezvousUrlKey) else it[RendezvousUrlKey] = url }
     }
 
+    override val internetOverMobileData: Flow<Boolean> =
+        dataStore.data.map { it[InternetOverMobileDataKey] ?: false }.distinctUntilChanged()
+
+    override suspend fun setInternetOverMobileData(allowed: Boolean) {
+        dataStore.edit { it[InternetOverMobileDataKey] = allowed }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -95,6 +103,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
         val PhotoDetailsKey = stringPreferencesKey("photo_details")
         val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
+        val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

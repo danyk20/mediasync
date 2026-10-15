@@ -77,6 +77,10 @@ data class ProducerHomeUiState(
     val askNotifications: Boolean = false,
     /** Android 12+: ask for *Unrestricted* battery use, which syncs at night need. */
     val askBattery: Boolean = false,
+    /** The receiving phone has a rendezvous Worker: this phone can sync with it over the internet (PLAN §8.4). */
+    val internetSync: Boolean = false,
+    /** Internet sync may also use mobile data. */
+    val internetOverMobileData: Boolean = false,
 )
 
 /**
@@ -126,9 +130,9 @@ class ProducerHomeViewModel @Inject constructor(
         peers.observeConsumer(),
         sync.state,
         pending,
-        settings.sourceSelection,
+        combine(settings.sourceSelection, settings.internetOverMobileData, ::Pair),
         combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
-    ) { consumer, state, count, sources, extras ->
+    ) { consumer, state, count, (sources, mobileData), extras ->
         val (access, record, dismissed) = extras
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
         val now = ZonedDateTime.now(clock)
@@ -156,6 +160,8 @@ class ProducerHomeViewModel @Inject constructor(
             askBattery = access.batteryRestricted &&
                 schedule != SyncSchedule.Manual &&
                 SetupPrompt.BATTERY !in dismissed,
+            internetSync = consumer?.rendezvousUrl != null,
+            internetOverMobileData = mobileData,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
@@ -177,6 +183,10 @@ class ProducerHomeViewModel @Inject constructor(
     fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
+
+    fun setInternetOverMobileData(allowed: Boolean) {
+        viewModelScope.launch { settings.setInternetOverMobileData(allowed) }
+    }
 
     /** Sends over a direct link (docs/PLAN.md §8.3), in the background like [syncNow]. */
     fun startTurbo() {

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
@@ -237,6 +238,29 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun mobileDataIsOfferedOnlyWithInternetSync() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Sync over mobile data").performScrollTo().performClick()
+
+        events shouldBe listOf("mobile data true")
+    }
+
+    @Test
+    fun noMobileDataWithoutInternetSync() {
+        show(paired.copy(pendingCount = 3))
+
+        composeRule.onNodeWithText("Sync over mobile data").assertDoesNotExist()
+    }
+
+    @Test
+    fun screenshot_internet_dark() = screenshot(
+        paired.copy(pendingCount = 3, internetSync = true, internetOverMobileData = true),
+        "producer_home_internet_dark",
+        darkTheme = true,
+    )
+
+    @Test
     fun screenshot_notPaired_light() = screenshot(ProducerHomeUiState(), "producer_home_not_paired_light")
 
     @Test
@@ -416,6 +440,7 @@ class ProducerHomeScreenTest {
                     onAllowNotifications = { events += "notifications" },
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
+                    onInternetOverMobileData = { events += "mobile data $it" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },

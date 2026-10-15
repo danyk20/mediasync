@@ -58,6 +58,14 @@ class FakeSettingsRepository(
         rendezvousUrlState.value = url
     }
 
+    private val internetOverMobileDataState = MutableStateFlow(false)
+
+    override val internetOverMobileData: StateFlow<Boolean> = internetOverMobileDataState
+
+    override suspend fun setInternetOverMobileData(allowed: Boolean) {
+        internetOverMobileDataState.value = allowed
+    }
+
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
 
     override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState

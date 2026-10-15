@@ -72,7 +72,7 @@ class Connectivity @Inject constructor(
  * rendezvous Worker, when they share no network.
  */
 interface InternetLinks {
-    /** As a sending phone: whether it may sync over the internet now: over Wi-Fi, not over mobile data. */
+    /** As a sending phone: whether it may sync over the internet now: over Wi-Fi, or mobile data if allowed. */
     fun allowed(): Boolean
 
     /**
@@ -173,6 +173,11 @@ fun interface DeviceConditions {
 /** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
 fun interface PhotoDetailsSource {
     fun current(): PhotoDetails
+}
+
+/** As a sending phone: whether internet sync (PLAN §8.4) may also use mobile data, as the user set it. */
+fun interface MobileDataSource {
+    fun allowed(): Boolean
 }
 
 /** The receiving phone's rendezvous Worker for internet sync (PLAN §8.4), as set up; `null` while it has none. */
