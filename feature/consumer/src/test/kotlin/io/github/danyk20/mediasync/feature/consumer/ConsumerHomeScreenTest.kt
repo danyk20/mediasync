@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
@@ -123,6 +124,23 @@ class ConsumerHomeScreenTest {
     fun screenshot_ready_light() {
         show(ConsumerHomeUiState(listening = true))
         composeRule.onRoot().captureScreenshot("consumer_home_ready_light")
+    }
+
+    @Test
+    fun theBackupRowSaysWhatWasHandedOverAndOpensBackup() {
+        show(ConsumerHomeUiState(listening = true, backup = BackupLine.On("Google Photos", 214)))
+
+        composeRule.onNodeWithText("Backed up by the Google Photos app · 214 handed over today").performScrollTo()
+            .performClick()
+
+        events shouldBe listOf("backup")
+    }
+
+    @Test
+    fun screenshot_backupOff_light() {
+        show(ConsumerHomeUiState(listening = true, backup = BackupLine.Off))
+        composeRule.onNodeWithText("Off: received photos stay on this phone only").assertIsDisplayed()
+        composeRule.onRoot().captureScreenshot("consumer_home_backup_off_light")
     }
 
     @Test
@@ -251,6 +269,7 @@ class ConsumerHomeScreenTest {
                 ConsumerHomeScreen(
                     state = state,
                     onAddProducer = { events += "add" },
+                    onOpenBackup = { events += "backup" },
                     onChangeSchedule = { events += "schedule" },
                     onAllowNotifications = { events += "notifications" },
                     onOpenSettings = { events += "settings" },

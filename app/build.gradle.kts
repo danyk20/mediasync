@@ -72,6 +72,7 @@ dependencies {
     implementation(projects.core.datastore)
     implementation(projects.core.designsystem)
     implementation(projects.core.model)
+    implementation(projects.feature.backup)
     implementation(projects.feature.consumer)
     implementation(projects.feature.diagnostics)
     implementation(projects.feature.onboarding)

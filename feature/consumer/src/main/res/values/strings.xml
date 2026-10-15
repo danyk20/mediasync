@@ -32,6 +32,10 @@
     <!-- Sync schedule -->
     <string name="consumer_schedule_row_title">Sync schedule</string>
     <string name="consumer_schedule_change">Change</string>
+    <string name="consumer_backup_row_title">Cloud backup</string>
+    <string name="consumer_backup_row_off">Off: received photos stay on this phone only</string>
+    <string name="consumer_backup_row_on">Backed up by the %1$s app · %2$s handed over today</string>
+    <string name="consumer_backup_row_open">Open</string>
     <string name="consumer_internet_row_title">Internet sync</string>
     <string name="consumer_internet_set_up">Set up</string>
     <string name="consumer_internet_row_relay">Relay this month: %1$s of %2$s free</string>
