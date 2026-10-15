@@ -38,3 +38,9 @@ A connector backs up what the receiving phone received to one kind of place: a c
 - **Pipeline:** what arrived → preprocessing (photo details, date repair, quality; not for another app's connector, whose stored file is what gets uploaded) → limits → upload → a receipt in the ledger. A run stops at the first failure and the next arrival tries again.
 - **Decorators**, outermost first: logging and metrics (`InstrumentedConnector`, which also turns a thrown exception into a failed run), retries with backoff and jitter (`RetryingConnector`), the rate limit (`RateLimitedConnector`), and the daily allowance (`QuotaTrackingConnector`).
 - **Another app's cleanup:** for a `DeviceAppConnector`, whatever `removedFromPhone()` reports after `folderChanges()` settles becomes *backed up and removed from this phone*.
+
+## Connectors so far
+
+| Module | Connector | Kind |
+|---|---|---|
+| `:connector:google-photos-app` | `google-photos-app`: the Google Photos app on the receiving phone (PLAN.md §9.3.1) | Another app on the phone (`DeviceAppConnector`) |
