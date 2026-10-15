@@ -68,6 +68,7 @@ android {
 
 dependencies {
     implementation(projects.connector.android)
+    implementation(projects.connector.googlePhotosApp)
     implementation(projects.core.datastore)
     implementation(projects.core.designsystem)
     implementation(projects.core.model)

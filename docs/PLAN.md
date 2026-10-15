@@ -858,6 +858,8 @@ There are two connectors, and the choice is made per consumer device.
 
 #### 9.3.1 Google Photos app on this phone (v1.0; default on Pixel 2–5)
 
+**Built (M4, part 2): the connector.** `:connector:google-photos-app` registers it as `google-photos-app`. It checks each received file is in `DCIM/MediaSync/` and hands it over, and it counts a file as backed up and removed once it's gone from the phone but isn't in the trash (Android 11+). Its descriptor declares what the app backs up, per Google: photos up to 200 MB, videos up to 10 GB. Larger files stay on the phone and are listed as skipped. It passes the contract kit with a fake gallery, and a device test checks the real one on API 29 and 36. The guided setup and the backup card come next.
+
 - **Capability:** `DELEGATED_TO_DEVICE_APP`. MediaSync doesn't upload anything. It stores files where the Google Photos app backs them up, which is free and unlimited in Storage saver on Pixel 2–5 (§1.5).
 - **One folder:**
   - All received files go into `DCIM/MediaSync/`. (`DCIM` because, on Android 10, it's the only top-level folder MediaStore accepts for both photos and videos.)
