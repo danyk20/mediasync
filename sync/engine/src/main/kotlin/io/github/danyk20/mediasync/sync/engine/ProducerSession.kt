@@ -311,11 +311,13 @@ class ProducerSession(
         }
 
         private fun onAck(ack: FileAck) {
-            val prepared = lock.withLock { inFlight.remove(ack.offerId) }
+            val prepared = lock.withLock { inFlight[ack.offerId] }
                 ?: throw ProtocolException("ACK for offer ${ack.offerId}, which isn't in flight")
             val confirmed = ack.status == FileAck.Status.OK
             if (confirmed) ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
+            // In flight until recorded and counted: the session, waiting for nothing to be in flight, then counts it.
             lock.withLock {
+                inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")
                 if (confirmed) sent++ else failed++
                 changed.signalAll()
             }

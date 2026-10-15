@@ -630,6 +630,7 @@ Speed is the top non-functional requirement. The strategy has six parts:
 4. **Keep the radio awake.**
    - Hold Wi-Fi locks during a session only: low-latency (screen on) and high-performance (screen off at night).
    - No partial wake lock: background jobs and foreground services already hold one, and another would only risk Play's "excessive wake locks" warning.
+   - Every transfer therefore runs as foreground work. The sending phone already does (*Sync now*, scheduled syncs, Turbo), and so does the receiving phone in its receive window. Outside it, with MediaSync open on screen or during *Turbo receive*, a session starts foreground work of its own ("Receiving…"), so the transfer carries on when the screen goes off or the user switches apps. It ends after a quiet minute.
    - Turbo groups request the 5 GHz band.
 5. **Never redo work.** Fingerprint dedupe, `HAVE` replies, and byte-offset resume.
 6. **Stay thermally aware.** Watch `PowerManager` thermal status and reduce streams before the SoC throttles. Throttling would cost more speed than backing off.
