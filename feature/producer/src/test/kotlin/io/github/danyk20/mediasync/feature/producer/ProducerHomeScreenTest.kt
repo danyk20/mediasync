@@ -5,6 +5,9 @@
 package io.github.danyk20.mediasync.feature.producer
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -55,6 +58,29 @@ class ProducerHomeScreenTest {
     private val events = mutableListOf<String>()
 
     @Test
+    fun unpairingAsksFirst() {
+        show(paired)
+
+        composeRule.onNodeWithText("Unpair").performScrollTo().performClick()
+        composeRule.onNodeWithText("Unpair Pixel 2 XL?").assertIsDisplayed()
+        composeRule.onNode(hasText("Unpair") and hasAnyAncestor(isDialog())).performClick()
+
+        events shouldBe listOf("unpair")
+    }
+
+    @Test
+    fun removedOnTheReceivingPhone_offersToUnpairInsteadOfSyncing() {
+        show(paired.copy(sync = ProducerState.Failed(SyncFailure.NOT_ALLOWED)))
+
+        composeRule.onNodeWithText("Pixel 2 XL no longer recognises this phone", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Sync now").assertDoesNotExist()
+        composeRule.onAllNodesWithText("Unpair")[0].performClick()
+        composeRule.onNode(hasText("Unpair") and hasAnyAncestor(isDialog())).performClick()
+
+        events shouldBe listOf("unpair")
+    }
+
+    @Test
     fun notPaired_offersPairing() {
         show(ProducerHomeUiState())
 
@@ -95,7 +121,9 @@ class ProducerHomeScreenTest {
     fun failures_explainWhatToDo() {
         show(paired.copy(sync = ProducerState.Failed(SyncFailure.NOT_ALLOWED)))
 
-        composeRule.onNodeWithText("Pixel 2 XL no longer recognises this phone. Pair them again.").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Pixel 2 XL no longer recognises this phone: it was removed there. Unpair it here, then pair them again.",
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -516,6 +544,7 @@ class ProducerHomeScreenTest {
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },
+                    onUnpair = { events += "unpair" },
                 )
             }
         }

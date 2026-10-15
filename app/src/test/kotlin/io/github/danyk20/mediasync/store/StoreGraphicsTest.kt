@@ -35,6 +35,7 @@ import io.github.danyk20.mediasync.connector.ConnectorAccount
 import io.github.danyk20.mediasync.connector.android.BackupOverview
 import io.github.danyk20.mediasync.connector.googlephotos.GooglePhotosAppConnectorFactory
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.feature.backup.AppBackup
 import io.github.danyk20.mediasync.feature.backup.BackupActions
@@ -47,6 +48,7 @@ import io.github.danyk20.mediasync.feature.consumer.IncomingTransfer
 import io.github.danyk20.mediasync.feature.consumer.InternetSyncActions
 import io.github.danyk20.mediasync.feature.consumer.InternetSyncScreen
 import io.github.danyk20.mediasync.feature.consumer.InternetSyncUiState
+import io.github.danyk20.mediasync.feature.consumer.PairedPhone
 import io.github.danyk20.mediasync.feature.producer.ProducerHomeScreen
 import io.github.danyk20.mediasync.feature.producer.ProducerHomeUiState
 import io.github.danyk20.mediasync.sync.android.ProducerState
@@ -106,7 +108,17 @@ class StoreGraphicsTest {
             state = ConsumerHomeUiState(
                 listening = true,
                 transfer = IncomingTransfer("Anna's Pixel", 128, 214, 1_210_000_000, 2_040_000_000),
-                producers = listOf("Anna's Pixel", "Tom's Galaxy"),
+                producers = listOf(
+                    PairedPhone(
+                        DeviceId.of(
+                            ByteArray(32) {
+                                1
+                            },
+                        ),
+                        "Anna's Pixel",
+                    ),
+                    PairedPhone(DeviceId.of(ByteArray(32) { 3 }), "Tom's Galaxy"),
+                ),
                 receivedCount = 18_203,
                 schedule = SyncSchedule.Default,
                 internetSync = true,

@@ -45,6 +45,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -117,6 +118,7 @@ fun ProducerHomeRoute(
         onChooseFolders = onChooseFolders,
         onSyncNow = viewModel::syncNow,
         onStop = viewModel::stop,
+        onUnpair = viewModel::unpair,
         onGrantAccess = { requestPermissions.launch(MediaPermissions.required.toTypedArray()) },
         onOpenSettings = {
             context.startActivity(
@@ -170,6 +172,7 @@ fun ProducerHomeScreen(
     onOpenDiagnostics: () -> Unit = {},
     onStartTurbo: () -> Unit = {},
     onOpenLocationSettings: () -> Unit = {},
+    onUnpair: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -195,7 +198,7 @@ fun ProducerHomeScreen(
                 !state.canReadLibrary -> NeedsAccess(consumer, onGrantAccess, onOpenSettings)
 
                 else -> {
-                    Paired(consumer, state, onSyncNow, onStop)
+                    Paired(consumer, state, onSyncNow, onStop, onUnpair)
                     Notices(state, consumer, onOpenSettings)
                     BackgroundSetupNotices(
                         askNotifications = state.askNotifications,
@@ -208,28 +211,82 @@ fun ProducerHomeScreen(
                     WithheldNotice(state, onChooseDetails)
                     HeldBackNotice(state)
                     TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
-                    SettingRow(
-                        title = stringResource(R.string.producer_sources_title),
-                        summary = sourcesSummary(state.sources),
-                        icon = MediaSyncIcons.Folder,
-                        onClick = onChooseFolders,
-                    )
-                    SettingRow(
-                        title = stringResource(R.string.producer_details_row_title),
-                        summary = stringResource(state.photoDetails.title),
-                        icon = MediaSyncIcons.Info,
-                        onClick = onChooseDetails,
-                    )
+                    WhatIsSent(state, onChooseFolders, onChooseDetails)
                     InternetCard(
                         state,
                         consumer,
                         InternetActions(onInternetOverMobileData, onVideosOverRelay, onMobileDataCap),
                     )
                     Hints(state, consumer, onGrantAccess)
+                    ReceivingPhoneRow(consumer, onUnpair)
                 }
             }
         }
     }
+}
+
+/** What this phone sends: from which folders, and with which photo details. */
+@Composable
+private fun WhatIsSent(state: ProducerHomeUiState, onChooseFolders: () -> Unit, onChooseDetails: () -> Unit) {
+    SettingRow(
+        title = stringResource(R.string.producer_sources_title),
+        summary = sourcesSummary(state.sources),
+        icon = MediaSyncIcons.Folder,
+        onClick = onChooseFolders,
+    )
+    SettingRow(
+        title = stringResource(R.string.producer_details_row_title),
+        summary = stringResource(state.photoDetails.title),
+        icon = MediaSyncIcons.Info,
+        onClick = onChooseDetails,
+    )
+}
+
+/** The receiving phone this one sends to, and *Unpair*, to send to another one. */
+@Composable
+private fun ReceivingPhoneRow(consumer: String, onUnpair: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.producer_receiving_phone_title)) },
+        supportingContent = { Text(consumer) },
+        trailingContent = {
+            AskingToUnpair(consumer, onUnpair) { ask ->
+                TextButton(onClick = ask) { Text(stringResource(R.string.producer_unpair)) }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+}
+
+/** [button], which asks before unpairing from [consumer]. */
+@Composable
+private fun AskingToUnpair(consumer: String, onUnpair: () -> Unit, button: @Composable (ask: () -> Unit) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    button { asking = true }
+    if (asking) {
+        UnpairDialog(
+            consumer,
+            onUnpair = {
+                asking = false
+                onUnpair()
+            },
+            onCancel = { asking = false },
+        )
+    }
+}
+
+@Composable
+private fun UnpairDialog(consumer: String, onUnpair: () -> Unit, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.producer_unpair_title, consumer)) },
+        text = { Text(stringResource(R.string.producer_unpair_body, consumer)) },
+        confirmButton = {
+            TextButton(onClick = onUnpair) {
+                Text(stringResource(R.string.producer_unpair), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.producer_cancel)) } },
+    )
 }
 
 @Composable
@@ -258,7 +315,13 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
 }
 
 @Composable
-private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -> Unit, onStop: () -> Unit) {
+private fun Paired(
+    consumer: String,
+    state: ProducerHomeUiState,
+    onSyncNow: () -> Unit,
+    onStop: () -> Unit,
+    onUnpair: () -> Unit,
+) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
             Sending(consumer, sync)
@@ -285,7 +348,16 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
                 body = failureMessage(sync.reason, consumer, state.internetSync),
                 icon = MediaSyncIcons.Info,
             )
-            SyncNowButton(onSyncNow)
+            // Unpaired on the other phone: unpair here too, then pair again.
+            if (sync.reason == SyncFailure.NOT_ALLOWED) {
+                AskingToUnpair(consumer, onUnpair) { ask ->
+                    Button(onClick = ask, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.producer_unpair))
+                    }
+                }
+            } else {
+                SyncNowButton(onSyncNow)
+            }
         }
 
         is ProducerState.Idle -> {

@@ -69,7 +69,7 @@ class ConsumerHomeViewModelTest {
         every { turbo } returns this@ConsumerHomeViewModelTest.turbo
         every { relayUsage() } returns RelayUsage(812_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null)
     }
-    private val peers = mockk<PeerStore> { every { observeAll() } returns flowOf(listOf(anna)) }
+    private val peers = mockk<PeerStore>(relaxUnitFun = true) { every { observeAll() } returns flowOf(listOf(anna)) }
     private val received = mockk<RoomReceivedLedger> { every { observeCount() } returns flowOf(7) }
     private val settings = FakeSettingsRepository()
     private var canNotify = true
@@ -86,6 +86,14 @@ class ConsumerHomeViewModelTest {
     }
 
     private fun viewModel() = ConsumerHomeViewModel(receiver, peers, received, settings, setup, backup)
+
+    @Test
+    fun removingASendingPhoneForgetsItAndStopsListeningForIt() {
+        viewModel().removeProducer(anna.id)
+
+        verify(timeout = WAIT_MILLIS) { peers.forget(anna.id) }
+        verify(timeout = WAIT_MILLIS) { receiver.refreshInternet() }
+    }
 
     @Test
     fun theBackupRowSaysWhetherAndHowMuchIsHandedOver() = runTest {
@@ -127,7 +135,7 @@ class ConsumerHomeViewModelTest {
         verify { receiver.hold(any()) }
         state shouldBe ConsumerHomeUiState(
             listening = true,
-            producers = listOf("Anna's Pixel"),
+            producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
             receivedCount = 7,
             turbo = TurboAvailability.AVAILABLE,
             backup = BackupLine.Off,
@@ -247,5 +255,9 @@ class ConsumerHomeViewModelTest {
         composeRule.onNodeWithText("Add sending phone").performScrollTo().performClick()
 
         added shouldBe true
+    }
+
+    private companion object {
+        const val WAIT_MILLIS = 5_000L
     }
 }

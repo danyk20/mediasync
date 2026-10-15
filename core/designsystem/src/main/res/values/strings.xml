@@ -24,6 +24,11 @@
     <string name="notice_not_now">Not now</string>
     <string name="more_options">More options</string>
     <string name="menu_diagnostics">Diagnostics</string>
+    <string name="menu_reset">Reset MediaSync</string>
+    <string name="reset_title">Reset MediaSync?</string>
+    <string name="reset_body">This phone forgets its role, its paired phones, its settings and its history, and MediaSync starts over as if just installed. Photos and videos stay where they are. A Cloudflare Worker you set up stays in your Cloudflare account.</string>
+    <string name="reset_confirm">Reset</string>
+    <string name="reset_cancel">Cancel</string>
 
     <!-- Cards asking for what background syncs need (Android 12+ battery, Android 13+ notifications). -->
     <string name="setup_notifications_title">See how syncs are going</string>
