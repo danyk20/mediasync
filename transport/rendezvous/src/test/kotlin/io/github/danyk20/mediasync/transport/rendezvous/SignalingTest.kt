@@ -56,6 +56,22 @@ class SignalingTest {
     }
 
     @Test
+    fun signalsSurviveSealingAndOnlyTheirPairCanReadThem() {
+        val codec = SignalCodec(SignalingCipher(secret, "pair-a"))
+        val signals = listOf(
+            Signal.Offer("s1", "v=0\r\no=- 1 2 IN IP4 0.0.0.0"),
+            Signal.Answer("s1", "v=0"),
+            Signal.Candidate("s1", "0", 0, "candidate:1 1 udp 2122260223 192.168.1.20 50000 typ host"),
+            Signal.Bye("s1"),
+        )
+
+        signals.map { codec.open(codec.seal(it)) } shouldBe signals
+        shouldThrow<IOException> { SignalCodec(SignalingCipher(secret, "pair-b")).open(codec.seal(signals[0])) }
+        val unknown = SignalingCipher(secret, "pair-a").seal("""{"type":"later","session":"s"}""".encodeToByteArray())
+        shouldThrow<IOException> { codec.open(unknown) }
+    }
+
+    @Test
     fun theMailboxIsSignedAndRelaysNoticesAndSealedMessages() {
         val serverSide = LinkedBlockingQueue<Any>()
         var serverSocket: WebSocket? = null
