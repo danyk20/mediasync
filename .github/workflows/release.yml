@@ -81,11 +81,15 @@ jobs:
           MEDIASYNC_KEYSTORE_PASSWORD: ${{ secrets.MEDIASYNC_KEYSTORE_PASSWORD }}
           MEDIASYNC_KEY_ALIAS: ${{ secrets.MEDIASYNC_KEY_ALIAS }}
           MEDIASYNC_KEY_PASSWORD: ${{ secrets.MEDIASYNC_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease :app:bundleRelease
+        run: ./gradlew :app:assembleRelease :app:bundleRelease -Pmediasync.abiSplits
       - name: Collect artifacts and checksums
         run: |
           mkdir dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/mediasync-$TAG.apk"
+          # The universal APK runs on every phone; the others hold one CPU's native code only, so they're smaller.
+          cp app/build/outputs/apk/release/app-universal-release.apk "dist/mediasync-$TAG.apk"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "app/build/outputs/apk/release/app-$abi-release.apk" "dist/mediasync-$TAG-$abi.apk"
+          done
           cp app/build/outputs/bundle/release/app-release.aab "dist/mediasync-$TAG.aab"
           (cd dist && sha256sum * > SHA256SUMS)
       - name: Attest build provenance
