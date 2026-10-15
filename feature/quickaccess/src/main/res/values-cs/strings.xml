@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quick_sync_now">Synchronizovat teď</string>
+    <string name="quick_receive_now">Přijmout teď</string>
+    <string name="quick_open_app">Nastavit MediaSync</string>
+    <string name="quick_syncing">Synchronizuji…</string>
+    <string name="quick_receiving">Přijímám…</string>
+    <string name="quick_last_sync">Poslední synchronizace %1$s</string>
+    <string name="quick_never_synced">Zatím nesynchronizováno</string>
+    <string name="quick_ready_to_receive">Připraven přijímat</string>
+    <string name="quick_not_set_up">Nejdřív spárujte tento telefon</string>
+    <string name="quick_widget_title">MediaSync</string>
+    <string name="quick_widget_description">Synchronizovat teď a kdy proběhla poslední synchronizace</string>
+</resources>

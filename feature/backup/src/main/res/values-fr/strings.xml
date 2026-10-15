@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Sauvegarde dans le cloud</string>
+    <string name="backup_done">Terminé</string>
+    <string name="backup_intro">Tout ce que ce téléphone reçoit est conservé dans son dossier MediaSync. Une appli de sauvegarde sur ce téléphone peut le téléverser depuis là.</string>
+    <string name="backup_none">Cette version de MediaSync n\'a aucune sauvegarde à configurer.</string>
+    <string name="backup_setup_title">Sauvegarder avec %1$s</string>
+    <string name="backup_setup_body">%1$s sauvegarde le dossier MediaSync de son côté. Sur Pixel 2 à 5, c\'est gratuit et illimité avec Économiseur d\'espace. MediaSync ne téléverse rien lui-même.</string>
+    <string name="backup_not_installed">%1$s n\'est pas installé sur ce téléphone.</string>
+    <string name="backup_install">Installer %1$s</string>
+    <string name="backup_steps_heading">À configurer une fois dans %1$s :</string>
+    <string name="backup_step_folder">Activez la sauvegarde du dossier %1$s : appuyez sur votre photo de profil, puis Paramètres Photos → Sauvegarde → Sauvegarder les dossiers de l\'appareil. Le dossier apparaît dès l\'arrivée de la première photo.</string>
+    <string name="backup_step_storage_saver">Choisissez Économiseur d\'espace : Paramètres Photos → Sauvegarde → Qualité de sauvegarde. Sur Pixel 2 à 5, il n\'utilise pas votre stockage Google.</string>
+    <string name="backup_open_app">Ouvrir %1$s</string>
+    <string name="backup_set_up_done">C\'est configuré</string>
+    <string name="backup_status_title">Sauvegardé par l\'appli %1$s</string>
+    <string name="backup_status_today">%1$s a transmis aujourd\'hui</string>
+    <string name="backup_status_handed_over">%1$s sur ce téléphone, pour sauvegarde par %2$s</string>
+    <string name="backup_status_removed">Sauvegardé par %1$s et supprimé de ce téléphone</string>
+    <string name="backup_status_waiting">Reçu par %1$s, pas encore transmis</string>
+    <string name="backup_status_note">%1$s les sauvegarde de son côté, en général en quelques minutes en Wi-Fi. MediaSync ne peut pas savoir quand c\'est terminé. Une fois que %1$s les supprime pour libérer de l\'espace, ils sont considérés comme sauvegardés.</string>
+    <string name="backup_free_up_title">Libérer de l\'espace</string>
+    <string name="backup_free_up_app">Dans %1$s, appuyez sur votre photo de profil, puis sur Libérer de l\'espace. Seuls les éléments sauvegardés sont supprimés.</string>
+    <string name="backup_free_up_open">Ouvrir %1$s</string>
+    <string name="backup_free_up_smart_storage">Ou laissez le téléphone le faire : Smart Storage, dans les réglages de stockage, supprime les photos et vidéos sauvegardées quand l\'espace manque.</string>
+    <string name="backup_free_up_storage_settings">Réglages de stockage</string>
+    <string name="backup_never_deletes">MediaSync ne supprime jamais ces fichiers lui-même.</string>
+    <string name="backup_stop">Arrêter la sauvegarde</string>
+</resources>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="producer_home_title">Tento telefon odesílá</string>
+    <string name="producer_status_not_paired_title">Zatím nespárováno</string>
+    <string name="producer_status_not_paired_body">Na přijímajícím telefonu otevřete MediaSync a klepněte na Přidat odesílající telefon. Pak naskenujte kód, který zobrazí.</string>
+    <string name="producer_pair">Spárovat s přijímajícím telefonem</string>
+
+    <string name="producer_access_title">Povolte přístup k fotkám</string>
+    <string name="producer_access_body">MediaSync odesílá vaše fotky a videa do %1$s. Potřebuje přístup ke všem a k místům, kde byly pořízeny, aby polohy zůstaly v záloze.</string>
+    <string name="producer_access_grant">Povolit přístup</string>
+    <string name="producer_access_settings">Otevřít nastavení</string>
+
+    <string name="producer_sync_now">Synchronizovat teď</string>
+    <string name="producer_stop">Zastavit</string>
+    <string name="producer_status_checking_title">Kontroluji nové fotky…</string>
+    <string name="producer_status_checking_body">Porovnávám s tím, co už má %1$s.</string>
+    <string name="producer_status_up_to_date_title">Aktuální</string>
+    <string name="producer_status_up_to_date_body">%1$s má všechny vaše fotky a videa.</string>
+    <string name="producer_last_sync">Poslední synchronizace %1$s</string>
+    <plurals name="producer_status_pending_title">
+        <item quantity="one">%d nová fotka nebo video</item>
+        <item quantity="few">%d nové fotky nebo videa</item>
+        <item quantity="many">%d nových fotek a videí</item>
+        <item quantity="other">%d nových fotek a videí</item>
+    </plurals>
+    <plurals name="producer_status_pending_body">
+        <item quantity="one">Klepnutím na Synchronizovat teď to odešlete na %1$s.</item>
+        <item quantity="few">Klepnutím na Synchronizovat teď je odešlete na %1$s.</item>
+        <item quantity="many">Klepnutím na Synchronizovat teď je odešlete na %1$s.</item>
+        <item quantity="other">Klepnutím na Synchronizovat teď je odešlete na %1$s.</item>
+    </plurals>
+    <string name="producer_status_connecting_title">Hledám %1$s…</string>
+    <string name="producer_status_connecting_body">Oba telefony musí být na stejné Wi-Fi a MediaSync musí být otevřený.</string>
+    <string name="producer_status_sending_title">Odesílám na %1$s</string>
+    <string name="producer_status_sending_preparing">Připravuji…</string>
+    <string name="producer_status_sending_body">%1$d z %2$d · %3$s z %4$s</string>
+
+    <string name="producer_status_failed_title">Synchronizace nebyla dokončena</string>
+    <string name="producer_failure_unreachable">Nepodařilo se najít %1$s. Zkontrolujte, zda jsou oba telefony na stejné Wi-Fi a zda je na %1$s otevřený MediaSync.</string>
+    <string name="producer_failure_unreachable_internet">Nepodařilo se spojit s %1$s, přes Wi-Fi ani internet. Otevřete na něm MediaSync, nebo počkejte na jeho naplánovanou synchronizaci.</string>
+    <string name="producer_failure_connection_lost">Spojení s %1$s se přerušilo. Nic se neztratilo: příští synchronizace naváže tam, kde tato skončila.</string>
+    <string name="producer_failure_not_allowed">%1$s tento telefon už nepozná: byl tam odstraněn. Zrušte zde párování a pak je spárujte znovu.</string>
+    <string name="producer_receiving_phone_title">Přijímající telefon</string>
+    <string name="producer_unpair">Zrušit párování</string>
+    <string name="producer_unpair_title">Zrušit párování s %1$s?</string>
+    <string name="producer_unpair_body">Tento telefon přestane odesílat na %1$s. Pak ho můžete spárovat s jiným přijímajícím telefonem, nebo znovu s tímto. Fotky a videa, která už byla odeslána, zůstanou na %1$s.</string>
+    <string name="producer_cancel">Zrušit</string>
+    <string name="producer_failure_incompatible">%1$s má jinou verzi MediaSync. Aktualizujte aplikaci na obou telefonech.</string>
+
+    <string name="producer_missed_title">Synchronizace naplánovaná na %1$s neproběhla</string>
+    <string name="producer_missed_no_wifi">Tento telefon nebyl připojen k Wi-Fi. Zkusí to znovu při nabíjení.</string>
+    <string name="producer_missed_unreachable">%1$s nebyl na Wi-Fi nalezen. Tento telefon to zkusí znovu při nabíjení.</string>
+    <string name="producer_missed_connection_lost">Spojení s %1$s se přerušilo. Tento telefon to zkusí znovu při nabíjení a naváže tam, kde skončil.</string>
+    <string name="producer_missed_hot">Tento telefon byl příliš teplý. Zkusí to znovu, až vychladne.</string>
+    <string name="producer_missed_low_battery" formatted="false">Baterie byla pod 20 %. Tento telefon to zkusí znovu, až se nabije víc.</string>
+    <string name="producer_missed_battery_restricted">Android mohl MediaSync pozastavit, aby šetřil baterii. V nastavení MediaSync otevřete nastavení baterie a zvolte Bez omezení.</string>
+    <string name="producer_missed_unknown">Synchronizace běží, když se tento telefon nabíjí, takže ho nechte připojený, třeba přes noc. Pokud se nabíjel, mohl MediaSync zastavit spořič baterie: v nastavení baterie telefonu mu povolte běh na pozadí.</string>
+    <string name="producer_waiting_for_space_title">%1$s je plný</string>
+    <plurals name="producer_waiting_for_space_body">
+        <item quantity="one">%1$d fotka nebo video čeká. Odešle se, až bude místo na %2$s.</item>
+        <item quantity="few">%1$d fotky nebo videa čekají. Odešlou se, až bude místo na %2$s.</item>
+        <item quantity="many">%1$d fotek a videí čeká. Odešlou se, až bude místo na %2$s.</item>
+        <item quantity="other">%1$d fotek a videí čeká. Odešlou se, až bude místo na %2$s.</item>
+    </plurals>
+
+    <string name="producer_location_missing">Polohy nebudou součástí vašich fotek, dokud nepovolíte MediaSync je číst.</string>
+    <string name="producer_location_grant">Zachovat polohy</string>
+    <string name="producer_keep_open_hint">Synchronizovat teď dosáhne na %1$s, když je na něm otevřený MediaSync, nebo během jeho naplánované synchronizace.</string>
+    <string name="producer_next_sync">Příští synchronizace %1$s, při nabíjení.</string>
+    <string name="producer_sync_while_charging">Synchronizuje se vždy, když se tento telefon nabíjí a má nové fotky.</string>
+    <string name="producer_sync_manual">Synchronizuje se jen po klepnutí na Synchronizovat teď.</string>
+    <string name="producer_sources_title">Složky k odeslání</string>
+    <string name="producer_sources_change">Změnit</string>
+    <string name="producer_sources_none">Nic nevybráno</string>
+    <plurals name="producer_sources_more">
+        <item quantity="one">%1$s a %2$d další</item>
+        <item quantity="few">%1$s a %2$d další</item>
+        <item quantity="many">%1$s a %2$d dalších</item>
+        <item quantity="other">%1$s a %2$d dalších</item>
+    </plurals>
+    <string name="producer_status_no_folders_title">Nejsou vybrané složky</string>
+    <string name="producer_status_no_folders_body">Vyberte složky, které chcete odesílat na %1$s.</string>
+
+    <string name="producer_details_row_title">Podrobnosti fotek</string>
+    <string name="producer_details_title">Odesílané podrobnosti fotek</string>
+    <string name="producer_details_intro">Fotky a videa nesou údaje: kde byly pořízeny, kterým telefonem, popisky. Vyberte, co tento telefon odešle na %1$s.</string>
+    <string name="producer_details_intro_unpaired">Fotky a videa nesou údaje: kde byly pořízeny, kterým telefonem, popisky. Vyberte, co tento telefon odešle.</string>
+    <string name="producer_details_keep_all">Ponechat vše</string>
+    <string name="producer_details_keep_all_description">Fotky a videa dorazí přesně tak, jak jsou v tomto telefonu.</string>
+    <string name="producer_details_remove_location">Odebrat polohu</string>
+    <string name="producer_details_remove_location_description">Místa se odeberou: GPS, názvy míst a poloha videa. Vše ostatní zůstane.</string>
+    <string name="producer_details_remove_all">Odebrat všechny údaje</string>
+    <string name="producer_details_remove_all_description">Odeberou se poloha, fotoaparát, telefon, popisky, album a oblíbené. Datum, orientace a barvy zůstanou.</string>
+    <string name="producer_details_remove_all_note">Pohyblivé fotky a fotky Ultra HDR dorazí jako běžné fotky. RAW fotky se neodesílají: jejich údaje nelze odebrat.</string>
+    <string name="producer_details_scope">Platí pro fotky a videa odeslaná od teď. Ta, která už byla odeslána, si údaje ponechají.</string>
+    <plurals name="producer_withheld_title">
+        <item quantity="one">%d fotka nebo video se neodešle</item>
+        <item quantity="few">%d fotky nebo videa se neodešlou</item>
+        <item quantity="many">%d fotek a videí se neodešlou</item>
+        <item quantity="other">%d fotek a videí se neodešlou</item>
+    </plurals>
+    <string name="producer_withheld_body">MediaSync neumí odstranit údaje RAW fotek a některých dalších souborů. Vyberte jiné nastavení podrobností fotek, abyste je odeslali.</string>
+
+    <string name="producer_turbo_title">Přenos Turbo</string>
+    <string name="producer_turbo_suggestion_title">%1$s čeká: zkuste přenos Turbo</string>
+    <string name="producer_turbo_body">Odešle přímo na %1$s přes přímé Wi-Fi spojení, bez routeru. Rychlejší pro velké množství. Držte oba telefony blízko u sebe.</string>
+    <string name="producer_turbo_start">Spustit Turbo</string>
+    <string name="producer_turbo_battery_low">Baterie je slabá: připojte tento telefon k nabíječce, protože Turbo spotřebovává víc energie.</string>
+    <string name="producer_turbo_location_off">Nejdřív zapněte polohu: před Androidem 13 ji přímé Wi-Fi spojení vyžaduje. MediaSync vaši polohu nepoužívá.</string>
+    <string name="producer_turbo_location_settings">Nastavení polohy</string>
+    <string name="producer_turbo_declined">Turbo potřebuje povolení připojovat se k okolním zařízením (poloha, před Androidem 13). Povolte to v nastavení MediaSync.</string>
+    <string name="producer_turbo_setting_up_title">Nastavuji Turbo s %1$s…</string>
+    <string name="producer_turbo_setting_up_body">Přímo propojujeme oba telefony. Trvá to několik sekund.</string>
+    <string name="producer_turbo_sending_title">Odesílám na %1$s přes Turbo</string>
+    <string name="producer_internet_sending_title">Odesílám na %1$s přes internet</string>
+    <string name="producer_mobile_data_cap_title">Měsíční limit mobilních dat</string>
+    <string name="producer_mobile_data_cap_none">Bez limitu · tento měsíc využito %1$s</string>
+    <string name="producer_mobile_data_cap_used">Tento měsíc využito %1$s z %2$s</string>
+    <string name="producer_mobile_data_cap_reached">Využito %1$s: do příštího měsíce synchronizace čekají na Wi-Fi</string>
+    <string name="producer_mobile_data_cap_option">%1$s měsíčně</string>
+    <string name="producer_mobile_data_cap_option_none">Bez limitu</string>
+    <string name="producer_mobile_data_cap_cancel">Zrušit</string>
+    <string name="producer_relay_videos_title">Odesílat videa přes relé</string>
+    <string name="producer_relay_videos_body">Když se telefony nemohou připojit přímo, odesílané přenáší relé Cloudflare. Vypnuto: videa čekají na Wi-Fi nebo přímé spojení, aby se ušetřil bezplatný limit.</string>
+    <plurals name="producer_held_back_title">
+        <item quantity="one">%1$d video čeká na Wi-Fi</item>
+        <item quantity="few">%1$d videa čekají na Wi-Fi</item>
+        <item quantity="many">%1$d videí čeká na Wi-Fi</item>
+        <item quantity="other">%1$d videí čeká na Wi-Fi</item>
+    </plurals>
+    <string name="producer_held_back_body">Přes relé šly jen fotky, aby se ušetřil bezplatný limit. Videa jdou přes Wi-Fi nebo přímé spojení, nebo zapněte Odesílat videa přes relé.</string>
+    <string name="producer_mobile_data_title">Synchronizace přes mobilní data</string>
+    <string name="producer_mobile_data_body">Mimo Wi-Fi jdou fotky a videa na %1$s přes internet. Vypnuto: jen přes Wi-Fi sítě, aby se ušetřil váš datový tarif.</string>
+    <string name="producer_failure_turbo_unreachable">%1$s nebyl nalezen, ani na této Wi-Fi, ani přímo. Na %1$s otevřete MediaSync a klepněte na Příjem Turbo, pak to zkuste znovu zde.</string>
+    <string name="producer_failure_turbo_not_set_up">%1$s není na této Wi-Fi. Aby fungovalo Turbo mimo sdílenou Wi-Fi, musí se oba telefony nejdřív jednou synchronizovat na stejné Wi-Fi.</string>
+    <string name="producer_turbo_problem_title">Turbo se nepoužilo</string>
+    <string name="producer_turbo_problem_unsupported">%1$s neumí přenos Turbo: nemá Wi-Fi Direct. Vše místo toho šlo přes Wi-Fi.</string>
+    <string name="producer_turbo_problem_not_allowed">Turbo potřebuje váš souhlas na %1$s: otevřete tam MediaSync a povolte mu připojování k okolním zařízením. Pak to zkuste znovu. Mezitím vše šlo přes Wi-Fi.</string>
+    <string name="producer_turbo_problem_no_link">Přímé spojení s %1$s se nepodařilo, takže vše šlo přes Wi-Fi. Držte telefony blízko u sebe a zkuste to znovu.</string>
+    <string name="producer_turbo_problem_dropped">Přímé spojení s %1$s se přerušilo, takže zbytek šel přes Wi-Fi.</string>
+
+    <string name="producer_folders_title">Složky k odeslání</string>
+    <string name="producer_folders_done">Hotovo</string>
+    <string name="producer_folders_intro">Fotky a videa v těchto složkách se odesílají do vašeho přijímajícího telefonu. Vypnutí složky neodstraní to, co už přijal.</string>
+    <string name="producer_folders_preset_camera">Jen fotoaparát</string>
+    <string name="producer_folders_preset_camera_screenshots">Fotoaparát + snímky obrazovky</string>
+    <string name="producer_folders_preset_everything">Všechny složky</string>
+    <string name="producer_folders_hint_preset">Odpovídající složky přidané později se zahrnou automaticky.</string>
+    <string name="producer_folders_hint_chosen">Odesílají se jen složky, které zaškrtnete.</string>
+    <string name="producer_folders_empty">Na tomto telefonu zatím nejsou žádné fotky ani videa.</string>
+    <plurals name="producer_folders_items">
+        <item quantity="one">%1$s položka</item>
+        <item quantity="few">%1$s položky</item>
+        <item quantity="many">%1$s položek</item>
+        <item quantity="other">%1$s položky</item>
+    </plurals>
+    <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+</resources>

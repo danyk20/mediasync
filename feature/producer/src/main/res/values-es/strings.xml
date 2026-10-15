@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="producer_home_title">Este teléfono envía</string>
+    <string name="producer_status_not_paired_title">Aún no emparejado</string>
+    <string name="producer_status_not_paired_body">En tu teléfono que recibe, abre MediaSync y toca Añadir teléfono que envía. Luego escanea el código que muestra.</string>
+    <string name="producer_pair">Emparejar con teléfono que recibe</string>
+
+    <string name="producer_access_title">Permite el acceso a las fotos</string>
+    <string name="producer_access_body">MediaSync envía tus fotos y vídeos a %1$s. Necesita acceso a todos ellos, y a los lugares donde se tomaron para que las ubicaciones se mantengan en tu copia.</string>
+    <string name="producer_access_grant">Permitir acceso</string>
+    <string name="producer_access_settings">Abrir ajustes</string>
+
+    <string name="producer_sync_now">Sincronizar ahora</string>
+    <string name="producer_stop">Detener</string>
+    <string name="producer_status_checking_title">Buscando fotos nuevas…</string>
+    <string name="producer_status_checking_body">Comparando con lo que %1$s ya tiene.</string>
+    <string name="producer_status_up_to_date_title">Al día</string>
+    <string name="producer_status_up_to_date_body">%1$s tiene todas tus fotos y vídeos.</string>
+    <string name="producer_last_sync">Última sincronización %1$s</string>
+    <plurals name="producer_status_pending_title">
+        <item quantity="one">%d foto o vídeo nuevo</item>
+        <item quantity="many">%d fotos y vídeos nuevos</item>
+        <item quantity="other">%d fotos y vídeos nuevos</item>
+    </plurals>
+    <plurals name="producer_status_pending_body">
+        <item quantity="one">Toca Sincronizar ahora para enviarlo a %1$s.</item>
+        <item quantity="many">Toca Sincronizar ahora para enviarlos a %1$s.</item>
+        <item quantity="other">Toca Sincronizar ahora para enviarlos a %1$s.</item>
+    </plurals>
+    <string name="producer_status_connecting_title">Buscando %1$s…</string>
+    <string name="producer_status_connecting_body">Ambos teléfonos deben estar en la misma Wi-Fi, con MediaSync abierta.</string>
+    <string name="producer_status_sending_title">Enviando a %1$s</string>
+    <string name="producer_status_sending_preparing">Preparando…</string>
+    <string name="producer_status_sending_body">%1$d de %2$d · %3$s de %4$s</string>
+
+    <string name="producer_status_failed_title">La sincronización no terminó</string>
+    <string name="producer_failure_unreachable">No se encontró %1$s. Comprueba que ambos teléfonos estén en la misma Wi-Fi y que MediaSync esté abierta en él.</string>
+    <string name="producer_failure_unreachable_internet">No se pudo contactar con %1$s, por Wi-Fi o internet. Abre MediaSync en él, o espera a su sincronización programada.</string>
+    <string name="producer_failure_connection_lost">Se perdió la conexión con %1$s. No se pierde nada: la próxima sincronización continúa donde se detuvo esta.</string>
+    <string name="producer_failure_not_allowed">%1$s ya no reconoce este teléfono: se eliminó allí. Desempareja aquí y luego vuelve a emparejarlos.</string>
+    <string name="producer_receiving_phone_title">Teléfono que recibe</string>
+    <string name="producer_unpair">Desemparejar</string>
+    <string name="producer_unpair_title">¿Desemparejar %1$s?</string>
+    <string name="producer_unpair_body">Este teléfono deja de enviar a %1$s. Después puedes emparejarlo con otro teléfono que reciba, o con este de nuevo. Las fotos y los vídeos ya enviados se quedan en %1$s.</string>
+    <string name="producer_cancel">Cancelar</string>
+    <string name="producer_failure_incompatible">%1$s tiene una versión distinta de MediaSync. Actualiza la app en ambos teléfonos.</string>
+
+    <string name="producer_missed_title">No se ejecutó la sincronización prevista para %1$s</string>
+    <string name="producer_missed_no_wifi">Este teléfono no estaba en Wi-Fi. Lo vuelve a intentar mientras carga.</string>
+    <string name="producer_missed_unreachable">No se encontró %1$s en la Wi-Fi. Este teléfono lo vuelve a intentar mientras carga.</string>
+    <string name="producer_missed_connection_lost">Se perdió la conexión con %1$s. Este teléfono lo vuelve a intentar mientras carga y continúa donde se detuvo.</string>
+    <string name="producer_missed_hot">Este teléfono estaba demasiado caliente. Lo vuelve a intentar cuando se haya enfriado.</string>
+    <string name="producer_missed_low_battery" formatted="false">La batería estaba por debajo del 20 %. Este teléfono lo vuelve a intentar cuando tenga más carga.</string>
+    <string name="producer_missed_battery_restricted">Android pudo pausar MediaSync para ahorrar batería. En los ajustes de MediaSync, abre los ajustes de batería y elige Sin restricciones.</string>
+    <string name="producer_missed_unknown">Las sincronizaciones se ejecutan mientras este teléfono carga, así que déjalo enchufado, por ejemplo toda la noche. Si estaba cargando, el ahorro de batería del teléfono puede haber detenido MediaSync: permite que se ejecute en segundo plano en los ajustes de batería del teléfono.</string>
+    <string name="producer_waiting_for_space_title">%1$s está lleno</string>
+    <plurals name="producer_waiting_for_space_body">
+        <item quantity="one">%1$d foto o vídeo en espera. Se envía cuando haya espacio en %2$s.</item>
+        <item quantity="many">%1$d fotos y vídeos en espera. Se envían cuando haya espacio en %2$s.</item>
+        <item quantity="other">%1$d fotos y vídeos en espera. Se envían cuando haya espacio en %2$s.</item>
+    </plurals>
+
+    <string name="producer_location_missing">Las ubicaciones no se incluirán en tus fotos hasta que permitas que MediaSync las lea.</string>
+    <string name="producer_location_grant">Mantener ubicaciones</string>
+    <string name="producer_keep_open_hint">Sincronizar ahora llega a %1$s mientras MediaSync esté abierta en él, o durante su sincronización programada.</string>
+    <string name="producer_next_sync">Próxima sincronización %1$s, mientras esté cargando.</string>
+    <string name="producer_sync_while_charging">Se sincroniza siempre que este teléfono esté cargando y tenga fotos nuevas.</string>
+    <string name="producer_sync_manual">Se sincroniza solo cuando toques Sincronizar ahora.</string>
+    <string name="producer_sources_title">Carpetas para enviar</string>
+    <string name="producer_sources_change">Cambiar</string>
+    <string name="producer_sources_none">Ninguna elegida</string>
+    <plurals name="producer_sources_more">
+        <item quantity="one">%1$s y %2$d más</item>
+        <item quantity="many">%1$s y %2$d más</item>
+        <item quantity="other">%1$s y %2$d más</item>
+    </plurals>
+    <string name="producer_status_no_folders_title">No hay carpetas elegidas</string>
+    <string name="producer_status_no_folders_body">Elige qué carpetas enviar a %1$s.</string>
+
+    <string name="producer_details_row_title">Detalles de las fotos</string>
+    <string name="producer_details_title">Detalles de fotos enviados</string>
+    <string name="producer_details_intro">Las fotos y los vídeos llevan detalles: dónde se tomaron, qué teléfono los tomó, pies de foto. Elige qué envía este teléfono a %1$s.</string>
+    <string name="producer_details_intro_unpaired">Las fotos y los vídeos llevan detalles: dónde se tomaron, qué teléfono los tomó, pies de foto. Elige qué envía este teléfono.</string>
+    <string name="producer_details_keep_all">Mantener todo</string>
+    <string name="producer_details_keep_all_description">Las fotos y los vídeos llegan exactamente como están en este teléfono.</string>
+    <string name="producer_details_remove_location">Quitar ubicación</string>
+    <string name="producer_details_remove_location_description">Se quitan los lugares: GPS, nombres de lugares y ubicación de los vídeos. Lo demás se mantiene.</string>
+    <string name="producer_details_remove_all">Quitar todos los detalles</string>
+    <string name="producer_details_remove_all_description">Se quitan la ubicación, la cámara, el teléfono, los pies de foto, el álbum y el favorito. Se mantienen la fecha, la orientación y los colores.</string>
+    <string name="producer_details_remove_all_note">Las fotos en movimiento y las fotos Ultra HDR llegan como fotos normales. Las fotos RAW no se envían: sus detalles no se pueden quitar.</string>
+    <string name="producer_details_scope">Se aplica a las fotos y vídeos que se envíen a partir de ahora. Los que ya se enviaron conservan sus detalles.</string>
+    <plurals name="producer_withheld_title">
+        <item quantity="one">%d foto o vídeo no se envía</item>
+        <item quantity="many">%d fotos y vídeos no se envían</item>
+        <item quantity="other">%d fotos y vídeos no se envían</item>
+    </plurals>
+    <string name="producer_withheld_body">MediaSync no puede quitar los detalles de las fotos RAW ni de algunos otros archivos. Elige otro ajuste de Detalles de las fotos para enviarlos.</string>
+
+    <string name="producer_turbo_title">Turbo</string>
+    <string name="producer_turbo_suggestion_title">%1$s en espera: prueba Turbo</string>
+    <string name="producer_turbo_body">Envía directamente a %1$s por un enlace Wi-Fi directo, sin el router. Más rápido para grandes acumulados. Mantén los dos teléfonos juntos.</string>
+    <string name="producer_turbo_start">Iniciar Turbo</string>
+    <string name="producer_turbo_battery_low">La batería está baja: conecta este teléfono, porque Turbo gasta más energía.</string>
+    <string name="producer_turbo_location_off">Activa primero la ubicación: antes de Android 13, los enlaces Wi-Fi directos la necesitan. MediaSync no usa tu ubicación.</string>
+    <string name="producer_turbo_location_settings">Ajustes de ubicación</string>
+    <string name="producer_turbo_declined">Turbo necesita permiso para conectarse a dispositivos cercanos (ubicación, antes de Android 13). Permítelo en los ajustes de MediaSync.</string>
+    <string name="producer_turbo_setting_up_title">Configurando Turbo con %1$s…</string>
+    <string name="producer_turbo_setting_up_body">Uniendo los dos teléfonos directamente. Tarda unos segundos.</string>
+    <string name="producer_turbo_sending_title">Enviando a %1$s por Turbo</string>
+    <string name="producer_internet_sending_title">Enviando a %1$s por internet</string>
+    <string name="producer_mobile_data_cap_title">Límite mensual de datos móviles</string>
+    <string name="producer_mobile_data_cap_none">Sin límite · %1$s usados este mes</string>
+    <string name="producer_mobile_data_cap_used">%1$s de %2$s usados este mes</string>
+    <string name="producer_mobile_data_cap_reached">%1$s usados: hasta el próximo mes, las sincronizaciones esperan a la Wi-Fi</string>
+    <string name="producer_mobile_data_cap_option">%1$s al mes</string>
+    <string name="producer_mobile_data_cap_option_none">Sin límite</string>
+    <string name="producer_mobile_data_cap_cancel">Cancelar</string>
+    <string name="producer_relay_videos_title">Enviar vídeos por el relay</string>
+    <string name="producer_relay_videos_body">Cuando los teléfonos no pueden conectarse directamente, el relay de Cloudflare transporta lo que se envía. Desactivado: los vídeos esperan a la Wi-Fi o a una conexión directa, para no gastar la cuota gratuita.</string>
+    <plurals name="producer_held_back_title">
+        <item quantity="one">%1$d vídeo espera a la Wi-Fi</item>
+        <item quantity="many">%1$d vídeos esperan a la Wi-Fi</item>
+        <item quantity="other">%1$d vídeos esperan a la Wi-Fi</item>
+    </plurals>
+    <string name="producer_held_back_body">Por el relay, solo se enviaron fotos, para no gastar su cuota gratuita. Los vídeos se envían por Wi-Fi o por una conexión directa, o activa Enviar vídeos por el relay.</string>
+    <string name="producer_mobile_data_title">Sincronizar con datos móviles</string>
+    <string name="producer_mobile_data_body">Fuera de la Wi-Fi, las fotos y los vídeos se envían a %1$s por internet. Desactivado: solo por redes Wi-Fi, para no gastar tu plan de datos.</string>
+    <string name="producer_failure_turbo_unreachable">No se encontró %1$s, ni en esta Wi-Fi ni directamente. En %1$s, abre MediaSync y toca Recepción Turbo, y vuelve a intentarlo aquí.</string>
+    <string name="producer_failure_turbo_not_set_up">%1$s no está en esta Wi-Fi. Para Turbo fuera de una Wi-Fi compartida, los dos teléfonos deben sincronizar una vez en la misma Wi-Fi primero.</string>
+    <string name="producer_turbo_problem_title">No se usó Turbo</string>
+    <string name="producer_turbo_problem_unsupported">%1$s no puede usar Turbo: no tiene Wi-Fi Direct. Todo se envió por Wi-Fi.</string>
+    <string name="producer_turbo_problem_not_allowed">Turbo necesita tu permiso en %1$s: abre MediaSync allí y permite que se conecte a dispositivos cercanos. Luego inténtalo de nuevo. Mientras tanto, todo se envió por Wi-Fi.</string>
+    <string name="producer_turbo_problem_no_link">El enlace directo con %1$s no se conectó, así que todo se envió por Wi-Fi. Mantén los teléfonos juntos e inténtalo de nuevo.</string>
+    <string name="producer_turbo_problem_dropped">Se cortó el enlace directo con %1$s, así que el resto se envió por Wi-Fi.</string>
+
+    <string name="producer_folders_title">Carpetas para enviar</string>
+    <string name="producer_folders_done">Listo</string>
+    <string name="producer_folders_intro">Las fotos y los vídeos de estas carpetas se envían a tu teléfono que recibe. Desactivar una carpeta no quita lo que ya recibió.</string>
+    <string name="producer_folders_preset_camera">Solo cámara</string>
+    <string name="producer_folders_preset_camera_screenshots">Cámara + capturas</string>
+    <string name="producer_folders_preset_everything">Todas las carpetas</string>
+    <string name="producer_folders_hint_preset">Las carpetas coincidentes que se añadan después se incluyen automáticamente.</string>
+    <string name="producer_folders_hint_chosen">Solo se envían las carpetas que marques.</string>
+    <string name="producer_folders_empty">Aún no hay fotos ni vídeos en este teléfono.</string>
+    <plurals name="producer_folders_items">
+        <item quantity="one">%1$s elemento</item>
+        <item quantity="many">%1$s elementos</item>
+        <item quantity="other">%1$s elementos</item>
+    </plurals>
+    <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+</resources>

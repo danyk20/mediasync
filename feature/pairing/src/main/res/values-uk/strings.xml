@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Закрити</string>
+    <string name="pairing_done">Готово</string>
+    <string name="pairing_try_again">Спробувати знову</string>
+
+    <string name="pairing_consumer_title">Додати телефон-відправник</string>
+    <string name="pairing_consumer_instructions">На телефоні, який надсилатиме фото, відкрийте MediaSync і відскануйте цей код.</string>
+    <string name="pairing_qr_description">Код спарювання</string>
+    <string name="pairing_consumer_validity">Код працює один раз, 5 хвилин. Обидва телефони мають бути в одній мережі Wi-Fi.</string>
+    <string name="pairing_share_link">Надіслати посилання для спарювання</string>
+    <string name="pairing_share_chooser">Надіслати посилання для спарювання на інший телефон</string>
+    <string name="pairing_no_network_title">Підключіться до Wi-Fi</string>
+    <string name="pairing_no_network_body">Щоб показати код спарювання, цей телефон має бути підключений до Wi-Fi.</string>
+    <string name="pairing_approve_title">Дозволити %1$s?</string>
+    <string name="pairing_approve_body">Він зможе надсилати на цей телефон свої фото й відео.</string>
+    <string name="pairing_approve_allow">Дозволити</string>
+    <string name="pairing_approve_deny">Не дозволяти</string>
+    <string name="pairing_paired_title">Спаровано з %1$s</string>
+    <string name="pairing_paired_consumer_body">Його фото й відео надходитимуть сюди.</string>
+
+    <string name="pairing_producer_title">Спарювання з телефоном-приймачем</string>
+    <string name="pairing_producer_instructions">На телефоні-приймачі відкрийте MediaSync, натисніть «Додати телефон-відправник» і наведіть камеру на код.</string>
+    <string name="pairing_camera_needed">Дозвольте доступ до камери для сканування коду або вставте посилання для спарювання.</string>
+    <string name="pairing_paste_link">Вставити посилання для спарювання</string>
+    <string name="pairing_not_a_code">Це не код спарювання MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Натисніть «Дозволити» на %1$s, щоб завершити спарювання.</string>
+    <string name="pairing_paired_producer_body">Тепер ви можете надсилати на нього свої фото й відео.</string>
+    <string name="pairing_confirm_title">Спарити з %1$s?</string>
+    <string name="pairing_confirm_body">Продовжуйте, лише якщо %1$s — ваш власний телефон-приймач: цей телефон надсилатиме на нього свої фото й відео.</string>
+    <string name="pairing_confirm_pair">Спарити</string>
+    <string name="pairing_confirm_cancel">Скасувати</string>
+    <string name="pairing_failed_title">Не спаровано</string>
+    <string name="pairing_problem_declined">Телефон-приймач не дозволив цей телефон.</string>
+    <string name="pairing_problem_expired">Код минув або вже використаний. Покажіть новий код на телефоні-приймачі.</string>
+    <string name="pairing_problem_no_answer">На телефоні-приймачі вчасно ніхто не натиснув «Дозволити».</string>
+    <string name="pairing_problem_unreachable">Не вдалося зв’язатися з телефоном-приймачем. Перевірте, чи обидва телефони в одній мережі Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">З’єднання розірвано. Спробуйте ще раз.</string>
+    <string name="pairing_problem_incompatible">На телефонах різні версії MediaSync. Оновіть застосунок на обох.</string>
+</resources>

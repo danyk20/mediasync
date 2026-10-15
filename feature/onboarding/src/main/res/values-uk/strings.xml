@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Ласкаво просимо до MediaSync</string>
+    <string name="onboarding_subtitle">Швидко й приватно переносьте фото й відео з ваших телефонів в одне місце.</string>
+    <string name="onboarding_question">Як ви використовуватимете цей телефон?</string>
+    <string name="onboarding_role_producer_title">Цей телефон надсилає</string>
+    <string name="onboarding_role_producer_description">Надсилає свої фото й відео на ваш телефон-приймач.</string>
+    <string name="onboarding_role_consumer_title">Цей телефон отримує</string>
+    <string name="onboarding_role_consumer_description">Збирає фото й відео з ваших інших телефонів. Google Photos на ньому може створювати їхні резервні копії.</string>
+    <string name="onboarding_how_title">Як це працює</string>
+    <string name="onboarding_how_receive">Виберіть один телефон для прийому. Найкраще підходить телефон, що лежить удома на зарядці, наприклад старий Pixel.</string>
+    <string name="onboarding_how_pair">Один раз спарте кожен телефон-відправник із ним, відсканувавши код.</string>
+    <string name="onboarding_how_sync">Нові фото й відео передаються щоночі, поки телефони заряджаються, або одразу, коли натиснути «Синхронізувати зараз». Вони йдуть напряму з телефона на телефон, у зашифрованому вигляді, без облікового запису.</string>
+    <string name="onboarding_change_later">Щоб згодом змінити роль цього телефона, виберіть «Скинути MediaSync» у меню ⋮.</string>
+</resources>

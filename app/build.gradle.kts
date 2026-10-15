@@ -56,7 +56,18 @@ android {
         }
     }
 
+    // The languages MediaSync is translated into (docs/TRANSLATING.md). Android 13+ lists them under the app's own
+    // language setting; other languages that libraries bring are left out.
+    androidResources {
+        generateLocaleConfig = true
+        localeFilters += listOf("en", "cs", "de", "es", "fr", "it", "pt-rBR", "ru", "sk", "uk", "en-rXA", "ar-rXB")
+    }
+
     buildTypes {
+        // Pseudo-locales (en-XA: longer, accented; ar-XB: right to left) to check layouts without translations.
+        debug {
+            isPseudoLocalesEnabled = true
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

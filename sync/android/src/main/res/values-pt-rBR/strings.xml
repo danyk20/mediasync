@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_notification_channel">Sincronização em segundo plano</string>
+    <string name="relay_channel">Franquia do relay de internet</string>
+    <string name="relay_high_title" formatted="false">80% da franquia do relay usada</string>
+    <string name="relay_high_text">A sincronização pela internet usou %1$s GB dos %2$s GB que o relay da Cloudflare transporta de graça este mês. Wi-Fi e conexões diretas não contam.</string>
+    <string name="relay_nearly_used_up_title">A franquia do relay está quase no fim</string>
+    <string name="relay_nearly_used_up_text">A sincronização pela internet para de usar o relay em %1$s GB este mês, para continuar gratuita. Telefones que conseguem se conectar diretamente, e o Wi-Fi, continuam sincronizando.</string>
+    <string name="relay_used_up_title">A franquia do relay acabou</string>
+    <string name="relay_used_up_text">Até ela recomeçar no próximo mês, os telefones que não conseguem se conectar diretamente sincronizam somente pelo Wi-Fi.</string>
+    <string name="sync_notification_sending">Enviando fotos e vídeos</string>
+    <string name="sync_notification_sending_to">Enviando para %1$s</string>
+    <string name="sync_notification_ready">Pronto para receber fotos e vídeos</string>
+    <string name="sync_notification_receiving">Recebendo fotos e vídeos</string>
+    <string name="sync_notification_receiving_from">Recebendo de %1$s</string>
+    <string name="sync_notification_progress">%1$d de %2$d</string>
+    <plurals name="sync_notification_sent">
+        <item quantity="one">%d foto ou vídeo enviado</item>
+        <item quantity="many">%d fotos e vídeos enviados</item>
+        <item quantity="other">%d fotos e vídeos enviados</item>
+    </plurals>
+    <string name="sync_notification_sent_to">Estão a salvo no %1$s.</string>
+</resources>

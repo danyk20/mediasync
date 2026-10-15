@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_notification_channel">Синхронізація у фоні</string>
+    <string name="relay_channel">Ліміт ретрансляції через інтернет</string>
+    <string name="relay_high_title" formatted="false">Використано 80 % ліміту ретрансляції</string>
+    <string name="relay_high_text">Синхронізація через інтернет використала %1$s ГБ з %2$s ГБ, які ретрансляція Cloudflare передає безкоштовно цього місяця. Wi-Fi і прямі підключення не враховуються.</string>
+    <string name="relay_nearly_used_up_title">Ліміт ретрансляції майже вичерпано</string>
+    <string name="relay_nearly_used_up_text">Синхронізація через інтернет перестане використовувати ретрансляцію при %1$s ГБ цього місяця, щоб вона залишалася безкоштовною. Телефони, які можуть з’єднатися напряму, та Wi-Fi і далі синхронізуються.</string>
+    <string name="relay_used_up_title">Ліміт ретрансляції вичерпано</string>
+    <string name="relay_used_up_text">До наступного місяця, коли ліміт скинеться, телефони, які не можуть з’єднатися напряму, синхронізуються лише через Wi-Fi.</string>
+    <string name="sync_notification_sending">Надсилання фото й відео</string>
+    <string name="sync_notification_sending_to">Надсилання на %1$s</string>
+    <string name="sync_notification_ready">Готово до прийому фото й відео</string>
+    <string name="sync_notification_receiving">Прийом фото й відео</string>
+    <string name="sync_notification_receiving_from">Прийом від %1$s</string>
+    <string name="sync_notification_progress">%1$d з %2$d</string>
+    <plurals name="sync_notification_sent">
+        <item quantity="one">Надіслано: %d</item>
+        <item quantity="few">Надіслано: %d</item>
+        <item quantity="many">Надіслано: %d</item>
+        <item quantity="other">Надіслано: %d</item>
+    </plurals>
+    <string name="sync_notification_sent_to">Їх збережено на %1$s.</string>
+</resources>

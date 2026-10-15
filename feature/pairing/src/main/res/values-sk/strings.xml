@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Zavrieť</string>
+    <string name="pairing_done">Hotovo</string>
+    <string name="pairing_try_again">Skúsiť znova</string>
+
+    <string name="pairing_consumer_title">Pridať odosielajúci telefón</string>
+    <string name="pairing_consumer_instructions">Na telefóne, ktorý bude odosielať fotky, otvorte MediaSync a naskenujte tento kód.</string>
+    <string name="pairing_qr_description">Párovací kód</string>
+    <string name="pairing_consumer_validity">Kód platí raz, 5 minút. Oba telefóny musia byť na rovnakej Wi-Fi.</string>
+    <string name="pairing_share_link">Zdieľať odkaz na párovanie</string>
+    <string name="pairing_share_chooser">Odoslať odkaz na párovanie do druhého telefónu</string>
+    <string name="pairing_no_network_title">Pripojte sa na Wi-Fi</string>
+    <string name="pairing_no_network_body">Tento telefón musí byť pripojený na Wi-Fi, aby mohol zobraziť párovací kód.</string>
+    <string name="pairing_approve_title">Povoliť %1$s?</string>
+    <string name="pairing_approve_body">Bude môcť odosielať svoje fotky a videá do tohto telefónu.</string>
+    <string name="pairing_approve_allow">Povoliť</string>
+    <string name="pairing_approve_deny">Nepovoliť</string>
+    <string name="pairing_paired_title">Spárované s %1$s</string>
+    <string name="pairing_paired_consumer_body">Jeho fotky a videá sem dorazia.</string>
+
+    <string name="pairing_producer_title">Spárovať s prijímajúcim telefónom</string>
+    <string name="pairing_producer_instructions">Na prijímajúcom telefóne otvorte MediaSync, klepnite na Pridať odosielajúci telefón a namierte na kód tento fotoaparát.</string>
+    <string name="pairing_camera_needed">Povoľte fotoaparát na skenovanie kódu, alebo namiesto toho vložte odkaz na párovanie.</string>
+    <string name="pairing_paste_link">Vložiť odkaz na párovanie</string>
+    <string name="pairing_not_a_code">Toto nie je párovací kód MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Klepnutím na Povoliť na %1$s dokončite párovanie.</string>
+    <string name="pairing_paired_producer_body">Teraz doň môžete odosielať svoje fotky a videá.</string>
+    <string name="pairing_confirm_title">Spárovať s %1$s?</string>
+    <string name="pairing_confirm_body">Pokračujte, len ak je %1$s váš vlastný prijímajúci telefón: tento telefón doň bude odosielať svoje fotky a videá.</string>
+    <string name="pairing_confirm_pair">Spárovať</string>
+    <string name="pairing_confirm_cancel">Zrušiť</string>
+    <string name="pairing_failed_title">Nespárované</string>
+    <string name="pairing_problem_declined">Prijímajúci telefón tento telefón nepovolil.</string>
+    <string name="pairing_problem_expired">Tento kód vypršal alebo už bol použitý. Na prijímajúcom telefóne zobrazte nový.</string>
+    <string name="pairing_problem_no_answer">Na prijímajúcom telefóne včas nikto neklepol na Povoliť.</string>
+    <string name="pairing_problem_unreachable">Nepodarilo sa spojiť s prijímajúcim telefónom. Skontrolujte, či sú oba telefóny na rovnakej Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">Spojenie sa prerušilo. Skúste to prosím znova.</string>
+    <string name="pairing_problem_incompatible">Telefóny majú rôzne verzie MediaSync. Aktualizujte aplikáciu na oboch.</string>
+</resources>

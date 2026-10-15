@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_target_label">MediaSync</string>
+    <string name="share_preparing">Підготовка… %1$d/%2$d</string>
+    <plurals name="share_sending">
+        <item quantity="one">Зараз надсилається %1$d фото або відео на %2$s.</item>
+        <item quantity="few">Зараз надсилаються %1$d фото або відео на %2$s.</item>
+        <item quantity="many">Зараз надсилаються %1$d фото та відео на %2$s.</item>
+        <item quantity="other">Зараз надсилаються %1$d фото та відео на %2$s.</item>
+    </plurals>
+    <string name="share_unreachable_note">Якщо зв’язатися з ним зараз не вдасться, вони надійдуть при наступній синхронізації.</string>
+    <plurals name="share_unreadable">
+        <item quantity="one">Не вдалося прочитати %1$d, тож його не надіслано.</item>
+        <item quantity="few">Не вдалося прочитати %1$d, тож їх не надіслано.</item>
+        <item quantity="many">Не вдалося прочитати %1$d, тож їх не надіслано.</item>
+        <item quantity="other">Не вдалося прочитати %1$d, тож їх не надіслано.</item>
+    </plurals>
+    <string name="share_nothing">Тут нічого надіслати.</string>
+    <string name="share_receiving_phone">ваш телефон-приймач</string>
+    <string name="share_ok">OK</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Добро пожаловать в MediaSync</string>
+    <string name="onboarding_subtitle">Быстро и приватно переносите фото и видео с ваших телефонов в одно место.</string>
+    <string name="onboarding_question">Как вы будете использовать этот телефон?</string>
+    <string name="onboarding_role_producer_title">Этот телефон отправляет</string>
+    <string name="onboarding_role_producer_description">Отправляет свои фото и видео на ваш принимающий телефон.</string>
+    <string name="onboarding_role_consumer_title">Этот телефон получает</string>
+    <string name="onboarding_role_consumer_description">Собирает фото и видео с ваших других телефонов. Google Photos на нём может создавать их резервные копии.</string>
+    <string name="onboarding_how_title">Как это работает</string>
+    <string name="onboarding_how_receive">Выберите один телефон для приёма. Лучше всего подходит телефон, который лежит дома на зарядке, например старый Pixel.</string>
+    <string name="onboarding_how_pair">Один раз сопрягите каждый отправляющий телефон с ним, отсканировав код.</string>
+    <string name="onboarding_how_sync">Новые фото и видео передаются каждую ночь, пока телефоны заряжаются, или сразу по кнопке «Синхронизировать сейчас». Они идут напрямую с телефона на телефон, в зашифрованном виде, без аккаунта.</string>
+    <string name="onboarding_change_later">Чтобы позже сменить роль этого телефона, выберите «Сбросить MediaSync» в меню ⋮.</string>
+</resources>

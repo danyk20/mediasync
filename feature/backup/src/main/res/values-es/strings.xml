@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Copia de seguridad en la nube</string>
+    <string name="backup_done">Listo</string>
+    <string name="backup_intro">Todo lo que recibe este teléfono se guarda en su carpeta de MediaSync. Una app de copia de seguridad de este teléfono puede subirlo desde ahí.</string>
+    <string name="backup_none">Esta versión de MediaSync no tiene ninguna copia de seguridad que configurar.</string>
+
+    <string name="backup_setup_title">Hacer copia con %1$s</string>
+    <string name="backup_setup_body">%1$s hace la copia de seguridad de la carpeta de MediaSync por su cuenta. En Pixel 2 a 5 es gratis e ilimitada con el Ahorro de almacenamiento. MediaSync no sube nada por sí mismo.</string>
+    <string name="backup_not_installed">%1$s no está instalada en este teléfono.</string>
+    <string name="backup_install">Instalar %1$s</string>
+    <string name="backup_steps_heading">Configúralo una vez en %1$s:</string>
+    <string name="backup_step_folder">Activa la copia de seguridad de la carpeta %1$s: toca tu foto de perfil y luego Configuración de Fotos → Copia de seguridad → Copia de seguridad de carpetas del dispositivo. La carpeta aparece en la lista cuando llega la primera foto.</string>
+    <string name="backup_step_storage_saver">Elige Ahorro de almacenamiento: Configuración de Fotos → Copia de seguridad → Calidad de la copia de seguridad. En Pixel 2 a 5 no usa tu almacenamiento de Google.</string>
+    <string name="backup_open_app">Abrir %1$s</string>
+    <string name="backup_set_up_done">Ya está configurado</string>
+
+    <string name="backup_status_title">Copia hecha por la app %1$s</string>
+    <string name="backup_status_today">%1$s entregó hoy</string>
+    <string name="backup_status_handed_over">%1$s en este teléfono, para que %2$s haga la copia de seguridad</string>
+    <string name="backup_status_removed">%1$s hizo la copia y la borró de este teléfono</string>
+    <string name="backup_status_waiting">%1$s recibidas, aún no entregadas</string>
+    <string name="backup_status_note">%1$s hace las copias por su cuenta, normalmente en unos minutos con Wi-Fi. MediaSync no puede ver cuándo termina. Cuando %1$s las borra para liberar espacio, se cuentan como copiadas.</string>
+
+    <string name="backup_free_up_title">Liberar espacio</string>
+    <string name="backup_free_up_app">En %1$s, toca tu foto de perfil y luego Liberar espacio. Solo borra lo que ya tiene copia de seguridad.</string>
+    <string name="backup_free_up_open">Abrir %1$s</string>
+    <string name="backup_free_up_smart_storage">O deja que el teléfono lo haga: Almacenamiento inteligente, en los ajustes de almacenamiento, borra las fotos y los vídeos con copia cuando queda poco espacio.</string>
+    <string name="backup_free_up_storage_settings">Ajustes de almacenamiento</string>
+    <string name="backup_never_deletes">MediaSync nunca borra estos archivos por sí mismo.</string>
+    <string name="backup_stop">Dejar de hacer copias</string>
+</resources>

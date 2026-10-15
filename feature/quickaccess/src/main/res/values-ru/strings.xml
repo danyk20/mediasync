@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quick_sync_now">Синхронизировать сейчас</string>
+    <string name="quick_receive_now">Принять сейчас</string>
+    <string name="quick_open_app">Настроить MediaSync</string>
+    <string name="quick_syncing">Синхронизация…</string>
+    <string name="quick_receiving">Приём…</string>
+    <string name="quick_last_sync">Последняя синхронизация: %1$s</string>
+    <string name="quick_never_synced">Ещё не синхронизировано</string>
+    <string name="quick_ready_to_receive">Готов к приёму</string>
+    <string name="quick_not_set_up">Сначала сопрягите этот телефон</string>
+    <string name="quick_widget_title">MediaSync</string>
+    <string name="quick_widget_description">Синхронизация сейчас и время последней синхронизации</string>
+</resources>

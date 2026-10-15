@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diagnostics_title">Diagnóstico</string>
+    <string name="diagnostics_done">Listo</string>
+    <string name="diagnostics_intro">Si MediaSync no funciona como esperas, comparte este registro con quien te ayude. Se queda en este teléfono hasta que lo compartas. Incluye lo que hizo MediaSync y cómo está configurado este teléfono, sin fotos, nombres de archivo ni lugares.</string>
+    <string name="diagnostics_share">Compartir registro</string>
+    <string name="diagnostics_save">Guardar en un archivo</string>
+    <string name="diagnostics_clear">Borrar registro</string>
+    <string name="diagnostics_share_title">Compartir diagnóstico de MediaSync</string>
+    <string name="diagnostics_recent">Eventos recientes</string>
+    <string name="diagnostics_empty">Aún no hay nada registrado.</string>
+    <string name="diagnostics_link_test">Prueba de enlace</string>
+    <string name="diagnostics_link_test_intro">Mide lo rápido que este teléfono puede enviar a %1$s, con MediaSync abierta en él. Tarda unos 10 segundos.</string>
+    <string name="diagnostics_link_test_start">Probar la conexión</string>
+    <string name="diagnostics_link_test_running">Probando…</string>
+    <string name="diagnostics_link_test_failed">No se pudo contactar con %1$s. Abre MediaSync en él, con la misma Wi-Fi, e inténtalo de nuevo.</string>
+    <string name="diagnostics_link_test_one">Una conexión: %1$s MB/s</string>
+    <string name="diagnostics_link_test_four">Cuatro conexiones: %1$s MB/s</string>
+</resources>

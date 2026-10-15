@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Chiudi</string>
+    <string name="pairing_done">Fine</string>
+    <string name="pairing_try_again">Riprova</string>
+    <string name="pairing_consumer_title">Aggiungi telefono di invio</string>
+    <string name="pairing_consumer_instructions">Sul telefono che invierà le foto, apri MediaSync e scansiona questo codice.</string>
+    <string name="pairing_qr_description">Codice di abbinamento</string>
+    <string name="pairing_consumer_validity">Il codice funziona una sola volta, per 5 minuti. Entrambi i telefoni devono essere sullo stesso Wi-Fi.</string>
+    <string name="pairing_share_link">Condividi link di abbinamento</string>
+    <string name="pairing_share_chooser">Invia il link di abbinamento all\'altro telefono</string>
+    <string name="pairing_no_network_title">Collegati al Wi-Fi</string>
+    <string name="pairing_no_network_body">Questo telefono deve essere sul Wi-Fi per mostrare un codice di abbinamento.</string>
+    <string name="pairing_approve_title">Consentire %1$s?</string>
+    <string name="pairing_approve_body">Potrà inviare le sue foto e i suoi video a questo telefono.</string>
+    <string name="pairing_approve_allow">Consenti</string>
+    <string name="pairing_approve_deny">Non consentire</string>
+    <string name="pairing_paired_title">Abbinato a %1$s</string>
+    <string name="pairing_paired_consumer_body">Le sue foto e i suoi video arriveranno qui.</string>
+    <string name="pairing_producer_title">Abbina con il telefono che riceve</string>
+    <string name="pairing_producer_instructions">Sul telefono che riceve, apri MediaSync, tocca Aggiungi telefono di invio e punta questa fotocamera sul codice.</string>
+    <string name="pairing_camera_needed">Consenti alla fotocamera di scansionare il codice, oppure incolla il link di abbinamento.</string>
+    <string name="pairing_paste_link">Incolla link di abbinamento</string>
+    <string name="pairing_not_a_code">Non è un codice di abbinamento di MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Tocca Consenti su %1$s per completare l\'abbinamento.</string>
+    <string name="pairing_paired_producer_body">Ora puoi inviargli le tue foto e i tuoi video.</string>
+    <string name="pairing_confirm_title">Abbinare con %1$s?</string>
+    <string name="pairing_confirm_body">Continua solo se %1$s è il tuo telefono che riceve: questo telefono gli invierà le sue foto e i suoi video.</string>
+    <string name="pairing_confirm_pair">Abbina</string>
+    <string name="pairing_confirm_cancel">Annulla</string>
+    <string name="pairing_failed_title">Non abbinato</string>
+    <string name="pairing_problem_declined">Il telefono che riceve non ha consentito a questo telefono.</string>
+    <string name="pairing_problem_expired">Questo codice è scaduto o è già stato usato. Mostra un nuovo codice sul telefono che riceve.</string>
+    <string name="pairing_problem_no_answer">Nessuno ha toccato Consenti sul telefono che riceve in tempo.</string>
+    <string name="pairing_problem_unreachable">Impossibile raggiungere il telefono che riceve. Controlla che entrambi i telefoni siano sullo stesso Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">La connessione si è interrotta. Riprova.</string>
+    <string name="pairing_problem_incompatible">I telefoni usano versioni diverse di MediaSync. Aggiorna l\'app su entrambi.</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quick_sync_now">Sincronizza ora</string>
+    <string name="quick_receive_now">Ricevi ora</string>
+    <string name="quick_open_app">Configura MediaSync</string>
+    <string name="quick_syncing">Sincronizzazione…</string>
+    <string name="quick_receiving">Ricezione…</string>
+    <string name="quick_last_sync">Ultima sincronizzazione %1$s</string>
+    <string name="quick_never_synced">Non ancora sincronizzato</string>
+    <string name="quick_ready_to_receive">Pronto a ricevere</string>
+    <string name="quick_not_set_up">Abbina prima questo telefono</string>
+    <string name="quick_widget_title">MediaSync</string>
+    <string name="quick_widget_description">Sincronizza ora e mostra quando è avvenuta l\'ultima sincronizzazione</string>
+</resources>

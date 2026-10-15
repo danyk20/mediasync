@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Backup na nuvem</string>
+    <string name="backup_done">Concluído</string>
+    <string name="backup_intro">Tudo o que este telefone recebe fica na pasta MediaSync dele. Um app de backup neste telefone pode enviar tudo a partir dela.</string>
+    <string name="backup_none">Esta versão do MediaSync não tem backup para configurar.</string>
+
+    <string name="backup_setup_title">Fazer backup com %1$s</string>
+    <string name="backup_setup_body">O %1$s faz o backup da pasta do MediaSync por conta própria. Nos Pixel 2 a 5, isso é gratuito e ilimitado com a Economia de armazenamento. O MediaSync não envia nada por si só.</string>
+    <string name="backup_not_installed">O %1$s não está instalado neste telefone.</string>
+    <string name="backup_install">Instalar %1$s</string>
+    <string name="backup_steps_heading">Configure uma vez no %1$s:</string>
+    <string name="backup_step_folder">Ative o backup da pasta %1$s: toque na sua foto de perfil e depois em Configurações do Google Fotos → Backup → Fazer backup de pastas do dispositivo. A pasta aparece na lista quando a primeira foto chegar.</string>
+    <string name="backup_step_storage_saver">Escolha Economia de armazenamento: Configurações do Google Fotos → Backup → Qualidade do backup. Nos Pixel 2 a 5, ela não usa o seu armazenamento do Google.</string>
+    <string name="backup_open_app">Abrir %1$s</string>
+    <string name="backup_set_up_done">Já está configurado</string>
+
+    <string name="backup_status_title">Backup feito pelo app %1$s</string>
+    <string name="backup_status_today">%1$s recebeu hoje</string>
+    <string name="backup_status_handed_over">%1$s neste telefone, para %2$s fazer o backup</string>
+    <string name="backup_status_removed">%1$s fez o backup e removeu deste telefone</string>
+    <string name="backup_status_waiting">%1$s recebidas, ainda não entregues</string>
+    <string name="backup_status_note">O %1$s faz os backups por conta própria, geralmente em minutos com Wi-Fi. O MediaSync não consegue ver quando termina. Quando o %1$s as remover para liberar espaço, elas contam como copiadas.</string>
+
+    <string name="backup_free_up_title">Liberar espaço</string>
+    <string name="backup_free_up_app">No %1$s, toque na sua foto de perfil e depois em Liberar espaço. Ele remove apenas o que já tem backup.</string>
+    <string name="backup_free_up_open">Abrir %1$s</string>
+    <string name="backup_free_up_smart_storage">Ou deixe o telefone fazer isso: o Armazenamento inteligente, nas configurações de armazenamento, remove fotos e vídeos com backup quando o espaço está acabando.</string>
+    <string name="backup_free_up_storage_settings">Configurações de armazenamento</string>
+    <string name="backup_never_deletes">O MediaSync nunca apaga esses arquivos por conta própria.</string>
+    <string name="backup_stop">Parar o backup</string>
+</resources>
