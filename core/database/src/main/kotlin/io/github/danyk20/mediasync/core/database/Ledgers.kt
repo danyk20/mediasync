@@ -81,8 +81,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
     ) {
         address?.let { dao.recordAddress(id.hex, it, System.currentTimeMillis()) }
         schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
-        turboKey?.let { dao.recordTurboKey(id.hex, it.hex()) }
-        pairSecret?.let { dao.recordPairSecret(id.hex, it.hex()) }
+        if (turboKey != null || pairSecret != null) dao.recordKeys(id.hex, turboKey?.hex(), pairSecret?.hex())
     }
 
     /** Consumer side: the secret shared with [producer], made on first use; `null` if it isn't paired. */
@@ -91,7 +90,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         val peer = dao.get(producer.hex) ?: return null
         peer.pairSecret?.let { return it.decodeHex() }
         val secret = ByteArray(PAIR_SECRET_BYTES).also(SecureRandom()::nextBytes).toByteString()
-        dao.recordPairSecret(producer.hex, secret.hex())
+        dao.recordKeys(producer.hex, turboKey = null, pairSecret = secret.hex())
         return secret
     }
 
