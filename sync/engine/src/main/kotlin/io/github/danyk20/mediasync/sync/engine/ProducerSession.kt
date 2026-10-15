@@ -55,6 +55,8 @@ data class SyncResult(
     val withheld: Int = 0,
     /** What the consumer's *Turbo receive* links derive from (docs/PLAN.md §8.3); `null` if it didn't say. */
     val consumerTurboKey: ByteString? = null,
+    /** The secret this pair's internet signaling is sealed with (ADR 0009 §4); `null` if the consumer didn't say. */
+    val consumerPairSecret: ByteString? = null,
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
@@ -99,6 +101,7 @@ class ProducerSession(
         val run = Run(connection, channel, consumer, queue.total, queue.totalBytes)
         run.consumerSchedule = SyncSchedule.decode(hello.schedule)
         run.consumerTurboKey = hello.turboKey.takeIf { it.size == TURBO_KEY_BYTES }
+        run.consumerPairSecret = hello.pairSecret.takeIf { it.size == PAIR_SECRET_BYTES }
         return run.send(queue)
     }
 
@@ -146,6 +149,7 @@ class ProducerSession(
         private var cancelled = false
         var consumerSchedule: SyncSchedule? = null
         var consumerTurboKey: ByteString? = null
+        var consumerPairSecret: ByteString? = null
 
         fun send(queue: WorkQueue): SyncResult {
             replies.start()
@@ -175,6 +179,7 @@ class ProducerSession(
                     consumerSchedule,
                     withheld,
                     consumerTurboKey,
+                    consumerPairSecret,
                 )
             }
         }

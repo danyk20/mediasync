@@ -154,10 +154,13 @@ class RuntimeEndToEndTest {
                 bytesSent = photos.sumOf { it.bytes.size.toLong() },
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe Pending()
         history.record.value.lastSyncMillis.shouldNotBeNull()
+        // Both phones now share their pair's secret for internet signaling (ADR 0009 §4).
+        producerPeers.consumer()?.pairSecret shouldBe consumerPeers.pairSecret(producerIdentity.id)
 
         // Nothing new: the next sync transfers nothing.
         producer.syncNow()
@@ -165,7 +168,11 @@ class RuntimeEndToEndTest {
             producer.state.first { it is ProducerState.Idle && it.lastResult != done.lastResult }
         }
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(consumerSchedule = SyncSchedule.Default, consumerTurboKey = consumerKey)
+            SyncResult(
+                consumerSchedule = SyncSchedule.Default,
+                consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
+            )
     }
 
     @Test
@@ -196,6 +203,7 @@ class RuntimeEndToEndTest {
                 bytesSent = newPhoto.bytes.size.toLong(),
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
             )
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
     }

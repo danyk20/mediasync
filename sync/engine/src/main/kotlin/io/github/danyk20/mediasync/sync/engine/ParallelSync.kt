@@ -134,6 +134,7 @@ class ParallelSync(
                 consumerSchedule = a.consumerSchedule ?: b.consumerSchedule,
                 withheld = a.withheld + b.withheld,
                 consumerTurboKey = a.consumerTurboKey ?: b.consumerTurboKey,
+                consumerPairSecret = a.consumerPairSecret ?: b.consumerPairSecret,
             )
         }
     }

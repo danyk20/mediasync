@@ -155,6 +155,35 @@ class TurboTest {
     }
 
     @Test
+    fun aPairedProducerGetsItsPairSecretInEverySessionAndAnUnpairedOneNone() {
+        val registry = FakePeerRegistry(PairedPeer(producerId, "Producer", DeviceRole.PRODUCER), pairSecrets = true)
+        fun secretFrom(registry: FakePeerRegistry): ByteString {
+            val connection = ConnectionPair(producerId, consumerId)
+            val consumer = ConsumerSession(
+                local,
+                registry,
+                FakeReceivedLedger(),
+                FakeMediaSink(),
+                FakePairingGate("one-time-token!!".encodeToByteArray().toByteString()),
+            )
+            return runBothSides(
+                producer = {
+                    val channel = FrameChannel(connection.producerEnd)
+                    channel.send(Hello(PROTOCOL_VERSION, "Producer", WireRole.PRODUCER, "test"))
+                    channel.expect<Hello>().also { channel.send(Bye()) }.pairSecret
+                },
+                consumer = { runCatching { consumer.serve(connection.consumerEnd) } },
+            ).first.getOrThrow()
+        }
+
+        val first = secretFrom(registry)
+
+        first.size shouldBe PAIR_SECRET_BYTES
+        secretFrom(registry) shouldBe first // The same every session.
+        secretFrom(FakePeerRegistry(pairSecrets = true)) shouldBe ByteString.EMPTY
+    }
+
+    @Test
     fun eachTransferGetsFreshCredentialsAndThePassphraseIsNeverLogged() {
         val all = List(20) { DirectLink.credentials() }
 

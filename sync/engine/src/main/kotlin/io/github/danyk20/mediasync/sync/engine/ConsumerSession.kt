@@ -92,6 +92,7 @@ class ConsumerSession(
                 sink.availableBytes(),
                 local.schedule?.encode().orEmpty(),
                 local.turboKey?.takeIf { paired } ?: ByteString.EMPTY, // Only for phones paired already.
+                (if (paired) registry.pairSecret(connection.peerId) else null) ?: ByteString.EMPTY,
             ),
         )
         if (hello.protocolVersion != PROTOCOL_VERSION || hello.role != WireRole.PRODUCER) {

@@ -26,6 +26,8 @@ data class PeerEntity(
     val schedule: String? = null,
     /** Producer side: the consumer's *Turbo receive* key (hex), as it last said. Since version 3. */
     val turboKey: String? = null,
+    /** The pair's secret for internet signaling (hex): made by the consumer, told to the producer. Since version 5. */
+    val pairSecret: String? = null,
 )
 
 /** Producer side: what a consumer has confirmed (docs/PLAN.md §5.6). */

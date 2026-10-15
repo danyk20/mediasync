@@ -101,7 +101,7 @@ class LedgersTest {
         peers.consumer()?.lastAddress shouldBe "192.168.1.20:47420"
         peers.observeAll().first().map { it.name } shouldBe listOf("Pixel 2 XL", "Anna's Pixel")
 
-        peers.recordAddress(consumer, "192.168.1.30:47420")
+        peers.recordConsumer(consumer, address = "192.168.1.30:47420")
         peers.consumer()?.lastAddress shouldBe "192.168.1.30:47420"
 
         peers.forget(producer)

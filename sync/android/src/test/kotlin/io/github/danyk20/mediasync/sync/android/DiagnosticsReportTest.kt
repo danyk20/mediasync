@@ -87,7 +87,7 @@ class DiagnosticsReportTest {
         settings.setRole(DeviceRole.PRODUCER)
         settings.setPhotoDetails(PhotoDetails.REMOVE_LOCATION)
         peers.register(PairedPeer(deviceId(7), "Anna's Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        peers.recordConsumer(deviceId(7), SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0)))
+        peers.recordConsumer(deviceId(7), schedule = SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0)))
         history.recordProblem(SyncProblem.UNREACHABLE)
 
         val facts = report().facts().associate { it.label to it.value }

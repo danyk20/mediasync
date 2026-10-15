@@ -165,7 +165,7 @@ class ProducerSync @Inject constructor(
                 } else {
                     peers.register(consumer, it.remoteAddress)
                     peers.keepOnlyConsumer(consumer.id)
-                    peers.recordConsumer(consumer.id, outcome.consumerSchedule)
+                    peers.recordConsumer(consumer.id, schedule = outcome.consumerSchedule)
                     PairingResult.Paired(consumer.name)
                 }
             }
@@ -390,8 +390,13 @@ class ProducerSync @Inject constructor(
                 progress = { progress -> _state.value = ProducerState.Syncing(progress, turbo = direct) },
                 mayAddStream = sockets::canUseMoreConnections,
             ).sync(it)
-            if (!direct) peers.recordAddress(consumer.id, it.remoteAddress) // A direct link's address is fleeting.
-            peers.recordConsumer(consumer.id, result.consumerSchedule, result.consumerTurboKey)
+            peers.recordConsumer(
+                consumer.id,
+                address = it.remoteAddress.takeUnless { direct }, // A direct link's address is fleeting.
+                schedule = result.consumerSchedule,
+                turboKey = result.consumerTurboKey,
+                pairSecret = result.consumerPairSecret,
+            )
             if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
             Diagnostics.log(Area.SEND, "Sync done$turbo in ${since(started)}: ${result.describe()}")
             ProducerState.Idle(result)

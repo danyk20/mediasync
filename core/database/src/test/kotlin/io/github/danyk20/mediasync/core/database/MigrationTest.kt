@@ -62,7 +62,7 @@ class MigrationTest {
             RoomSentLedger(database.sentItemDao()).sentFingerprints(consumer) shouldBe setOf(fingerprint)
 
             val everySix = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
-            peers.recordConsumer(consumer, everySix)
+            peers.recordConsumer(consumer, schedule = everySix)
             peers.consumer()!!.schedule shouldBe everySix
         } finally {
             database.close()
@@ -122,6 +122,38 @@ class MigrationTest {
             val backups = database.backupDao()
             backups.observeAccounts().first().shouldBeEmpty()
             backups.pending("google-photos-app", limit = 10).map { it.contentId } shouldBe listOf(fingerprint.hex())
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun version4PairingsSurviveAndGetAPairSecretWhenFirstNeeded() = runTest {
+        val producer = deviceId(3)
+        helper.createDatabase(NAME, 4).use { db ->
+            db.execSQL(
+                "INSERT INTO peers (deviceId, name, role, pairedAtMillis) " +
+                    "VALUES ('${producer.hex}', 'Anna''s Pixel', 'PRODUCER', 1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(NAME, 5, true).close()
+
+        val database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MediaSyncDatabase::class.java,
+            NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val peers = PeerStore(database.peerDao())
+            peers.observeAll().first().single().pairSecret.shouldBeNull()
+
+            val secret = peers.pairSecret(producer)!!
+
+            secret.size shouldBe 32
+            peers.pairSecret(producer) shouldBe secret // Kept.
+            peers.pairSecret(deviceId(9)).shouldBeNull() // Not paired.
+            peers.recordConsumer(consumer, pairSecret = secret) // The producer's side keeps what it was told.
         } finally {
             database.close()
         }

@@ -81,7 +81,16 @@ interface PeerRegistry {
 
     /** Also called when a paired device pairs again; that updates it and keeps its ledgers. */
     fun register(peer: PairedPeer)
+
+    /**
+     * Consumer side: the secret shared with [producer] for internet signaling (ADR 0009 §4), made on first use and the
+     * same afterwards; `null` where there is none to give.
+     */
+    fun pairSecret(producer: DeviceId): ByteString? = null
 }
+
+/** A pair's secret for internet signaling: 32 random bytes. */
+const val PAIR_SECRET_BYTES = 32
 
 data class PairingRequest(val peerId: DeviceId, val peerName: String, val token: ByteString)
 

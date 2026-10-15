@@ -42,6 +42,9 @@ interface PeerDao {
     @Query("UPDATE peers SET turboKey = :turboKey WHERE deviceId = :deviceId")
     fun recordTurboKey(deviceId: String, turboKey: String)
 
+    @Query("UPDATE peers SET pairSecret = :pairSecret WHERE deviceId = :deviceId")
+    fun recordPairSecret(deviceId: String, pairSecret: String)
+
     @Query("DELETE FROM peers WHERE deviceId = :deviceId")
     fun delete(deviceId: String)
 }
