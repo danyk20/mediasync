@@ -78,6 +78,25 @@ class RelayedBytesTest {
     }
 
     @Test
+    fun theRelayedPairIsTheSelectedOneThroughARelay() {
+        val relayed = stats(
+            stat("transport", "T", "selectedCandidatePairId" to "P1"),
+            pair("P1", "L1", "R1"),
+            stat("local-candidate", "L1", "candidateType" to "relay"),
+            stat("remote-candidate", "R1", "candidateType" to "srflx"),
+        )
+        val direct = stats(
+            stat("transport", "T", "selectedCandidatePairId" to "P1"),
+            pair("P1", "L1", "R1"),
+            stat("local-candidate", "L1", "candidateType" to "host"),
+            stat("remote-candidate", "R1", "candidateType" to "prflx"),
+        )
+
+        relayedPair(relayed)?.id shouldBe "P1"
+        relayedPair(direct) shouldBe null
+    }
+
+    @Test
     fun beforeAnyPairIsChosenNothingCounts() {
         relayedBytes(stats(stat("transport", "T"))) shouldBe 0
     }

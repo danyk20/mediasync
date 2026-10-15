@@ -81,6 +81,8 @@ data class ProducerHomeUiState(
     val internetSync: Boolean = false,
     /** Internet sync may also use mobile data. */
     val internetOverMobileData: Boolean = false,
+    /** Videos also go through the relay; otherwise they wait for Wi-Fi or a direct connection (relay saver). */
+    val videosOverRelay: Boolean = false,
 )
 
 /**
@@ -130,9 +132,9 @@ class ProducerHomeViewModel @Inject constructor(
         peers.observeConsumer(),
         sync.state,
         pending,
-        combine(settings.sourceSelection, settings.internetOverMobileData, ::Pair),
+        combine(settings.sourceSelection, settings.internetOverMobileData, settings.videosOverRelay, ::Triple),
         combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
-    ) { consumer, state, count, (sources, mobileData), extras ->
+    ) { consumer, state, count, (sources, mobileData, relayVideos), extras ->
         val (access, record, dismissed) = extras
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
         val now = ZonedDateTime.now(clock)
@@ -162,6 +164,7 @@ class ProducerHomeViewModel @Inject constructor(
                 SetupPrompt.BATTERY !in dismissed,
             internetSync = consumer?.rendezvousUrl != null,
             internetOverMobileData = mobileData,
+            videosOverRelay = relayVideos,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
@@ -186,6 +189,10 @@ class ProducerHomeViewModel @Inject constructor(
 
     fun setInternetOverMobileData(allowed: Boolean) {
         viewModelScope.launch { settings.setInternetOverMobileData(allowed) }
+    }
+
+    fun setVideosOverRelay(allowed: Boolean) {
+        viewModelScope.launch { settings.setVideosOverRelay(allowed) }
     }
 
     /** Sends over a direct link (docs/PLAN.md §8.3), in the background like [syncNow]. */

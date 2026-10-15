@@ -290,6 +290,9 @@ class ProducerHomeViewModelTest {
 
         viewModel.setInternetOverMobileData(true)
         settings.internetOverMobileData.value shouldBe true
+        viewModel.setVideosOverRelay(true)
+        settings.videosOverRelay.value shouldBe true
+        viewModel.uiState.first { it.videosOverRelay }
         viewModel.uiState.first { it.internetOverMobileData } // Shown as on.
     }
 

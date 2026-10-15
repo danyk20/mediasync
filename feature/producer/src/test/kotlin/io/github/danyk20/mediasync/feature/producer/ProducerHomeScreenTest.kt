@@ -22,6 +22,7 @@ import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboProblem
+import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import java.time.ZonedDateTime
@@ -247,6 +248,22 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun videosThroughTheRelayAreTheUsersChoice() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Send videos through the relay").performScrollTo().performClick()
+
+        events shouldBe listOf("relay videos true")
+    }
+
+    @Test
+    fun videosTheRelaySaverKeptAreShown() {
+        show(paired.copy(pendingCount = 2, sync = ProducerState.Idle(SyncResult(sent = 4, heldBack = 2))))
+
+        composeRule.onNodeWithText("2 videos wait for Wi-Fi").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun noMobileDataWithoutInternetSync() {
         show(paired.copy(pendingCount = 3))
 
@@ -441,6 +458,7 @@ class ProducerHomeScreenTest {
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
                     onInternetOverMobileData = { events += "mobile data $it" },
+                    onVideosOverRelay = { events += "relay videos $it" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },

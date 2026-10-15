@@ -46,6 +46,7 @@ class AndroidDeviceInfo @Inject constructor(
     private val details: PhotoDetailsSource,
     private val turboKeys: TurboKeyStore,
     private val rendezvous: RendezvousSource,
+    private val relayVideos: RelayVideosSource,
 ) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
@@ -57,6 +58,8 @@ class AndroidDeviceInfo @Inject constructor(
     )
 
     override fun photoDetails(): PhotoDetails = details.current()
+
+    override fun videosOverRelay(): Boolean = relayVideos.allowed()
 
     /** The name the user gave the phone (Settings → About phone), else its model. */
     private fun name(): String =

@@ -139,9 +139,12 @@ class DataStoreSettingsRepositoryTest {
         val repository = DataStoreSettingsRepository(dataStore())
         repository.rendezvousUrl.first() shouldBe null
         repository.internetOverMobileData.first() shouldBe false
+        repository.videosOverRelay.first() shouldBe false
 
         repository.setRendezvousUrl("https://mediasync.anna.workers.dev")
         repository.setInternetOverMobileData(true)
+        repository.setVideosOverRelay(true)
+        repository.videosOverRelay.first() shouldBe true
         repository.rendezvousUrl.first() shouldBe "https://mediasync.anna.workers.dev"
         repository.internetOverMobileData.first() shouldBe true
 

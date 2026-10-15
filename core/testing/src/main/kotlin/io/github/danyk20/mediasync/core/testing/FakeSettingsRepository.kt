@@ -66,6 +66,14 @@ class FakeSettingsRepository(
         internetOverMobileDataState.value = allowed
     }
 
+    private val videosOverRelayState = MutableStateFlow(false)
+
+    override val videosOverRelay: StateFlow<Boolean> = videosOverRelayState
+
+    override suspend fun setVideosOverRelay(allowed: Boolean) {
+        videosOverRelayState.value = allowed
+    }
+
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
 
     override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState

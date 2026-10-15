@@ -32,6 +32,12 @@ fun interface DeviceInfo {
 
     /** As a sending phone: the details it sends (docs/PLAN.md §6.3). */
     fun photoDetails(): PhotoDetails = PhotoDetails.Default
+
+    /**
+     * As a sending phone: whether videos also go through the relay; otherwise they wait for Wi-Fi or a direct
+     * connection (docs/PLAN.md §17, relay saver).
+     */
+    fun videosOverRelay(): Boolean = false
 }
 
 /** This phone's addresses on the local network, or none when it isn't on Wi-Fi or Ethernet. */
@@ -197,6 +203,11 @@ fun interface DeviceConditions {
 /** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
 fun interface PhotoDetailsSource {
     fun current(): PhotoDetails
+}
+
+/** As a sending phone: whether videos also go through the relay (PLAN §17, relay saver), as the user set it. */
+fun interface RelayVideosSource {
+    fun allowed(): Boolean
 }
 
 /** As a sending phone: whether internet sync (PLAN §8.4) may also use mobile data, as the user set it. */

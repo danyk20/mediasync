@@ -89,6 +89,17 @@ class SettingsMobileDataSource @Inject constructor(
     override fun allowed(): Boolean = allowed.value
 }
 
+/** Whether the sending phone sends videos through the relay too, from its settings. */
+@Singleton
+class SettingsRelayVideosSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : RelayVideosSource {
+    private val allowed = settings.videosOverRelay.stateIn(scope, SharingStarted.Eagerly, false)
+
+    override fun allowed(): Boolean = allowed.value
+}
+
 /** The settings the sync runtime follows as they change. */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -104,6 +115,9 @@ internal abstract class SettingsSourcesModule {
 
     @Binds
     abstract fun bindMobileDataSource(impl: SettingsMobileDataSource): MobileDataSource
+
+    @Binds
+    abstract fun bindRelayVideosSource(impl: SettingsRelayVideosSource): RelayVideosSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */

@@ -122,6 +122,7 @@ fun ProducerHomeRoute(
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
         onInternetOverMobileData = viewModel::setInternetOverMobileData,
+        onVideosOverRelay = viewModel::setVideosOverRelay,
         onOpenDiagnostics = onOpenDiagnostics,
         onStartTurbo = {
             if (state.turbo == TurboAvailability.NOT_ALLOWED) {
@@ -150,6 +151,7 @@ fun ProducerHomeScreen(
     onAllowNotifications: () -> Unit = {},
     onChooseDetails: () -> Unit = {},
     onInternetOverMobileData: (Boolean) -> Unit = {},
+    onVideosOverRelay: (Boolean) -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onStartTurbo: () -> Unit = {},
@@ -190,6 +192,7 @@ fun ProducerHomeScreen(
                         onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
                     )
                     WithheldNotice(state, onChooseDetails)
+                    HeldBackNotice(state)
                     TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
                     SettingRow(
                         title = stringResource(R.string.producer_sources_title),
@@ -203,7 +206,7 @@ fun ProducerHomeScreen(
                         icon = MediaSyncIcons.Info,
                         onClick = onChooseDetails,
                     )
-                    MobileDataRow(state, consumer, onInternetOverMobileData)
+                    InternetCard(state, consumer, onInternetOverMobileData, onVideosOverRelay)
                     Hints(state, consumer, onGrantAccess)
                 }
             }
@@ -386,26 +389,64 @@ private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, o
 }
 
 /**
- * Internet sync (docs/PLAN.md §8.4) works over Wi-Fi networks; over mobile data only if the user allows it here.
- * Shown once the receiving phone has set it up.
+ * Internet sync (docs/PLAN.md §8.4), as this phone uses it: over Wi-Fi networks, and over mobile data only if the user
+ * allows it; through the relay, videos wait unless the user lets them go (§17, relay saver). Shown once the receiving
+ * phone has set it up.
  */
 @Composable
-private fun MobileDataRow(state: ProducerHomeUiState, consumer: String, onChange: (Boolean) -> Unit) {
+private fun InternetCard(
+    state: ProducerHomeUiState,
+    consumer: String,
+    onMobileData: (Boolean) -> Unit,
+    onRelayVideos: (Boolean) -> Unit,
+) {
     if (!state.internetSync) return
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.producer_mobile_data_title)) },
-            supportingContent = { Text(stringResource(R.string.producer_mobile_data_body, consumer)) },
-            leadingContent = { Icon(painterResource(MediaSyncIcons.MobileData), contentDescription = null) },
-            trailingContent = { Switch(checked = state.internetOverMobileData, onCheckedChange = null) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.toggleable(
-                value = state.internetOverMobileData,
-                role = Role.Switch,
-                onValueChange = onChange,
-            ),
+        SwitchRow(
+            title = stringResource(R.string.producer_mobile_data_title),
+            body = stringResource(R.string.producer_mobile_data_body, consumer),
+            icon = MediaSyncIcons.MobileData,
+            checked = state.internetOverMobileData,
+            onChange = onMobileData,
+        )
+        SwitchRow(
+            title = stringResource(R.string.producer_relay_videos_title),
+            body = stringResource(R.string.producer_relay_videos_body),
+            icon = MediaSyncIcons.Send,
+            checked = state.videosOverRelay,
+            onChange = onRelayVideos,
         )
     }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    body: String,
+    @DrawableRes icon: Int,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(body) },
+        leadingContent = { Icon(painterResource(icon), contentDescription = null) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+    )
+}
+
+/** Videos the relay saver kept for Wi-Fi or a direct connection in the last sync (docs/PLAN.md §17). */
+@Composable
+private fun HeldBackNotice(state: ProducerHomeUiState) {
+    val held = (state.sync as? ProducerState.Idle)?.lastResult?.heldBack ?: 0
+    if (held == 0) return
+    NoticeCard(
+        title = pluralStringResource(R.plurals.producer_held_back_title, held, held),
+        body = stringResource(R.string.producer_held_back_body),
+        icon = MediaSyncIcons.Info,
+    )
 }
 
 /** Files the *Photo details* setting holds back, and the way to change it (docs/PLAN.md §6.4). */

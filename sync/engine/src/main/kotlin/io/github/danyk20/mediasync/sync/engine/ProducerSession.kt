@@ -59,11 +59,13 @@ data class SyncResult(
     val consumerPairSecret: ByteString? = null,
     /** The consumer's rendezvous Worker (PLAN §8.4); `null` if it has none or didn't say. */
     val consumerRendezvousUrl: String? = null,
+    /** Held back for this connection, such as videos over the relay (PLAN §17, relay saver); sent another time. */
+    val heldBack: Int = 0,
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
         "deferred=$deferred, bytesSent=$bytesSent, cancelled=$cancelled, consumerSchedule=$consumerSchedule, " +
-        "withheld=$withheld)"
+        "withheld=$withheld, heldBack=$heldBack)"
 }
 
 /**

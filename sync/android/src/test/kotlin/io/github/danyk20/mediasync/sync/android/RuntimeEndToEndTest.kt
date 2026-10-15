@@ -103,6 +103,7 @@ class RuntimeEndToEndTest {
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private var photoDetails = PhotoDetails.KEEP_ALL
+    private var videosOverRelay = false
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
@@ -112,6 +113,8 @@ class RuntimeEndToEndTest {
             override fun local() = LocalDevice("Anna's Pixel", "test")
 
             override fun photoDetails() = photoDetails
+
+            override fun videosOverRelay() = videosOverRelay
         },
         network = Connectivity(loopback, {
             if (offWifi) NoNetwork else SocketFactory.getDefault()
@@ -166,6 +169,37 @@ class RuntimeEndToEndTest {
 
         receiver.relayUsage()?.usedBytes shouldBe 312_000_000_000
         internet.meterAsked shouldBe listOf("https://mediasync.example.workers.dev" to producerIdentity.id)
+    }
+
+    @Test
+    fun throughTheRelayVideosWaitUnlessTheUserLetsThemGo() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        source.put(FakeMedia("photo", Random(11).nextBytes(100_000)))
+        source.put(FakeMedia("video", Random(12).nextBytes(300_000), "video.mp4", "video/mp4"))
+        offWifi = true
+        internet.throughRelay = true
+
+        producer.syncNow()
+        val saved = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.heldBack == 1 }
+        } as ProducerState.Idle
+        saved.lastResult?.sent shouldBe 1
+
+        videosOverRelay = true
+        producer.syncNow()
+        val sent = withTimeout(TIMEOUT) {
+            producer.state.first {
+                it is ProducerState.Idle &&
+                    it.lastResult?.let { result -> result.heldBack == 0 && result.sent == 1 } == true
+            }
+        } as ProducerState.Idle
+        sent.lastResult?.sent shouldBe 1
+        sink.stored.size shouldBe photos.size + 2
     }
 
     @Test
@@ -583,6 +617,10 @@ private class FakeDirectLinks : DirectLinks {
 private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks {
     @Volatile
     var allowed = true
+
+    /** Connections go through the relay, as when the phones can't reach each other directly. */
+    @Volatile
+    var throughRelay = false
     val connects = java.util.concurrent.atomic.AtomicInteger()
     val listening = ConcurrentHashMap<String, Pair<Map<DeviceId, ByteString>, (PeerConnection) -> Unit>>()
 
@@ -595,7 +633,16 @@ private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks
         if (pairs[sender] != pairSecret) throw java.io.IOException("Not sealed with this pair's secret")
         val connection = ConnectionPair(sender, consumer)
         kotlin.concurrent.thread(isDaemon = true) { serve(connection.consumerEnd) }
-        return connection.producerEnd
+        val end = connection.producerEnd
+        return if (!throughRelay) {
+            end
+        } else {
+            object : PeerConnection by end, io.github.danyk20.mediasync.transport.rendezvous.RelayCounter {
+                override fun relayedBytes() = 0L
+
+                override fun throughRelay() = true
+            }
+        }
     }
 
     override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable {

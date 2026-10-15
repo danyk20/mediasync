@@ -168,14 +168,20 @@ class WebRtcLink(context: Context) : PeerLinks {
             private var lastRelayed = 0L
 
             override fun relayedBytes(): Long {
-                if (closed.get()) return lastRelayed
+                stats()?.let { lastRelayed = relayedBytes(it) }
+                return lastRelayed
+            }
+
+            override fun throughRelay(): Boolean = stats()?.let { relayedPair(it) != null } ?: false
+
+            /** WebRTC's statistics, by id; `null` once closed or if they don't come in time. */
+            private fun stats(): Map<String, RTCStats>? {
+                if (closed.get()) return null
                 val report = AtomicReference<RTCStatsReport?>()
                 val done = CountDownLatch(1)
                 connection.getStats { report.set(it).also { done.countDown() } }
-                if (done.await(STATS_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                    report.get()?.let { lastRelayed = relayedBytes(it.statsMap) }
-                }
-                return lastRelayed
+                if (!done.await(STATS_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) return null
+                return report.get()?.statsMap
             }
         }
 
@@ -294,15 +300,20 @@ class WebRtcLink(context: Context) : PeerLinks {
  * (a `relay` candidate); 0 for a direct connection. [stats] is WebRTC's statistics report, by id.
  */
 internal fun relayedBytes(stats: Map<String, RTCStats>): Long {
+    val pair = relayedPair(stats) ?: return 0
+    return listOf("bytesSent", "bytesReceived").sumOf { (pair.members[it] as? Number)?.toLong() ?: 0L }
+}
+
+/** The selected candidate pair, if it goes through a TURN relay on either side; `null` if direct or none yet. */
+internal fun relayedPair(stats: Map<String, RTCStats>): RTCStats? {
     val selectedId = stats.values.firstOrNull { it.type == "transport" }?.members?.get("selectedCandidatePairId")
     val pair = stats[selectedId] ?: stats.values.firstOrNull {
         it.type == "candidate-pair" && it.members["nominated"] == true && it.members["state"] == "succeeded"
-    } ?: return 0
+    } ?: return null
     val relayed = listOf("localCandidateId", "remoteCandidateId").any { side ->
         stats[pair.members[side]]?.members?.get("candidateType") == "relay"
     }
-    if (!relayed) return 0
-    return listOf("bytesSent", "bytesReceived").sumOf { (pair.members[it] as? Number)?.toLong() ?: 0L }
+    return pair.takeIf { relayed }
 }
 
 private fun IceServer.toWebRtc(): PeerConnection.IceServer = PeerConnection.IceServer.builder(urls).apply {

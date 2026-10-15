@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.sync.engine.ParallelSync
 import io.github.danyk20.mediasync.sync.engine.PeerEndedSessionException
 import io.github.danyk20.mediasync.sync.engine.ProducerSession
 import io.github.danyk20.mediasync.sync.engine.SentLedger
+import io.github.danyk20.mediasync.sync.engine.SourceItem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
@@ -34,6 +35,7 @@ import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanClient
 import io.github.danyk20.mediasync.transport.lan.LanTimeouts
+import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import java.io.IOException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -405,6 +407,17 @@ class ProducerSync @Inject constructor(
             return sockets.keepingAwake { send(connection, Path.INTERNET) }
         }
 
+        /**
+         * Through the relay, videos wait for Wi-Fi or a direct connection unless the user lets them go (docs/PLAN.md
+         * §17, relay saver): they'd use most of the free allowance.
+         */
+        private fun relaySaver(connection: PeerConnection): (SourceItem) -> Boolean {
+            val relayed = (connection as? RelayCounter)?.throughRelay() == true
+            if (!relayed || device.videosOverRelay()) return { false }
+            Diagnostics.log(Area.SEND, "Internet: through the relay; videos wait for Wi-Fi or a direct connection")
+            return { item -> item.descriptor.mimeType.startsWith("video/") }
+        }
+
         private fun send(connection: PeerConnection, path: Path): ProducerState.Idle = connection.use {
             val direct = path == Path.DIRECT
             val over = when (path) {
@@ -422,6 +435,7 @@ class ProducerSync @Inject constructor(
                 },
                 // Over the internet, one connection carries it all.
                 mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
+                holdBack = relaySaver(it),
             ).sync(it)
             peers.recordConsumer(
                 consumer.id,

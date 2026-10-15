@@ -42,6 +42,14 @@ interface SettingsRepository {
 
     suspend fun setInternetOverMobileData(allowed: Boolean)
 
+    /**
+     * A sending phone: videos also go through the relay; off at first, so over the relay they wait for Wi-Fi or a
+     * direct connection (PLAN §17, relay saver).
+     */
+    val videosOverRelay: Flow<Boolean>
+
+    suspend fun setVideosOverRelay(allowed: Boolean)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

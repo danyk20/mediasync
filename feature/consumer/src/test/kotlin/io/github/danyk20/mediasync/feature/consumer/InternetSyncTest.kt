@@ -119,16 +119,17 @@ class InternetSyncTest {
     }
 
     @Test
-    fun itSaysWhetherSendingPhonesCanReachThisPhone() {
+    fun itSaysWhetherSendingPhonesCanReachThisPhone() = runBlocking<Unit> {
         viewModel.uiState.value shouldBe InternetSyncUiState(setup = CloudflareSetup.Ready)
         viewModel.save("https://mediasync.anna.workers.dev")
-        viewModel.uiState.value?.copy(relay = null) shouldBe
-            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = false, setup = CloudflareSetup.Ready)
+        val on = withTimeout(WAIT) { viewModel.uiState.first { it?.worker != null } }
+        on?.reachable shouldBe false
 
         receiverState.value = ReceiverState(overInternet = true)
 
-        viewModel.uiState.value?.copy(relay = null) shouldBe
-            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true, setup = CloudflareSetup.Ready)
+        // The meter is read meanwhile, on another thread: wait for the state, don't race it.
+        withTimeout(WAIT) { viewModel.uiState.first { it?.reachable == true } }?.worker shouldBe
+            "https://mediasync.anna.workers.dev"
     }
 
     @Test
