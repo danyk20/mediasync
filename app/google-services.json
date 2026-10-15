@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "379132746850",
+    "project_id": "mediasync-fe372",
+    "storage_bucket": "mediasync-fe372.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:379132746850:android:914adcfd671216fad5c53b",
+        "android_client_info": {
+          "package_name": "io.github.danyk20.mediasync"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYqH6USB-oSg2YIo0oS_LKJv57bp8q5vU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

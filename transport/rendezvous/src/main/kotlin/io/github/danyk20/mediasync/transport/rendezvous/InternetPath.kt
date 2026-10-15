@@ -133,13 +133,19 @@ class InternetPath(
     /**
      * As the consumer: registers each pair in [pairs] (producer → pair secret) at its Worker at [worker], and answers
      * those producers' offers through its mailbox. Each connection goes to [serve], on a thread of its own, until the
-     * returned handle is closed. A mailbox that drops is opened again. Doesn't block.
+     * returned handle is closed. A mailbox that drops is opened again. Doesn't block. [pushToken], this phone's FCM
+     * token, is registered with each pair, so a producer can wake this phone through the Worker (PLAN §10.4).
      */
-    fun listen(worker: URI, pairs: Map<DeviceId, ByteArray>, serve: (PeerConnection) -> Unit): Closeable {
+    fun listen(
+        worker: URI,
+        pairs: Map<DeviceId, ByteArray>,
+        pushToken: String? = null,
+        serve: (PeerConnection) -> Unit,
+    ): Closeable {
         val threads = Executors.newCachedThreadPool(daemon("mediasync-internet"))
         val retries = Executors.newSingleThreadScheduledExecutor(daemon("mediasync-internet-retry"))
         val listeners = pairs.map { (producer, secret) ->
-            PairListener(worker, producer, secret, threads, retries, serve)
+            PairListener(worker, producer, secret, threads, retries, pushToken, serve)
         }
         listeners.forEach { threads.execute(it::start) }
         return Closeable {
@@ -156,6 +162,7 @@ class InternetPath(
         private val secret: ByteArray,
         private val threads: ExecutorService,
         private val retries: ScheduledExecutorService,
+        private val pushToken: String?,
         private val serve: (PeerConnection) -> Unit,
     ) {
         private val pair = pairId(signer.deviceId, producer)
@@ -173,7 +180,7 @@ class InternetPath(
 
         fun start() {
             val open = try {
-                client.registerPair(producer)
+                client.registerPair(producer, pushToken?.let(PushToken::Of) ?: PushToken.Keep)
                 synchronized(this) {
                     if (closed) return
                     Mailbox(worker, pair, secret, ::onSignal, ::onDown).also {

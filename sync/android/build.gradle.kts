@@ -20,6 +20,8 @@ dependencies {
     implementation(projects.core.media)
     implementation(projects.transport.lan)
     implementation(projects.transport.webrtc)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(testFixtures(projects.sync.engine))
     testImplementation(testFixtures(projects.core.metadata))

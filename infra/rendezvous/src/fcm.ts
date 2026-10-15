@@ -134,7 +134,12 @@ export type WakeOutcome =
     /** FCM or Google's token service failed; the producer may try again later. */
     | "failed";
 
-/** Sends one high-priority data message to [token]. Retries once with a new access token on HTTP 401. */
+/** A Firebase Installation ID: 22 base64url characters, unlike a registration token's 150 or more. */
+export function isInstallationId(id: string): boolean {
+    return /^[A-Za-z0-9_-]{22}$/.test(id);
+}
+
+/** Sends one high-priority data message to [token] (a Firebase Installation ID, or a registration token). Retries once with a new access token on HTTP 401. */
 export async function sendWake(options: {
     account: ServiceAccount;
     token: string;
@@ -148,7 +153,8 @@ export async function sendWake(options: {
     const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(options.account.projectId)}/messages:send`;
     const message = {
         message: {
-            token: options.token,
+            // Current apps register a Firebase Installation ID; older ones a registration token (deprecated by FCM).
+            ...(isInstallationId(options.token) ? { fid: options.token } : { token: options.token }),
             data: options.data,
             android: { priority: "HIGH", ttl: `${WAKE_TTL_SECONDS}s`, collapse_key: options.collapseKey },
         },

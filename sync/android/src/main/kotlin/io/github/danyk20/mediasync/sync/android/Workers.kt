@@ -257,11 +257,12 @@ class ReceiveNowWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = logged("Receiving") {
         notifications.runInForeground(this, notifications.receiving())
+        val started = clock.millis()
         coroutineScope {
             receiver.hold(HOLDER)
             val progress = launch { notifications.showReceivingProgress(incoming(receiver, peers)) }
             try {
-                while (!quiet(receiver.state.value)) delay(CHECK_INTERVAL_MILLIS)
+                while (!quiet(receiver.state.value, started)) delay(CHECK_INTERVAL_MILLIS)
             } finally {
                 progress.cancel()
                 receiver.release(HOLDER)
@@ -272,9 +273,12 @@ class ReceiveNowWorker @AssistedInject constructor(
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.receiving()
 
-    /** Nothing coming in, no direct link open, and nothing happened for a minute. */
-    private fun quiet(state: ReceiverState): Boolean {
-        val idle = clock.millis() - (state.lastActivityMillis ?: 0L)
+    /**
+     * Nothing coming in, no direct link open, and nothing happened for a minute, counting from the start: a phone
+     * woken by a wake-up (docs/PLAN.md §10.4) waits that long for the sending phone to connect.
+     */
+    private fun quiet(state: ReceiverState, started: Long): Boolean {
+        val idle = clock.millis() - maxOf(state.lastActivityMillis ?: 0L, started)
         return state.sessions == 0 && !state.directLinkOpen && idle >= QUIET_MILLIS
     }
 

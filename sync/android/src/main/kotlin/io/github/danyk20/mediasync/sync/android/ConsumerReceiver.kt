@@ -174,15 +174,16 @@ class ConsumerReceiver internal constructor(
      * While listening: listens over the internet as set up now (docs/PLAN.md §8.4), after its Worker changed or a
      * sending phone got its pair secret (in its first session).
      */
-    fun refreshInternet() {
-        scope.launch(Dispatchers.IO) { listenOverInternet() }
+    fun refreshInternet(again: Boolean = false) {
+        scope.launch(Dispatchers.IO) { listenOverInternet(again) }
     }
 
-    private fun listenOverInternet() = synchronized(internetLock) {
+    /** [again]: even as set up already, which registers this phone with its Worker anew (a new FCM token). */
+    private fun listenOverInternet(again: Boolean = false) = synchronized(internetLock) {
         val worker = device.local().rendezvousUrl
         val pairs = peers.producers().mapNotNull { peer -> peer.pairSecret?.let { peer.id to it } }.toMap()
         val wanted = worker?.takeIf { pairs.isNotEmpty() && server != null }?.let { InternetSetup(it, pairs) }
-        if (wanted == overInternet?.first) return@synchronized
+        if (wanted == overInternet?.first && !again) return@synchronized
         overInternet?.second?.close()
         overInternet = wanted?.let { it to internet.listen(it.worker, it.pairs, ::serveOverInternet) }
         _state.update { it.copy(overInternet = wanted != null) }

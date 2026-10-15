@@ -31,6 +31,9 @@ okio = "3.18.2"
 serialization = "1.11.0"
 okhttp = "5.5.0"
 webrtc = "150.7871.01"
+# Firebase Cloud Messaging, for waking the receiving phone over the internet (docs/PLAN.md §10.4).
+firebaseBom = "34.19.0"
+googleServices = "4.5.0"
 zxing = "3.5.4"
 
 # Testing
@@ -57,6 +60,8 @@ licensee = "1.14.1"
 spotless = "8.10.4"
 
 [libraries]
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
@@ -133,6 +138,7 @@ roborazzi-gradlePlugin = { module = "io.github.takahirom.roborazzi:roborazzi-gra
 spotless-gradlePlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 
 [plugins]
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-lint = { id = "com.android.lint", version.ref = "agp" }

@@ -1207,13 +1207,18 @@ async function accessToken(account, fetcher, nowMillis) {
   return body.access_token;
 }
 __name(accessToken, "accessToken");
+function isInstallationId(id) {
+  return /^[A-Za-z0-9_-]{22}$/.test(id);
+}
+__name(isInstallationId, "isInstallationId");
 async function sendWake(options) {
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? Date.now();
   const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(options.account.projectId)}/messages:send`;
   const message = {
     message: {
-      token: options.token,
+      // Current apps register a Firebase Installation ID; older ones a registration token (deprecated by FCM).
+      ...isInstallationId(options.token) ? { fid: options.token } : { token: options.token },
       data: options.data,
       android: { priority: "HIGH", ttl: `${WAKE_TTL_SECONDS}s`, collapse_key: options.collapseKey }
     }

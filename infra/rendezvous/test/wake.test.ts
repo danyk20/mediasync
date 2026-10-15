@@ -244,6 +244,20 @@ async function wakeWith(pair: Pair, overrides: Partial<Env>) {
     return wake(context);
 }
 
+describe("phones registered by Firebase Installation ID", () => {
+    it("are addressed by fid, as FCM asks; registration tokens stay tokens", async () => {
+        const fid = "cJ3mPq9TQxW1bZ0vNn8YkA";
+        const pair = await registeredPair(fid);
+        const { requests } = fakeGoogle({ tokenRequests: 0, fcmStatus: [] });
+
+        expect((await wakeRequest(pair)).status).toBe(200);
+
+        const message = (requests.find((r) => r.url === FCM_URL)!.json() as { message: Record<string, unknown> }).message;
+        expect(message.fid).toBe(fid);
+        expect(message.token).toBeUndefined();
+    });
+});
+
 describe("a household's Worker, without an FCM service account", () => {
     const relay = "https://mediasync-wake-relay.example.workers.dev";
 
