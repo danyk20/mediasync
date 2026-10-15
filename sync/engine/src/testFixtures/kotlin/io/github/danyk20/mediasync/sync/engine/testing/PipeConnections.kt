@@ -102,16 +102,25 @@ class ConnectionPair(
     }
 
     /**
-     * Flushes like a socket: without waiting for the other side, or failing because it closed after reading what was
-     * sent. (A pipe the other side cancelled fails its next flush; the next write still fails, as a socket's would.)
+     * Fails like a socket's: with an [IOException] once this side closed it (a pipe throws IllegalStateException),
+     * and a flush doesn't fail because the other side closed after reading what was sent (a cancelled pipe's would).
+     * A write after the other side closed still fails, as a socket's would.
      */
     private class SocketLikeSink(delegate: Sink) : ForwardingSink(delegate) {
-        override fun flush() {
+        override fun write(source: Buffer, byteCount: Long) = whileOpen { super.write(source, byteCount) }
+
+        override fun flush() = whileOpen {
             try {
                 super.flush()
             } catch (_: IOException) {
                 // The other side closed: what it didn't read is lost, as over a network.
             }
+        }
+
+        private inline fun whileOpen(block: () -> Unit) = try {
+            block()
+        } catch (e: IllegalStateException) {
+            throw IOException("Socket closed", e)
         }
     }
 
