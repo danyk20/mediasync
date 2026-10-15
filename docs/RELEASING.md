@@ -17,6 +17,10 @@ Until the Play Store launch (M6, docs/PLAN.md §15) versions stay below 1.0: the
 
 `versionCode` is derived from the version: `1.2.3` → `1002003`.
 
+## If the build fails after the release was created
+
+The tag and the GitHub Release already exist then, without files. Fix the workflow on `main`, then build that release again: **Actions → Release → Run workflow**, with the tag (e.g. `v0.2.0`). It builds the tagged code, waits for your approval like a normal release, and attaches the files to the existing release.
+
 ## One-time setup: signing key
 
 Signing secrets live in a GitHub **environment** called `release`, which requires your approval before each release job runs.
