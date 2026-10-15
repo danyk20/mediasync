@@ -63,6 +63,10 @@ RELAY_PERIOD_START_DAY = "1"
 RELAY_ALLOW_PAID = "false"
 RELAY_PAID_CAP_USD = "0"
 TURN_CREDENTIAL_TTL_SECONDS = "3600"
+# The developer's wake relay, for a Worker without an FCM service account: a household's, deployed from the app
+# (PLAN §10.4). Empty: no wake-ups. WAKE_RELAY_ENABLED: this Worker is the wake relay itself.
+WAKE_RELAY_URL = ""
+WAKE_RELAY_ENABLED = "false"
 
 [secrets]
 required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]
@@ -106,6 +110,8 @@ RELAY_PERIOD_START_DAY = "1"
 RELAY_ALLOW_PAID = "false"
 RELAY_PAID_CAP_USD = "0"
 TURN_CREDENTIAL_TTL_SECONDS = "3600"
+WAKE_RELAY_URL = ""
+WAKE_RELAY_ENABLED = "false"
 
 [env.staging.secrets]
 required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]
@@ -147,6 +153,60 @@ RELAY_PERIOD_START_DAY = "1"
 RELAY_ALLOW_PAID = "false"
 RELAY_PAID_CAP_USD = "0"
 TURN_CREDENTIAL_TTL_SECONDS = "3600"
+# Set once the developer's wake relay is deployed (env wake-relay below); the app's bundle carries it.
+WAKE_RELAY_URL = ""
+WAKE_RELAY_ENABLED = "false"
 
 [env.production.secrets]
-required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]
+# Deployed from the app into a household's account: it sets CF_ACCOUNT_ID, and the TURN key when the token may make
+# one. No FCM service account: wake-ups go through the developer's wake relay. No analytics token: the meter runs on
+# live reports.
+required = ["CF_ACCOUNT_ID"]
+
+# ---------------------------------------------------------------------------------------------------------
+# The developer's wake relay (PLAN §10.4): this Worker with the app's FCM service account, deployed once into the
+# developer's own account by hand (rendezvous-deploy.yml). Households' Workers have no FCM service account and hand
+# their wake-ups to it (WAKE_RELAY_URL in production). Only POST /v1/relay/wake is used; no cron trigger.
+[env.wake-relay]
+name = "mediasync-wake-relay"
+
+[[env.wake-relay.durable_objects.bindings]]
+name = "PAIRS"
+class_name = "PairMailbox"
+
+[[env.wake-relay.durable_objects.bindings]]
+name = "METER"
+class_name = "UsageMeter"
+
+[[env.wake-relay.ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "4001"
+simple = { limit = 120, period = 60 }
+
+[[env.wake-relay.ratelimits]]
+name = "DEVICE_LIMITER"
+namespace_id = "4002"
+simple = { limit = 60, period = 60 }
+
+# On the wake relay: wake-ups per FCM token.
+[[env.wake-relay.ratelimits]]
+name = "TURN_LIMITER"
+namespace_id = "4003"
+simple = { limit = 10, period = 60 }
+
+[env.wake-relay.triggers]
+crons = []
+
+[env.wake-relay.vars]
+RELAY_BUDGET_GB = "950"
+RELAY_FREE_ALLOWANCE_GB = "1000"
+RELAY_PRICE_USD_PER_GB = "0.05"
+RELAY_PERIOD_START_DAY = "1"
+RELAY_ALLOW_PAID = "false"
+RELAY_PAID_CAP_USD = "0"
+TURN_CREDENTIAL_TTL_SECONDS = "3600"
+WAKE_RELAY_URL = ""
+WAKE_RELAY_ENABLED = "true"
+
+# FCM_SERVICE_ACCOUNT, its only secret, is set by the deploy workflow right after deploying (not listed as required:
+# the first deploy has to create the Worker before it can hold a secret). Until then it answers 503.

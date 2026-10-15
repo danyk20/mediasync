@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestContext } from "../src/context.ts";
 import { base64UrlDecode, utf8 } from "../src/encoding.ts";
 import { clearAccessTokenCache, FCM_SCOPE } from "../src/fcm.ts";
-import { wake } from "../src/handlers/wake.ts";
+import { relayedWake, wake } from "../src/handlers/wake.ts";
 import { pairTag } from "../src/identity.ts";
 import type { PairRecord } from "../src/pair-mailbox.ts";
 import type { Pair } from "./support/worker.ts";
@@ -225,5 +225,125 @@ describe("POST /v1/pairs/{pairId}/wake", () => {
             now: Date.now(),
         };
         await expect(wake(context)).rejects.toMatchObject({ status: 503, code: "push_not_configured" });
+    });
+});
+
+/** The producer's wake request, handled by a Worker with [overrides] to its bindings. */
+async function wakeWith(pair: Pair, overrides: Partial<Env>) {
+    const request = await pair.producer.request("POST", `/v1/pairs/${pair.pairId}/wake`);
+    const context: RequestContext = {
+        request,
+        env: { ...env, ...overrides },
+        ctx: {} as ExecutionContext,
+        url: new URL(request.url),
+        body: new Uint8Array(),
+        device: { id: pair.producer.id, nonce: request.headers.get("x-mediasync-nonce")!, timestamp: 0 },
+        pairId: pair.pairId,
+        now: Date.now(),
+    };
+    return wake(context);
+}
+
+describe("phones registered by Firebase Installation ID", () => {
+    it("are addressed by fid, as FCM asks; registration tokens stay tokens", async () => {
+        const fid = "cJ3mPq9TQxW1bZ0vNn8YkA";
+        const pair = await registeredPair(fid);
+        const { requests } = fakeGoogle({ tokenRequests: 0, fcmStatus: [] });
+
+        expect((await wakeRequest(pair)).status).toBe(200);
+
+        const message = (requests.find((r) => r.url === FCM_URL)!.json() as { message: Record<string, unknown> }).message;
+        expect(message.fid).toBe(fid);
+        expect(message.token).toBeUndefined();
+    });
+});
+
+describe("a household's Worker, without an FCM service account", () => {
+    const relay = "https://mediasync-wake-relay.example.workers.dev";
+
+    it("hands the wake-up to the developer's wake relay", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        const { requests } = mockFetch(() => jsonResponse({ sent: true }));
+
+        const response = await wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay });
+
+        expect(await response.json()).toEqual({ sent: true });
+        expect(requests.map((r) => r.url)).toEqual([`${relay}/v1/relay/wake`]);
+        expect(requests[0]!.json()).toEqual({
+            token: "fcm-token-1",
+            data: { type: "wake", v: "1", pair: pair.pairId },
+            collapseKey: `wake-${pairTag(pair.pairId)}`,
+        });
+    });
+
+    it("forgets a token the relay says FCM no longer knows", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        mockFetch(() => jsonResponse({ error: { code: "push_token_unregistered" } }, 410));
+
+        await expect(wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay })).rejects.toMatchObject({
+            status: 410,
+            code: "push_token_unregistered",
+        });
+        expect((await record(pair.pairId))?.fcmToken).toBeUndefined();
+    });
+
+    it("says wake-ups aren't set up without a relay either", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        await expect(wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: "" })).rejects.toMatchObject({
+            status: 503,
+            code: "push_not_configured",
+        });
+    });
+});
+
+describe("POST /v1/relay/wake, the developer's wake relay", () => {
+    const body = (fields: unknown) => new TextEncoder().encode(JSON.stringify(fields));
+    const asRelay = { ...env, WAKE_RELAY_ENABLED: "true" };
+
+    it("sends a household Worker's wake-up through FCM", async () => {
+        const google: Google = { tokenRequests: 0, fcmStatus: [] };
+        const { requests } = fakeGoogle(google);
+        const data = { type: "wake", v: "1", pair: "p" };
+
+        const response = await relayedWake(asRelay, body({ token: "fcm-token-2", data, collapseKey: "wake-x" }));
+
+        expect(await response.json()).toEqual({ sent: true });
+        expect(requests.find((r) => r.url === FCM_URL)!.json()).toEqual({
+            message: { token: "fcm-token-2", data, android: { priority: "HIGH", ttl: "60s", collapse_key: "wake-x" } },
+        });
+    });
+
+    it("tells the household's Worker when FCM no longer knows the token", async () => {
+        fakeGoogle({
+            tokenRequests: 0,
+            fcmStatus: [404],
+            fcmBody: JSON.stringify({ error: { status: "NOT_FOUND", details: [{ errorCode: "UNREGISTERED" }] } }),
+        });
+
+        await expect(
+            relayedWake(asRelay, body({ token: "gone", data: { type: "wake" }, collapseKey: "k" })),
+        ).rejects.toMatchObject({ status: 410, code: "push_token_unregistered" });
+    });
+
+    it("refuses what isn't a wake-up", async () => {
+        fakeGoogle({ tokenRequests: 0, fcmStatus: [] });
+        for (const fields of [
+            { data: { type: "wake" }, collapseKey: "k" },
+            { token: "t", data: "wake", collapseKey: "k" },
+            { token: "t", data: { n: 1 }, collapseKey: "k" },
+            { token: "t", data: { big: "x".repeat(4000) }, collapseKey: "k" },
+        ]) {
+            await expect(relayedWake(asRelay, body(fields))).rejects.toMatchObject({ status: 400 });
+        }
+    });
+
+    it("doesn't exist on a household's Worker", async () => {
+        const response = await send(
+            new Request("https://rendezvous.example/v1/relay/wake", {
+                method: "POST",
+                body: JSON.stringify({ token: "t", data: { type: "wake" }, collapseKey: "k" }),
+            }),
+        );
+        expect(response.status).toBe(404);
     });
 });

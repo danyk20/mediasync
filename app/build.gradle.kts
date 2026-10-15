@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Firebase, for waking the receiving phone over the internet (docs/PLAN.md §10.4), when the project's
+// google-services.json is there; a build without it works the same, without wake-ups.
+if (file("google-services.json").exists()) {
+    pluginManager.apply(libs.plugins.google.services.get().pluginId)
+}
+
 // Single source of truth for the version: version.txt, maintained by release-please.
 val appVersion: String = providers
     .fileContents(rootProject.layout.projectDirectory.file("version.txt"))

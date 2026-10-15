@@ -45,8 +45,8 @@ class InternetPathTest {
     private val served = LinkedBlockingQueue<PeerConnection>()
     private val listening = mutableListOf<Closeable>()
 
-    private fun listen() = InternetPath(consumer, links, timeouts = timeouts)
-        .listen(url, mapOf(producer.deviceId to secret)) { served.put(it) }
+    private fun listen(pushToken: String? = null) = InternetPath(consumer, links, timeouts = timeouts)
+        .listen(url, mapOf(producer.deviceId to secret), pushToken) { served.put(it) }
         .also { listening += it }
 
     private fun connect() = InternetPath(producer, links, timeouts = timeouts).connect(consumer.deviceId, url, secret)
@@ -103,6 +103,24 @@ class InternetPathTest {
         connect().close()
 
         worker.relayReports shouldBe emptyList()
+    }
+
+    @Test
+    fun theReceivingPhoneRegistersItsFcmTokenSoItCanBeWoken() {
+        listen(pushToken = "fcm-token-1")
+        worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
+
+        val registration = Json.parseToJsonElement(worker.registrations.single()).jsonObject
+        registration["fcmToken"]?.jsonPrimitive?.content shouldBe "fcm-token-1"
+        registration["producer"]?.jsonPrimitive?.content shouldBe producer.deviceId.hex
+    }
+
+    @Test
+    fun withoutAnFcmTokenTheRegisteredOneIsKept() {
+        listen()
+        worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
+
+        Json.parseToJsonElement(worker.registrations.single()).jsonObject.containsKey("fcmToken") shouldBe false
     }
 
     @Test

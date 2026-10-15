@@ -187,7 +187,8 @@ class SyncScheduler @Inject constructor(
         }
     }
 
-    private fun receiveNow() {
+    /** Receives now, in the foreground until a quiet minute: while busy, and when woken (docs/PLAN.md §10.4). */
+    fun receiveNow() {
         val request = OneTimeWorkRequest.Builder(ReceiveNowWorker::class.java)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)

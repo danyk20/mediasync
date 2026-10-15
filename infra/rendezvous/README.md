@@ -63,7 +63,23 @@ Optional: `RELAY_ADMIN_DEVICE_IDS`, comma-separated device IDs allowed to change
 
 ### 3. GitHub environments
 
-In the repository settings, create the environments `rendezvous-staging` and `rendezvous-production`, each with the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Give `rendezvous-production` **required reviewers**, so production deploys wait for approval. (GitHub creates an environment on first use without protection, so add the reviewers before the secrets.)
+In the repository settings, create the environment `rendezvous-staging` with the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, for the testing Worker. There's no production environment: households' Workers are deployed from the app into their own accounts.
+
+### 4. The wake relay (once, in the developer's account)
+
+Households' Workers have no FCM service account, so they hand wake-ups to the developer's wake relay: this Worker,
+deployed as `--env wake-relay` with the service account of the app's Firebase project (docs/PLAN.md §10.4). It only
+answers `POST /v1/relay/wake`, stores and logs nothing, and allows ten wake-ups a minute per phone.
+
+1. **Firebase:** in the app's project, *Project settings → Service accounts → Generate new private key*. Keep the JSON
+   file private: it can send messages to the app's users.
+2. **Cloudflare:** an API token for the developer's own account with *Workers Scripts: Edit*, and the account ID.
+3. **GitHub:** create the environment `rendezvous-wake-relay` with the secrets `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ACCOUNT_ID` and `FCM_SERVICE_ACCOUNT` (the whole JSON file).
+4. **Actions → Rendezvous deploy → Run workflow**, target `wake-relay`. The log shows its address,
+   `https://mediasync-wake-relay.<subdomain>.workers.dev`.
+5. Set that address as `WAKE_RELAY_URL` in `[env.production.vars]`, run `npm run bundle:app`, and commit: the app's
+   Worker carries it from then on, and households' Workers deployed (or redeployed) from it can be woken.
 
 ## Configuration
 

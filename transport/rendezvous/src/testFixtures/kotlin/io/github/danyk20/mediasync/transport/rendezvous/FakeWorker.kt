@@ -28,6 +28,9 @@ class FakeWorker(
     val wakes = AtomicInteger()
     val mailboxesOpened = AtomicInteger()
 
+    /** The consumer's pair registrations, as sent (JSON): the producer, and its FCM token if any. */
+    val registrations = CopyOnWriteArrayList<String>()
+
     /** The live relay reports, as sent (JSON). */
     val relayReports = CopyOnWriteArrayList<String>()
 
@@ -48,6 +51,7 @@ class FakeWorker(
 
             request.method == "PUT" -> {
                 registered += pair
+                registrations += request.body?.utf8().orEmpty()
                 json("""{"pairId":"$pair","created":true}""")
             }
 

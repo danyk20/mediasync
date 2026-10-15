@@ -52,6 +52,12 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             allowUrl("https://opensource.org/license/bsd-3-clause/") {
                 because("BSD-3-Clause, as WebRTC (io.github.webrtc-sdk) names it")
             }
+            // Not open source: Google's Android SDK terms, under which Google Play services' client libraries come, which
+            // Firebase Cloud Messaging needs for wake-ups (docs/PLAN.md §10.4): play-services-base, -basement,
+            // -cloud-messaging, -stats, -tasks, firebase-iid-interop and firebase-measurement-connector.
+            allowUrl("https://developer.android.com/studio/terms.html") {
+                because("Google Play services for Firebase Cloud Messaging (wake-ups); not open source")
+            }
         }
 
         configureKotlin()

@@ -36,6 +36,7 @@ class AndroidInternetLinks @Inject internal constructor(
     private val mobileData: MobileDataSource,
     private val alerts: RelayAlerts,
     private val usage: MobileDataUsage,
+    private val pushTokens: PushTokens,
 ) : InternetLinks {
     private val links by lazy { WebRtcLink(context) }
     private val signer by lazy {
@@ -75,7 +76,7 @@ class AndroidInternetLinks @Inject internal constructor(
         sending.connect(consumer, URI(worker), pairSecret.toByteArray())
 
     override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable =
-        receiving.listen(URI(worker), pairs.mapValues { it.value.toByteArray() }, serve)
+        receiving.listen(URI(worker), pairs.mapValues { it.value.toByteArray() }, pushTokens.current(), serve)
 
     override fun relayUsage(worker: String, producer: DeviceId): RelayUsage =
         receiving.relayMeter(URI(worker), producer).let { meter ->
