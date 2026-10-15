@@ -133,6 +133,11 @@ fun interface PhotoDetailsSource {
     fun current(): PhotoDetails
 }
 
+/** The receiving phone's rendezvous Worker for internet sync (PLAN §8.4), as set up; `null` while it has none. */
+fun interface RendezvousSource {
+    fun current(): String?
+}
+
 /** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */
 fun interface ScheduleSource {
     fun current(): SyncSchedule

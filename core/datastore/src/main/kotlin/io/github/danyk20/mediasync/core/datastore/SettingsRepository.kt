@@ -32,6 +32,11 @@ interface SettingsRepository {
 
     suspend fun setPhotoDetails(details: PhotoDetails)
 
+    /** A receiving phone's rendezvous Worker for internet sync (PLAN §8.4); `null` while it has none. */
+    val rendezvousUrl: Flow<String?>
+
+    suspend fun setRendezvousUrl(url: String?)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

@@ -50,6 +50,14 @@ class FakeSettingsRepository(
         photoDetailsState.value = details
     }
 
+    private val rendezvousUrlState = MutableStateFlow<String?>(null)
+
+    override val rendezvousUrl: StateFlow<String?> = rendezvousUrlState
+
+    override suspend fun setRendezvousUrl(url: String?) {
+        rendezvousUrlState.value = url
+    }
+
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
 
     override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState

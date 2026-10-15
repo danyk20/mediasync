@@ -69,6 +69,12 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[PhotoDetailsKey] = details.name }
     }
 
+    override val rendezvousUrl: Flow<String?> = dataStore.data.map { it[RendezvousUrlKey] }.distinctUntilChanged()
+
+    override suspend fun setRendezvousUrl(url: String?) {
+        dataStore.edit { if (url == null) it.remove(RendezvousUrlKey) else it[RendezvousUrlKey] = url }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -88,6 +94,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
         val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
         val PhotoDetailsKey = stringPreferencesKey("photo_details")
+        val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

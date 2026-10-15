@@ -45,11 +45,16 @@ class AndroidDeviceInfo @Inject constructor(
     private val schedule: ScheduleSource,
     private val details: PhotoDetailsSource,
     private val turboKeys: TurboKeyStore,
+    private val rendezvous: RendezvousSource,
 ) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
     /** As a receiving phone, it also tells its schedule and Turbo key; sending phones ignore those. */
-    override fun local(): LocalDevice = device.copy(schedule = schedule.current(), turboKey = turboKeys.current())
+    override fun local(): LocalDevice = device.copy(
+        schedule = schedule.current(),
+        turboKey = turboKeys.current(),
+        rendezvousUrl = rendezvous.current(),
+    )
 
     override fun photoDetails(): PhotoDetails = details.current()
 

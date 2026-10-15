@@ -67,6 +67,17 @@ class SettingsPhotoDetailsSource @Inject constructor(
     override fun current(): PhotoDetails = details.value
 }
 
+/** The receiving phone's rendezvous Worker from its settings, told to paired phones in every session (PLAN §8.4). */
+@Singleton
+class SettingsRendezvousSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : RendezvousSource {
+    private val url = settings.rendezvousUrl.stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun current(): String? = url.value
+}
+
 /** The settings the sync runtime follows as they change. */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -76,6 +87,9 @@ internal abstract class SettingsSourcesModule {
 
     @Binds
     abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
+
+    @Binds
+    abstract fun bindRendezvousSource(impl: SettingsRendezvousSource): RendezvousSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */
