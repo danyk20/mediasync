@@ -264,6 +264,14 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun unreachableWithInternetSyncDoesntBlameTheWifi() {
+        show(paired.copy(internetSync = true, sync = ProducerState.Failed(SyncFailure.UNREACHABLE)))
+
+        composeRule.onNodeWithText("Couldn't reach Pixel 2 XL, over Wi-Fi or the internet", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun noMobileDataWithoutInternetSync() {
         show(paired.copy(pendingCount = 3))
 

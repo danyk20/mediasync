@@ -34,6 +34,7 @@
 
     <string name="producer_status_failed_title">Sync didn\'t finish</string>
     <string name="producer_failure_unreachable">Couldn\'t find %1$s. Check that both phones are on the same Wi-Fi and MediaSync is open on it.</string>
+    <string name="producer_failure_unreachable_internet">Couldn\'t reach %1$s, over Wi-Fi or the internet. Open MediaSync on it, or wait for its scheduled sync.</string>
     <string name="producer_failure_connection_lost">The connection to %1$s dropped. Nothing is lost: the next sync continues where this one stopped.</string>
     <string name="producer_failure_not_allowed">%1$s no longer recognises this phone. Pair them again.</string>
     <string name="producer_failure_incompatible">%1$s runs a different MediaSync version. Update the app on both phones.</string>

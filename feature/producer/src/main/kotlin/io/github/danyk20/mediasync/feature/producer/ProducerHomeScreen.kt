@@ -264,7 +264,7 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
         is ProducerState.Failed -> {
             StatusCard(
                 title = stringResource(R.string.producer_status_failed_title),
-                body = failureMessage(sync.reason, consumer),
+                body = failureMessage(sync.reason, consumer, state.internetSync),
                 icon = MediaSyncIcons.Info,
             )
             SyncNowButton(onSyncNow)
@@ -625,13 +625,23 @@ private fun IdleStatus(consumer: String, pending: Int?, lastSyncMillis: Long?, n
 }
 
 @Composable
-private fun failureMessage(reason: SyncFailure, consumer: String): String = when (reason) {
+private fun failureMessage(reason: SyncFailure, consumer: String, internetSync: Boolean): String = when (reason) {
     SyncFailure.NOT_PAIRED -> stringResource(R.string.producer_status_not_paired_body)
-    SyncFailure.UNREACHABLE -> stringResource(R.string.producer_failure_unreachable, consumer)
+
+    // With internet sync, the same Wi-Fi isn't needed: the other phone must be listening.
+    SyncFailure.UNREACHABLE -> stringResource(
+        if (internetSync) R.string.producer_failure_unreachable_internet else R.string.producer_failure_unreachable,
+        consumer,
+    )
+
     SyncFailure.CONNECTION_LOST -> stringResource(R.string.producer_failure_connection_lost, consumer)
+
     SyncFailure.NOT_ALLOWED -> stringResource(R.string.producer_failure_not_allowed, consumer)
+
     SyncFailure.INCOMPATIBLE -> stringResource(R.string.producer_failure_incompatible, consumer)
+
     SyncFailure.TURBO_UNREACHABLE -> stringResource(R.string.producer_failure_turbo_unreachable, consumer)
+
     SyncFailure.TURBO_NOT_SET_UP -> stringResource(R.string.producer_failure_turbo_not_set_up, consumer)
 }
 
