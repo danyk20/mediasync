@@ -77,8 +77,16 @@ class MediaStoreFolderTest {
         val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 1) }
         context.contentResolver.update(trashed, values, null, null) shouldBe 1
 
-        folder.find(trashed.toString()) shouldBe PhoneFile.Found("DCIM/MediaSync/", trashed = true)
+        // Found either way, so never counted as removed, even before the gallery reports the trash.
         connector.removedFromPhone(listOf(receipt(trashed, 3))) shouldBe emptySet()
+        // Android 16 once reported it as not trashed yet a moment after the update (nightly, API 36): wait a little.
+        var file = folder.find(trashed.toString())
+        val end = System.currentTimeMillis() + TRASH_TIMEOUT_MILLIS
+        while ((file as? PhoneFile.Found)?.trashed != true && System.currentTimeMillis() < end) {
+            delay(POLL_MILLIS)
+            file = folder.find(trashed.toString())
+        }
+        file shouldBe PhoneFile.Found("DCIM/MediaSync/", trashed = true)
         connector.upload(item(trashed)) shouldBe UploadResult.Skipped(SkipReason.NOT_ON_PHONE)
     }
 
@@ -126,5 +134,7 @@ class MediaStoreFolderTest {
         val JPEG_START = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
         const val CHANGE_TIMEOUT_MILLIS = 10_000L
         const val OBSERVER_START_MILLIS = 500L
+        const val TRASH_TIMEOUT_MILLIS = 5_000L
+        const val POLL_MILLIS = 100L
     }
 }
