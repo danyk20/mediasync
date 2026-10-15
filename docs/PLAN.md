@@ -79,7 +79,7 @@ Two phones that are both behind NAT need a third party with a fixed address. It 
 
 **Recommendation:** run that piece on a **free serverless service rather than hardware**.
 
-- **Rendezvous:** a ~300-line Cloudflare Worker with a Durable Object, on the free tier. It is deployed automatically from this repo's CI.
+- **Rendezvous:** a ~300-line Cloudflare Worker with a Durable Object, on the free tier. It runs in the household's **own free Cloudflare account**: the receiving phone deploys it there when the user sets up internet sync (*bring your own Cloudflare*, §8.4), so every household has its own free allowance and nothing of the developer's is built into the app. This repo's CI deploys a staging Worker for testing.
   - It only ever handles small, end-to-end encrypted connection hints. It never sees media and can't read the hints.
   - Free tier: 100k requests/day, which is far more than a family needs.
 - **Direct connection:** the phones then connect directly to each other using WebRTC/ICE hole punching (UDP).
@@ -717,13 +717,21 @@ interface SecureSession : Closeable {
   - The user can add a fixed address, such as a Tailscale or other VPN IP, or an IPv6 address.
   - That address is then tried with the Wi-Fi transport (TLS/TCP). This gives zero-infrastructure internet sync for VPN users, and it never uses the relay.
 - **Device authentication.** No accounts: every request is signed with the phone's keystore identity key and carries its certificate, whose hash is the device ID the paired phone already pins. A timestamp and a nonce stop replays. Only the pair's two devices can use its mailbox and credentials; only the consumer registers a pair, and only the producer can wake the consumer ([ADR 0009](adr/0009-rendezvous-device-authentication.md) specifies the scheme and the API).
+- **Bring your own Cloudflare (decided 2026-10-15).** Each household runs the Worker in its own free Cloudflare account, so each has its own 1,000 GB relay allowance and the app carries no service credentials.
+  - The receiving phone deploys it from *Internet sync*: the user creates an API token on Cloudflare's token page, which MediaSync opens pre-filled (Workers Scripts: Edit; Realtime: Edit, for the relay), and pastes it. The app deploys the Worker it carries through Cloudflare's API: account, TURN key, upload with its Durable Objects, rate limits and settings, cron trigger, workers.dev address. The token is used once and kept nowhere.
+  - The bundle the app carries is built with `npm run bundle:app` in `infra/rendezvous/` (the module and the production settings of `wrangler.toml`); the build is reproducible, so CI checks the app's copy.
+  - *Sign in with Cloudflare* (OAuth with PKCE) replaces pasting a token once MediaSync's OAuth client is registered and its domain verified.
+  - Without the Realtime permission, the Worker runs without the relay: direct internet connections only. Without the rate-limit bindings, it runs unlimited.
+  - Sending phones learn the Worker's address in the paired TLS session (only from paired phones, `https` only). A Worker deployed by hand can be entered by address instead.
 - The Worker lives in `infra/rendezvous/`. It has unit tests (Vitest with the Workers pool), rate limiting, and **no logging of IPs beyond Cloudflare defaults**.
 - It is deployed by CI to a `staging` environment on main, and to `production` on release with manual approval.
 - *Built in M5 (server side):* the Worker with one Durable Object mailbox per pair (WebSocket hibernation, a 10-minute queue while the other phone is offline), signed requests with nonce replay protection, 1 h TURN credentials tagged per pair, FCM wake-ups, rate limits per address, device and credential request, and the deploy workflow (skipped until Cloudflare credentials are set up). See `infra/rendezvous/README.md`. The Android transport follows.
 
 ### 8.5 Relay usage meter and budget guard
 
-Only data that passes through the relay counts against the **1,000 GB free monthly allowance**. Wi-Fi, Turbo and direct internet connections are free and unlimited. The allowance belongs to the Cloudflare account that runs the Worker (yours), so all your phones share it.
+Only data that passes through the relay counts against the **1,000 GB free monthly allowance**. Wi-Fi, Turbo and direct internet connections are free and unlimited. The allowance belongs to the Cloudflare account that runs the Worker: the household's own (§8.4), so its phones share it.
+
+A Worker deployed from the phone has no analytics token (the deployment token isn't kept), so its meter runs on the live reports until one is added. *Built (M5): the sending phone reports the bytes relayed every minute and at the end of a session; the receiving phone's Internet sync screen shows the month's usage, where the relay stops and when it starts over.*
 
 **What the user sees**
 
@@ -987,6 +995,7 @@ How a scheduled sync runs:
 - **Token:** the consumer registers its FCM token with the Worker at pairing, together with the pair (ADR 0009). *The Worker's sending side is built (M5): FCM HTTP v1 with a service-account JWT, one wake-up per pair every 20 s.*
 - **Retries:** scheduled producers that can't reach the consumer use the same wake-up.
 - **Data path:** only a tiny wake-up signal goes over the internet. The data path can still be LAN-only.
+- **With bring your own Cloudflare (§8.4):** FCM needs the app's Firebase project, which a household's Worker doesn't have. Wake-ups go through a tiny wake-up relay the developer runs: it only forwards the wake request to FCM (no media, no addresses). Until it exists, the Worker answers `push_not_configured`, and internet sync reaches the receiving phone while it listens (app open, receive window).
 - **Without internet:** the user opens MediaSync on the consumer, which listens while it's open.
 
 ### 10.5 Additional guards
@@ -1171,7 +1180,7 @@ Estimates assume one developer working full-time with AI assistance. They are ro
 | **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
 | **M3** | Speed + Turbo | Parallel adaptive streams, pipelining, path switching, **Turbo transfer** (Wi-Fi Direct, Wi-Fi Aware when available), link test, benchmarks | ≥ 85 % of raw link throughput on Wi-Fi and Turbo. Turbo starts with one tap and no system dialogs. CI benchmark trend in place. | 2 wks |
 | **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
-| **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service) *(Worker built: mailbox, device authentication, TURN credentials, FCM sending, meter and guard, CI and deploy workflow; ADR 0009)*, Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
+| **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service) *(Worker built: mailbox, device authentication, TURN credentials, FCM sending, meter and guard, CI and deploy workflow; ADR 0009)*, **bring your own Cloudflare** (the receiving phone deploys the Worker into the household's free account), Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
 | **M6** | Polish and release | Onboarding polish, accessibility pass, widget + Quick Settings tile, translations scaffold, Play listing/policies/data safety, **closed test with ≥ 12 testers for 14 continuous days**, production rollout, first GitHub Release | The closed test passes with no data-loss bugs. Production access is granted, and v1.0 is live on Play and GitHub. | 3 wks |
 | **v1.1** | Google Photos API connector | OAuth verification (submitted during M6), upload pipeline that backs up as soon as items are received (§9.6), per-connector *Photo details*, metadata-preserving Storage saver, ledger and verification, MediaSync's own Free-up flow (trash on 11+, permanent delete on 10), `MANAGE_MEDIA` | End to end: received → uploaded → verified → trashed. Remote deletion blocks the local delete. | 3 wks |
 
