@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0](https://github.com/danyk20/mediasync/compare/v0.2.0...v0.3.0) (2026-10-15)
+
+
+### Features
+
+* back up through the Google Photos app on the receiving phone ([#31](https://github.com/danyk20/mediasync/issues/31)) ([ae531d9](https://github.com/danyk20/mediasync/commit/ae531d9ac3b95207e04a5a62066ca0d413db9258))
+* received photos and videos without a date get the best one there is ([#29](https://github.com/danyk20/mediasync/issues/29)) ([1f324d0](https://github.com/danyk20/mediasync/commit/1f324d0ee94c72975786eb892a8773accc88d51c))
+* set up cloud backup with the Google Photos app from the receiving phone ([#32](https://github.com/danyk20/mediasync/issues/32)) ([eb8aa4d](https://github.com/danyk20/mediasync/commit/eb8aa4d58290368855f3d4e3514a4e25c3241484))
+
 ## [0.2.0](https://github.com/danyk20/mediasync/compare/v0.1.0...v0.2.0) (2026-10-15)
 
 
