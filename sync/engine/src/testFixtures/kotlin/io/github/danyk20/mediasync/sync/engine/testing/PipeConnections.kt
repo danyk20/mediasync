@@ -59,10 +59,10 @@ class ConnectionPair(
     }
 
     /** What the producer writes, as it reaches the consumer. */
-    private val toConsumerSink = toConsumer.sink.delayed(latencyMillis)
+    private val toConsumerSink = SocketLikeSink(toConsumer.sink).delayed(latencyMillis)
 
     /** What the consumer writes, as it reaches the producer. */
-    private val toProducerSink = toProducer.sink.delayed(latencyMillis)
+    private val toProducerSink = SocketLikeSink(toProducer.sink).delayed(latencyMillis)
 
     /** The producer's end; its [PeerConnection.peerId] is the consumer, as TLS would have authenticated. */
     val producerEnd: PeerConnection = End(
@@ -99,6 +99,20 @@ class ConnectionPair(
         override val remoteAddress = "memory"
 
         override fun close() = onClose()
+    }
+
+    /**
+     * Flushes like a socket: without waiting for the other side, or failing because it closed after reading what was
+     * sent. (A pipe the other side cancelled fails its next flush; the next write still fails, as a socket's would.)
+     */
+    private class SocketLikeSink(delegate: Sink) : ForwardingSink(delegate) {
+        override fun flush() {
+            try {
+                super.flush()
+            } catch (_: IOException) {
+                // The other side closed: what it didn't read is lost, as over a network.
+            }
+        }
     }
 
     private class FaultySink(delegate: Sink, private val faults: Faults, private val onCut: () -> Unit) :
