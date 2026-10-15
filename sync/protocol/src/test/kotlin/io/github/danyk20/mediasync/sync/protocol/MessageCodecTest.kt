@@ -54,7 +54,16 @@ class MessageCodecTest {
             LinkTestEnd(bytes = 1_234_567_890),
             LinkTestResult(bytes = 1_234_567_890, micros = 5_000_123),
             TurboRequest(),
+            TurboRequest(aware = true),
             TurboReady(TurboReady.Status.OK, "DIRECT-ab-MediaSync", "passphrase-1234", "192.168.49.1", 47_420),
+            TurboReady(
+                TurboReady.Status.OK,
+                "MediaSync-abc",
+                "passphrase-1234",
+                "",
+                47_420,
+                TurboReady.Kind.WIFI_AWARE,
+            ),
             TurboReady(TurboReady.Status.NOT_ALLOWED),
         )
 

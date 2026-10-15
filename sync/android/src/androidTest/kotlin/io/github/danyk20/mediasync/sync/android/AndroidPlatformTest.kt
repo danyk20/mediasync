@@ -22,6 +22,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -213,6 +214,24 @@ class AndroidPlatformTest {
         val nowhere = DirectLink("DIRECT-zz-MediaSync", "no-such-group-passphrase", "192.168.49.1", 47_420)
         direct.join(nowhere, timeoutMillis = 5_000).shouldBeNull()
         direct.leave()
+    }
+
+    @Test
+    fun wifiAwareIsLeftAloneOnPhonesWithoutIt() = runBlocking<Unit> {
+        val aware = WifiAware(context)
+        // Phones with Wi-Fi Aware are tested by hand (docs/PLAN.md §8.3); emulators have none.
+        assumeTrue(
+            "This device has Wi-Fi Aware",
+            !context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE),
+        )
+
+        aware.awareAvailable() shouldBe false
+        aware.open(47_420, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE) shouldBe
+            TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+        val link =
+            DirectLink("MediaSync-abcdefghijklmnop", "no-such-service-passphrase", "", 47_420, LinkKind.WIFI_AWARE)
+        aware.join(link, timeoutMillis = 1_000).shouldBeNull()
+        aware.leave()
     }
 
     /**

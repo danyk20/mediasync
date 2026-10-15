@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.android
 
 import androidx.work.WorkInfo
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.LinkSpeed
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SyncResult
@@ -109,6 +110,9 @@ private const val MINUTES_PER_HOUR = 60L
 private const val MICROS_PER_MILLI = 1000L
 
 internal fun TurboAnswer.describe(): String = when (this) {
-    is TurboAnswer.Ready -> "ready on ${link.networkName}"
+    is TurboAnswer.Ready ->
+        "ready on ${link.networkName}" +
+            if (link.kind == LinkKind.WIFI_AWARE) " (Wi-Fi Aware)" else ""
+
     is TurboAnswer.Unavailable -> "unavailable (${reason.name.lowercase()})"
 }

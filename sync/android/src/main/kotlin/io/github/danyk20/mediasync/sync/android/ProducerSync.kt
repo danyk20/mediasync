@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.LinkSpeed
 import io.github.danyk20.mediasync.sync.engine.LinkTest
 import io.github.danyk20.mediasync.sync.engine.MediaSource
@@ -37,6 +38,7 @@ import io.github.danyk20.mediasync.transport.lan.LanClient
 import io.github.danyk20.mediasync.transport.lan.LanTimeouts
 import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import javax.inject.Inject
@@ -307,11 +309,15 @@ class ProducerSync @Inject constructor(
 
         /**
          * Asks the consumer for a direct link over [connection], joins it and sends over it. Whatever doesn't work
-         * on the way, everything (or the rest) still goes over Wi-Fi, and the home screen says why.
+         * on the way, everything (or the rest) still goes over Wi-Fi, and the home screen says why. [aware]: asks
+         * for Wi-Fi Aware, and for Wi-Fi Direct again if that can't be joined.
          */
-        suspend fun overTurbo(connection: PeerConnection): ProducerState {
+        suspend fun overTurbo(
+            connection: PeerConnection,
+            aware: Boolean = directLinks.awareAvailable(),
+        ): ProducerState {
             _state.value = ProducerState.SettingUpTurbo
-            val answer = connection.use { TurboSetup(device.local()).request(it) }
+            val answer = connection.use { TurboSetup(device.local()).request(it, aware) }
             Diagnostics.log(Area.SEND, "Turbo: the receiving phone is ${answer.describe()}")
             val link = when (answer) {
                 is TurboAnswer.Ready -> answer.link
@@ -323,6 +329,12 @@ class ProducerSync @Inject constructor(
                 directLinks.leave()
             }
             return when {
+                outcome == null && link.kind == LinkKind.WIFI_AWARE -> {
+                    Diagnostics.log(Area.SEND, "Turbo: no Wi-Fi Aware link; asking for Wi-Fi Direct instead")
+                    val again = connect(consumer) ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
+                    overTurbo(again, aware = false)
+                }
+
                 outcome == null -> wifiAgain(TurboProblem.NO_LINK)
 
                 outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED -> wifiAgain(
@@ -363,17 +375,18 @@ class ProducerSync @Inject constructor(
 
         /** How it ended over [link]; `null` if it couldn't be joined. A link dropping goes on over Wi-Fi. */
         private suspend fun overDirectLink(link: DirectLink): ProducerState? {
-            val owner = directLinks.join(link, JOIN_TIMEOUT_MILLIS)
-            if (owner == null) {
-                Diagnostics.log(Area.SEND, "Turbo: couldn't join $link within ${since(0, JOIN_TIMEOUT_MILLIS)}")
+            val timeout = if (link.kind == LinkKind.WIFI_AWARE) AWARE_JOIN_TIMEOUT_MILLIS else JOIN_TIMEOUT_MILLIS
+            val joined = directLinks.join(link, timeout)
+            if (joined == null) {
+                Diagnostics.log(Area.SEND, "Turbo: couldn't join $link within ${since(0, timeout)}")
                 return null
             }
             // Where the phone that opened the link is on it: it said so, but the link knows best.
-            val direct = connectToFirst(listOf("$owner:${link.port}"), consumer.id, direct = true) ?: return null
-            Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at $owner:${link.port}")
+            val direct = connectOver(joined, link.port, consumer.id) ?: return null
+            Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host.hostAddress}")
             _state.value = ProducerState.Syncing(progress = null, turbo = true)
             return try {
-                sockets.keepingAwake { send(direct, Path.DIRECT) }
+                sockets.keepingAwake { send(direct, Path.DIRECT) { connectOver(joined, link.port, consumer.id) } }
             } catch (e: IOException) {
                 if (failureOf(e) != SyncFailure.CONNECTION_LOST) throw e
                 Diagnostics.log(Area.SEND, "Turbo: the direct link dropped; going on over Wi-Fi", e)
@@ -421,7 +434,12 @@ class ProducerSync @Inject constructor(
             return { item -> item.descriptor.mimeType.startsWith("video/") }
         }
 
-        private fun send(connection: PeerConnection, path: Path): ProducerState.Idle = connection.use {
+        /** [another]: one more connection the way [connection] went, for parallel streams. */
+        private fun send(
+            connection: PeerConnection,
+            path: Path,
+            another: () -> PeerConnection? = { connectToFirst(listOf(connection.remoteAddress), consumer.id) },
+        ): ProducerState.Idle = connection.use {
             val direct = path == Path.DIRECT
             val over = when (path) {
                 Path.WIFI -> ""
@@ -432,7 +450,7 @@ class ProducerSync @Inject constructor(
                 session = { progress ->
                     ProducerSession(device.local(), source, ledger, progress, { !cancelled && !pauseWhen() }, details)
                 },
-                connect = { connectToFirst(listOf(it.remoteAddress), consumer.id, direct) },
+                connect = { another() },
                 progress = { progress ->
                     _state.value = ProducerState.Syncing(progress, turbo = direct, internet = path == Path.INTERNET)
                     // This month's mobile data limit reached: stops after the current file.
@@ -499,15 +517,21 @@ class ProducerSync @Inject constructor(
     }
 
     /** [direct]: over a direct link, which Android routes by itself, not through a Wi-Fi network. */
-    private fun connectToFirst(addresses: List<String>, expected: DeviceId, direct: Boolean = false): PeerConnection? =
+    private fun connectToFirst(addresses: List<String>, expected: DeviceId): PeerConnection? =
         addresses.asSequence().mapNotNull(::parseAddress).firstNotNullOfOrNull { address ->
-            try {
-                val factory = if (direct) SocketFactory.getDefault() else sockets.factoryFor(address)
-                LanClient.connect(address, identity.identity(), expected, TIMEOUTS, factory)
-            } catch (e: IOException) {
-                Diagnostics.log(Area.SEND, "Couldn't connect to ${address.hostString}:${address.port}", e)
-                null
-            }
+            connectTo(address, expected, sockets.factoryFor(address))
+        }
+
+    /** Over a direct link this phone [joined]: through the network the link is. */
+    private fun connectOver(joined: JoinedLink, port: Int, expected: DeviceId): PeerConnection? =
+        connectTo(InetSocketAddress(joined.host, port), expected, joined.sockets)
+
+    private fun connectTo(address: InetSocketAddress, expected: DeviceId, factory: SocketFactory): PeerConnection? =
+        try {
+            LanClient.connect(address, identity.identity(), expected, TIMEOUTS, factory)
+        } catch (e: IOException) {
+            Diagnostics.log(Area.SEND, "Couldn't connect to ${address.hostString}:${address.port}", e)
+            null
         }
 
     private companion object {
@@ -516,6 +540,9 @@ class ProducerSync @Inject constructor(
 
         /** Joining a Wi-Fi Direct group usually takes a few seconds; some phones take longer. */
         const val JOIN_TIMEOUT_MILLIS = 30_000L
+
+        /** Wi-Fi Aware usually links up within seconds; Wi-Fi Direct is the fallback after this. */
+        const val AWARE_JOIN_TIMEOUT_MILLIS = 15_000L
         val TIMEOUTS = LanTimeouts(connectMillis = 3_000)
     }
 }

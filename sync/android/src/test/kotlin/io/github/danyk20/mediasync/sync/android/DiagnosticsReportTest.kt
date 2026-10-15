@@ -78,6 +78,7 @@ class DiagnosticsReportTest {
         peers,
         history,
         { listOf(InetAddress.getByName("192.168.1.37")) },
+        DirectLinks.None,
         workManager,
         log,
         clock,
@@ -101,6 +102,7 @@ class DiagnosticsReportTest {
         facts["Last sync"] shouldBe "never"
         facts["Last problem"] shouldBe "unreachable"
         facts["Local network"] shouldBe "192.168.1.x"
+        facts["Turbo"] shouldBe "Wi-Fi Direct: unsupported; Wi-Fi Aware: no"
         facts.keys shouldContain "Battery use"
         facts.keys shouldContain "Work: scheduled-sync"
         facts.values.joinToString() shouldNotContain "Anna"

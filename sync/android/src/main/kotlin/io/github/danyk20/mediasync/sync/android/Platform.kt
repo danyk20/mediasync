@@ -8,6 +8,7 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
@@ -159,23 +160,31 @@ enum class TurboAvailability {
 }
 
 /**
- * Wi-Fi Direct links between the two phones, for Turbo transfer (docs/PLAN.md §8.3). The receiving phone creates
- * a fresh one for each transfer, and the sending phone joins it with what it was told in an encrypted session.
+ * Direct links between the two phones, for Turbo transfer (docs/PLAN.md §8.3): Wi-Fi Direct, or Wi-Fi Aware where
+ * both phones have it. The receiving phone opens a fresh one for each transfer, and the sending phone joins it with
+ * what it was told in an encrypted session.
  */
 interface DirectLinks {
     fun availability(): TurboAvailability
 
+    /** Whether this phone can use a Wi-Fi Aware link now: it has Wi-Fi Aware, it's on, and it's allowed. */
+    fun awareAvailable(): Boolean = false
+
     /**
-     * As a receiving phone: creates a link that sending phones join with [credentials] (network name and
-     * passphrase), listening on it at [port]. Blocks.
+     * As a receiving phone: opens a link of [kind] that sending phones join with [credentials] (network or service
+     * name, and passphrase), listening on it at [port]. Blocks.
      */
-    fun open(port: Int, credentials: Pair<String, String> = DirectLink.credentials()): TurboAnswer
+    fun open(
+        port: Int,
+        credentials: Pair<String, String> = DirectLink.credentials(),
+        kind: LinkKind = LinkKind.WIFI_DIRECT,
+    ): TurboAnswer
 
     /** As a receiving phone: removes the link named [networkName], if it's still up. */
     fun close(networkName: String)
 
-    /** As a sending phone: joins [link]; the address of the phone that opened it, or `null` if not joined in time. */
-    suspend fun join(link: DirectLink, timeoutMillis: Long): String?
+    /** As a sending phone: joins [link]; how to reach the phone that opened it, or `null` if not joined in time. */
+    suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink?
 
     /** As a sending phone: leaves the link it joined. */
     fun leave()
@@ -184,16 +193,22 @@ interface DirectLinks {
     object None : DirectLinks {
         override fun availability() = TurboAvailability.UNSUPPORTED
 
-        override fun open(port: Int, credentials: Pair<String, String>): TurboAnswer =
+        override fun open(port: Int, credentials: Pair<String, String>, kind: LinkKind): TurboAnswer =
             TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
 
         override fun close(networkName: String) = Unit
 
-        override suspend fun join(link: DirectLink, timeoutMillis: Long): String? = null
+        override suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? = null
 
         override fun leave() = Unit
     }
 }
+
+/**
+ * A direct link this phone joined: the address of the phone that opened it, and the [sockets] that reach it there (a
+ * Wi-Fi Aware link is a network of its own).
+ */
+data class JoinedLink(val host: InetAddress, val sockets: SocketFactory = SocketFactory.getDefault())
 
 /** Why background work waits for better conditions (docs/PLAN.md §10.5). */
 enum class PauseReason {

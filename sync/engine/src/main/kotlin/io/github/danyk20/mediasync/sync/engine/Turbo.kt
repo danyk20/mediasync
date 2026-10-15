@@ -16,13 +16,32 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import okio.ByteString
 
+/** How the two phones link up directly for Turbo transfer (docs/PLAN.md §8.3). */
+enum class LinkKind {
+    /** A Wi-Fi Direct group the consumer created. */
+    WIFI_DIRECT,
+
+    /** A Wi-Fi Aware service the consumer published: faster to set up, and it disturbs the normal Wi-Fi less. */
+    WIFI_AWARE,
+}
+
 /**
- * A direct Wi-Fi link between the two phones (Turbo transfer, docs/PLAN.md §8.3): the Wi-Fi Direct network the
- * consumer created, and where it listens on it.
+ * A direct Wi-Fi link between the two phones (Turbo transfer, docs/PLAN.md §8.3): the Wi-Fi Direct network or Wi-Fi
+ * Aware service the consumer opened, and where it listens on it. Over Wi-Fi Aware, [host] is empty: the link itself
+ * tells the producer the consumer's address.
  */
-data class DirectLink(val networkName: String, val passphrase: String, val host: String, val port: Int) {
+data class DirectLink(
+    val networkName: String,
+    val passphrase: String,
+    val host: String,
+    val port: Int,
+    val kind: LinkKind = LinkKind.WIFI_DIRECT,
+) {
     /** Never the passphrase: this ends up in logs. */
-    override fun toString() = "DirectLink($networkName at $host:$port)"
+    override fun toString() = when (kind) {
+        LinkKind.WIFI_DIRECT -> "DirectLink($networkName at $host:$port)"
+        LinkKind.WIFI_AWARE -> "DirectLink(Wi-Fi Aware $networkName, port $port)"
+    }
 
     companion object {
         /**
@@ -32,6 +51,15 @@ data class DirectLink(val networkName: String, val passphrase: String, val host:
         fun credentials(random: SecureRandom = SecureRandom()): Pair<String, String> {
             fun text(length: Int) = String(CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] })
             return "DIRECT-${text(2)}$NAME_MARKER" to text(PASSPHRASE_LENGTH)
+        }
+
+        /**
+         * A fresh Wi-Fi Aware service for one Turbo transfer: a random name, so only the phone it's sent to looks
+         * for it, and a random passphrase for the data path.
+         */
+        fun awareCredentials(random: SecureRandom = SecureRandom()): Pair<String, String> {
+            fun text(length: Int) = String(CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] })
+            return "MediaSync-${text(AWARE_NAME_LENGTH)}" to text(PASSPHRASE_LENGTH)
         }
 
         /**
@@ -61,6 +89,7 @@ data class DirectLink(val networkName: String, val passphrase: String, val host:
         private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
         private const val PASSPHRASE_LENGTH = 24
         private const val NAME_TAIL = 6
+        private const val AWARE_NAME_LENGTH = 16
         private const val HMAC = "HmacSHA256"
         private const val BYTE_MASK = 0xFF
     }
@@ -88,15 +117,19 @@ sealed interface TurboAnswer {
     data class Unavailable(val reason: TurboUnavailable) : TurboAnswer
 }
 
-/** The consumer's side of Turbo: opens the direct link, or says why it can't. Called on a session's thread. */
+/**
+ * The consumer's side of Turbo: opens the direct link, or says why it can't. Called on a session's thread. [aware]:
+ * the producer can join over Wi-Fi Aware.
+ */
 fun interface TurboHost {
-    fun open(): TurboAnswer
+    fun open(aware: Boolean): TurboAnswer
 }
 
 /** The producer's side: asks the consumer for a direct link, over a session on the network they share now. */
 class TurboSetup(private val local: LocalDevice) {
 
-    fun request(connection: PeerConnection): TurboAnswer {
+    /** [aware]: this phone can join a Wi-Fi Aware link now, which the consumer then prefers if it can open one. */
+    fun request(connection: PeerConnection, aware: Boolean = false): TurboAnswer {
         val channel = FrameChannel(connection)
         channel.send(Hello(PROTOCOL_VERSION, local.name, WireRole.PRODUCER, local.appVersion))
         val hello = channel.expect<Hello>()
@@ -104,7 +137,7 @@ class TurboSetup(private val local: LocalDevice) {
             channel.send(Bye(Bye.Reason.INCOMPATIBLE_VERSION))
             throw IncompatiblePeerException("Peer speaks v${hello.protocolVersion} as role ${hello.role}")
         }
-        channel.send(TurboRequest())
+        channel.send(TurboRequest(aware = aware))
         val ready = channel.expect<TurboReady>() // An unpaired phone is told so here.
         channel.send(Bye())
         return ready.toAnswer()
@@ -112,7 +145,17 @@ class TurboSetup(private val local: LocalDevice) {
 }
 
 internal fun TurboAnswer.toWire(): TurboReady = when (this) {
-    is TurboAnswer.Ready -> TurboReady(TurboReady.Status.OK, link.networkName, link.passphrase, link.host, link.port)
+    is TurboAnswer.Ready -> TurboReady(
+        TurboReady.Status.OK,
+        link.networkName,
+        link.passphrase,
+        link.host,
+        link.port,
+        when (link.kind) {
+            LinkKind.WIFI_DIRECT -> TurboReady.Kind.WIFI_DIRECT
+            LinkKind.WIFI_AWARE -> TurboReady.Kind.WIFI_AWARE
+        },
+    )
 
     is TurboAnswer.Unavailable -> TurboReady(
         when (reason) {
@@ -124,8 +167,18 @@ internal fun TurboAnswer.toWire(): TurboReady = when (this) {
 }
 
 internal fun TurboReady.toAnswer(): TurboAnswer = when (status) {
-    TurboReady.Status.OK -> TurboAnswer.Ready(DirectLink(networkName, passphrase, host, port))
+    TurboReady.Status.OK -> when (kind) {
+        TurboReady.Kind.WIFI_DIRECT -> TurboAnswer.Ready(DirectLink(networkName, passphrase, host, port))
+
+        TurboReady.Kind.WIFI_AWARE ->
+            TurboAnswer.Ready(DirectLink(networkName, passphrase, host, port, LinkKind.WIFI_AWARE))
+
+        else -> TurboAnswer.Unavailable(TurboUnavailable.FAILED) // A kind of link a later version adds.
+    }
+
     TurboReady.Status.UNSUPPORTED -> TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+
     TurboReady.Status.NOT_ALLOWED -> TurboAnswer.Unavailable(TurboUnavailable.NOT_ALLOWED)
+
     else -> TurboAnswer.Unavailable(TurboUnavailable.FAILED) // Including reasons a later version adds.
 }
