@@ -521,6 +521,10 @@ In v1.0 the consumer's files are removed by the connector app (Google Photos) af
    - The archive copy on the consumer stays byte-identical to the original.
    - Without this, Google Photos would file these items under the upload day.
    - **Google Photos app mode (§9.3.1)** is different: the Google Photos app uploads the stored file itself. So for files *without* an internal date only, the date is inserted losslessly into the stored file. The original hash is still recorded for dedupe.
+   - *As built (M4):* the receiving phone does this as it stores each file, before the gallery and the Google Photos app can see it.
+     - A photo (JPEG, PNG, WebP) gets the date and its UTC offset in its EXIF.
+     - A video (MP4, MOV, 3GP) gets it as the creation time of its movie, tracks and media, written in place: the file keeps its size and every sample. Times after 2040 don't fit the short header most videos have, and are left out.
+     - Dates in file names: `PXL_…` (UTC), `IMG_…`, `VID_…`, Samsung's `20250512_103045`, `Screenshot_…`, and WhatsApp's `IMG-20250512-WA0003`, which has the day only. For that, the time the file was last changed is used if it's the same day, noon otherwise. A name's date later than the file's last change is ignored.
 4. **Re-encoding normally drops metadata.**
    - In Storage saver mode, all EXIF, XMP and the color profile are copied into the compressed photo. Only the pixel dimensions are updated.
    - Transcoded videos get creation time, location and rotation written explicitly.

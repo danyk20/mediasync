@@ -23,6 +23,7 @@ import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.metadata.ByteReader
 import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
 import io.github.danyk20.mediasync.core.metadata.Redaction
+import io.github.danyk20.mediasync.core.metadata.VideoDates
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
@@ -38,6 +39,9 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
@@ -150,6 +154,49 @@ class MediaStoreTest {
                 BitmapFactory.decodeByteArray(photo, 0, photo.size),
             ) shouldBe true
         }
+    }
+
+    @Test
+    fun aPhotoWithoutAnyDateTakesTheDayInItsName() {
+        // A WhatsApp image: no EXIF date, and no gallery date from the sending phone either.
+        val photo = jpeg(Color.YELLOW)
+        val noon = LocalDate.of(2025, 5, 12).atTime(LocalTime.NOON).atZone(ZoneId.systemDefault())
+
+        val uri = Uri.parse(
+            sink.open(producer, descriptorOf(photo, "IMG-20250512-WA0004.jpg"), 0).run {
+                write(photo, 0, photo.size)
+                commit()
+            },
+        ).also { created += it }
+
+        dateTaken(uri) shouldBe noon.toInstant().toEpochMilli()
+        rescan(uri)
+        dateTaken(uri) shouldBe noon.toInstant().toEpochMilli()
+    }
+
+    @Test
+    fun aVideoWithoutACaptureTimeGetsOneThatARescanKeeps() {
+        val video = undatedVideo()
+        val takenAt = Instant.parse("2025-05-12T17:45:10Z").toEpochMilli()
+        val descriptor = descriptorOf(video, "VID-20250512-WA0001.mp4", capturedAt = takenAt, mimeType = "video/mp4")
+
+        val uri = Uri.parse(
+            sink.open(producer, descriptor, 0).run {
+                write(video, 0, video.size)
+                commit()
+            },
+        ).also { created += it }
+        rescan(uri)
+
+        dateTaken(uri) shouldBe takenAt
+        val stored = readBytes(uri)
+        stored.size shouldBe video.size // Written in place: the samples keep their offsets.
+        VideoDates.capturedAtMillis(
+            stored.size.toLong(),
+            ByteReader { at, count ->
+                stored.copyOfRange(at.toInt(), at.toInt() + count)
+            },
+        ) shouldBe takenAt
     }
 
     @Test
@@ -316,14 +363,38 @@ class MediaStoreTest {
 
     private fun readBytes(uri: Uri) = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
 
-    private fun descriptorOf(bytes: ByteArray, name: String, capturedAt: Long? = null, modifiedAt: Long? = null) =
-        MediaDescriptor(
-            fingerprint = Fingerprints.of(bytes),
-            size = bytes.size.toLong(),
-            mimeType = "image/jpeg",
-            displayName = name,
-            meta = MediaMeta(capturedAtMillis = capturedAt, modifiedAtMillis = modifiedAt),
-        )
+    private fun descriptorOf(
+        bytes: ByteArray,
+        name: String,
+        capturedAt: Long? = null,
+        modifiedAt: Long? = null,
+        mimeType: String = "image/jpeg",
+    ) = MediaDescriptor(
+        fingerprint = Fingerprints.of(bytes),
+        size = bytes.size.toLong(),
+        mimeType = mimeType,
+        displayName = name,
+        meta = MediaMeta(capturedAtMillis = capturedAt, modifiedAtMillis = modifiedAt),
+    )
+
+    /**
+     * The golden MP4 with every creation and modification time (movie, tracks, media) set to zero, as in many videos
+     * saved by messaging apps.
+     */
+    private fun undatedVideo(): ByteArray {
+        val video = javaClass.getResourceAsStream("/golden/video.mp4")!!.use { it.readBytes() }
+        val text = String(video, Charsets.ISO_8859_1)
+        listOf("mvhd", "tkhd", "mdhd").forEach { type ->
+            var at = text.indexOf(type)
+            while (at >= 0) {
+                val payload = at + 4
+                val width = if (video[payload].toInt() == 0) 8 else 16
+                ByteArray(width).copyInto(video, payload + 4)
+                at = text.indexOf(type, at + 1)
+            }
+        }
+        return video
+    }
 
     /** A real JPEG; without [exifDate] it has no capture date, as WhatsApp images don't. */
     private fun jpeg(color: Int, exifDate: String? = null, location: Boolean = false): ByteArray {

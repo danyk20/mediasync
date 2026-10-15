@@ -149,12 +149,10 @@ class MediaStoreSink internal constructor(
             channel.force(true)
             close()
             val meta = descriptor.meta
-            resolver.openFileDescriptor(uri, "rw")?.use { complete ->
+            val dateWritten = resolver.openFileDescriptor(uri, "rw")?.use { complete ->
                 CaptureDates.complete(
                     complete.fileDescriptor,
-                    descriptor.mimeType,
-                    meta.capturedAtMillis,
-                    meta.utcOffsetMinutes,
+                    descriptor,
                     // Android 11+ keeps the file byte for byte, and its modification time, instead.
                     addTimeZone = Build.VERSION.SDK_INT < Build.VERSION_CODES.R,
                 )
@@ -163,6 +161,8 @@ class MediaStoreSink internal constructor(
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.IS_PENDING, 0)
                 putGalleryDetails(descriptor)
+                // A date found for a file without one (docs/PLAN.md §6.2): the gallery shows the same.
+                if (meta.capturedAtMillis == null) dateWritten?.let { put(MediaStore.MediaColumns.DATE_TAKEN, it) }
             }
             if (resolver.update(uri, values, null, null) != 1) throw IOException("Couldn't publish $uri")
             partials.delete(producer.hex, fingerprint)

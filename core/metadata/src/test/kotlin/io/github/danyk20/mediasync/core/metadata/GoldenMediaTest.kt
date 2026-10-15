@@ -157,7 +157,7 @@ class GoldenMediaTest {
         it in this
     }.shouldBeEmpty()
 
-    private companion object {
+    internal companion object {
         const val JPEG = "pixel.jpg"
         const val SAMSUNG = "samsung.jpg"
         const val MOTION = "motion.jpg"

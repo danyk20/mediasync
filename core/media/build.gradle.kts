@@ -10,14 +10,16 @@ android {
 dependencies {
     api(projects.sync.engine)
     implementation(projects.core.database)
+    implementation(projects.core.metadata)
     implementation(projects.core.datastore)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)
 
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    testImplementation(testFixtures(projects.core.metadata))
 
-    androidTestImplementation(projects.core.metadata)
+    androidTestImplementation(testFixtures(projects.core.metadata))
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
