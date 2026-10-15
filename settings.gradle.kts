@@ -17,6 +17,8 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
+apply(from = "gradle/patched-build-libraries.settings.gradle.kts")
+
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {

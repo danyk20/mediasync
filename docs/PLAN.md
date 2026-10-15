@@ -1133,6 +1133,8 @@ mediasync/
 - All third-party actions are **pinned by commit SHA**.
 - Least-privilege `permissions:` in every workflow.
 - Dependabot covers Gradle, npm and GitHub Actions.
+  - Build tools' own libraries that Gradle or AGP pull in at an old version are raised to patched ones in `gradle/patched-build-libraries.settings.gradle.kts`. Each entry goes once the tool ships the fix itself.
+  - **Open follow-up:** the Kotlin Gradle plugin is below 2.4.20 (Dependabot alert #8: unsafe deserialization in the Kotlin build cache). Gradle 9.8.1 embeds Kotlin 2.4.10, which can't be raised from the build. Only local build caches are affected, so the alert was dismissed as a tolerable risk. **Upgrade to the first Gradle release that ships Kotlin 2.4.20 or newer as soon as it exists.**
 
 ### 14.3 Engineering standards
 
