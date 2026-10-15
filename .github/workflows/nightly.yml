@@ -36,17 +36,9 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Cache the emulator image
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.ANDROID_HOME }}/system-images/android-${{ matrix.api }}
-          key: emulator-image-api${{ matrix.api }}-${{ runner.os }}-${{ hashFiles('build-logic/convention/src/main/kotlin/io/github/danyk20/mediasync/buildlogic/KotlinAndroid.kt') }}
-      # Every module sets up the same emulator in parallel, and two of them installing one system image at
-      # once can fail ("System Image ... does not exist for this architecture"). Install it once first.
+      # Downloaded each time: caching an image (1–2 GB) would push the Gradle caches out of the repository's 10 GB.
       - name: Install the emulator image
-        run: >
-          ./gradlew :app:api${{ matrix.api }}Setup --max-workers=1
-          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+        run: scripts/install-emulator-image.sh ${{ matrix.api }}
       # Each test task boots its own emulator; gradle.properties allows one at a time, or the runner runs out of
       # memory and systemd-oomd stops the job (exit code 143): two API 36 emulators already do.
       - name: Run on API ${{ matrix.api }}
