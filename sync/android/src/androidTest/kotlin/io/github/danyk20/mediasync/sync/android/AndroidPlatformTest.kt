@@ -220,9 +220,12 @@ class AndroidPlatformTest {
      * and drop it when the host's network changes. Asks for it and waits; a test without it is skipped, not failed.
      */
     private fun requireWifi() {
+        // Connecting while connected makes the Wi-Fi drop for a moment, and its address with it: a test then bound to
+        // an address that was gone (EADDRNOTAVAIL), and the next tests ran on a network still settling.
+        if (wifiIsUp(QUICK_CHECK_SECONDS)) return
         shell("svc wifi enable")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) shell("cmd wifi connect-network AndroidWifi open")
-        assumeTrue("This emulator has no Wi-Fi", wifiIsUp())
+        assumeTrue("This emulator has no Wi-Fi", wifiIsUp(WIFI_TIMEOUT_SECONDS))
     }
 
     /** Android tells apps about the battery by a broadcast, which arrives a moment after the change. */
@@ -242,7 +245,8 @@ class AndroidPlatformTest {
     }
 
     /** Whether a Wi-Fi network with an IPv4 address appears within [WIFI_TIMEOUT_SECONDS]. */
-    private fun wifiIsUp(): Boolean {
+    // Whether a Wi-Fi network with an IPv4 address shows up within timeoutSeconds.
+    private fun wifiIsUp(timeoutSeconds: Long): Boolean {
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
         val ready = CountDownLatch(1)
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -256,7 +260,7 @@ class AndroidPlatformTest {
             .build()
         connectivity.registerNetworkCallback(wifi, callback)
         return try {
-            ready.await(WIFI_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            ready.await(timeoutSeconds, TimeUnit.SECONDS)
         } finally {
             connectivity.unregisterNetworkCallback(callback)
         }
@@ -264,6 +268,7 @@ class AndroidPlatformTest {
 
     private companion object {
         const val WIFI_TIMEOUT_SECONDS = 60L
+        const val QUICK_CHECK_SECONDS = 2L
         const val SETTLE_MILLIS = 10_000L
         const val POLL_MILLIS = 100L
     }

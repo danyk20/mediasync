@@ -83,6 +83,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # Robolectric fetches Android itself (about 200 MB) from Maven Central while the tests run, outside Gradle and
+      # its cache. Kept here per Robolectric version, it isn't fetched again each run, and a dropped connection can't
+      # fail the tests, as it once did ("Connection reset").
+      - name: Robolectric version
+        id: robolectric
+        run: echo "version=$(sed -n 's/^robolectric = "\(.*\)"/\1/p' gradle/libs.versions.toml)" >> "$GITHUB_OUTPUT"
+      - name: Cache Robolectric's Android
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ steps.robolectric.outputs.version }}
       # The Kover tasks run every module's unit tests once (debug variant on Android), including screenshot
       # verification, and then check the coverage gates: 70 % overall, 85 % for sync and transport modules.
       - name: Tests, screenshot verification and coverage gates
