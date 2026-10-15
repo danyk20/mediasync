@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.feature.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -55,7 +56,13 @@ fun RoleChoiceScreen(onRoleChosen: (DeviceRole) -> Unit, modifier: Modifier = Mo
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            HowItWorks()
             Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.onboarding_question),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
             ChoiceCard(
                 title = stringResource(R.string.onboarding_role_producer_title),
                 description = stringResource(R.string.onboarding_role_producer_description),
@@ -75,6 +82,31 @@ fun RoleChoiceScreen(onRoleChosen: (DeviceRole) -> Unit, modifier: Modifier = Mo
             )
         }
     }
+}
+
+/** The three steps from two phones to synced photos, before choosing this phone's part in them. */
+@Composable
+private fun HowItWorks() {
+    Text(
+        text = stringResource(R.string.onboarding_how_title),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.semantics { heading() },
+    )
+    listOf(R.string.onboarding_how_receive, R.string.onboarding_how_pair, R.string.onboarding_how_sync)
+        .forEachIndexed { index, step ->
+            // Read out as one: "1. Choose one phone to receive…".
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+            ) {
+                Text(
+                    text = "${index + 1}.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(text = stringResource(step), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
 }
 
 @Preview

@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="onboarding_title">Welcome to MediaSync</string>
-    <string name="onboarding_subtitle">Move photos and videos from your phones to one place, quickly and privately. How will you use this phone?</string>
+    <string name="onboarding_subtitle">Move photos and videos from your phones to one place, quickly and privately.</string>
+    <string name="onboarding_question">How will you use this phone?</string>
     <string name="onboarding_role_producer_title">This phone sends</string>
     <string name="onboarding_role_producer_description">Sends its photos and videos to your receiving phone.</string>
     <string name="onboarding_role_consumer_title">This phone receives</string>
-    <string name="onboarding_role_consumer_description">Collects photos and videos from your other phones and hands them to Google Photos.</string>
-    <string name="onboarding_change_later">You can change this later.</string>
+    <string name="onboarding_role_consumer_description">Collects photos and videos from your other phones. Google Photos on it can back them up.</string>
+    <string name="onboarding_how_title">How it works</string>
+    <string name="onboarding_how_receive">Choose one phone to receive. A phone that stays at home on a charger works best, such as an older Pixel.</string>
+    <string name="onboarding_how_pair">Pair each sending phone with it once, by scanning a code.</string>
+    <string name="onboarding_how_sync">New photos and videos go over every night while the phones charge, or right away with Sync now. They go straight from phone to phone, encrypted, with no account.</string>
+    <string name="onboarding_change_later">To change this phone\'s role later, choose Reset MediaSync in the ⋮ menu.</string>
 </resources>
