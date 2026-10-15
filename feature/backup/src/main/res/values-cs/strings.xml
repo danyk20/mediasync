@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Zálohování do cloudu</string>
+    <string name="backup_done">Hotovo</string>
+    <string name="backup_intro">Vše, co tento telefon přijme, se ukládá do jeho složky MediaSync. Aplikace pro zálohování v tomto telefonu ji odtud může nahrát.</string>
+    <string name="backup_none">Tato verze MediaSync nemá žádnou zálohu k nastavení.</string>
+
+    <string name="backup_setup_title">Zálohovat pomocí: %1$s</string>
+    <string name="backup_setup_body">%1$s zálohuje složku MediaSync sama od sebe. Na Pixelu 2 až 5 je to zdarma a bez limitu v Úspoře úložiště. MediaSync sám nic nenahrává.</string>
+    <string name="backup_not_installed">Aplikace %1$s v tomto telefonu není nainstalovaná.</string>
+    <string name="backup_install">Nainstalovat %1$s</string>
+    <string name="backup_steps_heading">Jednorázově to nastavte v %1$s:</string>
+    <string name="backup_step_folder">Zapněte zálohování pro složku %1$s: klepněte na profilový obrázek, pak Nastavení Fotek → Zálohování → Zálohovat složky zařízení. Složka se zobrazí, jakmile dorazí první fotka.</string>
+    <string name="backup_step_storage_saver">Zvolte Úsporu úložiště: Nastavení Fotek → Zálohování → Kvalita zálohy. Na Pixelu 2 až 5 nevyužívá vaše úložiště Google.</string>
+    <string name="backup_open_app">Otevřít %1$s</string>
+    <string name="backup_set_up_done">Je nastaveno</string>
+
+    <string name="backup_status_title">Zálohuje aplikace %1$s</string>
+    <string name="backup_status_today">Dnes předáno: %1$s</string>
+    <string name="backup_status_handed_over">%1$s v tomto telefonu k zálohování v aplikaci %2$s</string>
+    <string name="backup_status_removed">%1$s zálohováno a odstraněno z tohoto telefonu</string>
+    <string name="backup_status_waiting">%1$s přijato, zatím nepředáno</string>
+    <string name="backup_status_note">%1$s je zálohuje samo, obvykle během několika minut na Wi-Fi. MediaSync nevidí, kdy je to hotovo. Jakmile je %1$s odstraní kvůli uvolnění místa, počítají se jako zálohované.</string>
+
+    <string name="backup_free_up_title">Uvolnit místo</string>
+    <string name="backup_free_up_app">V %1$s klepněte na profilový obrázek a pak na Uvolnit místo. Odstraní jen to, co je zálohováno.</string>
+    <string name="backup_free_up_open">Otevřít %1$s</string>
+    <string name="backup_free_up_smart_storage">Nebo nechte telefon, ať to udělá sám: Chytré úložiště v nastavení úložiště odstraní zálohované fotky a videa, když dochází místo.</string>
+    <string name="backup_free_up_storage_settings">Nastavení úložiště</string>
+    <string name="backup_never_deletes">MediaSync tyto soubory sám nikdy nemaže.</string>
+    <string name="backup_stop">Zastavit zálohování</string>
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Fermer</string>
+    <string name="pairing_done">OK</string>
+    <string name="pairing_try_again">Réessayer</string>
+    <string name="pairing_consumer_title">Ajouter un téléphone émetteur</string>
+    <string name="pairing_consumer_instructions">Sur le téléphone qui enverra des photos, ouvrez MediaSync et scannez ce code.</string>
+    <string name="pairing_qr_description">Code d\'association</string>
+    <string name="pairing_consumer_validity">Le code fonctionne une fois, pendant 5 minutes. Les deux téléphones doivent être sur le même Wi-Fi.</string>
+    <string name="pairing_share_link">Partager le lien d\'association</string>
+    <string name="pairing_share_chooser">Envoyez le lien d\'association à votre autre téléphone</string>
+    <string name="pairing_no_network_title">Connectez-vous au Wi-Fi</string>
+    <string name="pairing_no_network_body">Ce téléphone doit être sur le Wi-Fi pour afficher un code d\'association.</string>
+    <string name="pairing_approve_title">Autoriser %1$s ?</string>
+    <string name="pairing_approve_body">Il pourra envoyer ses photos et vidéos vers ce téléphone.</string>
+    <string name="pairing_approve_allow">Autoriser</string>
+    <string name="pairing_approve_deny">Ne pas autoriser</string>
+    <string name="pairing_paired_title">Associé à %1$s</string>
+    <string name="pairing_paired_consumer_body">Ses photos et vidéos arriveront ici.</string>
+    <string name="pairing_producer_title">Associer au téléphone récepteur</string>
+    <string name="pairing_producer_instructions">Sur le téléphone récepteur, ouvrez MediaSync, appuyez sur Ajouter un téléphone émetteur, puis pointez cette caméra vers le code.</string>
+    <string name="pairing_camera_needed">Autorisez la caméra à scanner le code, ou collez plutôt le lien d\'association.</string>
+    <string name="pairing_paste_link">Coller le lien d\'association</string>
+    <string name="pairing_not_a_code">Ce n\'est pas un code d\'association MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Appuyez sur Autoriser sur %1$s pour terminer l\'association.</string>
+    <string name="pairing_paired_producer_body">Vous pouvez maintenant y envoyer vos photos et vidéos.</string>
+    <string name="pairing_confirm_title">Associer à %1$s ?</string>
+    <string name="pairing_confirm_body">Continuez seulement si %1$s est votre propre téléphone récepteur : ce téléphone y enverra ses photos et vidéos.</string>
+    <string name="pairing_confirm_pair">Associer</string>
+    <string name="pairing_confirm_cancel">Annuler</string>
+    <string name="pairing_failed_title">Non associé</string>
+    <string name="pairing_problem_declined">Le téléphone récepteur n\'a pas autorisé ce téléphone.</string>
+    <string name="pairing_problem_expired">Ce code a expiré ou a déjà été utilisé. Affichez-en un nouveau sur le téléphone récepteur.</string>
+    <string name="pairing_problem_no_answer">Personne n\'a appuyé sur Autoriser sur le téléphone récepteur à temps.</string>
+    <string name="pairing_problem_unreachable">Impossible de joindre le téléphone récepteur. Vérifiez que les deux téléphones sont sur le même Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">La connexion a été interrompue. Veuillez réessayer.</string>
+    <string name="pairing_problem_incompatible">Les téléphones utilisent des versions différentes de MediaSync. Mettez l\'appli à jour sur les deux.</string>
+</resources>

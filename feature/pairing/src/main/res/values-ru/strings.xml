@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Закрыть</string>
+    <string name="pairing_done">Готово</string>
+    <string name="pairing_try_again">Попробовать снова</string>
+
+    <string name="pairing_consumer_title">Добавить отправляющий телефон</string>
+    <string name="pairing_consumer_instructions">На телефоне, который будет отправлять фото, откройте MediaSync и отсканируйте этот код.</string>
+    <string name="pairing_qr_description">Код сопряжения</string>
+    <string name="pairing_consumer_validity">Код работает один раз, 5 минут. Оба телефона должны быть в одной сети Wi-Fi.</string>
+    <string name="pairing_share_link">Отправить ссылку для сопряжения</string>
+    <string name="pairing_share_chooser">Отправить ссылку для сопряжения на другой телефон</string>
+    <string name="pairing_no_network_title">Подключитесь к Wi-Fi</string>
+    <string name="pairing_no_network_body">Чтобы показать код сопряжения, этот телефон должен быть подключён к Wi-Fi.</string>
+    <string name="pairing_approve_title">Разрешить %1$s?</string>
+    <string name="pairing_approve_body">Он сможет отправлять на этот телефон свои фото и видео.</string>
+    <string name="pairing_approve_allow">Разрешить</string>
+    <string name="pairing_approve_deny">Не разрешать</string>
+    <string name="pairing_paired_title">Сопряжено с %1$s</string>
+    <string name="pairing_paired_consumer_body">Его фото и видео будут поступать сюда.</string>
+
+    <string name="pairing_producer_title">Сопряжение с принимающим телефоном</string>
+    <string name="pairing_producer_instructions">На принимающем телефоне откройте MediaSync, нажмите «Добавить отправляющий телефон» и наведите камеру на код.</string>
+    <string name="pairing_camera_needed">Разрешите доступ к камере для сканирования кода или вставьте ссылку для сопряжения.</string>
+    <string name="pairing_paste_link">Вставить ссылку для сопряжения</string>
+    <string name="pairing_not_a_code">Это не код сопряжения MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Нажмите «Разрешить» на %1$s, чтобы завершить сопряжение.</string>
+    <string name="pairing_paired_producer_body">Теперь вы можете отправлять на него свои фото и видео.</string>
+    <string name="pairing_confirm_title">Сопрячь с %1$s?</string>
+    <string name="pairing_confirm_body">Продолжайте, только если %1$s — ваш собственный принимающий телефон: этот телефон будет отправлять на него свои фото и видео.</string>
+    <string name="pairing_confirm_pair">Сопрячь</string>
+    <string name="pairing_confirm_cancel">Отмена</string>
+    <string name="pairing_failed_title">Не сопряжено</string>
+    <string name="pairing_problem_declined">Принимающий телефон не разрешил подключение этого телефона.</string>
+    <string name="pairing_problem_expired">Код истёк или уже использован. Покажите новый код на принимающем телефоне.</string>
+    <string name="pairing_problem_no_answer">На принимающем телефоне вовремя никто не нажал «Разрешить».</string>
+    <string name="pairing_problem_unreachable">Не удалось связаться с принимающим телефоном. Проверьте, что оба телефона подключены к одной сети Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">Соединение разорвано. Попробуйте ещё раз.</string>
+    <string name="pairing_problem_incompatible">На телефонах разные версии MediaSync. Обновите приложение на обоих.</string>
+</resources>

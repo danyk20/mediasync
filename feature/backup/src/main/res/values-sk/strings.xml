@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Zálohovanie do cloudu</string>
+    <string name="backup_done">Hotovo</string>
+    <string name="backup_intro">Všetko, čo tento telefón prijme, sa ukladá do jeho priečinka MediaSync. Aplikácia na zálohovanie v tomto telefóne ju odtiaľ môže nahrať.</string>
+    <string name="backup_none">Táto verzia MediaSync nemá žiadnu zálohu na nastavenie.</string>
+
+    <string name="backup_setup_title">Zálohovať pomocou: %1$s</string>
+    <string name="backup_setup_body">%1$s zálohuje priečinok MediaSync samostatne. Na Pixeli 2 až 5 je to zadarmo a bez limitu v Šetrení úložiska. MediaSync sám nič nenahráva.</string>
+    <string name="backup_not_installed">Aplikácia %1$s nie je v tomto telefóne nainštalovaná.</string>
+    <string name="backup_install">Nainštalovať %1$s</string>
+    <string name="backup_steps_heading">Raz to nastavte v %1$s:</string>
+    <string name="backup_step_folder">Zapnite zálohovanie pre priečinok %1$s: klepnite na profilový obrázok, potom Nastavenia Fotiek → Zálohovanie → Zálohovať priečinky zariadenia. Priečinok sa zobrazí, len čo príde prvá fotka.</string>
+    <string name="backup_step_storage_saver">Zvoľte Šetrenie úložiska: Nastavenia Fotiek → Zálohovanie → Kvalita zálohovania. Na Pixeli 2 až 5 nevyužíva vaše úložisko Google.</string>
+    <string name="backup_open_app">Otvoriť %1$s</string>
+    <string name="backup_set_up_done">Je nastavené</string>
+
+    <string name="backup_status_title">Zálohuje aplikácia %1$s</string>
+    <string name="backup_status_today">Dnes odovzdané: %1$s</string>
+    <string name="backup_status_handed_over">%1$s v tomto telefóne na zálohovanie v aplikácii %2$s</string>
+    <string name="backup_status_removed">%1$s zálohované a odstránené z tohto telefónu</string>
+    <string name="backup_status_waiting">%1$s prijaté, zatiaľ neodovzdané</string>
+    <string name="backup_status_note">%1$s ich zálohuje samo, zvyčajne do niekoľkých minút cez Wi-Fi. MediaSync nevidí, kedy je to hotové. Keď ich %1$s odstráni kvôli uvoľneniu miesta, počítajú sa ako zálohované.</string>
+
+    <string name="backup_free_up_title">Uvoľniť miesto</string>
+    <string name="backup_free_up_app">V %1$s klepnite na profilový obrázok a potom na Uvoľniť miesto. Odstráni len to, čo je zálohované.</string>
+    <string name="backup_free_up_open">Otvoriť %1$s</string>
+    <string name="backup_free_up_smart_storage">Alebo nechajte telefón, nech to urobí sám: Inteligentné úložisko v nastaveniach úložiska odstráni zálohované fotky a videá, keď dochádza miesto.</string>
+    <string name="backup_free_up_storage_settings">Nastavenia úložiska</string>
+    <string name="backup_never_deletes">MediaSync tieto súbory sám nikdy nemaže.</string>
+    <string name="backup_stop">Zastaviť zálohovanie</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diagnostics_title">Diagnostika</string>
+    <string name="diagnostics_done">Hotovo</string>
+    <string name="diagnostics_intro">Ak MediaSync nefunguje podľa očakávaní, zdieľajte tento záznam s tým, kto vám pomôže. Zostane v tomto telefóne, kým ho nezdieľate. Obsahuje, čo MediaSync robil a ako je tento telefón nastavený, bez fotiek, názvov súborov a miest.</string>
+    <string name="diagnostics_share">Zdieľať záznam</string>
+    <string name="diagnostics_save">Uložiť do súboru</string>
+    <string name="diagnostics_clear">Vymazať záznam</string>
+    <string name="diagnostics_share_title">Zdieľať diagnostiku MediaSync</string>
+    <string name="diagnostics_recent">Posledné udalosti</string>
+    <string name="diagnostics_empty">Zatiaľ nič nie je zaznamenané.</string>
+    <string name="diagnostics_link_test">Test spojenia</string>
+    <string name="diagnostics_link_test_intro">Meria, ako rýchlo môže tento telefón odosielať na %1$s, keď je na ňom otvorený MediaSync. Trvá asi 10 sekúnd.</string>
+    <string name="diagnostics_link_test_start">Otestovať spojenie</string>
+    <string name="diagnostics_link_test_running">Testujem…</string>
+    <string name="diagnostics_link_test_failed">Na %1$s sa nedá dostať. Otvorte na ňom MediaSync, na rovnakej Wi-Fi, a skúste to znova.</string>
+    <string name="diagnostics_link_test_one">Jedno spojenie: %1$s MB/s</string>
+    <string name="diagnostics_link_test_four">Štyri spojenia: %1$s MB/s</string>
+</resources>

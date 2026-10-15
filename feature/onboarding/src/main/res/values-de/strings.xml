@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Willkommen bei MediaSync</string>
+    <string name="onboarding_subtitle">Verschiebe Fotos und Videos schnell und privat von deinen Telefonen an einen Ort.</string>
+    <string name="onboarding_question">Wie nutzt du dieses Telefon?</string>
+    <string name="onboarding_role_producer_title">Dieses Telefon sendet</string>
+    <string name="onboarding_role_producer_description">Sendet seine Fotos und Videos an dein empfangendes Telefon.</string>
+    <string name="onboarding_role_consumer_title">Dieses Telefon empfängt</string>
+    <string name="onboarding_role_consumer_description">Sammelt Fotos und Videos von deinen anderen Telefonen. Google Fotos darauf kann sie sichern.</string>
+    <string name="onboarding_how_title">So funktioniert es</string>
+    <string name="onboarding_how_receive">Wähle ein Telefon zum Empfangen. Ein Telefon, das zu Hause am Ladegerät bleibt, eignet sich am besten, zum Beispiel ein älteres Pixel.</string>
+    <string name="onboarding_how_pair">Koppele jedes sendende Telefon einmal damit, indem du einen Code scannst.</string>
+    <string name="onboarding_how_sync">Neue Fotos und Videos werden nachts beim Laden übertragen oder sofort mit Jetzt synchronisieren. Sie gehen direkt von Telefon zu Telefon, verschlüsselt und ohne Konto.</string>
+    <string name="onboarding_change_later">Um die Rolle dieses Telefons später zu ändern, wähle im ⋮-Menü MediaSync zurücksetzen.</string>
+</resources>

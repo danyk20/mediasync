@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="schedule_daily">Jeden Tag um %1$s</string>
+    <plurals name="schedule_every_hours">
+        <item quantity="one">Jede Stunde ab %2$s</item>
+        <item quantity="other">Alle %1$d Stunden ab %2$s</item>
+    </plurals>
+    <plurals name="schedule_every_days">
+        <item quantity="one">Jeden Tag um %2$s</item>
+        <item quantity="other">Alle %1$d Tage um %2$s</item>
+    </plurals>
+    <string name="schedule_weekly">Jeden %1$s um %2$s</string>
+    <string name="schedule_while_charging">Immer beim Laden</string>
+    <string name="schedule_manual">Nur wenn du auf „Jetzt synchronisieren“ tippst</string>
+    <string name="moment_today">heute um %1$s</string>
+    <string name="moment_tomorrow">morgen um %1$s</string>
+    <string name="moment_yesterday">gestern um %1$s</string>
+    <string name="moment_weekday">%1$s um %2$s</string>
+    <string name="notice_not_now">Nicht jetzt</string>
+    <string name="more_options">Weitere Optionen</string>
+    <string name="menu_diagnostics">Diagnose</string>
+    <string name="menu_reset">MediaSync zurücksetzen</string>
+    <string name="reset_title">MediaSync zurücksetzen?</string>
+    <string name="reset_body">Dieses Telefon vergisst seine Rolle, seine gekoppelten Telefone, seine Einstellungen und seinen Verlauf, und MediaSync beginnt neu, als wäre es gerade installiert worden. Fotos und Videos bleiben, wo sie sind. Ein Cloudflare-Worker, den du eingerichtet hast, bleibt in deinem Cloudflare-Konto.</string>
+    <string name="reset_confirm">Zurücksetzen</string>
+    <string name="reset_cancel">Abbrechen</string>
+    <string name="setup_notifications_title">Sehen, wie Synchronisierungen laufen</string>
+    <string name="setup_notifications_body">Erlaube Benachrichtigungen, um den Fortschritt einer Synchronisierung zu sehen, auch wenn MediaSync geschlossen ist.</string>
+    <string name="setup_notifications_allow">Erlauben</string>
+    <string name="setup_battery_title">Synchronisierungen nachts laufen lassen</string>
+    <string name="setup_battery_body">Android pausiert Apps im Hintergrund, um Akku zu sparen. Öffne in den Einstellungen von MediaSync die Akkueinstellungen und wähle Uneingeschränkt. MediaSync synchronisiert nur beim Laden.</string>
+    <string name="setup_battery_open">Einstellungen öffnen</string>
+</resources>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Cerrar</string>
+    <string name="pairing_done">Listo</string>
+    <string name="pairing_try_again">Intentar de nuevo</string>
+
+    <string name="pairing_consumer_title">Añadir teléfono que envía</string>
+    <string name="pairing_consumer_instructions">En el teléfono que enviará fotos, abre MediaSync y escanea este código.</string>
+    <string name="pairing_qr_description">Código de emparejamiento</string>
+    <string name="pairing_consumer_validity">El código funciona una vez, durante 5 minutos. Ambos teléfonos deben estar en la misma Wi-Fi.</string>
+    <string name="pairing_share_link">Compartir enlace de emparejamiento</string>
+    <string name="pairing_share_chooser">Envía el enlace de emparejamiento a tu otro teléfono</string>
+    <string name="pairing_no_network_title">Conéctate a Wi-Fi</string>
+    <string name="pairing_no_network_body">Este teléfono necesita estar en Wi-Fi para mostrar un código de emparejamiento.</string>
+    <string name="pairing_approve_title">¿Permitir a %1$s?</string>
+    <string name="pairing_approve_body">Podrá enviar sus fotos y vídeos a este teléfono.</string>
+    <string name="pairing_approve_allow">Permitir</string>
+    <string name="pairing_approve_deny">No permitir</string>
+    <string name="pairing_paired_title">Emparejado con %1$s</string>
+    <string name="pairing_paired_consumer_body">Sus fotos y vídeos llegarán aquí.</string>
+
+    <string name="pairing_producer_title">Emparejar con teléfono que recibe</string>
+    <string name="pairing_producer_instructions">En el teléfono que recibe, abre MediaSync, toca Añadir teléfono que envía y apunta con la cámara de este teléfono al código.</string>
+    <string name="pairing_camera_needed">Permite la cámara para escanear el código, o pega el enlace de emparejamiento.</string>
+    <string name="pairing_paste_link">Pegar enlace de emparejamiento</string>
+    <string name="pairing_not_a_code">Eso no es un código de emparejamiento de MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Toca Permitir en %1$s para terminar el emparejamiento.</string>
+    <string name="pairing_paired_producer_body">Ya puedes enviarle tus fotos y vídeos.</string>
+    <string name="pairing_confirm_title">¿Emparejar con %1$s?</string>
+    <string name="pairing_confirm_body">Continúa solo si %1$s es tu propio teléfono que recibe: este teléfono le enviará sus fotos y vídeos.</string>
+    <string name="pairing_confirm_pair">Emparejar</string>
+    <string name="pairing_confirm_cancel">Cancelar</string>
+    <string name="pairing_failed_title">No emparejado</string>
+    <string name="pairing_problem_declined">El teléfono que recibe no permitió este teléfono.</string>
+    <string name="pairing_problem_expired">Este código ha caducado o ya se usó. Muestra uno nuevo en el teléfono que recibe.</string>
+    <string name="pairing_problem_no_answer">Nadie tocó Permitir en el teléfono que recibe a tiempo.</string>
+    <string name="pairing_problem_unreachable">No se pudo contactar con el teléfono que recibe. Comprueba que ambos estén en la misma Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">Se cortó la conexión. Inténtalo de nuevo.</string>
+    <string name="pairing_problem_incompatible">Los teléfonos tienen versiones distintas de MediaSync. Actualiza la app en ambos.</string>
+</resources>

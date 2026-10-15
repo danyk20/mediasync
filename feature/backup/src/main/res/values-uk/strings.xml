@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Резервне копіювання в хмару</string>
+    <string name="backup_done">Готово</string>
+    <string name="backup_intro">Усе, що отримує цей телефон, зберігається в його папці MediaSync. Застосунок для резервного копіювання на цьому телефоні може завантажити їх звідти.</string>
+    <string name="backup_none">У цій версії MediaSync немає резервного копіювання для налаштування.</string>
+
+    <string name="backup_setup_title">Резервне копіювання через %1$s</string>
+    <string name="backup_setup_body">%1$s сам резервує папку MediaSync. На Pixel 2–5 це безкоштовно і без обмежень у режимі «Економія місця». Сам MediaSync нічого не завантажує.</string>
+    <string name="backup_not_installed">Застосунок %1$s не встановлено на цьому телефоні.</string>
+    <string name="backup_install">Встановити %1$s</string>
+    <string name="backup_steps_heading">Налаштуйте один раз у %1$s:</string>
+    <string name="backup_step_folder">Увімкніть резервне копіювання для папки %1$s: натисніть на фото профілю, потім «Налаштування Фото» → «Резервне копіювання» → «Резервне копіювання папок пристрою». Папка з’явиться в списку, щойно надійде перше фото.</string>
+    <string name="backup_step_storage_saver">Виберіть «Економія місця»: «Налаштування Фото» → «Резервне копіювання» → «Якість резервної копії». На Pixel 2–5 це не використовує ваше сховище Google.</string>
+    <string name="backup_open_app">Відкрити %1$s</string>
+    <string name="backup_set_up_done">Налаштовано</string>
+
+    <string name="backup_status_title">Резервне копіювання через %1$s</string>
+    <string name="backup_status_today">Сьогодні передано: %1$s</string>
+    <string name="backup_status_handed_over">%1$s на цьому телефоні для резервного копіювання в %2$s</string>
+    <string name="backup_status_removed">%1$s збережено в резервній копії та видалено з цього телефона</string>
+    <string name="backup_status_waiting">%1$s отримано, ще не передано</string>
+    <string name="backup_status_note">%1$s зберігає їх у резервну копію само, зазвичай протягом кількох хвилин через Wi-Fi. MediaSync не бачить, коли це готово. Щойно %1$s видалить їх, щоб звільнити місце, вони вважаються збереженими.</string>
+
+    <string name="backup_free_up_title">Звільнити місце</string>
+    <string name="backup_free_up_app">У %1$s натисніть на фото профілю, потім «Звільнити місце». Видаляться лише ті файли, що збережені в резервній копії.</string>
+    <string name="backup_free_up_open">Відкрити %1$s</string>
+    <string name="backup_free_up_smart_storage">Або нехай телефон зробить це сам: «Розумне сховище» у налаштуваннях сховища видаляє збережені фото й відео, коли місце закінчується.</string>
+    <string name="backup_free_up_storage_settings">Налаштування сховища</string>
+    <string name="backup_never_deletes">MediaSync сам ніколи не видаляє ці файли.</string>
+    <string name="backup_stop">Зупинити резервне копіювання</string>
+</resources>

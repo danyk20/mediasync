@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_notification_channel">Synchronizácia na pozadí</string>
+    <string name="relay_channel">Limit relé cez internet</string>
+    <string name="relay_high_title" formatted="false">Využitých 80 % limitu relé</string>
+    <string name="relay_high_text">Synchronizácia cez internet využila %1$s GB z %2$s GB, ktoré relé Cloudflare tento mesiac prenesie zadarmo. Wi-Fi a priame pripojenia sa nepočítajú.</string>
+    <string name="relay_nearly_used_up_title">Limit relé je takmer vyčerpaný</string>
+    <string name="relay_nearly_used_up_text">Synchronizácia cez internet prestane relé tento mesiac používať pri %1$s GB, aby zostalo zadarmo. Telefóny, ktoré sa môžu pripojiť priamo, a Wi-Fi sa synchronizujú ďalej.</string>
+    <string name="relay_used_up_title">Limit relé je vyčerpaný</string>
+    <string name="relay_used_up_text">Do budúceho mesiaca, keď sa začne znova, sa telefóny, ktoré sa nemôžu pripojiť priamo, synchronizujú len cez Wi-Fi.</string>
+    <string name="sync_notification_sending">Odosielanie fotiek a videí</string>
+    <string name="sync_notification_sending_to">Odosielanie na %1$s</string>
+    <string name="sync_notification_ready">Pripravené prijímať fotky a videá</string>
+    <string name="sync_notification_receiving">Prijímanie fotiek a videí</string>
+    <string name="sync_notification_receiving_from">Prijímanie od %1$s</string>
+    <string name="sync_notification_progress">%1$d z %2$d</string>
+    <plurals name="sync_notification_sent">
+        <item quantity="one">Odoslané: %d</item>
+        <item quantity="few">Odoslané: %d</item>
+        <item quantity="many">Odoslané: %d</item>
+        <item quantity="other">Odoslané: %d</item>
+    </plurals>
+    <string name="sync_notification_sent_to">Sú v bezpečí na %1$s.</string>
+</resources>

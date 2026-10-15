@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Vitajte v MediaSync</string>
+    <string name="onboarding_subtitle">Rýchlo a súkromne presuňte fotky a videá z vašich telefónov na jedno miesto.</string>
+    <string name="onboarding_question">Ako budete tento telefón používať?</string>
+    <string name="onboarding_role_producer_title">Tento telefón odosiela</string>
+    <string name="onboarding_role_producer_description">Odosiela svoje fotky a videá do vášho prijímajúceho telefónu.</string>
+    <string name="onboarding_role_consumer_title">Tento telefón prijíma</string>
+    <string name="onboarding_role_consumer_description">Zbiera fotky a videá z vašich ďalších telefónov. Google Photos ich v ňom môže zálohovať.</string>
+    <string name="onboarding_how_title">Ako to funguje</string>
+    <string name="onboarding_how_receive">Vyberte jeden telefón na príjem. Najlepšie sa osvedčí telefón, ktorý zostáva doma na nabíjačke, napríklad starší Pixel.</string>
+    <string name="onboarding_how_pair">Každý odosielajúci telefón s ním raz spárujte naskenovaním kódu.</string>
+    <string name="onboarding_how_sync">Nové fotky a videá sa prenášajú každú noc, keď sa telefóny nabíjajú, alebo hneď cez Synchronizovať teraz. Idú priamo z telefónu do telefónu, šifrovane, bez účtu.</string>
+    <string name="onboarding_change_later">Rolu tohto telefónu zmeníte neskôr voľbou Obnoviť MediaSync v ponuke ⋮.</string>
+</resources>

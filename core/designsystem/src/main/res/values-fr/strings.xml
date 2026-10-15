@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="schedule_daily">Tous les jours à %1$s</string>
+    <plurals name="schedule_every_hours">
+        <item quantity="one">Toutes les heures à partir de %2$s</item>
+        <item quantity="many">Toutes les %1$d heures à partir de %2$s</item>
+        <item quantity="other">Toutes les %1$d heures à partir de %2$s</item>
+    </plurals>
+    <plurals name="schedule_every_days">
+        <item quantity="one">Tous les jours à %2$s</item>
+        <item quantity="many">Tous les %1$d jours à %2$s</item>
+        <item quantity="other">Tous les %1$d jours à %2$s</item>
+    </plurals>
+    <string name="schedule_weekly">Tous les %1$s à %2$s</string>
+    <string name="schedule_while_charging">Pendant la charge</string>
+    <string name="schedule_manual">Uniquement quand vous appuyez sur Synchroniser maintenant</string>
+    <string name="moment_today">aujourd\'hui à %1$s</string>
+    <string name="moment_tomorrow">demain à %1$s</string>
+    <string name="moment_yesterday">hier à %1$s</string>
+    <string name="moment_weekday">%1$s à %2$s</string>
+    <string name="notice_not_now">Pas maintenant</string>
+    <string name="more_options">Plus d\'options</string>
+    <string name="menu_diagnostics">Diagnostic</string>
+    <string name="menu_reset">Réinitialiser MediaSync</string>
+    <string name="reset_title">Réinitialiser MediaSync ?</string>
+    <string name="reset_body">Ce téléphone oublie son rôle, ses téléphones associés, ses réglages et son historique, et MediaSync repart de zéro comme s\'il venait d\'être installé. Les photos et vidéos restent où elles sont. Un Worker Cloudflare que vous avez configuré reste dans votre compte Cloudflare.</string>
+    <string name="reset_confirm">Réinitialiser</string>
+    <string name="reset_cancel">Annuler</string>
+    <string name="setup_notifications_title">Suivre le déroulement des synchronisations</string>
+    <string name="setup_notifications_body">Autorisez les notifications pour suivre la progression d\'une synchronisation, même lorsque MediaSync est fermé.</string>
+    <string name="setup_notifications_allow">Autoriser</string>
+    <string name="setup_battery_title">Laisser les synchronisations tourner la nuit</string>
+    <string name="setup_battery_body">Android met en pause les applis en arrière-plan pour économiser la batterie. Dans les réglages de MediaSync, ouvrez les réglages de batterie et choisissez Sans restriction. MediaSync ne synchronise que pendant la charge.</string>
+    <string name="setup_battery_open">Ouvrir les réglages</string>
+</resources>

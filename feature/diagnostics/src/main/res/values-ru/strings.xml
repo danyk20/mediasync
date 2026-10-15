@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diagnostics_title">Диагностика</string>
+    <string name="diagnostics_done">Готово</string>
+    <string name="diagnostics_intro">Если MediaSync работает не так, как ожидалось, отправьте этот журнал тому, кто вам поможет. Он остаётся на этом телефоне, пока вы им не поделитесь. В нём записано, что делал MediaSync и как настроен телефон, но без фото, имён файлов и мест.</string>
+    <string name="diagnostics_share">Отправить журнал</string>
+    <string name="diagnostics_save">Сохранить в файл</string>
+    <string name="diagnostics_clear">Очистить журнал</string>
+    <string name="diagnostics_share_title">Отправить диагностику MediaSync</string>
+    <string name="diagnostics_recent">Недавние события</string>
+    <string name="diagnostics_empty">Записей пока нет.</string>
+    <string name="diagnostics_link_test">Проверка связи</string>
+    <string name="diagnostics_link_test_intro">Измеряет, как быстро этот телефон может отправлять данные на %1$s, при открытом на нём MediaSync. Занимает около 10 секунд.</string>
+    <string name="diagnostics_link_test_start">Проверить соединение</string>
+    <string name="diagnostics_link_test_running">Проверка…</string>
+    <string name="diagnostics_link_test_failed">Не удалось связаться с %1$s. Откройте на нём MediaSync, в той же сети Wi-Fi, и попробуйте снова.</string>
+    <string name="diagnostics_link_test_one">Одно соединение: %1$s МБ/с</string>
+    <string name="diagnostics_link_test_four">Четыре соединения: %1$s МБ/с</string>
+</resources>

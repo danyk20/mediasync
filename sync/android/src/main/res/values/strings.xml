@@ -2,7 +2,7 @@
 <resources>
     <string name="sync_notification_channel">Background sync</string>
     <string name="relay_channel">Internet relay allowance</string>
-    <string name="relay_high_title">80 % of the relay allowance used</string>
+    <string name="relay_high_title" formatted="false">80 % of the relay allowance used</string>
     <string name="relay_high_text">Internet sync used %1$s GB of the %2$s GB Cloudflare\'s relay carries for free this month. Wi-Fi and direct connections don\'t count.</string>
     <string name="relay_nearly_used_up_title">The relay allowance is nearly used up</string>
     <string name="relay_nearly_used_up_text">Internet sync stops using the relay at %1$s GB this month, so it stays free. Phones that can connect directly, and Wi-Fi, still sync.</string>

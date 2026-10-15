@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_target_label">MediaSync</string>
+    <string name="share_preparing">Preparando… %1$d/%2$d</string>
+    <plurals name="share_sending">
+        <item quantity="one">Enviando %1$d foto ou vídeo para %2$s agora.</item>
+        <item quantity="many">Enviando %1$d fotos e vídeos para %2$s agora.</item>
+        <item quantity="other">Enviando %1$d fotos e vídeos para %2$s agora.</item>
+    </plurals>
+    <string name="share_unreachable_note">Se não for possível acessá-lo agora, eles vão com a próxima sincronização.</string>
+    <plurals name="share_unreadable">
+        <item quantity="one">%1$d não pôde ser lido, então não é enviado.</item>
+        <item quantity="many">%1$d não puderam ser lidos, então não são enviados.</item>
+        <item quantity="other">%1$d não puderam ser lidos, então não são enviados.</item>
+    </plurals>
+    <string name="share_nothing">Nada aqui pode ser enviado.</string>
+    <string name="share_receiving_phone">seu telefone que recebe</string>
+    <string name="share_ok">OK</string>
+</resources>

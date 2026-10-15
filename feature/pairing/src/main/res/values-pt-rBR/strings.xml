@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Fechar</string>
+    <string name="pairing_done">Concluído</string>
+    <string name="pairing_try_again">Tentar de novo</string>
+
+    <string name="pairing_consumer_title">Adicionar telefone que envia</string>
+    <string name="pairing_consumer_instructions">No telefone que vai enviar fotos, abra o MediaSync e leia este código.</string>
+    <string name="pairing_qr_description">Código de pareamento</string>
+    <string name="pairing_consumer_validity">O código funciona uma vez, por 5 minutos. Os dois telefones precisam estar na mesma rede Wi-Fi.</string>
+    <string name="pairing_share_link">Compartilhar link de pareamento</string>
+    <string name="pairing_share_chooser">Envie o link de pareamento para o seu outro telefone</string>
+    <string name="pairing_no_network_title">Conecte-se ao Wi-Fi</string>
+    <string name="pairing_no_network_body">Este telefone precisa estar no Wi-Fi para mostrar um código de pareamento.</string>
+    <string name="pairing_approve_title">Permitir %1$s?</string>
+    <string name="pairing_approve_body">Ele vai poder enviar as fotos e os vídeos dele para este telefone.</string>
+    <string name="pairing_approve_allow">Permitir</string>
+    <string name="pairing_approve_deny">Não permitir</string>
+    <string name="pairing_paired_title">Pareado com %1$s</string>
+    <string name="pairing_paired_consumer_body">As fotos e os vídeos dele vão chegar aqui.</string>
+
+    <string name="pairing_producer_title">Parear com o telefone que recebe</string>
+    <string name="pairing_producer_instructions">No telefone que recebe, abra o MediaSync, toque em Adicionar telefone que envia e aponte a câmera deste telefone para o código.</string>
+    <string name="pairing_camera_needed">Permita a câmera para ler o código, ou cole o link de pareamento.</string>
+    <string name="pairing_paste_link">Colar link de pareamento</string>
+    <string name="pairing_not_a_code">Isso não é um código de pareamento do MediaSync.</string>
+    <string name="pairing_waiting_for_approval">Toque em Permitir no %1$s para concluir o pareamento.</string>
+    <string name="pairing_paired_producer_body">Agora você pode enviar suas fotos e vídeos para ele.</string>
+    <string name="pairing_confirm_title">Parear com %1$s?</string>
+    <string name="pairing_confirm_body">Continue só se %1$s for o seu próprio telefone que recebe: este telefone vai enviar as fotos e os vídeos dele para ele.</string>
+    <string name="pairing_confirm_pair">Parear</string>
+    <string name="pairing_confirm_cancel">Cancelar</string>
+    <string name="pairing_failed_title">Não pareado</string>
+    <string name="pairing_problem_declined">O telefone que recebe não permitiu este telefone.</string>
+    <string name="pairing_problem_expired">Este código expirou ou já foi usado. Mostre um novo no telefone que recebe.</string>
+    <string name="pairing_problem_no_answer">Ninguém tocou em Permitir no telefone que recebe a tempo.</string>
+    <string name="pairing_problem_unreachable">Não foi possível acessar o telefone que recebe. Verifique se os dois estão na mesma rede Wi-Fi.</string>
+    <string name="pairing_problem_connection_lost">A conexão caiu. Tente de novo.</string>
+    <string name="pairing_problem_incompatible">Os telefones usam versões diferentes do MediaSync. Atualize o app nos dois.</string>
+</resources>

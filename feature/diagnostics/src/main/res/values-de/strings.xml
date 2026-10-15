@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diagnostics_title">Diagnose</string>
+    <string name="diagnostics_done">Fertig</string>
+    <string name="diagnostics_intro">Wenn MediaSync nicht wie erwartet funktioniert, teile dieses Protokoll mit der Person, die dir hilft. Es bleibt auf diesem Telefon, bis du es teilst. Es listet auf, was MediaSync getan hat und wie dieses Telefon eingerichtet ist, ohne Fotos, Dateinamen oder Orte.</string>
+    <string name="diagnostics_share">Protokoll teilen</string>
+    <string name="diagnostics_save">In Datei speichern</string>
+    <string name="diagnostics_clear">Protokoll leeren</string>
+    <string name="diagnostics_share_title">MediaSync-Diagnose teilen</string>
+    <string name="diagnostics_recent">Letzte Ereignisse</string>
+    <string name="diagnostics_empty">Noch nichts protokolliert.</string>
+    <string name="diagnostics_link_test">Verbindungstest</string>
+    <string name="diagnostics_link_test_intro">Misst, wie schnell dieses Telefon an %1$s senden kann, wenn MediaSync darauf geöffnet ist. Dauert etwa 10 Sekunden.</string>
+    <string name="diagnostics_link_test_start">Verbindung testen</string>
+    <string name="diagnostics_link_test_running">Wird getestet…</string>
+    <string name="diagnostics_link_test_failed">%1$s war nicht erreichbar. Öffne MediaSync darauf, im selben WLAN, und versuche es erneut.</string>
+    <string name="diagnostics_link_test_one">Eine Verbindung: %1$s MB/s</string>
+    <string name="diagnostics_link_test_four">Vier Verbindungen: %1$s MB/s</string>
+</resources>

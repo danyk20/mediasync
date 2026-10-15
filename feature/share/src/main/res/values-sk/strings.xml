@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_target_label">MediaSync</string>
+    <string name="share_preparing">Pripravujem… %1$d/%2$d</string>
+    <plurals name="share_sending">
+        <item quantity="one">Odosielam %1$d fotku alebo video na %2$s teraz.</item>
+        <item quantity="few">Odosielam %1$d fotky alebo videá na %2$s teraz.</item>
+        <item quantity="many">Odosielam %1$d fotiek a videí na %2$s teraz.</item>
+        <item quantity="other">Odosielam %1$d fotiek a videí na %2$s teraz.</item>
+    </plurals>
+    <string name="share_unreachable_note">Ak sa na ne teraz nedá dostať, odošlú sa pri ďalšej synchronizácii.</string>
+    <plurals name="share_unreadable">
+        <item quantity="one">Nedá sa prečítať: %1$d, preto sa neodošle.</item>
+        <item quantity="few">Nedá sa prečítať: %1$d, preto sa neodošle.</item>
+        <item quantity="many">Nedá sa prečítať: %1$d, preto sa neodošle.</item>
+        <item quantity="other">Nedá sa prečítať: %1$d, preto sa neodošle.</item>
+    </plurals>
+    <string name="share_nothing">Tu sa nedá nič odoslať.</string>
+    <string name="share_receiving_phone">váš prijímajúci telefón</string>
+    <string name="share_ok">OK</string>
+</resources>

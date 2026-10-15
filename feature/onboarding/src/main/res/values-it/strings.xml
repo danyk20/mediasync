@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Benvenuto in MediaSync</string>
+    <string name="onboarding_subtitle">Sposta foto e video dai tuoi telefoni in un unico posto, in modo rapido e privato.</string>
+    <string name="onboarding_question">Come userai questo telefono?</string>
+    <string name="onboarding_role_producer_title">Questo telefono invia</string>
+    <string name="onboarding_role_producer_description">Invia le sue foto e i suoi video al telefono che riceve.</string>
+    <string name="onboarding_role_consumer_title">Questo telefono riceve</string>
+    <string name="onboarding_role_consumer_description">Raccoglie foto e video dagli altri tuoi telefoni. Google Foto su di esso può farne il backup.</string>
+    <string name="onboarding_how_title">Come funziona</string>
+    <string name="onboarding_how_receive">Scegli un telefono che riceve. Funziona meglio un telefono che resta a casa sul caricabatterie, come un Pixel più vecchio.</string>
+    <string name="onboarding_how_pair">Abbina una volta ogni telefono di invio, scansionando un codice.</string>
+    <string name="onboarding_how_sync">Le nuove foto e i nuovi video vengono inviati ogni notte mentre i telefoni sono in carica, oppure subito con Sincronizza ora. Passano direttamente da telefono a telefono, cifrati, senza account.</string>
+    <string name="onboarding_change_later">Per cambiare in seguito il ruolo di questo telefono, scegli Reimposta MediaSync nel menu ⋮.</string>
+</resources>

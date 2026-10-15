@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pairing_close">Schließen</string>
+    <string name="pairing_done">Fertig</string>
+    <string name="pairing_try_again">Erneut versuchen</string>
+    <string name="pairing_consumer_title">Sendendes Telefon hinzufügen</string>
+    <string name="pairing_consumer_instructions">Öffne auf dem Telefon, das Fotos senden wird, MediaSync und scanne diesen Code.</string>
+    <string name="pairing_qr_description">Kopplungscode</string>
+    <string name="pairing_consumer_validity">Der Code funktioniert einmal, 5 Minuten lang. Beide Telefone müssen im selben WLAN sein.</string>
+    <string name="pairing_share_link">Kopplungslink teilen</string>
+    <string name="pairing_share_chooser">Sende den Kopplungslink an dein anderes Telefon</string>
+    <string name="pairing_no_network_title">Mit WLAN verbinden</string>
+    <string name="pairing_no_network_body">Dieses Telefon muss mit einem WLAN verbunden sein, um einen Kopplungscode anzuzeigen.</string>
+    <string name="pairing_approve_title">%1$s erlauben?</string>
+    <string name="pairing_approve_body">Es kann seine Fotos und Videos an dieses Telefon senden.</string>
+    <string name="pairing_approve_allow">Erlauben</string>
+    <string name="pairing_approve_deny">Nicht erlauben</string>
+    <string name="pairing_paired_title">Gekoppelt mit %1$s</string>
+    <string name="pairing_paired_consumer_body">Seine Fotos und Videos kommen hier an.</string>
+    <string name="pairing_producer_title">Mit empfangendem Telefon koppeln</string>
+    <string name="pairing_producer_instructions">Öffne auf dem empfangenden Telefon MediaSync, tippe auf Sendendes Telefon hinzufügen und halte diese Kamera auf den Code.</string>
+    <string name="pairing_camera_needed">Erlaube der Kamera, den Code zu scannen, oder füge stattdessen den Kopplungslink ein.</string>
+    <string name="pairing_paste_link">Kopplungslink einfügen</string>
+    <string name="pairing_not_a_code">Das ist kein MediaSync-Kopplungscode.</string>
+    <string name="pairing_waiting_for_approval">Tippe auf %1$s auf Erlauben, um die Kopplung abzuschließen.</string>
+    <string name="pairing_paired_producer_body">Du kannst jetzt deine Fotos und Videos dorthin senden.</string>
+    <string name="pairing_confirm_title">Mit %1$s koppeln?</string>
+    <string name="pairing_confirm_body">Fahre nur fort, wenn %1$s dein eigenes empfangendes Telefon ist: Dieses Telefon sendet seine Fotos und Videos dorthin.</string>
+    <string name="pairing_confirm_pair">Koppeln</string>
+    <string name="pairing_confirm_cancel">Abbrechen</string>
+    <string name="pairing_failed_title">Nicht gekoppelt</string>
+    <string name="pairing_problem_declined">Das empfangende Telefon hat dieses Telefon nicht erlaubt.</string>
+    <string name="pairing_problem_expired">Dieser Code ist abgelaufen oder wurde schon benutzt. Zeige auf dem empfangenden Telefon einen neuen an.</string>
+    <string name="pairing_problem_no_answer">Auf dem empfangenden Telefon hat niemand rechtzeitig auf Erlauben getippt.</string>
+    <string name="pairing_problem_unreachable">Das empfangende Telefon war nicht erreichbar. Prüfe, ob beide Telefone im selben WLAN sind.</string>
+    <string name="pairing_problem_connection_lost">Die Verbindung ist abgebrochen. Bitte versuche es erneut.</string>
+    <string name="pairing_problem_incompatible">Die Telefone haben unterschiedliche MediaSync-Versionen. Aktualisiere die App auf beiden.</string>
+</resources>

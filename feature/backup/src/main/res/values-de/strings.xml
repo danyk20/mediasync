@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_title">Cloud-Sicherung</string>
+    <string name="backup_done">Fertig</string>
+    <string name="backup_intro">Alles, was dieses Telefon empfängt, wird in seinem MediaSync-Ordner gespeichert. Eine Backup-App auf diesem Telefon kann es von dort hochladen.</string>
+    <string name="backup_none">Diese Version von MediaSync hat keine Sicherung einzurichten.</string>
+    <string name="backup_setup_title">Sichern mit %1$s</string>
+    <string name="backup_setup_body">%1$s sichert den MediaSync-Ordner selbst. Auf Pixel 2 bis 5 ist das im Modus Speicher sparen kostenlos und unbegrenzt. MediaSync lädt selbst nichts hoch.</string>
+    <string name="backup_not_installed">%1$s ist auf diesem Telefon nicht installiert.</string>
+    <string name="backup_install">%1$s installieren</string>
+    <string name="backup_steps_heading">Einmal in %1$s einrichten:</string>
+    <string name="backup_step_folder">Sicherung für den Ordner %1$s aktivieren: Tippe auf dein Profilbild, dann auf Fotoeinstellungen → Sicherung → Geräteordner sichern. Der Ordner erscheint, sobald das erste Foto angekommen ist.</string>
+    <string name="backup_step_storage_saver">Speicher sparen wählen: Fotoeinstellungen → Sicherung → Sicherungsqualität. Auf Pixel 2 bis 5 wird dein Google-Speicher dabei nicht genutzt.</string>
+    <string name="backup_open_app">%1$s öffnen</string>
+    <string name="backup_set_up_done">Es ist eingerichtet</string>
+    <string name="backup_status_title">Gesichert von der App %1$s</string>
+    <string name="backup_status_today">%1$s heute übergeben</string>
+    <string name="backup_status_handed_over">%1$s auf diesem Telefon, zur Sicherung durch %2$s</string>
+    <string name="backup_status_removed">Von %1$s gesichert und von diesem Telefon entfernt</string>
+    <string name="backup_status_waiting">Von %1$s empfangen, noch nicht übergeben</string>
+    <string name="backup_status_note">%1$s sichert sie selbst, meist innerhalb von Minuten über WLAN. MediaSync kann nicht sehen, wann das fertig ist. Sobald %1$s sie zum Freigeben von Speicher entfernt, gelten sie als gesichert.</string>
+    <string name="backup_free_up_title">Speicherplatz freigeben</string>
+    <string name="backup_free_up_app">Tippe in %1$s auf dein Profilbild und dann auf Speicherplatz freigeben. Entfernt werden nur gesicherte Dateien.</string>
+    <string name="backup_free_up_open">%1$s öffnen</string>
+    <string name="backup_free_up_smart_storage">Oder lass das Telefon es erledigen: Smart Storage in den Speichereinstellungen entfernt gesicherte Fotos und Videos, wenn der Speicher knapp wird.</string>
+    <string name="backup_free_up_storage_settings">Speichereinstellungen</string>
+    <string name="backup_never_deletes">MediaSync löscht diese Dateien nie selbst.</string>
+    <string name="backup_stop">Sicherung beenden</string>
+</resources>

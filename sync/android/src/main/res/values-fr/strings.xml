@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_notification_channel">Synchronisation en arrière-plan</string>
+    <string name="relay_channel">Forfait relais Internet</string>
+    <string name="relay_high_title" formatted="false">80 % du forfait relais utilisé</string>
+    <string name="relay_high_text">La synchro par Internet a utilisé %1$s Go sur les %2$s Go que le relais de Cloudflare transporte gratuitement ce mois-ci. Le Wi-Fi et les connexions directes ne comptent pas.</string>
+    <string name="relay_nearly_used_up_title">Le forfait relais est presque épuisé</string>
+    <string name="relay_nearly_used_up_text">La synchro par Internet cesse d\'utiliser le relais à %1$s Go ce mois-ci, pour rester gratuite. Les téléphones qui peuvent se connecter directement, ainsi que le Wi-Fi, continuent de synchroniser.</string>
+    <string name="relay_used_up_title">Le forfait relais est épuisé</string>
+    <string name="relay_used_up_text">Jusqu\'à son renouvellement le mois prochain, les téléphones qui ne peuvent pas se connecter directement ne se synchronisent que par Wi-Fi.</string>
+    <string name="sync_notification_sending">Envoi de photos et vidéos</string>
+    <string name="sync_notification_sending_to">Envoi vers %1$s</string>
+    <string name="sync_notification_ready">Prêt à recevoir photos et vidéos</string>
+    <string name="sync_notification_receiving">Réception de photos et vidéos</string>
+    <string name="sync_notification_receiving_from">Réception depuis %1$s</string>
+    <string name="sync_notification_progress">%1$d sur %2$d</string>
+    <plurals name="sync_notification_sent">
+        <item quantity="one">%d photo ou vidéo envoyée</item>
+        <item quantity="many">%d photos et vidéos envoyées</item>
+        <item quantity="other">%d photos et vidéos envoyées</item>
+    </plurals>
+    <string name="sync_notification_sent_to">Elles sont en sécurité sur %1$s.</string>
+</resources>

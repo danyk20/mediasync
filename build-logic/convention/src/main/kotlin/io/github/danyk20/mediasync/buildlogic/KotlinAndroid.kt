@@ -34,6 +34,9 @@ internal fun Lint.configureLint() {
         "GradleDependency",
         "NewerVersionAvailable",
         "OldTargetApi",
+        // A new string shows in English until the next translation pass (docs/TRANSLATING.md); broken placeholders,
+        // missing plural forms and strings no longer used are still errors.
+        "MissingTranslation",
     )
 }
 
