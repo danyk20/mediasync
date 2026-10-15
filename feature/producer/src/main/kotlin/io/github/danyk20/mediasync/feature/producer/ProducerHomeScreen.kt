@@ -461,8 +461,10 @@ private fun NextSync(state: ProducerHomeUiState) {
 /** A setting of what is sent (folders, details), and the way to change it. */
 @Composable
 private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, onClick: () -> Unit) {
-    OutlinedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            modifier = Modifier.clickable(onClick = onClick),
             headlineContent = { Text(title) },
             supportingContent = { Text(summary) },
             leadingContent = { Icon(painterResource(icon), contentDescription = null) },

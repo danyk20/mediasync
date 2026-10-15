@@ -12,6 +12,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -250,8 +251,10 @@ private fun TurboReceiveRow(state: ConsumerHomeUiState, onStart: () -> Unit) {
         !state.askTurbo && state.turbo != TurboAvailability.UNSUPPORTED
     if (!offered) return
     val locationOff = state.turbo == TurboAvailability.LOCATION_OFF
-    OutlinedCard(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            modifier = Modifier.clickable(onClick = onStart),
             headlineContent = { Text(stringResource(R.string.consumer_turbo_receive_title)) },
             supportingContent = {
                 Text(
@@ -375,8 +378,10 @@ private fun StorageNotice(state: ConsumerHomeUiState, onOpenStorage: () -> Unit)
 /** When the sending phones sync, and the way to change it. */
 @Composable
 private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
-    OutlinedCard(onClick = onChangeSchedule, modifier = Modifier.fillMaxWidth()) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            modifier = Modifier.clickable(onClick = onChangeSchedule),
             headlineContent = { Text(stringResource(R.string.consumer_schedule_row_title)) },
             supportingContent = { Text(scheduleSummary(schedule)) },
             trailingContent = {
@@ -394,8 +399,10 @@ private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
 /** Cloud backup (docs/PLAN.md §9.3.1): whether, and by what, what's received is backed up. */
 @Composable
 private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
-    OutlinedCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            modifier = Modifier.clickable(onClick = onOpen),
             headlineContent = { Text(stringResource(R.string.consumer_backup_row_title)) },
             supportingContent = {
                 Text(
@@ -430,8 +437,10 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
 /** Internet sync (docs/PLAN.md §8.4): whether sending phones away from this Wi-Fi can sync. */
 @Composable
 private fun InternetRow(on: Boolean, relay: RelayUsage?, onSetUp: () -> Unit) {
-    OutlinedCard(onClick = onSetUp, modifier = Modifier.fillMaxWidth()) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            modifier = Modifier.clickable(onClick = onSetUp),
             headlineContent = { Text(stringResource(R.string.consumer_internet_row_title)) },
             supportingContent = {
                 Column {
