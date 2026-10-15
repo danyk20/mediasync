@@ -33,7 +33,7 @@ The tests print a warning about missing required secrets; that's expected, they 
 
 ## Deploying
 
-Nothing deploys until you set up the accounts below. `.github/workflows/rendezvous-deploy.yml` deploys `--env staging` on pushes to `main` and `--env production` with each release; while the GitHub environment has no Cloudflare credentials it skips the deploy with a notice.
+Nothing deploys until you set up the accounts below. `.github/workflows/rendezvous-deploy.yml` deploys `--env staging` on pushes to `main`, for testing; while the GitHub environment has no Cloudflare credentials it skips the deploy with a notice. There's no production deploy: households run their own Worker, which the receiving phone deploys into their Cloudflare account with the settings of `--env production` (`npm run bundle:app`).
 
 ### 1. Accounts and keys
 

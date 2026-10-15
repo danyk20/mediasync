@@ -740,7 +740,7 @@ interface SecureSession : Closeable {
   - Without the Realtime permission, the Worker runs without the relay: direct internet connections only. Without the rate-limit bindings, it runs unlimited.
   - Sending phones learn the Worker's address in the paired TLS session (only from paired phones, `https` only). A Worker deployed by hand can be entered by address instead.
 - The Worker lives in `infra/rendezvous/`. It has unit tests (Vitest with the Workers pool), rate limiting, and **no logging of IPs beyond Cloudflare defaults**.
-- It is deployed by CI to a `staging` environment on main, and to `production` on release with manual approval.
+- CI deploys it to a `staging` environment on main, for testing. There's no production deployment of the developer's: every household's Worker is its own (bring your own Cloudflare).
 - *Built in M5 (server side):* the Worker with one Durable Object mailbox per pair (WebSocket hibernation, a 10-minute queue while the other phone is offline), signed requests with nonce replay protection, 1 h TURN credentials tagged per pair, FCM wake-ups, rate limits per address, device and credential request, and the deploy workflow (skipped until Cloudflare credentials are set up). See `infra/rendezvous/README.md`. The Android transport follows.
 
 ### 8.5 Relay usage meter and budget guard
@@ -1131,12 +1131,12 @@ mediasync/
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | PRs, push to `main` | `static` (Spotless/ktlint with license headers, Detekt, Android Lint with warnings as errors, dependency analysis, dependency license check with Licensee) → `unit` (JVM + Robolectric tests incl. the metadata golden set, Kover verify, coverage summary in the job summary) → `screenshots` (Roborazzi verify; diff images uploaded on failure) → `build` (debug and release APK/AAB, APK size budget check) → `instrumented` (Gradle Managed Devices, API 29 and 36) → `rendezvous` (typecheck, Vitest) |
+| `ci.yml` | PRs, push to `main` | `static` (Spotless/ktlint with license headers, Detekt, Android Lint with warnings as errors, dependency analysis, dependency license check with Licensee) → `unit` (JVM + Robolectric tests incl. the metadata golden set, Kover verify, coverage summary in the job summary) → `screenshots` (Roborazzi verify; diff images uploaded on failure) → `build` (debug and release APK/AAB, APK size budget check) → `instrumented` (Gradle Managed Devices, API 29 and 36 side by side, one job each, system images cached) → `rendezvous` (typecheck, Vitest, the app's copy of the Worker). Pull requests changing only docs or the Worker skip the Android jobs |
 | `codeql.yml` | PRs, weekly | CodeQL for Kotlin/Java and TypeScript |
 | `release.yml` | Push to `main` | **release-please** keeps a release PR with the changelog built from Conventional Commits. Merging it creates the `vX.Y.Z` tag and GitHub Release. The same workflow then builds the signed AAB and APK (`release` environment, with approval), SHA-256 checksums and a **build provenance attestation**, and attaches them. Play **internal** track upload is added in M6. |
 | `dependency-graph.yml` | Push to `main` | Submits the resolved Gradle dependency graph, so Dependabot alerts cover vulnerable libraries |
-| `rendezvous-deploy.yml` (M5) | Push to `main` touching the Worker (staging); called by `release.yml` on release (production, approval in the `rendezvous-production` environment); manual | `wrangler deploy` (Worker, Durable Object migrations, cron schedule). Skipped with a notice while the environment has no Cloudflare credentials |
-| `nightly.yml` | Cron | Full instrumented matrix (API 29, 31, 34, 36); Jazzer fuzzing (from M1) and benchmarks (from M3) |
+| `rendezvous-deploy.yml` (M5) | Push to `main` touching the Worker; manual | `wrangler deploy --env staging` (Worker, Durable Object migrations, cron schedule), for testing. Skipped with a notice while the environment has no Cloudflare credentials. Households deploy their own from the app |
+| `nightly.yml` | Cron | Full instrumented matrix (API 29, 31, 34, 36, one job each, one emulator at a time); Jazzer fuzzing (from M1) and benchmarks (from M3) |
 | `pr-hygiene.yml` | PRs | Conventional Commit title lint, labeler, size labels |
 
 **CI practices**

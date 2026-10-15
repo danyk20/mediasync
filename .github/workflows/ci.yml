@@ -17,8 +17,36 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
+  # Which parts a pull request touches: one changing only docs or the Worker skips the Android jobs (skipped jobs
+  # count as passed). Everything else, workflows included, runs them all.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "android=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          others=$(git diff --name-only "$BASE"...HEAD | grep -vE '^(docs/|infra/rendezvous/)|\.md$' || true)
+          echo "Changes outside docs and the Worker:"
+          echo "${others:-none}"
+          if [ -n "$others" ]; then echo "android=true"; else echo "android=false"; fi >> "$GITHUB_OUTPUT"
+
   static-checks:
     name: Static checks
+    needs: changes
+    # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -43,6 +71,9 @@ jobs:
 
   unit-tests:
     name: Unit & screenshot tests
+    needs: changes
+    # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -90,6 +121,9 @@ jobs:
 
   benchmark:
     name: Throughput benchmark
+    needs: changes
+    # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -129,6 +163,9 @@ jobs:
 
   build:
     name: Build
+    needs: changes
+    # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -177,10 +214,18 @@ jobs:
       - name: Bundle as for deployment (dry run, no Cloudflare account needed)
         run: npm run bundle
 
+  # One job per API level, side by side on their own runners. Branch protection requires the summary's name.
   instrumented-tests:
-    name: Instrumented tests (API 29, 36)
+    name: Instrumented tests (API ${{ matrix.api }})
+    needs: changes
+    # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
+    if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 36]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -193,25 +238,32 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      # Every module sets up the same emulators in parallel, and two of them installing one system image at
-      # once can fail ("System Image ... does not exist for this architecture"). Install them once first.
-      - name: Install emulator images
+      # Downloading the emulator's system image took most of the setup's three minutes.
+      - name: Cache the emulator image
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.ANDROID_HOME }}/system-images/android-${{ matrix.api }}
+          key: emulator-image-api${{ matrix.api }}-${{ runner.os }}-${{ hashFiles('build-logic/convention/src/main/kotlin/io/github/danyk20/mediasync/buildlogic/KotlinAndroid.kt') }}
+      # Every module sets up the same emulator in parallel, and two of them installing one system image at
+      # once can fail ("System Image ... does not exist for this architecture"). Install it once first.
+      - name: Install the emulator image
         run: >
-          ./gradlew :app:api29Setup :app:api36Setup --max-workers=1
+          ./gradlew :app:api${{ matrix.api }}Setup --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
-      # alive: each test task boots its own, and they keep running for a while after it ends. Fewer parallel
-      # tasks keep fewer alive. The cause wasn't visible, so memory, disk and emulators are now logged.
+      # alive: each test task boots its own, and they keep running for a while after it ends. Two API 36 emulators
+      # at once already run a runner out of memory (nightly), so each job runs one at a time. Memory, disk and
+      # emulators are logged.
       - name: Record memory and disk while testing
         run: |
           nohup bash -c 'while true; do
             echo "$(date -u +%T) $(free -m | awk "/^Mem:/ {print \"used=\" \$3 \"MB available=\" \$7 \"MB\"}") disk_free=$(df -m / | awk "NR==2 {print \$4}")MB emulators=$(pgrep -c qemu-system || true)"
             sleep 10
           done' > memory.log 2>&1 &
-      - name: Run on Gradle Managed Devices
+      - name: Run on API ${{ matrix.api }}
         id: device-tests
         run: >
-          ./gradlew ciGroupDebugAndroidTest --max-workers=2
+          ./gradlew api${{ matrix.api }}DebugAndroidTest --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # always(): when the runner is stopped from outside, failure() steps are skipped.
       - name: Show why the tests stopped
@@ -224,9 +276,23 @@ jobs:
         if: always() && steps.device-tests.outcome != 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: instrumented-test-reports
+          name: instrumented-test-reports-api${{ matrix.api }}
           path: |
             **/build/reports/androidTests/
             **/build/outputs/androidTest-results/
             memory.log
           if-no-files-found: ignore
+
+  instrumented-tests-summary:
+    name: Instrumented tests (API 29, 36)
+    needs: instrumented-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Skipped when the pull request changes only docs or the Worker.
+      - name: Every API level passed
+        run: |
+          result="${{ needs.instrumented-tests.result }}"
+          echo "Instrumented tests: $result"
+          test "$result" = success || test "$result" = skipped
