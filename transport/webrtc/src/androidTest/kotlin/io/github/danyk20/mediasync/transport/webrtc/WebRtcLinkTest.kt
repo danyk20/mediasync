@@ -20,6 +20,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.testing.FakeSentLedger
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
+import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.Signal
 import io.github.danyk20.mediasync.transport.rendezvous.SignalPipe
 import io.kotest.matchers.shouldBe
@@ -98,8 +99,11 @@ class WebRtcLinkTest {
             sent.getOrThrow().sent shouldBe 6
             served.getOrThrow()
             sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
+            // On one device the phones connect directly: nothing counts against the relay allowance.
+            (producerConnection as RelayCounter).relayedBytes() shouldBe 0
             producerConnection.close()
             consumerConnection.close()
+            (producerConnection as RelayCounter).relayedBytes() shouldBe 0 // After closing: what it last counted.
         } finally {
             pool.shutdownNow()
         }

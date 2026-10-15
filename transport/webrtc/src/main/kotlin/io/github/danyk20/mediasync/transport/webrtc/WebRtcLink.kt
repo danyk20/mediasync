@@ -6,11 +6,13 @@ package io.github.danyk20.mediasync.transport.webrtc
 
 import android.content.Context
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.transport.PeerConnection as SyncConnection
 import io.github.danyk20.mediasync.transport.rendezvous.ChannelPeerConnection
 import io.github.danyk20.mediasync.transport.rendezvous.ChannelStream
 import io.github.danyk20.mediasync.transport.rendezvous.IceServer
 import io.github.danyk20.mediasync.transport.rendezvous.MessageChannel
 import io.github.danyk20.mediasync.transport.rendezvous.PeerLinks
+import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.Signal
 import io.github.danyk20.mediasync.transport.rendezvous.SignalPipe
 import java.io.IOException
@@ -18,12 +20,16 @@ import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RTCStats
+import org.webrtc.RTCStatsReport
 import org.webrtc.RtpReceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
@@ -50,7 +56,7 @@ class WebRtcLink(context: Context) : PeerLinks {
         iceServers: List<IceServer>,
         pipe: SignalPipe,
         timeoutMillis: Long,
-    ): ChannelPeerConnection {
+    ): SyncConnection {
         val session = UUID.randomUUID().toString()
         val attempt = Attempt(peer, session, iceServers, pipe)
         attempt.startAsOfferer()
@@ -64,7 +70,7 @@ class WebRtcLink(context: Context) : PeerLinks {
         iceServers: List<IceServer>,
         pipe: SignalPipe,
         timeoutMillis: Long,
-    ): ChannelPeerConnection {
+    ): SyncConnection {
         val attempt = Attempt(peer, offer.session, iceServers, pipe)
         attempt.startAsAnswerer(offer)
         return attempt.await(timeoutMillis)
@@ -143,7 +149,7 @@ class WebRtcLink(context: Context) : PeerLinks {
             is Signal.Offer -> Unit // Only one offer per attempt.
         }
 
-        fun await(timeoutMillis: Long): ChannelPeerConnection {
+        fun await(timeoutMillis: Long): SyncConnection {
             val ready = opened.await(timeoutMillis, TimeUnit.MILLISECONDS)
             val open = stream
             if (!ready || open == null || failure != null) {
@@ -151,7 +157,26 @@ class WebRtcLink(context: Context) : PeerLinks {
                 close()
                 throw IOException(failure ?: "No WebRTC connection within $timeoutMillis ms")
             }
-            return ChannelPeerConnection(peer, open, REMOTE_ADDRESS)
+            return Link(ChannelPeerConnection(peer, open, REMOTE_ADDRESS))
+        }
+
+        /** The open connection; it counts what goes through the relay (PLAN §8.5) from WebRTC's statistics. */
+        private inner class Link(private val channel: ChannelPeerConnection) :
+            SyncConnection by channel,
+            RelayCounter {
+            @Volatile
+            private var lastRelayed = 0L
+
+            override fun relayedBytes(): Long {
+                if (closed.get()) return lastRelayed
+                val report = AtomicReference<RTCStatsReport?>()
+                val done = CountDownLatch(1)
+                connection.getStats { report.set(it).also { done.countDown() } }
+                if (done.await(STATS_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    report.get()?.let { lastRelayed = relayedBytes(it.statsMap) }
+                }
+                return lastRelayed
+            }
         }
 
         private fun adopt(dataChannel: DataChannel) {
@@ -184,9 +209,17 @@ class WebRtcLink(context: Context) : PeerLinks {
             opened.countDown()
         }
 
+        private val closed = AtomicBoolean()
+
+        /** Closes and frees the native connection, once. */
         private fun close() {
-            channel?.close()
-            connection.close()
+            if (!closed.compareAndSet(false, true)) return
+            channel?.run {
+                unregisterObserver()
+                close()
+                dispose()
+            }
+            connection.dispose() // Closes it, then frees it.
         }
 
         private inner class Channel(private val dataChannel: DataChannel) : MessageChannel {
@@ -252,7 +285,24 @@ class WebRtcLink(context: Context) : PeerLinks {
         const val CHANNEL = "mediasync"
         const val REMOTE_ADDRESS = "webrtc"
         const val POLL_MILLIS = 200L
+        const val STATS_TIMEOUT_MILLIS = 5_000L
     }
+}
+
+/**
+ * The bytes sent and received over the selected candidate pair, if it goes through a TURN relay on either side
+ * (a `relay` candidate); 0 for a direct connection. [stats] is WebRTC's statistics report, by id.
+ */
+internal fun relayedBytes(stats: Map<String, RTCStats>): Long {
+    val selectedId = stats.values.firstOrNull { it.type == "transport" }?.members?.get("selectedCandidatePairId")
+    val pair = stats[selectedId] ?: stats.values.firstOrNull {
+        it.type == "candidate-pair" && it.members["nominated"] == true && it.members["state"] == "succeeded"
+    } ?: return 0
+    val relayed = listOf("localCandidateId", "remoteCandidateId").any { side ->
+        stats[pair.members[side]]?.members?.get("candidateType") == "relay"
+    }
+    if (!relayed) return 0
+    return listOf("bytesSent", "bytesReceived").sumOf { (pair.members[it] as? Number)?.toLong() ?: 0L }
 }
 
 private fun IceServer.toWebRtc(): PeerConnection.IceServer = PeerConnection.IceServer.builder(urls).apply {

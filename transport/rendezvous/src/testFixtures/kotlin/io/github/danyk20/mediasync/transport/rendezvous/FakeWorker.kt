@@ -28,6 +28,9 @@ class FakeWorker(
     val wakes = AtomicInteger()
     val mailboxesOpened = AtomicInteger()
 
+    /** The live relay reports, as sent (JSON). */
+    val relayReports = CopyOnWriteArrayList<String>()
+
     @Volatile
     var onWake: () -> Unit = {}
 
@@ -50,6 +53,13 @@ class FakeWorker(
 
             path.endsWith("/ice-servers") ->
                 json("""{"iceServers":$iceServers,"ttlSeconds":3600,"relay":{"available":true}}""")
+
+            path.endsWith("/relay-usage") && request.method == "POST" -> {
+                relayReports += request.body?.utf8().orEmpty()
+                json(METER)
+            }
+
+            path.endsWith("/relay-usage") -> json(METER)
 
             path.endsWith("/wake") -> {
                 wakes.incrementAndGet()
@@ -105,5 +115,12 @@ class FakeWorker(
             synchronized(open()) { open().remove(webSocket) }
             webSocket.close(code, null)
         }
+    }
+
+    private companion object {
+        /** 312 GB of a 950 GB budget used in October. */
+        const val METER = """{"period":{"start":"2026-10-01T00:00:00Z","end":"2026-11-01T00:00:00Z"},""" +
+            """"usedBytes":312000000000,"authoritativeBytes":310000000000,"liveBytes":2000000000,""" +
+            """"limitBytes":950000000000,"freeAllowanceBytes":1000000000000,"relayAvailable":true}"""
     }
 }

@@ -9,6 +9,7 @@ import io.github.danyk20.mediasync.transport.PeerConnection
 import java.io.Closeable
 import java.io.IOException
 import java.net.URI
+import java.security.SecureRandom
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -30,6 +31,12 @@ interface SignalPipe {
 
     /** Signals from the other phone, as they arrive. */
     val incoming: BlockingQueue<Signal>
+}
+
+/** A connection that may go through the TURN relay, which counts against the relay allowance (PLAN §8.5). */
+interface RelayCounter {
+    /** Bytes sent and received through the relay so far; 0 while the phones are connected directly. */
+    fun relayedBytes(): Long
 }
 
 /** A connection between the two phones that signals set up: WebRTC (transport:webrtc). */
@@ -72,6 +79,8 @@ class InternetPath(
         val connect: Long = 45_000,
         /** Before the first retry of a mailbox that dropped; each next waits twice as long, up to 5 minutes. */
         val retry: Long = 5_000,
+        /** Between reports of the bytes relayed (PLAN §8.5: every minute). */
+        val relayReport: Long = 60_000,
     )
 
     /**
@@ -95,7 +104,7 @@ class InternetPath(
                 true -> Unit
             }
             val connection = links.connect(consumer, ice.iceServers, mailbox.pipe(queue), timeouts.connect)
-            return WithMailbox(connection, mailbox)
+            return InternetConnection(connection, mailbox, client, pair)
         } catch (e: IOException) {
             mailbox.close()
             throw e
@@ -340,20 +349,59 @@ class InternetPath(
         }
     }
 
-    /** The producer's connection: its mailbox closes with it. */
-    private class WithMailbox(private val connection: PeerConnection, private val mailbox: Mailbox) :
-        PeerConnection by connection {
-        override fun close() {
+    /**
+     * The producer's connection: its mailbox closes with it. Meanwhile it reports what went through the relay
+     * (PLAN §8.5): only the producer does, so the Worker counts each byte once.
+     */
+    private inner class InternetConnection(
+        private val connection: PeerConnection,
+        private val mailbox: Mailbox,
+        private val client: RendezvousClient,
+        private val pair: String,
+    ) : PeerConnection by connection {
+        /** The Worker tells sessions apart by this: 16 random bytes. */
+        private val session = base64Url(ByteArray(SESSION_BYTES).also(SecureRandom()::nextBytes))
+        private val reporting = REPORTS.scheduleWithFixedDelay(
+            ::report,
+            timeouts.relayReport,
+            timeouts.relayReport,
+            TimeUnit.MILLISECONDS,
+        )
+
+        @Volatile
+        private var reported = 0L
+
+        @Synchronized
+        private fun report() {
+            val relayed = (connection as? RelayCounter)?.relayedBytes() ?: return
+            if (relayed <= reported) return // Nothing (more) through the relay.
             try {
-                connection.close()
+                client.reportRelayUsage(pair, session, relayed)
+                reported = relayed
+            } catch (e: IOException) {
+                log("Couldn't report the bytes relayed", e) // The Worker's analytics catch up anyway.
+            }
+        }
+
+        override fun close() {
+            reporting.cancel(false)
+            try {
+                report()
             } finally {
-                mailbox.close()
+                try {
+                    connection.close()
+                } finally {
+                    mailbox.close()
+                }
             }
         }
     }
 
     private companion object {
         fun daemon(name: String) = ThreadFactory { task -> Thread(task, name).apply { isDaemon = true } }
+
+        val REPORTS: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(daemon("mediasync-relay"))
+        const val SESSION_BYTES = 16
 
         const val MILLIS_PER_SECOND = 1000L
         const val MAX_RETRY_MILLIS = 5 * 60_000L

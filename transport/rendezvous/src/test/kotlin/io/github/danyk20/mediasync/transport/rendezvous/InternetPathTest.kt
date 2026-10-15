@@ -18,6 +18,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -35,7 +40,8 @@ class InternetPathTest {
     }
     private val url = URI(server.url("/").toString())
     private val links = FakeLinks(producer.deviceId, consumer.deviceId)
-    private val timeouts = InternetPath.Timeouts(ready = WAIT, wake = WAIT, connect = WAIT, retry = 50)
+    private val timeouts =
+        InternetPath.Timeouts(ready = WAIT, wake = WAIT, connect = WAIT, retry = 50, relayReport = 50)
     private val served = LinkedBlockingQueue<PeerConnection>()
     private val listening = mutableListOf<Closeable>()
 
@@ -69,6 +75,34 @@ class InternetPathTest {
         worker.relayed.size shouldBe 3
         worker.relayed.none { "v=0" in it.string(Charsets.ISO_8859_1) } shouldBe true
         links.candidates.get() shouldBe 1
+    }
+
+    @Test
+    fun theSendingPhoneReportsWhatWentThroughTheRelay() {
+        listen()
+        worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
+        val connection = connect()
+        served.poll(WAIT, TimeUnit.MILLISECONDS)!!.close()
+
+        links.relayed.set(1_000_000)
+        val end = System.currentTimeMillis() + WAIT
+        while (worker.relayReports.isEmpty() && System.currentTimeMillis() < end) Thread.sleep(10)
+        links.relayed.set(3_000_000)
+        connection.close()
+
+        val reports = worker.relayReports.map { Json.parseToJsonElement(it).jsonObject }
+        reports.map { it["relayedBytes"]?.jsonPrimitive?.long } shouldBe listOf(1_000_000L, 3_000_000L)
+        reports.map { it["session"]?.jsonPrimitive?.content }.distinct().single()!!.length shouldBe 22
+    }
+
+    @Test
+    fun directConnectionsAreNotReported() {
+        listen()
+        worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
+
+        connect().close()
+
+        worker.relayReports shouldBe emptyList()
     }
 
     @Test
@@ -118,6 +152,9 @@ class InternetPathTest {
         private val pairs = ConcurrentHashMap<String, ConnectionPair>()
         val candidates = AtomicInteger()
 
+        /** What went through the relay so far, as the producer's connection counts it. */
+        val relayed = AtomicLong()
+
         override fun connect(
             peer: DeviceId,
             iceServers: List<IceServer>,
@@ -130,7 +167,12 @@ class InternetPathTest {
             pipe.send(Signal.Candidate(session, "0", 0, "candidate:1 1 udp 1 192.0.2.1 9 typ host"))
             while (true) {
                 val signal = pipe.incoming.poll(timeoutMillis, TimeUnit.MILLISECONDS) ?: throw IOException("No answer")
-                if (signal is Signal.Answer && signal.session == session) return pairs.getValue(session).producerEnd
+                if (signal is Signal.Answer && signal.session == session) {
+                    val end = pairs.getValue(session).producerEnd
+                    return object : PeerConnection by end, RelayCounter {
+                        override fun relayedBytes() = relayed.get()
+                    }
+                }
             }
         }
 

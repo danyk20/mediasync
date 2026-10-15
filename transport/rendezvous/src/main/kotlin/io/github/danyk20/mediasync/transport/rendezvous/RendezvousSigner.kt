@@ -105,7 +105,7 @@ fun pairId(consumer: DeviceId, producer: DeviceId): String = Buffer()
     .sha256()
     .hex()
 
-private fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+internal fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 
 private const val AUTH_VERSION = "MEDIASYNC-AUTH-V1"
 private const val PAIR_LABEL = "mediasync-pair-v1"
