@@ -7,12 +7,14 @@ import { ApiError } from "./http.ts";
 
 /**
  * Rate limiting with the Workers Rate Limiting API (PLAN §8.4). Limits are configured per binding in
- * wrangler.toml and counted per Cloudflare location, which is fine for abuse protection.
+ * wrangler.toml and counted per Cloudflare location, which is fine for abuse protection. A Worker deployed
+ * without the bindings (an account that doesn't offer them) runs unlimited rather than failing every request.
  *
  * The pre-authentication limit is keyed by the client address Cloudflare reports. The address is only
  * used as a counter key inside Cloudflare's limiter; the Worker never stores or logs it.
  */
-export async function enforceLimit(limiter: RateLimit, key: string): Promise<void> {
+export async function enforceLimit(limiter: RateLimit | undefined, key: string): Promise<void> {
+    if (limiter === undefined) return;
     const { success } = await limiter.limit({ key });
     if (!success) {
         throw new ApiError(429, "rate_limited", "Too many requests; try again in a minute", { "retry-after": "60" });

@@ -15,7 +15,8 @@
     "types": "wrangler types --include-runtime=false --strict-vars=false",
     "check:types": "wrangler types --include-runtime=false --strict-vars=false --check",
     "bundle": "wrangler deploy --dry-run --env production --outdir dist",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "bundle:app": "node scripts/app-bundle.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.0",

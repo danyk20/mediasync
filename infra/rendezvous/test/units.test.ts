@@ -16,9 +16,21 @@ import {
     relayLimitBytes,
     validateRelaySettings,
 } from "../src/meter/settings.ts";
+import { enforceLimit } from "../src/rate-limit.ts";
 import { mintTurnCredentials, TurnError } from "../src/turn.ts";
 
 const fakeFetch = (reply: () => Response) => (async () => reply()) as unknown as typeof fetch;
+
+describe("rate limits", () => {
+    it("refuses once the limiter says so", async () => {
+        const limiter = { limit: async () => ({ success: false }) } as unknown as RateLimit;
+        await expect(enforceLimit(limiter, "ip:1")).rejects.toMatchObject({ status: 429, code: "rate_limited" });
+    });
+
+    it("lets everything through without the binding, as on an account that doesn't offer it", async () => {
+        await expect(enforceLimit(undefined, "ip:1")).resolves.toBeUndefined();
+    });
+});
 
 describe("encoding", () => {
     it("round-trips base64url without padding", () => {
