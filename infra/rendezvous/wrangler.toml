@@ -1,0 +1,152 @@
+# Copyright 2026 The MediaSync Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# MediaSync rendezvous Worker: signaling mailbox, TURN credentials, FCM wake-up, relay usage meter.
+# Design: docs/PLAN.md §8.4, §8.5, §10.4 and docs/adr/0009-rendezvous-device-authentication.md.
+#
+# The top level is for local development and tests only. Deployments always name an environment:
+# `wrangler deploy --env staging` (CI, on main) or `--env production` (CI, on release, with approval).
+#
+# Secrets are never written here. They are listed by name under `secrets.required`, and set per environment
+# with `wrangler secret put <NAME> --env <staging|production>` (see README.md). `wrangler deploy` refuses
+# to deploy while one of them is missing.
+
+name = "mediasync-rendezvous-dev"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# No request logs beyond Cloudflare's defaults (PLAN §8.4): Workers Logs stays off.
+# `wrangler tail` shows live logs on demand; the Worker itself never logs IP addresses.
+[observability]
+enabled = false
+
+# Every 15 minutes: refresh the authoritative relay usage from Cloudflare's analytics (PLAN §8.5).
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[durable_objects.bindings]]
+name = "PAIRS"
+class_name = "PairMailbox"
+
+[[durable_objects.bindings]]
+name = "METER"
+class_name = "UsageMeter"
+
+# SQLite-backed Durable Objects: the storage backend available on the Workers Free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PairMailbox", "UsageMeter"]
+
+# Rate limits (Workers Rate Limiting API: periods of 10 or 60 seconds, counted per Cloudflare location).
+# Before authentication, per client address; after it, per device and per relay-credential request.
+[[ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }
+
+[[ratelimits]]
+name = "DEVICE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "TURN_LIMITER"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }
+
+# Relay budget defaults (PLAN §8.5). An admin device can override them at runtime (README.md).
+[vars]
+RELAY_BUDGET_GB = "950"
+RELAY_FREE_ALLOWANCE_GB = "1000"
+RELAY_PRICE_USD_PER_GB = "0.05"
+RELAY_PERIOD_START_DAY = "1"
+RELAY_ALLOW_PAID = "false"
+RELAY_PAID_CAP_USD = "0"
+TURN_CREDENTIAL_TTL_SECONDS = "3600"
+
+[secrets]
+required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]
+
+# ---------------------------------------------------------------------------------------------------------
+# Staging: deployed by CI on every push to main.
+# Durable Object and rate-limit bindings, vars and secrets aren't inherited by environments, so each one
+# repeats them; the rest (compatibility date, observability, cron trigger, migrations) is inherited.
+
+[env.staging]
+name = "mediasync-rendezvous-staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "PAIRS"
+class_name = "PairMailbox"
+
+[[env.staging.durable_objects.bindings]]
+name = "METER"
+class_name = "UsageMeter"
+
+[[env.staging.ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "2001"
+simple = { limit = 120, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "DEVICE_LIMITER"
+namespace_id = "2002"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "TURN_LIMITER"
+namespace_id = "2003"
+simple = { limit = 10, period = 60 }
+
+[env.staging.vars]
+RELAY_BUDGET_GB = "950"
+RELAY_FREE_ALLOWANCE_GB = "1000"
+RELAY_PRICE_USD_PER_GB = "0.05"
+RELAY_PERIOD_START_DAY = "1"
+RELAY_ALLOW_PAID = "false"
+RELAY_PAID_CAP_USD = "0"
+TURN_CREDENTIAL_TTL_SECONDS = "3600"
+
+[env.staging.secrets]
+required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]
+
+# ---------------------------------------------------------------------------------------------------------
+# Production: deployed by CI when a release is published, after manual approval.
+
+[env.production]
+name = "mediasync-rendezvous"
+
+[[env.production.durable_objects.bindings]]
+name = "PAIRS"
+class_name = "PairMailbox"
+
+[[env.production.durable_objects.bindings]]
+name = "METER"
+class_name = "UsageMeter"
+
+[[env.production.ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "3001"
+simple = { limit = 120, period = 60 }
+
+[[env.production.ratelimits]]
+name = "DEVICE_LIMITER"
+namespace_id = "3002"
+simple = { limit = 60, period = 60 }
+
+[[env.production.ratelimits]]
+name = "TURN_LIMITER"
+namespace_id = "3003"
+simple = { limit = 10, period = 60 }
+
+[env.production.vars]
+RELAY_BUDGET_GB = "950"
+RELAY_FREE_ALLOWANCE_GB = "1000"
+RELAY_PRICE_USD_PER_GB = "0.05"
+RELAY_PERIOD_START_DAY = "1"
+RELAY_ALLOW_PAID = "false"
+RELAY_PAID_CAP_USD = "0"
+TURN_CREDENTIAL_TTL_SECONDS = "3600"
+
+[env.production.secrets]
+required = ["CF_ACCOUNT_ID", "CF_ANALYTICS_TOKEN", "TURN_KEY_ID", "TURN_KEY_API_TOKEN", "FCM_SERVICE_ACCOUNT"]

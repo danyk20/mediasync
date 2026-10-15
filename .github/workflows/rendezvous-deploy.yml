@@ -1,0 +1,78 @@
+name: Rendezvous deploy
+
+# Deploys the Cloudflare Worker in infra/rendezvous (docs/PLAN.md §8.4, §14.2):
+# - staging on every push to main that changes it;
+# - production when release.yml publishes a release (it calls this workflow), or on manual dispatch.
+# Each target uses the GitHub environment `rendezvous-<target>`; give `rendezvous-production` required
+# reviewers so production deploys wait for approval. Until an environment holds CLOUDFLARE_API_TOKEN and
+# CLOUDFLARE_ACCOUNT_ID, the job skips the deploy with a notice. See infra/rendezvous/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - infra/rendezvous/**
+      - .github/workflows/rendezvous-deploy.yml
+  workflow_call:
+    inputs:
+      environment:
+        description: staging or production
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy (${{ inputs.environment || 'staging' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: rendezvous-${{ inputs.environment || 'staging' }}
+    concurrency:
+      group: rendezvous-deploy-${{ inputs.environment || 'staging' }}
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ inputs.environment || 'staging' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check the target and the Cloudflare credentials
+        id: credentials
+        run: |
+          case "$TARGET" in
+            staging|production) ;;
+            *) echo "::error::Unknown environment '$TARGET'"; exit 1 ;;
+          esac
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::No Cloudflare credentials in the rendezvous-$TARGET environment; skipping the deploy (infra/rendezvous/README.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.credentials.outputs.ready == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: steps.credentials.outputs.ready == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: infra/rendezvous/package-lock.json
+      - if: steps.credentials.outputs.ready == 'true'
+        name: Install the exact versions from package-lock.json
+        working-directory: infra/rendezvous
+        run: npm ci
+      # Deploys the Worker, its Durable Object migrations and the cron trigger. The Worker's own secrets
+      # (TURN key, analytics token, FCM service account) are set once with `wrangler secret put`.
+      - if: steps.credentials.outputs.ready == 'true'
+        name: Deploy
+        working-directory: infra/rendezvous
+        run: npx wrangler deploy --env "$TARGET"
