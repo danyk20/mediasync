@@ -24,6 +24,11 @@ data class LanTimeouts(
     val connectMillis: Int = 5_000,
     /** Long enough for the consumer's user to approve a pairing request. */
     val readMillis: Int = 120_000,
+    /**
+     * For the TLS handshake, which needs nobody's approval: something that accepted the connection but doesn't
+     * answer as MediaSync (a stale address now taken by another device) fails it soon, not after [readMillis].
+     */
+    val handshakeMillis: Int = 15_000,
 )
 
 /** Large buffers keep Wi-Fi busy during bulk transfers (docs/PLAN.md §7). */
@@ -101,8 +106,9 @@ object LanClient {
 private fun SSLSocket.establish(timeouts: LanTimeouts): PeerConnection {
     try {
         tcpNoDelay = true
-        soTimeout = timeouts.readMillis
+        soTimeout = timeouts.handshakeMillis
         startHandshake()
+        soTimeout = timeouts.readMillis
         val peerCertificate = session.peerCertificates.first() as X509Certificate
         return SocketPeerConnection(this, peerCertificate.deviceId())
     } catch (e: IOException) {
