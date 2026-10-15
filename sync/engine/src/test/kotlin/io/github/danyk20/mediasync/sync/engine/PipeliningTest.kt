@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
@@ -19,7 +20,10 @@ import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
 
@@ -41,10 +45,11 @@ class PipeliningTest {
         window: Int = 16,
         faults: Faults = Faults(),
         latencyMillis: Long = 0,
+        session: ProducerSession = ProducerSession(local, source, sent, window = window),
     ): Result<SyncResult> {
         val connection = ConnectionPair(producerId, consumerId, faults, latencyMillis = latencyMillis)
         return runBothSides(
-            producer = { ProducerSession(local, source, sent, window = window).sync(connection.producerEnd) },
+            producer = { session.sync(connection.producerEnd) },
             consumer = {
                 ConsumerSession(local, registry, received, sink, FakePairingGate(TOKEN)).serve(connection.consumerEnd)
             },
@@ -106,8 +111,33 @@ class PipeliningTest {
         received.items.size shouldBe 30
     }
 
+    @Test
+    fun aConfirmationStillBeingRecordedCountsBeforeTheSessionEnds() {
+        val source = FakeMediaSource(photos(count = 1, size = 10_000))
+        val recording = CountDownLatch(1)
+        val slowLedger = object : SentLedger by sent {
+            override fun markSent(consumer: DeviceId, fingerprint: ByteString, contentId: ByteString) {
+                recording.countDown()
+                Thread.sleep(SLOW_RECORD_MILLIS) // A database write on a busy phone.
+                sent.markSent(consumer, fingerprint, contentId)
+            }
+        }
+        // Once the photo went, the session checks whether it's done only while its confirmation is being recorded.
+        val afterTheConfirmationCame = {
+            synchronized(source.opened) { source.opened.isEmpty() } || recording.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        }
+
+        val session = ProducerSession(local, source, slowLedger, shouldContinue = afterTheConfirmationCame)
+        val result = sync(source, session = session).getOrThrow()
+
+        result.sent shouldBe 1
+        sent.entries.size shouldBe 1
+    }
+
     private companion object {
         const val NANOS_PER_MILLI = 1_000_000L
+        const val SLOW_RECORD_MILLIS = 500L
+        const val WAIT_SECONDS = 5L
         val TOKEN = "one-time-token!!".encodeToByteArray().toByteString()
     }
 }
