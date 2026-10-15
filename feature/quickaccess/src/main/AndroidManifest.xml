@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Sync now from the Quick Settings panel. -->
+        <service
+            android:name=".SyncTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_quick_sync"
+            android:label="@string/quick_sync_now"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Sync now from the home screen. -->
+        <receiver
+            android:name=".SyncWidget"
+            android:exported="false"
+            android:label="@string/quick_widget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sync_widget_info" />
+        </receiver>
+    </application>
+</manifest>

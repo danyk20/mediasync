@@ -13,6 +13,7 @@ import io.github.danyk20.mediasync.connector.android.CloudBackup
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
+import io.github.danyk20.mediasync.feature.quickaccess.QuickAccess
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import javax.inject.Inject
@@ -37,6 +38,9 @@ class MediaSyncApplication :
     @Inject
     lateinit var cloudBackup: CloudBackup
 
+    @Inject
+    lateinit var quickAccess: QuickAccess
+
     /** Background work gets its dependencies from Hilt (the default initializer is removed in the manifest). */
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -51,5 +55,7 @@ class MediaSyncApplication :
         scheduler.followReceiving(receiver.state)
         // Backs up what arrives as soon as it's stored, whatever the schedule (§9.6).
         cloudBackup.start()
+        // The home-screen widget shows how syncing stands.
+        quickAccess.start()
     }
 }

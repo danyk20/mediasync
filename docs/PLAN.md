@@ -1258,7 +1258,7 @@ Ranked by value for effort:
 5. **"Not synced for N days" alerts** on the consumer, e.g. "Dad's phone hasn't synced in 7 days".
 6. **Live/Motion Photos and RAW+JPEG kept together** as one logical item.
 7. **Duplicate finder** on the consumer: exact duplicates first, near-duplicates via perceptual hash later.
-8. **Quick Settings tile + widget** for *Sync now* (in M6).
+8. **Quick Settings tile + widget** for *Sync now* (in M6). *Built (M6):* `:feature:quickaccess`. On a paired sending phone, both say *Sync now*, with the time of the last sync or *Syncing…*. On a receiving phone, *Receive now* opens a receive window. Before pairing, they open the app.
 9. **Self-hosted connectors:** Immich (true hash verification), Nextcloud/WebDAV, S3/MinIO, SMB/NAS.
 10. **Desktop/NAS consumer** later, reusing the pure-Kotlin engine (Compose Multiplatform). This turns any computer into the hub without new hardware.
 11. **Daily digest notification** on the consumer: "Received 214 photos from 3 phones; 4.1 GB backed up."
