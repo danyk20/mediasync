@@ -28,7 +28,7 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldEndWith
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -49,7 +49,10 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val info = AndroidDeviceInfo(context, { SyncSchedule.WhileCharging }, { PhotoDetails.REMOVE_LOCATION })
+        val info =
+            AndroidDeviceInfo(context, {
+                SyncSchedule.WhileCharging
+            }, { PhotoDetails.REMOVE_LOCATION }, TurboKeyStore(context))
         val device = info.local()
 
         device.name.shouldNotBeBlank()
@@ -195,14 +198,14 @@ class AndroidPlatformTest {
         // Emulators have Wi-Fi Direct turned off: the group fails, cleanly. On a phone, it's MediaSync's own.
         when (val answer = direct.open(port = 47_420)) {
             is TurboAnswer.Ready -> {
-                answer.link.networkName shouldEndWith DirectLink.NAME_SUFFIX
-                direct.close()
+                answer.link.networkName shouldContain DirectLink.NAME_MARKER
+                direct.close(answer.link.networkName)
             }
 
             is TurboAnswer.Unavailable -> answer.reason shouldBe TurboUnavailable.FAILED
         }
         val nowhere = DirectLink("DIRECT-zz-MediaSync", "no-such-group-passphrase", "192.168.49.1", 47_420)
-        direct.join(nowhere, timeoutMillis = 5_000) shouldBe false
+        direct.join(nowhere, timeoutMillis = 5_000).shouldBeNull()
         direct.leave()
     }
 

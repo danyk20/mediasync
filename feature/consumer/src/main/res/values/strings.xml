@@ -67,5 +67,11 @@
     <string name="consumer_turbo_location_settings">Location settings</string>
     <string name="consumer_turbo_open_title">Ready for Turbo</string>
     <string name="consumer_turbo_open_body">The sending phone is joining a direct Wi-Fi link to this phone. Keep the two phones close together.</string>
+    <string name="consumer_turbo_receive_title">Turbo receive</string>
+    <string name="consumer_turbo_receive_body">For a sending phone away from this Wi-Fi: links the two phones directly. Start here, then Start Turbo there.</string>
+    <string name="consumer_turbo_receive_start">Start</string>
+    <string name="consumer_turbo_receive_waiting_title">Waiting for a sending phone</string>
+    <string name="consumer_turbo_receive_waiting_body">On the sending phone, tap Start Turbo. Keep the two phones close together.</string>
+    <string name="consumer_turbo_receive_stop">Stop Turbo receive</string>
     <string name="consumer_turbo_receiving_title">Receiving from %1$s over Turbo</string>
 </resources>

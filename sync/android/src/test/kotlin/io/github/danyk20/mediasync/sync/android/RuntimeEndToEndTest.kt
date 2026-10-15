@@ -16,6 +16,7 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
@@ -66,13 +67,14 @@ class RuntimeEndToEndTest {
     private val sink = FakeMediaSink()
     private val consumerIdentity = testIdentity("Pixel 2 XL")
     private var consumerSchedule: SyncSchedule = SyncSchedule.Default
+    private val consumerKey = ByteArray(TURBO_KEY_BYTES) { 9 }.toByteString()
     private val consumerLinks = FakeDirectLinks()
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
         ledger = received,
         sink = sink,
-        device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule) },
+        device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule, consumerKey) },
         network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, consumerLinks),
         scope = scope,
         preferredPort = 0,
@@ -85,6 +87,10 @@ class RuntimeEndToEndTest {
     private val photos = List(4) { FakeMedia("photo$it", Random(it).nextBytes(300_000 + it)) }
     private val source = FakeMediaSource(photos)
     private val producerLinks = FakeDirectLinks()
+
+    /** The sending phone is away from the receiving phone's Wi-Fi; a direct link still reaches it. */
+    @Volatile
+    private var offWifi = false
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private var photoDetails = PhotoDetails.KEEP_ALL
@@ -98,7 +104,9 @@ class RuntimeEndToEndTest {
 
             override fun photoDetails() = photoDetails
         },
-        network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, producerLinks),
+        network = Connectivity(loopback, {
+            if (offWifi) NoNetwork else SocketFactory.getDefault()
+        }, noDiscovery, producerLinks),
         history = history,
         conditions = { null },
         scope = scope,
@@ -145,6 +153,7 @@ class RuntimeEndToEndTest {
                 sent = 4,
                 bytesSent = photos.sumOf { it.bytes.size.toLong() },
                 consumerSchedule = SyncSchedule.Default,
+                consumerTurboKey = consumerKey,
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe Pending()
@@ -156,7 +165,7 @@ class RuntimeEndToEndTest {
             producer.state.first { it is ProducerState.Idle && it.lastResult != done.lastResult }
         }
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(consumerSchedule = SyncSchedule.Default)
+            SyncResult(consumerSchedule = SyncSchedule.Default, consumerTurboKey = consumerKey)
     }
 
     @Test
@@ -182,7 +191,12 @@ class RuntimeEndToEndTest {
         }
 
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(sent = 1, bytesSent = newPhoto.bytes.size.toLong(), consumerSchedule = SyncSchedule.Default)
+            SyncResult(
+                sent = 1,
+                bytesSent = newPhoto.bytes.size.toLong(),
+                consumerSchedule = SyncSchedule.Default,
+                consumerTurboKey = consumerKey,
+            )
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
     }
 
@@ -319,8 +333,9 @@ class RuntimeEndToEndTest {
             receiver.start()
             pairWithApproval()
             // On the phones, a Wi-Fi Direct group; here, the receiving phone's loopback address.
-            consumerLinks.answer =
-                { port -> TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port)) }
+            consumerLinks.answer = { port, _ ->
+                TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port))
+            }
 
             val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
 
@@ -331,7 +346,7 @@ class RuntimeEndToEndTest {
             entries.any { it.startsWith("send Sync done over Turbo") } shouldBe true
             // The receiving phone closes the link once nothing has come over it for a while.
             withTimeout(TIMEOUT) { receiver.state.first { !it.directLinkOpen } }
-            withTimeout(TIMEOUT) { while (consumerLinks.closed == 0) delay(POLL) }
+            withTimeout(TIMEOUT) { while (consumerLinks.closed.isEmpty()) delay(POLL) }
         } finally {
             Diagnostics.install { _, _ -> }
         }
@@ -343,7 +358,7 @@ class RuntimeEndToEndTest {
         pairWithApproval()
 
         // The receiving phone's user hasn't allowed it: everything goes over Wi-Fi, and it asks there.
-        consumerLinks.answer = { TurboAnswer.Unavailable(TurboUnavailable.NOT_ALLOWED) }
+        consumerLinks.answer = { _, _ -> TurboAnswer.Unavailable(TurboUnavailable.NOT_ALLOWED) }
         val refused = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
         refused.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.RECEIVER_NOT_ALLOWED
         refused.lastResult?.sent shouldBe 4
@@ -352,9 +367,10 @@ class RuntimeEndToEndTest {
 
         // The link is there, but this phone can't join it.
         source.put(FakeMedia("new", Random(9).nextBytes(100_000)))
-        consumerLinks.answer =
-            { port -> TurboAnswer.Ready(DirectLink("DIRECT-cd-MediaSync", "pass", "127.0.0.1", port)) }
-        producerLinks.joins = false
+        consumerLinks.answer = { port, _ ->
+            TurboAnswer.Ready(DirectLink("DIRECT-cd-MediaSync", "pass", "127.0.0.1", port))
+        }
+        producerLinks.joinable = { false }
         val notJoined = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
         notJoined.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
         notJoined.lastResult?.sent shouldBe 1
@@ -367,8 +383,9 @@ class RuntimeEndToEndTest {
         pairWithApproval()
         // The direct link: a relay to the receiving phone that breaks after 500 kB.
         DroppingRelay(target = receiver.state.value.port!!, dropAfterBytes = 500_000).use { relay ->
-            consumerLinks.answer =
-                { TurboAnswer.Ready(DirectLink("DIRECT-ef-MediaSync", "pass", "127.0.0.1", relay.port)) }
+            consumerLinks.answer = { _, _ ->
+                TurboAnswer.Ready(DirectLink("DIRECT-ef-MediaSync", "pass", "127.0.0.1", relay.port))
+            }
 
             val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
 
@@ -376,6 +393,46 @@ class RuntimeEndToEndTest {
             sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
             producerLinks.left shouldBe true
         }
+    }
+
+    @Test
+    fun turboReceiveLetsAPhoneAwayFromTheWifiSendDirectly() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        consumerLinks.answer = { port, (name, passphrase) ->
+            TurboAnswer.Ready(DirectLink(name, passphrase, "127.0.0.1", port))
+        }
+        // It joins only a link the receiving phone opened, as a phone would.
+        producerLinks.joinable = consumerLinks::isOpen
+        offWifi = true
+
+        // Away before ever syncing: it doesn't know the receiving phone's Turbo key yet.
+        withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) } shouldBe
+            ProducerState.Failed(SyncFailure.TURBO_NOT_SET_UP)
+
+        // A sync on the same Wi-Fi tells it.
+        offWifi = false
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        producerPeers.consumer()?.turboKey shouldBe consumerKey
+        offWifi = true
+        val away = FakeMedia("away", Random(11).nextBytes(150_000))
+        source.put(away)
+
+        // Nothing to join until the receiving phone's user starts Turbo receive.
+        withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) } shouldBe
+            ProducerState.Failed(SyncFailure.TURBO_UNREACHABLE)
+        receiver.turbo.startReceive().shouldBeInstanceOf<TurboAnswer.Ready>().link.networkName shouldContain
+            DirectLink.NAME_MARKER
+        receiver.state.value.turboReceiving shouldBe true
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        sink.storedContents() shouldBe (photos + away).map { it.bytes.toByteString() }.toSet()
+        receiver.turbo.stopReceive()
+        receiver.state.value.turboReceiving shouldBe false
+        receiver.state.value.directLinkOpen shouldBe false
+        withTimeout(TIMEOUT) { while (consumerLinks.closed.isEmpty()) delay(POLL) }
     }
 
     /** Shows the consumer's QR code, scans it on the producer, and approves the request on the consumer. */
@@ -398,30 +455,39 @@ class RuntimeEndToEndTest {
 
 /** Wi-Fi Direct as the test wants it: on the phones, a direct link; here, loopback. */
 private class FakeDirectLinks : DirectLinks {
-    var answer: (Int) -> TurboAnswer = { TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED) }
-    var joins = true
+    var answer: (
+        Int,
+        Pair<String, String>,
+    ) -> TurboAnswer = { _, _ -> TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED) }
+
+    /** Which links this phone can join: any, or only those another phone opened. */
+    var joinable: (DirectLink) -> Boolean = { true }
     var joined: DirectLink? = null
     var left = false
-
-    @Volatile
-    var closed = 0
+    val opened = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
+    val closed = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     override fun availability() = TurboAvailability.AVAILABLE
 
-    override fun open(port: Int) = answer(port)
+    override fun open(port: Int, credentials: Pair<String, String>) =
+        answer(port, credentials).also { if (it is TurboAnswer.Ready) opened += credentials }
 
-    override fun close() {
-        closed++
+    override fun close(networkName: String) {
+        closed += networkName
     }
 
-    override suspend fun join(link: DirectLink, timeoutMillis: Long): Boolean {
-        joined = link.takeIf { joins }
-        return joins
+    override suspend fun join(link: DirectLink, timeoutMillis: Long): String? {
+        val joins = joinable(link)
+        if (joins) joined = link
+        return if (joins) "127.0.0.1" else null
     }
 
     override fun leave() {
         left = true
     }
+
+    /** As a receiving phone: the links it opened and hasn't closed. */
+    fun isOpen(link: DirectLink) = (link.networkName to link.passphrase) in opened && link.networkName !in closed
 }
 
 /** Forwards connections to [target] on loopback, and breaks every one once [dropAfterBytes] went through. */
@@ -466,4 +532,25 @@ private class DroppingRelay(private val target: Int, private val dropAfterBytes:
     private companion object {
         const val BUFFER = 64 * 1024
     }
+}
+
+/** No network at all: every connection fails, as off the receiving phone's Wi-Fi. */
+private object NoNetwork : SocketFactory() {
+    private fun none(): Nothing = throw java.io.IOException("Not on that network")
+
+    override fun createSocket(): java.net.Socket = none()
+
+    override fun createSocket(host: String?, port: Int): java.net.Socket = none()
+
+    override fun createSocket(host: String?, port: Int, localHost: InetAddress?, localPort: Int): java.net.Socket =
+        none()
+
+    override fun createSocket(host: InetAddress?, port: Int): java.net.Socket = none()
+
+    override fun createSocket(
+        address: InetAddress?,
+        port: Int,
+        localAddress: InetAddress?,
+        localPort: Int,
+    ): java.net.Socket = none()
 }

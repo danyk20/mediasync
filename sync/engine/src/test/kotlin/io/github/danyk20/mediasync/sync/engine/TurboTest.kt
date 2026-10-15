@@ -13,12 +13,18 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.github.danyk20.mediasync.sync.protocol.Bye
+import io.github.danyk20.mediasync.sync.protocol.Hello
+import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
 import io.github.danyk20.mediasync.sync.protocol.TurboReady
+import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldMatch
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
 
@@ -93,6 +99,59 @@ class TurboTest {
     @Test
     fun aReasonFromALaterVersionIsAFailure() {
         TurboReady(status = 42).toAnswer() shouldBe TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+    }
+
+    @Test
+    fun turboReceiveNetworksAreDerivedFromTheKeyAndChangeWithEachEpoch() {
+        val key = ByteArray(TURBO_KEY_BYTES) { 7 }.toByteString()
+        val other = ByteArray(TURBO_KEY_BYTES) { 8 }.toByteString()
+
+        val (name, passphrase) = DirectLink.derived(key, epoch = 1_000)
+
+        DirectLink.derived(key, epoch = 1_000) shouldBe (name to passphrase) // Both phones get the same.
+        name shouldMatch Regex("DIRECT-[A-Za-z0-9]{2}-MediaSync-[A-Za-z0-9]{6}")
+        name.length shouldBeLessThanOrEqual 32 // Wi-Fi network names are at most 32 bytes.
+        passphrase shouldMatch Regex("[A-Za-z0-9]{24}")
+        DirectLink.derived(key, epoch = 1_001).first shouldNotBe name
+        DirectLink.derived(key, epoch = 1_001).second shouldNotBe passphrase
+        DirectLink.derived(other, epoch = 1_000).second shouldNotBe passphrase
+        DirectLink.epochAt(DirectLink.EPOCH_MILLIS * 1_000 + 1) shouldBe 1_000
+    }
+
+    @Test
+    fun onlyAPairedProducerLearnsTheTurboKey() {
+        val key = ByteArray(TURBO_KEY_BYTES) { 3 }.toByteString()
+        val keyed = local.copy(turboKey = key)
+        fun helloFrom(paired: Boolean): Hello {
+            val connection = ConnectionPair(producerId, consumerId)
+            val registry =
+                if (paired) {
+                    FakePeerRegistry(
+                        PairedPeer(producerId, "Producer", DeviceRole.PRODUCER),
+                    )
+                } else {
+                    FakePeerRegistry()
+                }
+            val consumer = ConsumerSession(
+                keyed,
+                registry,
+                FakeReceivedLedger(),
+                FakeMediaSink(),
+                FakePairingGate("one-time-token!!".encodeToByteArray().toByteString()),
+            )
+            return runBothSides(
+                producer = {
+                    val channel = FrameChannel(connection.producerEnd)
+                    channel.send(Hello(PROTOCOL_VERSION, "Producer", WireRole.PRODUCER, "test"))
+                    channel.expect<Hello>().also { channel.send(Bye()) }
+                },
+                consumer = { runCatching { consumer.serve(connection.consumerEnd) } },
+            ).first.getOrThrow()
+        }
+
+        helloFrom(paired = true).turboKey shouldBe key
+        helloFrom(paired = false).turboKey shouldBe ByteString.EMPTY
+        keyed.toString() shouldNotContain key.hex()
     }
 
     @Test

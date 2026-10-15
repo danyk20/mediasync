@@ -354,6 +354,18 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun turbo_awayFromTheWifiPointsToTurboReceive() {
+        show(paired.copy(sync = ProducerState.Failed(SyncFailure.TURBO_UNREACHABLE)))
+        composeRule.onNodeWithText("tap Turbo receive", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun turbo_awayFromTheWifiNeedsOneSyncOnItFirst() {
+        show(paired.copy(sync = ProducerState.Failed(SyncFailure.TURBO_NOT_SET_UP)))
+        composeRule.onNodeWithText("sync once on the same Wi-Fi first", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun screenshot_turbo_light() = screenshot(
         paired.copy(pendingCount = 2_400, pendingBytes = 4_300_000_000, turbo = TurboAvailability.AVAILABLE),
         "producer_home_turbo_light",

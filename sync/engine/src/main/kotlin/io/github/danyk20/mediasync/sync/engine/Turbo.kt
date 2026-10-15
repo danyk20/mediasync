@@ -12,6 +12,9 @@ import io.github.danyk20.mediasync.sync.protocol.TurboRequest
 import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
 import java.security.SecureRandom
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import okio.ByteString
 
 /**
  * A direct Wi-Fi link between the two phones (Turbo transfer, docs/PLAN.md §8.3): the Wi-Fi Direct network the
@@ -28,16 +31,43 @@ data class DirectLink(val networkName: String, val passphrase: String, val host:
          */
         fun credentials(random: SecureRandom = SecureRandom()): Pair<String, String> {
             fun text(length: Int) = String(CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] })
-            return "DIRECT-${text(2)}$NAME_SUFFIX" to text(PASSPHRASE_LENGTH)
+            return "DIRECT-${text(2)}$NAME_MARKER" to text(PASSPHRASE_LENGTH)
         }
 
-        /** How MediaSync's networks end, so it only ever removes its own. */
-        const val NAME_SUFFIX = "-MediaSync"
+        /**
+         * The *Turbo receive* network for [epoch] (docs/PLAN.md §8.3): derived from the consumer's [key], which its
+         * paired producers know, so they can join it when the two phones share no network to ask on. It changes with
+         * every epoch, so the name isn't a lasting trace of the phone.
+         */
+        fun derived(key: ByteString, epoch: Long): Pair<String, String> {
+            fun text(label: String, length: Int): String {
+                val mac = Mac.getInstance(HMAC)
+                mac.init(SecretKeySpec(key.toByteArray(), HMAC))
+                val bytes = mac.doFinal("mediasync-turbo-v1:$label:$epoch".toByteArray(Charsets.UTF_8))
+                return String(CharArray(length) { ALPHABET[(bytes[it].toInt() and BYTE_MASK) % ALPHABET.length] })
+            }
+            return "DIRECT-${text("prefix", 2)}$NAME_MARKER-${text("name", NAME_TAIL)}" to
+                text("passphrase", PASSPHRASE_LENGTH)
+        }
+
+        /** The *Turbo receive* epoch at [millis]: a consumer's network keeps its name this long. */
+        fun epochAt(millis: Long): Long = millis / EPOCH_MILLIS
+
+        /** In MediaSync's network names, so it only ever removes its own. */
+        const val NAME_MARKER = "-MediaSync"
+
+        const val EPOCH_MILLIS = 15 * 60_000L
 
         private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
         private const val PASSPHRASE_LENGTH = 24
+        private const val NAME_TAIL = 6
+        private const val HMAC = "HmacSHA256"
+        private const val BYTE_MASK = 0xFF
     }
 }
+
+/** A consumer's *Turbo receive* key: 32 random bytes. */
+const val TURBO_KEY_BYTES = 32
 
 /** Why the consumer couldn't open a direct link. */
 enum class TurboUnavailable {

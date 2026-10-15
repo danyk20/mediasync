@@ -29,7 +29,12 @@ data class Peer(
     val lastSeenMillis: Long?,
     /** Producer side: the schedule the consumer asked for; `null` until it says. */
     val schedule: SyncSchedule? = null,
-)
+    /** Producer side: the consumer's *Turbo receive* key (docs/PLAN.md §8.3); `null` until it says. */
+    val turboKey: ByteString? = null,
+) {
+    /** Never the key: this may end up in logs. */
+    override fun toString() = "Peer($id, $name, $role, paired at $pairedAtMillis, last at $lastAddress)"
+}
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
 @Singleton
@@ -59,9 +64,13 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
 
     fun recordAddress(id: DeviceId, address: String) = dao.recordAddress(id.hex, address, System.currentTimeMillis())
 
-    /** Producer side: keeps the schedule the consumer asked for; a `null` (it didn't say) changes nothing. */
-    fun recordSchedule(id: DeviceId, schedule: SyncSchedule?) {
+    /**
+     * Producer side: keeps what the consumer said in a session, its [schedule] and its *Turbo receive* [turboKey]
+     * (docs/PLAN.md §8.3). A `null` (an older consumer didn't say) changes nothing.
+     */
+    fun recordConsumer(id: DeviceId, schedule: SyncSchedule?, turboKey: ByteString? = null) {
         schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
+        turboKey?.let { dao.recordTurboKey(id.hex, it.hex()) }
     }
 
     fun forget(id: DeviceId) = dao.delete(id.hex)
@@ -74,6 +83,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         lastAddress,
         lastSeenMillis,
         schedule?.let(SyncSchedule::decode),
+        turboKey?.decodeHex(),
     )
 }
 

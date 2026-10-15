@@ -555,6 +555,8 @@ private fun failureMessage(reason: SyncFailure, consumer: String): String = when
     SyncFailure.CONNECTION_LOST -> stringResource(R.string.producer_failure_connection_lost, consumer)
     SyncFailure.NOT_ALLOWED -> stringResource(R.string.producer_failure_not_allowed, consumer)
     SyncFailure.INCOMPATIBLE -> stringResource(R.string.producer_failure_incompatible, consumer)
+    SyncFailure.TURBO_UNREACHABLE -> stringResource(R.string.producer_failure_turbo_unreachable, consumer)
+    SyncFailure.TURBO_NOT_SET_UP -> stringResource(R.string.producer_failure_turbo_not_set_up, consumer)
 }
 
 @Preview
