@@ -13,7 +13,7 @@ Until the Play Store launch (M6, docs/PLAN.md §15) versions stay below 1.0: the
    - writes SHA-256 checksums;
    - creates a build provenance attestation;
    - attaches everything to the release.
-4. Google Play upload is added in milestone M6 (docs/PLAN.md §14.4).
+4. If the `release` environment has a Google Play key, the App Bundle also goes to a Play testing track, internal testing by default. Setup: [docs/play/README.md §7](play/README.md#7-uploading-each-release-from-github-optional).
 
 `versionCode` is derived from the version: `1.2.3` → `1002003`.
 

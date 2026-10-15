@@ -100,6 +100,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" dist/* --clobber
+      # Optional: with a Play service account key in the 'release' environment, the App Bundle also goes to a
+      # Google Play testing track (docs/play/README.md §7). Without the key, the upload is skipped.
+      - name: Check for a Google Play key
+        id: play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No PLAY_SERVICE_ACCOUNT_JSON in the 'release' environment: not uploading to Google Play."
+          fi
+      - name: Upload to Google Play
+        if: steps.play.outputs.upload == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: io.github.danyk20.mediasync
+          releaseFiles: dist/mediasync-${{ env.TAG }}.aab
+          # Repository variables; Play accepts only drafts until the app's first release has passed review.
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          # Lets Play show readable stack traces for crashes.
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
       - name: Remove signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks"

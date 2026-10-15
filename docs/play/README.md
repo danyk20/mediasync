@@ -109,6 +109,20 @@ New versions can be uploaded to the closed track at any time, without restarting
 
 After the 14 days: **Dashboard → Apply for production**. Answer the questions about the test, and how you acted on feedback. Then roll out in stages: 10 %, 50 %, 100 % (§14.4).
 
+## 7. Uploading each release from GitHub (optional)
+
+The Release workflow can upload each new version's App Bundle to Play by itself. It needs a Google Cloud service account that may release to testing tracks. Without it, nothing changes: upload the AAB from the GitHub release by hand, as in step 5.
+
+1. **Google Cloud console** (<https://console.cloud.google.com>): create a project, e.g. `mediasync-play`, and enable the **Google Play Android Developer API** in it.
+2. In that project: **IAM & Admin → Service accounts → Create service account**, e.g. `play-upload`. It needs no Google Cloud roles. Then **Keys → Add key → JSON**, which downloads the key.
+3. **Play Console → Users and permissions → Invite new users:** the service account's email address (`play-upload@….iam.gserviceaccount.com`). Under **App permissions**, add MediaSync with **Release apps to testing tracks**, and nothing else. It may take up to a day before the account works.
+4. **GitHub → Settings → Environments → release → Add environment secret:** `PLAY_SERVICE_ACCOUNT_JSON`, with the whole JSON file as its value. Then delete the downloaded file.
+5. Optional, under **Settings → Secrets and variables → Actions → Variables**:
+   - `PLAY_TRACK`: where releases go. `internal` (the default) reaches up to 100 internal testers within minutes, without review. `alpha` is *Closed testing - Alpha*, the closed test's track; a renamed closed track uses its name as Play shows it.
+   - `PLAY_RELEASE_STATUS`: `completed` (the default) rolls the release out. Until the app's first release has passed review, Play accepts only `draft`: the release then waits in Play Console for you to roll it out.
+
+The first App Bundle must be uploaded by hand (step 5), because Play only accepts uploads through the API for an app that already has one. Each release after that is uploaded when you approve the Release workflow, with the code's R8 mapping file so Play shows readable crash reports. Release notes are added in Play Console.
+
 ## Remaking the graphics
 
 The screenshots and the feature graphic are rendered from the app's screens with sample data, and the icon from the launcher icon:
