@@ -33,7 +33,7 @@
     "RELAY_ALLOW_PAID": "false",
     "RELAY_PAID_CAP_USD": "0",
     "TURN_CREDENTIAL_TTL_SECONDS": "3600",
-    "WAKE_RELAY_URL": "",
+    "WAKE_RELAY_URL": "https://mediasync-wake-relay.dry-bird-7439.workers.dev",
     "WAKE_RELAY_ENABLED": "false"
   },
   "crons": [

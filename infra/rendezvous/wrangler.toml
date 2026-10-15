@@ -153,8 +153,8 @@ RELAY_PERIOD_START_DAY = "1"
 RELAY_ALLOW_PAID = "false"
 RELAY_PAID_CAP_USD = "0"
 TURN_CREDENTIAL_TTL_SECONDS = "3600"
-# Set once the developer's wake relay is deployed (env wake-relay below); the app's bundle carries it.
-WAKE_RELAY_URL = ""
+# The developer's wake relay (env wake-relay below), which the app's bundle carries to households' Workers.
+WAKE_RELAY_URL = "https://mediasync-wake-relay.dry-bird-7439.workers.dev"
 WAKE_RELAY_ENABLED = "false"
 
 [env.production.secrets]
