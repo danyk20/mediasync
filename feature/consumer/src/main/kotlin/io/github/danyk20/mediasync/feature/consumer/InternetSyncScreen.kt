@@ -30,9 +30,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,6 +50,8 @@ import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.RelayUsage
+import io.github.danyk20.mediasync.sync.android.SetupStep
+import io.github.danyk20.mediasync.sync.android.WorkerSetup
 import java.net.URI
 import java.net.URISyntaxException
 import java.text.NumberFormat
@@ -74,6 +78,8 @@ data class InternetSyncUiState(
     val reachable: Boolean = false,
     /** This month's relay usage (docs/PLAN.md §8.5); `null` until known. */
     val relay: RelayUsage? = null,
+    /** Setting it up with the user's Cloudflare account. */
+    val setup: CloudflareSetup = CloudflareSetup.Unavailable,
 )
 
 /**
@@ -84,15 +90,19 @@ data class InternetSyncUiState(
 class InternetSyncViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val receiver: ConsumerReceiver,
+    private val workerSetup: WorkerSetup,
 ) : ViewModel() {
 
     private val relay = MutableStateFlow<RelayUsage?>(null)
+    private val setup = MutableStateFlow(
+        if (workerSetup.available()) CloudflareSetup.Ready else CloudflareSetup.Unavailable,
+    )
 
     /** `null` while loading. */
     val uiState: StateFlow<InternetSyncUiState?> =
-        combine(settings.rendezvousUrl, receiver.state, relay) { worker, state, relay ->
+        combine(settings.rendezvousUrl, receiver.state, relay, setup) { worker, state, relay, setup ->
             val on = worker != null
-            InternetSyncUiState(worker, reachable = on && state.overInternet, relay = relay?.takeIf { on })
+            InternetSyncUiState(worker, reachable = on && state.overInternet, relay = relay?.takeIf { on }, setup)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
@@ -116,6 +126,21 @@ class InternetSyncViewModel @Inject constructor(
     }
 
     fun turnOff() = update(null)
+
+    /** Deploys the Worker into the user's Cloudflare account with [token], and turns internet sync on with it. */
+    fun setUp(token: String) {
+        if (setup.value is CloudflareSetup.Running || setup.value == CloudflareSetup.Unavailable) return
+        setup.value = CloudflareSetup.Running(SetupStep.ACCOUNT)
+        viewModelScope.launch {
+            val result = workerSetup.deploy(token) { step -> setup.value = CloudflareSetup.Running(step) }
+            setup.value = CloudflareSetup.Finished(result)
+        }
+    }
+
+    /** The outcome was read: back to the token steps. */
+    fun dismissSetup() {
+        if (setup.value is CloudflareSetup.Finished) setup.value = CloudflareSetup.Ready
+    }
 
     private fun update(worker: String?) {
         viewModelScope.launch {
@@ -157,10 +182,16 @@ fun InternetSyncRoute(
     viewModel: InternetSyncViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val links = LocalUriHandler.current
     InternetSyncScreen(
         state = state,
-        onSave = viewModel::save,
-        onTurnOff = viewModel::turnOff,
+        actions = InternetSyncActions(
+            save = viewModel::save,
+            turnOff = viewModel::turnOff,
+            setUp = viewModel::setUp,
+            openTokenPage = { links.openUri(WorkerSetup.TOKEN_URL) },
+            dismissSetup = viewModel::dismissSetup,
+        ),
         onDone = onDone,
         modifier = modifier,
     )
@@ -171,8 +202,7 @@ fun InternetSyncRoute(
 @Composable
 fun InternetSyncScreen(
     state: InternetSyncUiState?,
-    onSave: (String) -> Boolean,
-    onTurnOff: () -> Unit,
+    actions: InternetSyncActions,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,17 +241,45 @@ fun InternetSyncScreen(
                 },
                 style = MaterialTheme.typography.titleMedium,
             )
-            WorkerField(state, onSave, onTurnOff)
+            Setup(state, actions)
             state.relay?.let { RelayMeter(it) }
         }
     }
 }
 
+/**
+ * Without a Worker: set one up with the user's Cloudflare account, or enter the address of one they deployed
+ * themselves. With one: its address, to change or turn off, and how setting it up went.
+ */
 @Composable
-private fun WorkerField(state: InternetSyncUiState, onSave: (String) -> Boolean, onTurnOff: () -> Unit) {
+private fun Setup(state: InternetSyncUiState, actions: InternetSyncActions) {
+    var ownWorker by rememberSaveable { mutableStateOf(false) }
+    val setup = state.setup
+    val deploying = setup != CloudflareSetup.Unavailable
+    when {
+        state.worker != null -> {
+            WorkerField(state, actions)
+            if (setup is CloudflareSetup.Finished) CloudflareSetupCard(setup, actions)
+        }
+
+        !deploying || ownWorker -> WorkerField(state, actions)
+
+        else -> {
+            CloudflareSetupCard(setup, actions)
+            if (setup !is CloudflareSetup.Running) {
+                TextButton(onClick = { ownWorker = true }) {
+                    Text(stringResource(R.string.consumer_internet_own_worker))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkerField(state: InternetSyncUiState, actions: InternetSyncActions) {
     var address by remember(state.worker) { mutableStateOf(state.worker.orEmpty()) }
     var invalid by remember { mutableStateOf(false) }
-    val save = { invalid = !onSave(address) }
+    val save = { invalid = !actions.save(address) }
     OutlinedTextField(
         value = address,
         onValueChange = {
@@ -247,7 +305,7 @@ private fun WorkerField(state: InternetSyncUiState, onSave: (String) -> Boolean,
             Text(stringResource(R.string.consumer_internet_save))
         }
         if (state.worker != null) {
-            OutlinedButton(onClick = onTurnOff) { Text(stringResource(R.string.consumer_internet_turn_off)) }
+            OutlinedButton(onClick = actions.turnOff) { Text(stringResource(R.string.consumer_internet_turn_off)) }
         }
     }
 }
@@ -305,8 +363,7 @@ private fun InternetSyncScreenPreview() {
     MediaSyncTheme {
         InternetSyncScreen(
             state = InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true),
-            onSave = { true },
-            onTurnOff = {},
+            actions = InternetSyncActions(),
             onDone = {},
         )
     }

@@ -19,7 +19,13 @@ import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.android.RelayUsage
+import io.github.danyk20.mediasync.sync.android.SetupFailure
+import io.github.danyk20.mediasync.sync.android.SetupResult
+import io.github.danyk20.mediasync.sync.android.SetupStep
+import io.github.danyk20.mediasync.sync.android.WorkerSetup
 import io.kotest.matchers.shouldBe
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -59,7 +65,18 @@ class InternetSyncTest {
         every { state } returns receiverState
         every { relayUsage() } returns usage
     }
-    private val viewModel by lazy { InternetSyncViewModel(settings, receiver) }
+    private var deployment: SetupResult = SetupResult.Done(
+        "https://mediasync-rendezvous.anna.workers.dev",
+        relay = true,
+    )
+    private val workerSetup = mockk<WorkerSetup> {
+        every { available() } returns true
+        coEvery { deploy(any(), any()) } coAnswers {
+            secondArg<(SetupStep) -> Unit>()(SetupStep.UPLOAD)
+            deployment
+        }
+    }
+    private val viewModel by lazy { InternetSyncViewModel(settings, receiver, workerSetup) }
     private val events = mutableListOf<String>()
 
     @Test
@@ -103,15 +120,15 @@ class InternetSyncTest {
 
     @Test
     fun itSaysWhetherSendingPhonesCanReachThisPhone() {
-        viewModel.uiState.value shouldBe InternetSyncUiState()
+        viewModel.uiState.value shouldBe InternetSyncUiState(setup = CloudflareSetup.Ready)
         viewModel.save("https://mediasync.anna.workers.dev")
         viewModel.uiState.value?.copy(relay = null) shouldBe
-            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = false)
+            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = false, setup = CloudflareSetup.Ready)
 
         receiverState.value = ReceiverState(overInternet = true)
 
         viewModel.uiState.value?.copy(relay = null) shouldBe
-            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true)
+            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true, setup = CloudflareSetup.Ready)
     }
 
     @Test
@@ -137,6 +154,61 @@ class InternetSyncTest {
 
         composeRule.onNodeWithText("The relay allowance is used up", substring = true).performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingUpWithCloudflareDeploysWithTheTokenAndSaysHowItWent() = runBlocking<Unit> {
+        viewModel.uiState.value?.setup shouldBe CloudflareSetup.Ready
+
+        viewModel.setUp("token-123")
+
+        withTimeout(WAIT) { viewModel.uiState.first { it?.setup is CloudflareSetup.Finished } }?.setup shouldBe
+            CloudflareSetup.Finished(deployment)
+        coVerify { workerSetup.deploy("token-123", any()) }
+        viewModel.dismissSetup()
+        viewModel.uiState.value?.setup shouldBe CloudflareSetup.Ready
+    }
+
+    @Test
+    fun aBuildWithoutTheWorkerOnlyTakesAnAddress() {
+        every { workerSetup.available() } returns false
+
+        viewModel.uiState.value?.setup shouldBe CloudflareSetup.Unavailable
+        viewModel.setUp("token-123")
+        coVerify(exactly = 0) { workerSetup.deploy(any(), any()) }
+    }
+
+    @Test
+    fun theSetupCardTakesTheToken() {
+        show(InternetSyncUiState(setup = CloudflareSetup.Ready))
+
+        composeRule.onNodeWithText("Create a token at Cloudflare").performScrollTo().performClick()
+        composeRule.onNodeWithText("Set up").assertIsNotEnabled()
+        composeRule.onNodeWithText("Cloudflare token").performTextReplacement("token-123")
+        composeRule.onNodeWithText("Set up").performScrollTo().performClick()
+
+        events shouldBe listOf("token page", "set up token-123")
+    }
+
+    @Test
+    fun aWorkerOfOnesOwnCanStillBeEntered() {
+        show(InternetSyncUiState(setup = CloudflareSetup.Ready))
+        composeRule.onNodeWithText("Worker address").assertDoesNotExist()
+
+        composeRule.onNodeWithText("Use a Worker you deployed yourself").performScrollTo().performClick()
+
+        composeRule.onNodeWithText("Worker address").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aRefusedTokenSaysWhyAndOffersToTryAgain() {
+        show(InternetSyncUiState(setup = CloudflareSetup.Finished(SetupResult.Failed(SetupFailure.INVALID_TOKEN))))
+
+        composeRule.onNodeWithText("Cloudflare doesn't accept this token. Copy it again, all of it.").performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Try again").performClick()
+
+        events shouldBe listOf("dismiss")
     }
 
     @Test
@@ -166,6 +238,17 @@ class InternetSyncTest {
     fun screenshot_off_light() = screenshot(InternetSyncUiState(), "consumer_internet_off_light")
 
     @Test
+    fun screenshot_cloudflare_light() =
+        screenshot(InternetSyncUiState(setup = CloudflareSetup.Ready), "consumer_internet_cloudflare_light")
+
+    @Test
+    fun screenshot_cloudflareRunning_dark() = screenshot(
+        InternetSyncUiState(setup = CloudflareSetup.Running(SetupStep.UPLOAD)),
+        "consumer_internet_cloudflare_running_dark",
+        darkTheme = true,
+    )
+
+    @Test
     fun screenshot_reachable_dark() = screenshot(
         InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true, relay = usage),
         "consumer_internet_reachable_dark",
@@ -186,11 +269,16 @@ class InternetSyncTest {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
                 InternetSyncScreen(
                     state = state,
-                    onSave = {
-                        events += "save $it"
-                        accepts
-                    },
-                    onTurnOff = { events += "off" },
+                    actions = InternetSyncActions(
+                        save = {
+                            events += "save $it"
+                            accepts
+                        },
+                        turnOff = { events += "off" },
+                        setUp = { events += "set up $it" },
+                        openTokenPage = { events += "token page" },
+                        dismissSetup = { events += "dismiss" },
+                    ),
                     onDone = { events += "done" },
                 )
             }
