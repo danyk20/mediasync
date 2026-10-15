@@ -13,7 +13,16 @@ import type { Snapshot } from "../src/meter/usage-meter.ts";
 import { billingPeriod } from "../src/meter/period.ts";
 import { STUN_SERVERS } from "../src/turn.ts";
 import { TestDevice } from "./support/device.ts";
-import { errorCode, jsonResponse, meterStub, mockFetch, registeredPair, send } from "./support/worker.ts";
+import {
+    errorCode,
+    jsonResponse,
+    meterStub,
+    mockFetch,
+    RATE_LIMIT_TEST_TIMEOUT_MILLIS,
+    registeredPair,
+    roomInRateLimitWindow,
+    send,
+} from "./support/worker.ts";
 
 const TURN_RESPONSE = {
     iceServers: [
@@ -127,6 +136,7 @@ describe("POST /v1/pairs/{pairId}/ice-servers", () => {
     });
 
     it("limits how often one device asks for credentials", async () => {
+        await roomInRateLimitWindow();
         const { producer, pairId } = await registeredPair();
         mockFetch(() => jsonResponse(TURN_RESPONSE, 201));
         const statuses: number[] = [];
@@ -138,5 +148,5 @@ describe("POST /v1/pairs/{pairId}/ice-servers", () => {
         expect(limited.status).toBe(429);
         expect(limited.headers.get("retry-after")).toBe("60");
         expect(await errorCode(limited)).toBe("rate_limited");
-    });
+    }, RATE_LIMIT_TEST_TIMEOUT_MILLIS);
 });
