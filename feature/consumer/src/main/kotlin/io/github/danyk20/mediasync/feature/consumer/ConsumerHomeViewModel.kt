@@ -12,6 +12,7 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
@@ -42,10 +43,13 @@ data class IncomingTransfer(
     val bytesTotal: Long,
 )
 
+/** A sending phone paired with this one. */
+data class PairedPhone(val id: DeviceId, val name: String)
+
 data class ConsumerHomeUiState(
     val listening: Boolean = false,
     val transfer: IncomingTransfer? = null,
-    val producers: List<String> = emptyList(),
+    val producers: List<PairedPhone> = emptyList(),
     val receivedCount: Int = 0,
     val schedule: SyncSchedule = SyncSchedule.Default,
     /** Too little free space to receive more (docs/PLAN.md §2.2). */
@@ -91,7 +95,7 @@ private data class DeviceAccess(
 @HiltViewModel
 class ConsumerHomeViewModel @Inject constructor(
     private val receiver: ConsumerReceiver,
-    peers: PeerStore,
+    private val peers: PeerStore,
     received: RoomReceivedLedger,
     private val settings: SettingsRepository,
     private val setup: BackgroundSetup,
@@ -138,7 +142,7 @@ class ConsumerHomeViewModel @Inject constructor(
         ConsumerHomeUiState(
             listening = state.listening,
             transfer = transfer,
-            producers = producers.map { it.name },
+            producers = producers.map { PairedPhone(it.id, it.name) },
             receivedCount = count,
             schedule = schedule,
             storageFull = access.freeBytes < LOW_SPACE_BYTES,
@@ -160,6 +164,17 @@ class ConsumerHomeViewModel @Inject constructor(
     /** Call when the screen is shown again, e.g. back from settings, and after the user answered a prompt. */
     fun refresh() {
         access.value = checkAccess()
+    }
+
+    /**
+     * Forgets the sending phone [id]: it no longer syncs to this phone, over Wi-Fi or the internet, until it's paired
+     * again. What it sent stays.
+     */
+    fun removeProducer(id: DeviceId) {
+        viewModelScope.launch(Dispatchers.IO) {
+            peers.forget(id)
+            receiver.refreshInternet()
+        }
     }
 
     /** The user answered a setup card with *Not now*, or declined what it asked for. */

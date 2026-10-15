@@ -84,7 +84,10 @@ class ProducerHomeViewModelTest {
     /** 20:00 in Zurich: the next scheduled sync is at 03:00. */
     private val clock = Clock.fixed(Instant.parse("2026-10-14T18:00:00Z"), ZoneId.of("Europe/Zurich"))
     private val consumer = Peer(DeviceId.of(ByteArray(32)), "Pixel 2 XL", DeviceRole.CONSUMER, 0, null, null)
-    private val peers = mockk<PeerStore> { every { observeConsumer() } returns flowOf(consumer) }
+    private val peers = mockk<PeerStore>(relaxUnitFun = true) {
+        every { observeConsumer() } returns flowOf(consumer)
+        every { consumer() } returns consumer
+    }
     private var missed: ZonedDateTime? = null
     private val scheduler = mockk<SyncScheduler>(relaxed = true) { every { missedSync(any()) } answers { missed } }
     private val history = SyncHistory(application)
@@ -97,6 +100,14 @@ class ProducerHomeViewModelTest {
 
     private fun viewModel() =
         ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock, mobileData)
+
+    @Test
+    fun unpairingStopsASyncAndForgetsTheReceivingPhone() {
+        viewModel().unpair()
+
+        verify { sync.cancel() }
+        verify(timeout = 5_000) { peers.forget(consumer.id) }
+    }
 
     @Test
     fun turboStartsInTheBackgroundWhenThisPhoneCanUseIt() = runTest {

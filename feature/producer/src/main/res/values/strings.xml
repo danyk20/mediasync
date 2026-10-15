@@ -36,7 +36,12 @@
     <string name="producer_failure_unreachable">Couldn\'t find %1$s. Check that both phones are on the same Wi-Fi and MediaSync is open on it.</string>
     <string name="producer_failure_unreachable_internet">Couldn\'t reach %1$s, over Wi-Fi or the internet. Open MediaSync on it, or wait for its scheduled sync.</string>
     <string name="producer_failure_connection_lost">The connection to %1$s dropped. Nothing is lost: the next sync continues where this one stopped.</string>
-    <string name="producer_failure_not_allowed">%1$s no longer recognises this phone. Pair them again.</string>
+    <string name="producer_failure_not_allowed">%1$s no longer recognises this phone: it was removed there. Unpair it here, then pair them again.</string>
+    <string name="producer_receiving_phone_title">Receiving phone</string>
+    <string name="producer_unpair">Unpair</string>
+    <string name="producer_unpair_title">Unpair %1$s?</string>
+    <string name="producer_unpair_body">This phone stops sending to %1$s. You can then pair it with another receiving phone, or with this one again. Photos and videos already sent stay on %1$s.</string>
+    <string name="producer_cancel">Cancel</string>
     <string name="producer_failure_incompatible">%1$s runs a different MediaSync version. Update the app on both phones.</string>
 
     <!-- A scheduled sync that didn't happen. "The sync planned for today at 3:00 AM didn't run" -->

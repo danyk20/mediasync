@@ -30,6 +30,7 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import java.time.Clock
 import java.time.ZonedDateTime
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -131,7 +132,7 @@ class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
     private val scheduler: SyncScheduler,
-    peers: PeerStore,
+    private val peers: PeerStore,
     library: MediaLibrary,
     private val settings: SettingsRepository,
     history: SyncHistory,
@@ -212,6 +213,15 @@ class ProducerHomeViewModel @Inject constructor(
     fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
+
+    /**
+     * Forgets the receiving phone, stopping a sync to it first. This phone can then pair with another one, or with
+     * the same one again; what was sent stays there.
+     */
+    fun unpair() {
+        sync.cancel()
+        viewModelScope.launch(Dispatchers.IO) { peers.consumer()?.let { peers.forget(it.id) } }
+    }
 
     fun setInternetOverMobileData(allowed: Boolean) {
         viewModelScope.launch { settings.setInternetOverMobileData(allowed) }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -31,15 +32,20 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -57,6 +63,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.RelayLevel
 import io.github.danyk20.mediasync.sync.android.RelayUsage
@@ -102,6 +109,7 @@ fun ConsumerHomeRoute(
         modifier = modifier,
         onSetUpInternet = onSetUpInternet,
         onOpenBackup = onOpenBackup,
+        onRemoveProducer = { viewModel.removeProducer(it.id) },
         onAllowNotifications = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -150,6 +158,7 @@ fun ConsumerHomeScreen(
     modifier: Modifier = Modifier,
     onSetUpInternet: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
+    onRemoveProducer: (PairedPhone) -> Unit = {},
     onAllowNotifications: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
@@ -200,7 +209,7 @@ fun ConsumerHomeScreen(
             InternetRow(state.internetSync, state.relay, onSetUpInternet)
             state.backup?.let { BackupRow(it, onOpenBackup) }
             TurboReceiveRow(state, onStartTurboReceive)
-            if (state.producers.isNotEmpty()) Producers(state.producers)
+            if (state.producers.isNotEmpty()) Producers(state.producers, onRemoveProducer)
             Text(
                 text = pluralStringResource(
                     R.plurals.consumer_received_count,
@@ -463,7 +472,8 @@ private fun InternetRow(on: Boolean, relay: RelayUsage?, onSetUp: () -> Unit) {
 }
 
 @Composable
-private fun Producers(names: List<String>) {
+private fun Producers(phones: List<PairedPhone>, onRemove: (PairedPhone) -> Unit) {
+    var removing by remember { mutableStateOf<PairedPhone?>(null) }
     Column {
         Text(
             text = stringResource(R.string.consumer_producers_heading),
@@ -472,10 +482,36 @@ private fun Producers(names: List<String>) {
                 .padding(vertical = 8.dp)
                 .semantics { heading() },
         )
-        names.forEachIndexed { index, name ->
+        phones.forEachIndexed { index, phone ->
             if (index > 0) HorizontalDivider()
-            ListItem(headlineContent = { Text(name) })
+            // TalkBack says which phone: "Remove Anna's Pixel".
+            val described = stringResource(R.string.consumer_producer_remove_described, phone.name)
+            ListItem(
+                headlineContent = { Text(phone.name) },
+                trailingContent = {
+                    TextButton(
+                        onClick = { removing = phone },
+                        modifier = Modifier.semantics { contentDescription = described },
+                    ) { Text(stringResource(R.string.consumer_producer_remove)) }
+                },
+            )
         }
+    }
+    removing?.let { phone ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(R.string.consumer_producer_remove_title, phone.name)) },
+            text = { Text(stringResource(R.string.consumer_producer_remove_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    removing = null
+                    onRemove(phone)
+                }) { Text(stringResource(R.string.consumer_producer_remove), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { removing = null }) { Text(stringResource(R.string.consumer_cancel)) }
+            },
+        )
     }
 }
 
@@ -487,7 +523,7 @@ private fun ConsumerHomeScreenPreview() {
             state = ConsumerHomeUiState(
                 listening = true,
                 transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000),
-                producers = listOf("Anna's Pixel"),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
                 receivedCount = 1234,
             ),
             onAddProducer = {},

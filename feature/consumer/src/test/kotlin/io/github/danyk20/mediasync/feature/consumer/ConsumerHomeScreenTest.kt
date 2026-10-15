@@ -5,6 +5,9 @@
 package io.github.danyk20.mediasync.feature.consumer
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.RelayUsage
@@ -37,7 +41,17 @@ class ConsumerHomeScreenTest {
     private val receiving = ConsumerHomeUiState(
         listening = true,
         transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000),
-        producers = listOf("Anna's Pixel", "Tom's Galaxy"),
+        producers = listOf(
+            PairedPhone(
+                DeviceId.of(
+                    ByteArray(32) {
+                        1
+                    },
+                ),
+                "Anna's Pixel",
+            ),
+            PairedPhone(DeviceId.of(ByteArray(32) { 3 }), "Tom's Galaxy"),
+        ),
         receivedCount = 1234,
     )
     private val events = mutableListOf<String>()
@@ -127,6 +141,34 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
+    fun aSendingPhoneIsRemovedOnlyAfterConfirming() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                producers = listOf(
+                    PairedPhone(
+                        DeviceId.of(
+                            ByteArray(32) {
+                                1
+                            },
+                        ),
+                        "Anna's Pixel",
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithContentDescription("Remove Anna's Pixel").performScrollTo().performClick()
+        composeRule.onNodeWithText("Remove Anna's Pixel?").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
+        events shouldBe emptyList()
+
+        composeRule.onNodeWithContentDescription("Remove Anna's Pixel").performScrollTo().performClick()
+        composeRule.onNode(hasText("Remove") and hasAnyAncestor(isDialog())).performClick()
+        events shouldBe listOf("remove Anna's Pixel")
+    }
+
+    @Test
     fun theBackupRowSaysWhatWasHandedOverAndOpensBackup() {
         show(ConsumerHomeUiState(listening = true, backup = BackupLine.On("Google Photos", 214)))
 
@@ -203,7 +245,7 @@ class ConsumerHomeScreenTest {
         show(
             ConsumerHomeUiState(
                 listening = true,
-                producers = listOf("Anna's Pixel"),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
                 turbo = TurboAvailability.AVAILABLE,
             ),
         )
@@ -223,7 +265,7 @@ class ConsumerHomeScreenTest {
         show(
             ConsumerHomeUiState(
                 listening = true,
-                producers = listOf("Anna's Pixel"),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
                 directLinkOpen = true,
                 turboReceiving = true,
                 turbo = TurboAvailability.AVAILABLE,
@@ -240,7 +282,7 @@ class ConsumerHomeScreenTest {
         show(
             ConsumerHomeUiState(
                 listening = true,
-                producers = listOf("Anna's Pixel"),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
                 directLinkOpen = true,
                 turboReceiving = true,
                 turbo = TurboAvailability.AVAILABLE,
@@ -255,7 +297,7 @@ class ConsumerHomeScreenTest {
         show(
             ConsumerHomeUiState(
                 listening = true,
-                producers = listOf("Anna's Pixel"),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
                 askTurbo = true,
                 turbo = TurboAvailability.NOT_ALLOWED,
             ),
@@ -269,6 +311,7 @@ class ConsumerHomeScreenTest {
                 ConsumerHomeScreen(
                     state = state,
                     onAddProducer = { events += "add" },
+                    onRemoveProducer = { events += "remove ${it.name}" },
                     onOpenBackup = { events += "backup" },
                     onChangeSchedule = { events += "schedule" },
                     onAllowNotifications = { events += "notifications" },

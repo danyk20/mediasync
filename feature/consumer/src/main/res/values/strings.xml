@@ -9,6 +9,11 @@
     <string name="consumer_status_receiving_title">Receiving from %1$s</string>
     <string name="consumer_status_receiving_body">%1$d of %2$d · %3$s of %4$s</string>
     <string name="consumer_add_producer">Add sending phone</string>
+    <string name="consumer_producer_remove">Remove</string>
+    <string name="consumer_producer_remove_described">Remove %1$s</string>
+    <string name="consumer_producer_remove_title">Remove %1$s?</string>
+    <string name="consumer_producer_remove_body">It stops syncing to this phone. Photos and videos it already sent stay here. To sync again, pair it again.</string>
+    <string name="consumer_cancel">Cancel</string>
     <string name="consumer_producers_heading">Sending phones</string>
 
     <!-- Storage guard: MediaSync keeps 2 GB free. -->
