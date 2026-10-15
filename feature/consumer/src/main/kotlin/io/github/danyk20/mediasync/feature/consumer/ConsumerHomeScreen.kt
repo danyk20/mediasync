@@ -66,6 +66,7 @@ fun ConsumerHomeRoute(
     onAddProducer: () -> Unit,
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
+    onSetUpInternet: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
 ) {
@@ -94,6 +95,7 @@ fun ConsumerHomeRoute(
         onAddProducer = onAddProducer,
         onChangeSchedule = onChangeSchedule,
         modifier = modifier,
+        onSetUpInternet = onSetUpInternet,
         onAllowNotifications = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -140,6 +142,7 @@ fun ConsumerHomeScreen(
     onAddProducer: () -> Unit,
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
+    onSetUpInternet: () -> Unit = {},
     onAllowNotifications: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
@@ -187,6 +190,7 @@ fun ConsumerHomeScreen(
                 onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
             )
             ScheduleRow(state.schedule, onChangeSchedule)
+            InternetRow(state.internetSync, onSetUpInternet)
             TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers)
             Text(
@@ -361,6 +365,29 @@ private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
             trailingContent = {
                 Text(
                     text = stringResource(R.string.consumer_schedule_change),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** Internet sync (docs/PLAN.md §8.4): whether sending phones away from this Wi-Fi can sync. */
+@Composable
+private fun InternetRow(on: Boolean, onSetUp: () -> Unit) {
+    OutlinedCard(onClick = onSetUp, modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.consumer_internet_row_title)) },
+            supportingContent = {
+                Text(stringResource(if (on) R.string.consumer_internet_row_on else R.string.consumer_internet_row_off))
+            },
+            trailingContent = {
+                Text(
+                    text = stringResource(
+                        if (on) R.string.consumer_schedule_change else R.string.consumer_internet_set_up,
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )

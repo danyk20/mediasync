@@ -346,6 +346,12 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun internet_sendingSaysSo() {
+        show(syncing.copy(sync = ProducerState.Syncing(TransferProgress(1, 9, 1, 9, null), internet = true)))
+        composeRule.onNodeWithText("Sending to Pixel 2 XL over the internet").assertIsDisplayed()
+    }
+
+    @Test
     fun turbo_whyItWasntUsed() {
         show(paired.copy(sync = ProducerState.Idle(turboProblem = TurboProblem.RECEIVER_NOT_ALLOWED)))
 

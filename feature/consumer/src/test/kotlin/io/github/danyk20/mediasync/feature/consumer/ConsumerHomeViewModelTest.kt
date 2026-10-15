@@ -197,7 +197,7 @@ class ConsumerHomeViewModelTest {
             }
         }
         composeRule.onNodeWithText("Anna's Pixel").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Add sending phone").performClick()
+        composeRule.onNodeWithText("Add sending phone").performScrollTo().performClick()
 
         added shouldBe true
     }

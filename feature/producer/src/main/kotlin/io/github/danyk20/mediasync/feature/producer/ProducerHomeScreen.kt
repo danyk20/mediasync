@@ -234,7 +234,7 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
 private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -> Unit, onStop: () -> Unit) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync.progress, sync.turbo)
+            Sending(consumer, sync)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
@@ -486,11 +486,17 @@ private fun SyncNowButton(onSyncNow: () -> Unit) {
 }
 
 @Composable
-private fun Sending(consumer: String, progress: TransferProgress?, turbo: Boolean) {
+private fun Sending(consumer: String, sync: ProducerState.Syncing) {
+    val progress = sync.progress
+    val turbo = sync.turbo
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusCard(
             title = stringResource(
-                if (turbo) R.string.producer_turbo_sending_title else R.string.producer_status_sending_title,
+                when {
+                    turbo -> R.string.producer_turbo_sending_title
+                    sync.internet -> R.string.producer_internet_sending_title
+                    else -> R.string.producer_status_sending_title
+                },
                 consumer,
             ),
             body = if (progress == null) {

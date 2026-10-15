@@ -103,6 +103,7 @@
     <string name="producer_turbo_setting_up_title">Setting up Turbo with %1$s…</string>
     <string name="producer_turbo_setting_up_body">Linking the two phones directly. This takes a few seconds.</string>
     <string name="producer_turbo_sending_title">Sending to %1$s over Turbo</string>
+    <string name="producer_internet_sending_title">Sending to %1$s over the internet</string>
     <string name="producer_failure_turbo_unreachable">%1$s wasn\'t found, on this Wi-Fi or directly. On %1$s, open MediaSync and tap Turbo receive, then try again here.</string>
     <string name="producer_failure_turbo_not_set_up">%1$s isn\'t on this Wi-Fi. For Turbo away from a shared Wi-Fi, the two phones need to sync once on the same Wi-Fi first.</string>
     <string name="producer_turbo_problem_title">Turbo wasn\'t used</string>

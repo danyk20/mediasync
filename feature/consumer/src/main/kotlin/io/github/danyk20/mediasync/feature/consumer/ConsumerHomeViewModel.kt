@@ -57,6 +57,8 @@ data class ConsumerHomeUiState(
     val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
     /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's Wi-Fi. */
     val turboReceiving: Boolean = false,
+    /** Internet sync (docs/PLAN.md §8.4) is set up: this phone has a rendezvous Worker. */
+    val internetSync: Boolean = false,
 )
 
 /** What the phone allows MediaSync, and its free space. */
@@ -89,9 +91,9 @@ class ConsumerHomeViewModel @Inject constructor(
         receiver.state,
         peers.observeAll(),
         received.observeCount(),
-        settings.syncSchedule,
+        combine(settings.syncSchedule, settings.rendezvousUrl, ::Pair),
         combine(access, settings.dismissedPrompts, ::Pair),
-    ) { state, allPeers, count, schedule, (access, dismissed) ->
+    ) { state, allPeers, count, (schedule, worker), (access, dismissed) ->
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
             IncomingTransfer(
@@ -118,6 +120,7 @@ class ConsumerHomeViewModel @Inject constructor(
             askTurbo = state.turboNeedsPermission && access.turbo != TurboAvailability.AVAILABLE,
             turbo = access.turbo,
             turboReceiving = state.turboReceiving,
+            internetSync = worker != null,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
