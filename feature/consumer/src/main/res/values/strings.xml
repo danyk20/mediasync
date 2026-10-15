@@ -48,6 +48,12 @@
     <string name="consumer_internet_worker_invalid">Enter an https address, like https://mediasync.example.workers.dev</string>
     <string name="consumer_internet_save">Save</string>
     <string name="consumer_internet_turn_off">Turn off</string>
+    <string name="consumer_relay_title">Relay this month</string>
+    <string name="consumer_relay_used">%1$s of %2$s free</string>
+    <string name="consumer_relay_limit">Internet sync stops using the relay at %1$s, so it stays free. Starts over on %2$s.</string>
+    <string name="consumer_relay_limit_no_date">Internet sync stops using the relay at %1$s, so it stays free.</string>
+    <string name="consumer_relay_used_up">The relay allowance is used up. Sending phones that can\'t connect directly wait until %1$s, or sync over Wi-Fi.</string>
+    <string name="consumer_relay_free_paths">Wi-Fi, Turbo and direct internet connections don\'t count.</string>
     <string name="consumer_schedule_title">Sync schedule</string>
     <string name="consumer_schedule_done">Done</string>
     <string name="consumer_schedule_intro">Your sending phones sync with this phone at these times while they\'re charging. A phone that isn\'t charging then syncs as soon as it\'s plugged in.</string>

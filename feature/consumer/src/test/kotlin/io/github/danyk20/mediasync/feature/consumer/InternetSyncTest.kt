@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
@@ -17,11 +18,16 @@ import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.ReceiverState
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,7 +48,17 @@ class InternetSyncTest {
 
     private val settings = FakeSettingsRepository()
     private val receiverState = MutableStateFlow(ReceiverState())
-    private val receiver = mockk<ConsumerReceiver>(relaxed = true) { every { state } returns receiverState }
+    private val usage = RelayUsage(
+        usedBytes = 312_400_000_000,
+        limitBytes = 950_000_000_000,
+        freeBytes = 1_000_000_000_000,
+        available = true,
+        resetsAt = Instant.parse("2026-11-01T00:00:00Z"),
+    )
+    private val receiver = mockk<ConsumerReceiver>(relaxed = true) {
+        every { state } returns receiverState
+        every { relayUsage() } returns usage
+    }
     private val viewModel by lazy { InternetSyncViewModel(settings, receiver) }
     private val events = mutableListOf<String>()
 
@@ -89,11 +105,38 @@ class InternetSyncTest {
     fun itSaysWhetherSendingPhonesCanReachThisPhone() {
         viewModel.uiState.value shouldBe InternetSyncUiState()
         viewModel.save("https://mediasync.anna.workers.dev")
-        viewModel.uiState.value shouldBe InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = false)
+        viewModel.uiState.value?.copy(relay = null) shouldBe
+            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = false)
 
         receiverState.value = ReceiverState(overInternet = true)
 
-        viewModel.uiState.value shouldBe InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true)
+        viewModel.uiState.value?.copy(relay = null) shouldBe
+            InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true)
+    }
+
+    @Test
+    fun theRelayMeterIsReadOnceThereIsAWorker() = runBlocking<Unit> {
+        viewModel.uiState.value?.relay shouldBe null
+        verify(exactly = 0) { receiver.relayUsage() }
+
+        viewModel.save("https://mediasync.anna.workers.dev")
+
+        withTimeout(WAIT) { viewModel.uiState.first { it?.relay != null } }?.relay shouldBe usage
+    }
+
+    @Test
+    fun theMeterSaysHowMuchOfTheAllowanceIsUsed() {
+        show(InternetSyncUiState("https://mediasync.anna.workers.dev", relay = usage))
+
+        composeRule.onNodeWithText("312 GB of 1,000 GB free").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aUsedUpAllowanceSaysUntilWhen() {
+        show(InternetSyncUiState("https://mediasync.anna.workers.dev", relay = usage.copy(available = false)))
+
+        composeRule.onNodeWithText("The relay allowance is used up", substring = true).performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -124,10 +167,14 @@ class InternetSyncTest {
 
     @Test
     fun screenshot_reachable_dark() = screenshot(
-        InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true),
+        InternetSyncUiState("https://mediasync.anna.workers.dev", reachable = true, relay = usage),
         "consumer_internet_reachable_dark",
         darkTheme = true,
     )
+
+    private companion object {
+        const val WAIT = 5_000L
+    }
 
     private fun screenshot(state: InternetSyncUiState, name: String, darkTheme: Boolean = false) {
         show(state, darkTheme = darkTheme)

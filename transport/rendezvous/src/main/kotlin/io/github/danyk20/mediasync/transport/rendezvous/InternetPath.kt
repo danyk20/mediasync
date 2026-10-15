@@ -123,6 +123,10 @@ class InternetPath(
         }
     }
 
+    /** As the consumer: this month's relay usage (PLAN §8.5) at its Worker at [worker], as the pair with [producer]. */
+    fun relayMeter(worker: URI, producer: DeviceId): RelayMeter =
+        RendezvousClient(worker, signer, http).relayUsage(pairId(signer.deviceId, producer))
+
     /**
      * As the consumer: registers each pair in [pairs] (producer → pair secret) at its Worker at [worker], and answers
      * those producers' offers through its mailbox. Each connection goes to [serve], on a thread of its own, until the

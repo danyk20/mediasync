@@ -17,8 +17,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,16 +44,27 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import java.net.URI
 import java.net.URISyntaxException
+import java.text.NumberFormat
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** What the internet sync screen shows. */
 data class InternetSyncUiState(
@@ -59,6 +72,8 @@ data class InternetSyncUiState(
     val worker: String? = null,
     /** Paired phones can reach this phone through the Worker now. */
     val reachable: Boolean = false,
+    /** This month's relay usage (docs/PLAN.md §8.5); `null` until known. */
+    val relay: RelayUsage? = null,
 )
 
 /**
@@ -71,10 +86,27 @@ class InternetSyncViewModel @Inject constructor(
     private val receiver: ConsumerReceiver,
 ) : ViewModel() {
 
+    private val relay = MutableStateFlow<RelayUsage?>(null)
+
     /** `null` while loading. */
-    val uiState: StateFlow<InternetSyncUiState?> = combine(settings.rendezvousUrl, receiver.state) { worker, state ->
-        InternetSyncUiState(worker, reachable = worker != null && state.overInternet)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val uiState: StateFlow<InternetSyncUiState?> =
+        combine(settings.rendezvousUrl, receiver.state, relay) { worker, state, relay ->
+            val on = worker != null
+            InternetSyncUiState(worker, reachable = on && state.overInternet, relay = relay?.takeIf { on })
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    init {
+        // The meter moves while relayed transfers run: read it again every minute, and for a new Worker at once.
+        viewModelScope.launch {
+            settings.rendezvousUrl.collectLatest { worker ->
+                relay.value = null
+                while (worker != null) {
+                    relay.value = withContext(Dispatchers.IO) { receiver.relayUsage() }
+                    delay(RELAY_REFRESH_MILLIS)
+                }
+            }
+        }
+    }
 
     /** Saves the Worker at [address]; `false` (and nothing saved) if it isn't an `https` address. */
     fun save(address: String): Boolean {
@@ -90,6 +122,10 @@ class InternetSyncViewModel @Inject constructor(
             settings.setRendezvousUrl(worker)
             receiver.refreshInternet()
         }
+    }
+
+    private companion object {
+        const val RELAY_REFRESH_MILLIS = 60_000L
     }
 }
 
@@ -176,6 +212,7 @@ fun InternetSyncScreen(
                 style = MaterialTheme.typography.titleMedium,
             )
             WorkerField(state, onSave, onTurnOff)
+            state.relay?.let { RelayMeter(it) }
         }
     }
 }
@@ -214,6 +251,53 @@ private fun WorkerField(state: InternetSyncUiState, onSave: (String) -> Boolean,
         }
     }
 }
+
+/** The relay allowance this month (docs/PLAN.md §8.5). */
+@Composable
+private fun RelayMeter(relay: RelayUsage) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.consumer_relay_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.consumer_relay_used, gigabytes(relay.usedBytes), gigabytes(relay.freeBytes)),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            LinearProgressIndicator(
+                progress = { (relay.usedBytes.toFloat() / relay.freeBytes.coerceAtLeast(1)).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+                color = if (relay.available) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+            val colors = MaterialTheme.colorScheme
+            val tone = if (relay.available) colors.onSurfaceVariant else colors.error
+            val resets = relay.resetsAt?.let {
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(it.atZone(ZoneId.systemDefault()))
+            }
+            Text(
+                text = when {
+                    !relay.available && resets != null -> stringResource(R.string.consumer_relay_used_up, resets)
+                    resets != null -> stringResource(R.string.consumer_relay_limit, gigabytes(relay.limitBytes), resets)
+                    else -> stringResource(R.string.consumer_relay_limit_no_date, gigabytes(relay.limitBytes))
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = tone,
+            )
+            Text(
+                stringResource(R.string.consumer_relay_free_paths),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Relay amounts as Cloudflare states its allowance: "312 GB", "1,000 GB"; below a gigabyte, as file sizes. */
+private fun gigabytes(bytes: Long): String = if (bytes < BYTES_PER_GB) {
+    formatBytes(bytes)
+} else {
+    "${NumberFormat.getIntegerInstance().format(bytes / BYTES_PER_GB)} GB"
+}
+
+private const val BYTES_PER_GB = 1_000_000_000L
 
 @Preview
 @Composable

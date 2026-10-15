@@ -224,6 +224,21 @@ class ConsumerReceiver internal constructor(
     /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
     fun freeBytes(): Long = sink.availableBytes()
 
+    /**
+     * This month's relay usage at this phone's Worker (docs/PLAN.md §8.5); `null` without internet sync, before a
+     * sending phone could use it, or while the Worker can't be asked. Blocks.
+     */
+    fun relayUsage(): RelayUsage? {
+        val worker = device.local().rendezvousUrl ?: return null
+        val producer = peers.producers().firstOrNull { it.pairSecret != null } ?: return null
+        return try {
+            internet.relayUsage(worker, producer.id)
+        } catch (e: IOException) {
+            Diagnostics.log(Area.RECEIVE, "Internet: couldn't read the relay meter", e)
+            null
+        }
+    }
+
     private suspend fun acceptLoop(server: LanServer) {
         while (scope.isActive) {
             val pending = try {

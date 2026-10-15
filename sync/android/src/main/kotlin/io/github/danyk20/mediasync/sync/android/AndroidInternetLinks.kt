@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.transport.webrtc.WebRtcLink
 import java.io.Closeable
 import java.net.URI
 import java.security.Signature
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import okio.ByteString
@@ -58,6 +59,17 @@ class AndroidInternetLinks @Inject internal constructor(
 
     override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable =
         receiving.listen(URI(worker), pairs.mapValues { it.value.toByteArray() }, serve)
+
+    override fun relayUsage(worker: String, producer: DeviceId): RelayUsage =
+        receiving.relayMeter(URI(worker), producer).let { meter ->
+            RelayUsage(
+                usedBytes = meter.usedBytes,
+                limitBytes = meter.limitBytes,
+                freeBytes = meter.freeAllowanceBytes,
+                available = meter.relayAvailable,
+                resetsAt = runCatching { Instant.parse(meter.period.end) }.getOrNull(),
+            )
+        }
 
     private fun path(area: Area) = InternetPath(signer, links, log = { message, error ->
         val entry = "Internet: $message"

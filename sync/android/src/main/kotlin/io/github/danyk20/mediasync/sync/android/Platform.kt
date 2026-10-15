@@ -18,6 +18,7 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.time.Instant
 import javax.inject.Inject
 import javax.net.SocketFactory
 import okio.ByteString
@@ -90,6 +91,14 @@ interface InternetLinks {
      */
     fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable
 
+    /**
+     * As a receiving phone: this month's relay usage at its Worker at [worker] (docs/PLAN.md §8.5), asked as the
+     * pair with [producer]. Blocks.
+     *
+     * @throws IOException if the Worker can't be asked now.
+     */
+    fun relayUsage(worker: String, producer: DeviceId): RelayUsage
+
     /** Without internet sync. */
     object None : InternetLinks {
         override fun allowed() = false
@@ -99,8 +108,23 @@ interface InternetLinks {
 
         override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit) =
             Closeable {}
+
+        override fun relayUsage(worker: String, producer: DeviceId): RelayUsage =
+            throw IOException("No internet sync on this phone")
     }
 }
+
+/**
+ * The relay allowance this month (docs/PLAN.md §8.5): [usedBytes] of the [freeBytes] Cloudflare gives for free; the
+ * relay stops at [limitBytes] (a margin below), and is [available] until then. It starts over at [resetsAt].
+ */
+data class RelayUsage(
+    val usedBytes: Long,
+    val limitBytes: Long,
+    val freeBytes: Long,
+    val available: Boolean,
+    val resetsAt: Instant?,
+)
 
 /** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
 enum class TurboAvailability {

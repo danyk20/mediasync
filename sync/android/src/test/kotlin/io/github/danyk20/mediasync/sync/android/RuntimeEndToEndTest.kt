@@ -154,6 +154,21 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun theReceivingPhoneReadsItsRelayMeterAsAPair() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        receiver.relayUsage() shouldBe null // No Worker.
+
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.relayUsage() shouldBe null // No sending phone with a pair secret yet.
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        receiver.relayUsage()?.usedBytes shouldBe 312_000_000_000
+        internet.meterAsked shouldBe listOf("https://mediasync.example.workers.dev" to producerIdentity.id)
+    }
+
+    @Test
     fun overMobileDataItDoesntSyncThroughTheInternet() = runBlocking<Unit> {
         consumerWorker = "https://mediasync.example.workers.dev"
         receiver.start()
@@ -586,6 +601,14 @@ private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks
     override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable {
         listening[worker] = pairs to serve
         return Closeable { listening.remove(worker) }
+    }
+
+    /** The Worker's meter, as asked: by which Worker, for which pair. */
+    val meterAsked = java.util.concurrent.CopyOnWriteArrayList<Pair<String, DeviceId>>()
+
+    override fun relayUsage(worker: String, producer: DeviceId): RelayUsage {
+        meterAsked += worker to producer
+        return RelayUsage(312_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null)
     }
 }
 
