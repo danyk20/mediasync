@@ -10,14 +10,17 @@ import java.io.IOException
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlin.concurrent.thread
 import okio.Buffer
 import okio.BufferedSink
 import okio.BufferedSource
 import okio.ForwardingSink
 import okio.Pipe
 import okio.Sink
+import okio.Timeout
 import okio.buffer
 
 /** Deterministic device ids for tests. */
@@ -42,6 +45,8 @@ class ConnectionPair(
     consumerId: DeviceId,
     faults: Faults = Faults(),
     timeoutMillis: Long = 10_000,
+    /** Each byte arrives this long after it was written, like a Wi-Fi hop (a round trip is twice this). */
+    latencyMillis: Long = 0,
 ) {
     private val toConsumer = Pipe(PIPE_BUFFER)
     private val toProducer = Pipe(PIPE_BUFFER)
@@ -53,33 +58,70 @@ class ConnectionPair(
         }
     }
 
+    /** What the producer writes, as it reaches the consumer. */
+    private val toConsumerSink = SocketLikeSink(toConsumer.sink).delayed(latencyMillis)
+
+    /** What the consumer writes, as it reaches the producer. */
+    private val toProducerSink = SocketLikeSink(toProducer.sink).delayed(latencyMillis)
+
     /** The producer's end; its [PeerConnection.peerId] is the consumer, as TLS would have authenticated. */
     val producerEnd: PeerConnection = End(
         peerId = consumerId,
         source = toProducer.source.buffer(),
-        sink = FaultySink(toConsumer.sink, faults) { closeAll() }.buffer(),
+        sink = FaultySink(toConsumerSink, faults) { endOf(toConsumerSink, toProducer) }.buffer(),
+        onClose = { endOf(toConsumerSink, toProducer) },
     )
 
     /** The consumer's end; its [PeerConnection.peerId] is the producer. */
     val consumerEnd: PeerConnection = End(
         peerId = producerId,
         source = toConsumer.source.buffer(),
-        sink = toProducer.sink.buffer(),
+        sink = toProducerSink.buffer(),
+        onClose = { endOf(toProducerSink, toConsumer) },
     )
 
-    private fun closeAll() {
-        toConsumer.cancel()
-        toProducer.cancel()
+    /**
+     * One side's end of the connection, as with a socket, whether it closed it or the connection dropped: the other
+     * side still reads what was sent before, then the end, and this side reads nothing more. Cancelling the outgoing
+     * pipe instead would throw away what the other side hadn't read yet: on a slow machine, everything.
+     */
+    private fun endOf(outgoing: Sink, incoming: Pipe) {
+        runCatching { outgoing.close() } // After what's still on its way.
+        incoming.cancel()
     }
 
-    private inner class End(
+    private class End(
         override val peerId: DeviceId,
         override val source: BufferedSource,
         override val sink: BufferedSink,
+        private val onClose: () -> Unit,
     ) : PeerConnection {
         override val remoteAddress = "memory"
 
-        override fun close() = closeAll()
+        override fun close() = onClose()
+    }
+
+    /**
+     * Fails like a socket's: with an [IOException] once this side closed it (a pipe throws IllegalStateException),
+     * and a flush doesn't fail because the other side closed after reading what was sent (a cancelled pipe's would).
+     * A write after the other side closed still fails, as a socket's would.
+     */
+    private class SocketLikeSink(delegate: Sink) : ForwardingSink(delegate) {
+        override fun write(source: Buffer, byteCount: Long) = whileOpen { super.write(source, byteCount) }
+
+        override fun flush() = whileOpen {
+            try {
+                super.flush()
+            } catch (_: IOException) {
+                // The other side closed: what it didn't read is lost, as over a network.
+            }
+        }
+
+        private inline fun whileOpen(block: () -> Unit) = try {
+            block()
+        } catch (e: IllegalStateException) {
+            throw IOException("Socket closed", e)
+        }
     }
 
     private class FaultySink(delegate: Sink, private val faults: Faults, private val onCut: () -> Unit) :
@@ -109,8 +151,54 @@ class ConnectionPair(
         }
     }
 
+    /** Delivers what's written [latencyMillis] later, without holding up the writer. */
+    private class DelayedSink(private val delegate: Sink, private val latencyMillis: Long) : Sink {
+        private val queue = LinkedBlockingQueue<Pair<Long, Buffer>>()
+        private val delivery = thread(isDaemon = true, name = "latency") {
+            try {
+                while (true) {
+                    val (due, chunk) = queue.take()
+                    if (chunk.size == 0L) break // Closed.
+                    val wait = due - System.nanoTime() / NANOS_PER_MILLI
+                    if (wait > 0) Thread.sleep(wait)
+                    delegate.write(chunk, chunk.size)
+                    delegate.flush()
+                }
+            } catch (_: IOException) {
+                // The pipe was cancelled.
+            } catch (_: InterruptedException) {
+                // Shut down.
+            }
+        }
+
+        override fun write(source: Buffer, byteCount: Long) {
+            val chunk = Buffer()
+            source.read(chunk, byteCount)
+            queue.put(System.nanoTime() / NANOS_PER_MILLI + latencyMillis to chunk)
+        }
+
+        override fun flush() = Unit
+
+        override fun timeout(): Timeout = Timeout.NONE
+
+        override fun close() {
+            queue.put(0L to Buffer())
+            delivery.join()
+            delegate.close()
+        }
+    }
+
+    private fun Sink.delayed(latencyMillis: Long): Sink = if (latencyMillis >
+        0
+    ) {
+        DelayedSink(this, latencyMillis)
+    } else {
+        this
+    }
+
     private companion object {
         const val PIPE_BUFFER = 4L * 1024 * 1024
+        const val NANOS_PER_MILLI = 1_000_000L
     }
 }
 

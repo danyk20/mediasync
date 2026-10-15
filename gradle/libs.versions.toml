@@ -18,12 +18,15 @@ hiltLifecycleViewmodelCompose = "1.4.0"
 lifecycle = "2.11.0"
 navigation3 = "1.2.0"
 room = "2.8.5"
+work = "2.12.0"
+androidxHilt = "1.4.0"
 camerax = "1.6.2"
 exifinterface = "1.4.2"
 
 # Libraries
 coroutines = "1.11.0"
 hilt = "2.60.1"
+metadataExtractor = "2.21.0"
 okio = "3.18.2"
 serialization = "1.11.0"
 zxing = "3.5.4"
@@ -82,11 +85,16 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
+androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHilt" }
+androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHilt" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 androidx-camera-compose = { module = "androidx.camera:camera-compose", version.ref = "camerax" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+metadata-extractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadataExtractor" }
 
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }

@@ -10,8 +10,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -48,10 +50,44 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         }
     }
 
+    override val syncSchedule: Flow<SyncSchedule> = dataStore.data
+        .map { preferences -> preferences[SyncScheduleKey]?.let(SyncSchedule::decode) ?: SyncSchedule.Default }
+        .distinctUntilChanged()
+
+    override suspend fun setSyncSchedule(schedule: SyncSchedule) {
+        dataStore.edit { it[SyncScheduleKey] = schedule.encode() }
+    }
+
+    override val photoDetails: Flow<PhotoDetails> = dataStore.data
+        .map { preferences ->
+            preferences[PhotoDetailsKey]?.let { name -> PhotoDetails.entries.firstOrNull { it.name == name } }
+                ?: PhotoDetails.Default
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setPhotoDetails(details: PhotoDetails) {
+        dataStore.edit { it[PhotoDetailsKey] = details.name }
+    }
+
+    override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
+        .map { preferences ->
+            preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
+                SetupPrompt.entries.firstOrNull { it.name == name }
+            }
+        }
+        .distinctUntilChanged()
+
+    override suspend fun dismissPrompt(prompt: SetupPrompt) {
+        dataStore.edit { it[DismissedPromptsKey] = it[DismissedPromptsKey].orEmpty() + prompt.name }
+    }
+
     internal companion object {
         val RoleKey = stringPreferencesKey("device_role")
+        val SyncScheduleKey = stringPreferencesKey("sync_schedule")
         val SourcePresetKey = stringPreferencesKey("source_preset")
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
+        val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
+        val PhotoDetailsKey = stringPreferencesKey("photo_details")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

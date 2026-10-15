@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_notification_channel">Background sync</string>
+    <string name="sync_notification_sending">Sending photos and videos</string>
+    <string name="sync_notification_sending_to">Sending to %1$s</string>
+    <string name="sync_notification_ready">Ready to receive photos and videos</string>
+    <string name="sync_notification_receiving">Receiving photos and videos</string>
+    <string name="sync_notification_receiving_from">Receiving from %1$s</string>
+    <string name="sync_notification_progress">%1$d of %2$d</string>
+    <plurals name="sync_notification_sent">
+        <item quantity="one">%d photo or video sent</item>
+        <item quantity="other">%d photos and videos sent</item>
+    </plurals>
+    <string name="sync_notification_sent_to">They\'re safe on %1$s.</string>
+</resources>

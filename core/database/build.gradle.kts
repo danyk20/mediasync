@@ -8,6 +8,13 @@ android {
     namespace = "io.github.danyk20.mediasync.core.database"
 }
 
+// The migration tests read the exported schemas as assets, on the JVM too.
+androidComponents {
+    onVariants { variant ->
+        variant.hostTests.values.forEach { it.sources.assets?.addStaticSourceDirectory("schemas") }
+    }
+}
+
 room {
     // Exported schemas are committed; MigrationTestHelper checks every migration against them.
     schemaDirectory("$projectDir/schemas")

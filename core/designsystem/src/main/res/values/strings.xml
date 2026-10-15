@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sync schedules, as both phones show them. %s is a time like "3:00 AM" or "03:00". -->
+    <string name="schedule_daily">Every day at %1$s</string>
+    <plurals name="schedule_every_hours">
+        <item quantity="one">Every hour from %2$s</item>
+        <item quantity="other">Every %1$d hours from %2$s</item>
+    </plurals>
+    <plurals name="schedule_every_days">
+        <item quantity="one">Every day at %2$s</item>
+        <item quantity="other">Every %1$d days at %2$s</item>
+    </plurals>
+    <!-- "Every Sunday at 8:00 PM" -->
+    <string name="schedule_weekly">Every %1$s at %2$s</string>
+    <string name="schedule_while_charging">Whenever charging</string>
+    <string name="schedule_manual">Only when you tap Sync now</string>
+
+    <string name="moment_today">today at %1$s</string>
+    <string name="moment_tomorrow">tomorrow at %1$s</string>
+    <string name="moment_yesterday">yesterday at %1$s</string>
+    <!-- "Monday at 3:00 AM" -->
+    <string name="moment_weekday">%1$s at %2$s</string>
+
+    <string name="notice_not_now">Not now</string>
+    <string name="more_options">More options</string>
+    <string name="menu_diagnostics">Diagnostics</string>
+
+    <!-- Cards asking for what background syncs need (Android 12+ battery, Android 13+ notifications). -->
+    <string name="setup_notifications_title">See how syncs are going</string>
+    <string name="setup_notifications_body">Allow notifications to see a sync\'s progress, even when MediaSync is closed.</string>
+    <string name="setup_notifications_allow">Allow</string>
+    <string name="setup_battery_title">Let syncs run at night</string>
+    <string name="setup_battery_body">Android pauses apps in the background to save battery. In MediaSync\'s settings, open the battery settings and choose Unrestricted. MediaSync only syncs while charging.</string>
+    <string name="setup_battery_open">Open settings</string>
+</resources>

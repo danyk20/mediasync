@@ -96,11 +96,18 @@ class ConsumerPairingViewModel @Inject constructor(private val receiver: Consume
         link.value = open()
     }
 
-    override fun onCleared() = receiver.closePairing()
+    override fun onCleared() {
+        receiver.closePairing()
+        receiver.release(HOLDER)
+    }
 
     private fun open(): PairingLink? {
-        receiver.start()
+        receiver.hold(HOLDER) // The producer connects here to pair.
         return receiver.openPairing()
+    }
+
+    private companion object {
+        const val HOLDER = "pairing-screen"
     }
 }
 

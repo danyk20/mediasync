@@ -11,12 +11,23 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
-import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.android.SyncHistory
+import io.github.danyk20.mediasync.sync.android.SyncProblem
+import io.github.danyk20.mediasync.sync.android.SyncRecord
+import io.github.danyk20.mediasync.sync.android.SyncScheduler
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import java.time.Clock
+import java.time.ZonedDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,29 +50,113 @@ data class ProducerHomeUiState(
     val sync: ProducerState = ProducerState.Idle(),
     /** Photos and videos not yet sent; `null` while counting. */
     val pendingCount: Int? = null,
+    /** Their size. */
+    val pendingBytes: Long = 0,
+    /** Whether Turbo transfer (docs/PLAN.md §8.3) can be used, as far as this phone goes. */
+    val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
+    /** Battery below 30 % and not charging: Turbo uses more power. */
+    val turboBatteryLow: Boolean = false,
+    /** The user declined Turbo's permission: only the app's settings can grant it now. */
+    val turboDeclined: Boolean = false,
+    /** Photos and videos the *Photo details* setting holds back: their details can't be removed. */
+    val withheldCount: Int = 0,
+    val photoDetails: PhotoDetails = PhotoDetails.Default,
     val sources: SourceSelection = SourceSelection.Default,
+    /** The receiving phone's schedule, which this phone follows; `null` until paired. */
+    val schedule: SyncSchedule? = null,
+    /** When the next scheduled sync is due, as of [now]; `null` without a timed schedule. */
+    val nextSyncAt: ZonedDateTime? = null,
+    val now: ZonedDateTime? = null,
+    /** When a sync last sent everything it could. */
+    val lastSyncMillis: Long? = null,
+    /** Photos and videos the receiving phone had no space for in the last sync. */
+    val waitingForSpace: Int = 0,
+    /** A scheduled sync that should have happened by now but didn't. */
+    val missedSync: MissedSync? = null,
+    /** Android 13+: ask to show sync progress. */
+    val askNotifications: Boolean = false,
+    /** Android 12+: ask for *Unrestricted* battery use, which syncs at night need. */
+    val askBattery: Boolean = false,
+)
+
+/**
+ * A scheduled sync that didn't happen (docs/PLAN.md §10.3), and what's known about why: the [problem] its last
+ * try ran into, or that Android restricts the app's battery use.
+ */
+data class MissedSync(val due: ZonedDateTime, val problem: SyncProblem?, val batteryRestricted: Boolean)
+
+/** What the home screen shows besides the sync itself. */
+private data class Extras(
+    val access: DeviceAccess,
+    val record: SyncRecord,
+    val dismissed: Set<SetupPrompt>,
+    val details: PhotoDetails,
+    val turboDeclined: Boolean,
+)
+
+/** What the phone allows MediaSync, as of [checkedAtMillis]. */
+private data class DeviceAccess(
+    val library: Boolean,
+    val location: Boolean,
+    val canNotify: Boolean,
+    val batteryRestricted: Boolean,
+    val turbo: TurboAvailability,
+    val turboBatteryLow: Boolean,
+    val checkedAtMillis: Long,
 )
 
 @HiltViewModel
 class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
+    private val scheduler: SyncScheduler,
     peers: PeerStore,
     library: MediaLibrary,
-    settings: SettingsRepository,
+    private val settings: SettingsRepository,
+    history: SyncHistory,
+    private val setup: BackgroundSetup,
+    private val clock: Clock,
 ) : ViewModel() {
 
-    private val permissions = MutableStateFlow(currentPermissions())
-    private val pending = MutableStateFlow<Int?>(null)
+    private val access = MutableStateFlow(checkAccess())
+    private val pending = MutableStateFlow<Pending?>(null)
+    private val turboDeclined = MutableStateFlow(false)
 
     val uiState: StateFlow<ProducerHomeUiState> = combine(
-        peers.observeAll().map { all -> all.firstOrNull { it.role == DeviceRole.CONSUMER }?.name },
-        permissions,
+        peers.observeConsumer(),
         sync.state,
         pending,
         settings.sourceSelection,
-    ) { consumer, (library, location), state, count, sources ->
-        ProducerHomeUiState(consumer, library, location, state, count, sources)
+        combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
+    ) { consumer, state, count, sources, extras ->
+        val (access, record, dismissed) = extras
+        val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
+        val now = ZonedDateTime.now(clock)
+        ProducerHomeUiState(
+            consumerName = consumer?.name,
+            canReadLibrary = access.library,
+            canReadLocation = access.location,
+            sync = state,
+            pendingCount = count?.toSend,
+            pendingBytes = count?.bytes ?: 0,
+            turbo = access.turbo,
+            turboBatteryLow = access.turboBatteryLow,
+            turboDeclined = extras.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
+            withheldCount = count?.withheld ?: 0,
+            photoDetails = extras.details,
+            sources = sources,
+            schedule = schedule,
+            nextSyncAt = schedule?.nextDue(now),
+            now = now,
+            lastSyncMillis = record.lastSyncMillis,
+            waitingForSpace = record.waitingForSpace,
+            missedSync = schedule?.let(scheduler::missedSync)
+                ?.let { MissedSync(it, record.problem, access.batteryRestricted) },
+            askNotifications = !access.canNotify && SetupPrompt.NOTIFICATIONS !in dismissed,
+            askBattery = access.batteryRestricted &&
+                schedule != SyncSchedule.Manual &&
+                SetupPrompt.BATTERY !in dismissed,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
     init {
@@ -70,7 +165,7 @@ class ProducerHomeViewModel @Inject constructor(
         @OptIn(FlowPreview::class)
         val reasons = merge(
             uiState.distinctUntilChangedBy {
-                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources)
+                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources, it.photoDetails)
             }
                 .map { },
             library.changes().debounce(LIBRARY_SETTLE_MILLIS),
@@ -78,13 +173,31 @@ class ProducerHomeViewModel @Inject constructor(
         viewModelScope.launch { reasons.collectLatest { countPending() } }
     }
 
-    fun syncNow() = sync.syncNow()
+    /** Sends in the background, so it carries on when the user leaves the app. */
+    fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
 
-    /** Call after the user answered a permission prompt or came back from settings. */
+    /** Sends over a direct link (docs/PLAN.md §8.3), in the background like [syncNow]. */
+    fun startTurbo() {
+        access.value = checkAccess()
+        if (access.value.turbo == TurboAvailability.AVAILABLE) scheduler.syncNow(turbo = true)
+    }
+
+    /** The answer to Turbo's permission request; declined, only the app's settings can grant it after that. */
+    fun onTurboPermission(granted: Boolean) {
+        turboDeclined.value = !granted
+        if (granted) startTurbo()
+    }
+
+    /** Call when the screen is shown again, e.g. back from settings, and after the user answered a prompt. */
     fun onPermissionsChanged() {
-        permissions.value = currentPermissions()
+        access.value = checkAccess()
+    }
+
+    /** The user answered a setup card with *Not now*, or declined what it asked for. */
+    fun dismiss(prompt: SetupPrompt) {
+        viewModelScope.launch { settings.dismissPrompt(prompt) }
     }
 
     private suspend fun countPending() {
@@ -93,8 +206,15 @@ class ProducerHomeViewModel @Inject constructor(
         pending.value = sync.pendingCount()
     }
 
-    private fun currentPermissions() =
-        MediaPermissions.canReadLibrary(context) to MediaPermissions.canReadLocation(context)
+    private fun checkAccess() = DeviceAccess(
+        library = MediaPermissions.canReadLibrary(context),
+        location = MediaPermissions.canReadLocation(context),
+        canNotify = setup.canNotify(),
+        batteryRestricted = setup.batteryRestricted(),
+        turbo = sync.turboAvailability(),
+        turboBatteryLow = sync.turboBatteryLow(),
+        checkedAtMillis = clock.millis(), // Also brings the times shown up to date.
+    )
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L

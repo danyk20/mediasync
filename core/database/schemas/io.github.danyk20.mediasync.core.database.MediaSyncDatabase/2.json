@@ -1,0 +1,293 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "3c0f0cd8a2360f68631e91ed62427827",
+    "entities": [
+      {
+        "tableName": "peers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceId` TEXT NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, `pairedAtMillis` INTEGER NOT NULL, `lastAddress` TEXT, `lastSeenMillis` INTEGER, `schedule` TEXT, PRIMARY KEY(`deviceId`))",
+        "fields": [
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pairedAtMillis",
+            "columnName": "pairedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAddress",
+            "columnName": "lastAddress",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastSeenMillis",
+            "columnName": "lastSeenMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "schedule",
+            "columnName": "schedule",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "deviceId"
+          ]
+        }
+      },
+      {
+        "tableName": "sent_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`consumerId` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `contentId` TEXT NOT NULL, `sentAtMillis` INTEGER NOT NULL, PRIMARY KEY(`consumerId`, `fingerprint`))",
+        "fields": [
+          {
+            "fieldPath": "consumerId",
+            "columnName": "consumerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentId",
+            "columnName": "contentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sentAtMillis",
+            "columnName": "sentAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "consumerId",
+            "fingerprint"
+          ]
+        }
+      },
+      {
+        "tableName": "received_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `producerId` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `contentId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `mimeType` TEXT NOT NULL, `size` INTEGER NOT NULL, `capturedAtMillis` INTEGER, `utcOffsetMinutes` INTEGER, `album` TEXT, `favorite` INTEGER NOT NULL, `location` TEXT NOT NULL, `receivedAtMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "rowId",
+            "columnName": "rowId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "producerId",
+            "columnName": "producerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentId",
+            "columnName": "contentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAtMillis",
+            "columnName": "capturedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "utcOffsetMinutes",
+            "columnName": "utcOffsetMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "album",
+            "columnName": "album",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "favorite",
+            "columnName": "favorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAtMillis",
+            "columnName": "receivedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "rowId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_received_items_fingerprint",
+            "unique": false,
+            "columnNames": [
+              "fingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_received_items_fingerprint` ON `${TABLE_NAME}` (`fingerprint`)"
+          },
+          {
+            "name": "index_received_items_contentId",
+            "unique": false,
+            "columnNames": [
+              "contentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_received_items_contentId` ON `${TABLE_NAME}` (`contentId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "partial_transfers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`producerId` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `location` TEXT NOT NULL, `startedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`producerId`, `fingerprint`))",
+        "fields": [
+          {
+            "fieldPath": "producerId",
+            "columnName": "producerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtMillis",
+            "columnName": "startedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "producerId",
+            "fingerprint"
+          ]
+        }
+      },
+      {
+        "tableName": "media_fingerprints",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`mediaStoreUri` TEXT NOT NULL, `mediaStoreSize` INTEGER NOT NULL, `modifiedAtMillis` INTEGER NOT NULL, `byteCount` INTEGER NOT NULL, `original` INTEGER NOT NULL, `fingerprint` TEXT NOT NULL, PRIMARY KEY(`mediaStoreUri`))",
+        "fields": [
+          {
+            "fieldPath": "mediaStoreUri",
+            "columnName": "mediaStoreUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreSize",
+            "columnName": "mediaStoreSize",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modifiedAtMillis",
+            "columnName": "modifiedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "byteCount",
+            "columnName": "byteCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "original",
+            "columnName": "original",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fingerprint",
+            "columnName": "fingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "mediaStoreUri"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3c0f0cd8a2360f68631e91ed62427827')"
+    ]
+  }
+}

@@ -4,7 +4,10 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
@@ -12,10 +15,14 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.InetAddress
@@ -33,10 +40,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
 @Singleton
-class AndroidDeviceInfo @Inject constructor(@ApplicationContext private val context: Context) : DeviceInfo {
+class AndroidDeviceInfo @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val schedule: ScheduleSource,
+    private val details: PhotoDetailsSource,
+    private val turboKeys: TurboKeyStore,
+) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
-    override fun local(): LocalDevice = device
+    /** As a receiving phone, it also tells its schedule and Turbo key; sending phones ignore those. */
+    override fun local(): LocalDevice = device.copy(schedule = schedule.current(), turboKey = turboKeys.current())
+
+    override fun photoDetails(): PhotoDetails = details.current()
 
     /** The name the user gave the phone (Settings → About phone), else its model. */
     private fun name(): String =
@@ -54,6 +69,62 @@ class AndroidDeviceInfo @Inject constructor(@ApplicationContext private val cont
     }
 }
 
+/** Battery level and temperature from Android, for the background guards (docs/PLAN.md §10.5). */
+@ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
+@Singleton
+class AndroidDeviceConditions @Inject constructor(@ApplicationContext private val context: Context) :
+    DeviceConditions {
+
+    override fun pauseReason(): PauseReason? {
+        val power = context.getSystemService(PowerManager::class.java)
+        return when {
+            power.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE -> PauseReason.HOT
+            (batteryPercent() ?: PERCENT) < MIN_BATTERY_PERCENT -> PauseReason.LOW_BATTERY
+            else -> null
+        }
+    }
+
+    override fun lowForTurbo(): Boolean {
+        val battery = battery() ?: return false
+        val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        return !plugged && (batteryPercent() ?: PERCENT) < TURBO_WARNING_PERCENT
+    }
+
+    private fun battery(): Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
+    /** From the last battery broadcast: what the system shows, unlike a direct reading from the battery. */
+    private fun batteryPercent(): Int? {
+        val battery = battery() ?: return null
+        val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        return if (level < 0 || scale <= 0) null else level * PERCENT / scale
+    }
+
+    private companion object {
+        const val MIN_BATTERY_PERCENT = 20
+        const val TURBO_WARNING_PERCENT = 30
+        const val PERCENT = 100
+    }
+}
+
+/**
+ * What background syncs need the user to allow (docs/PLAN.md §10.3); the home screens ask for it.
+ *
+ * - Android 12+ starts a foreground service from the background, which a sync at night needs to run longer
+ *   than 10 minutes, only for apps whose battery use is *Unrestricted*.
+ * - Android 13+ shows the progress notification only with the user's permission.
+ */
+@ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
+@Singleton
+class BackgroundSetup @Inject constructor(@ApplicationContext private val context: Context) {
+
+    fun batteryRestricted(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+
+    fun canNotify(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+}
+
 /**
  * The Wi-Fi and Ethernet networks this phone is on, whether or not Android uses them for the internet. While
  * a Wi-Fi has no (verified) internet, Android sends traffic over mobile data instead, yet phones on that
@@ -65,6 +136,26 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
     AddressProvider,
     LanSockets {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val wifi = context.getSystemService(WifiManager::class.java)
+    private val power = context.getSystemService(PowerManager::class.java)
+
+    /**
+     * Holds Wi-Fi locks while a session runs: Wi-Fi power saving would otherwise slow transfers down, the screen
+     * being off at night. No wake lock: background jobs and foreground services already keep the phone awake.
+     */
+    override fun canUseMoreConnections(): Boolean = power.currentThermalStatus < PowerManager.THERMAL_STATUS_MODERATE
+
+    override fun <T> keepingAwake(session: () -> T): T {
+        @Suppress("DEPRECATION") // Low latency needs the screen on; high performance covers the night.
+        val locks = listOf(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, WifiManager.WIFI_MODE_FULL_HIGH_PERF)
+            .map { mode -> wifi.createWifiLock(mode, WIFI_LOCK_TAG).apply { setReferenceCounted(false) } }
+        locks.forEach { it.acquire() }
+        try {
+            return session()
+        } finally {
+            locks.forEach { if (it.isHeld) it.release() }
+        }
+    }
 
     override fun localAddresses(): List<InetAddress> =
         localNetworks().flatMap { (_, links) -> links.linkAddresses.map { it.address } }
@@ -195,3 +286,5 @@ class NsdServiceDiscovery @Inject constructor(@ApplicationContext context: Conte
         const val ID_ATTRIBUTE = "id"
     }
 }
+
+private const val WIFI_LOCK_TAG = "MediaSync:session"

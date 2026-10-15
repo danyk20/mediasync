@@ -4,7 +4,9 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
@@ -12,13 +14,21 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
+import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -39,10 +49,16 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val device = AndroidDeviceInfo(context).local()
+        val info =
+            AndroidDeviceInfo(context, {
+                SyncSchedule.WhileCharging
+            }, { PhotoDetails.REMOVE_LOCATION }, TurboKeyStore(context))
+        val device = info.local()
 
         device.name.shouldNotBeBlank()
         device.appVersion.shouldNotBeBlank()
+        device.schedule shouldBe SyncSchedule.WhileCharging
+        info.photoDetails() shouldBe PhotoDetails.REMOVE_LOCATION
     }
 
     @Test
@@ -71,6 +87,31 @@ class AndroidPlatformTest {
     }
 
     @Test
+    fun sessionsKeepTheWifiAwakeAndLetItRestAfterwards() {
+        val network = AndroidLocalNetwork(context)
+
+        val held = network.keepingAwake { wifiLocks() }
+
+        held shouldBe true
+        wifiLocks() shouldBe false
+    }
+
+    /** Whether this app holds a Wi-Fi lock: listed under "Locks held:" (newer Androids also log past ones). */
+    private fun wifiLocks(): Boolean {
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("dumpsys wifi")
+        val dump = ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes().decodeToString() }
+        var held = false
+        return dump.lines().any { line ->
+            val text = line.trim()
+            when {
+                text == "Locks held:" -> held = true
+                text.isEmpty() || text.startsWith("Locks ") || text.startsWith("Active lock owners") -> held = false
+            }
+            held && "MediaSync:session" in text
+        }
+    }
+
+    @Test
     fun anAdvertisedReceiverIsFoundByItsServiceId() = runBlocking<Unit> {
         requireWifi()
         val discovery = NsdServiceDiscovery(context)
@@ -88,6 +129,86 @@ class AndroidPlatformTest {
         NsdServiceDiscovery(context).find("not-advertised", timeoutMillis = 2_000).shouldBeNull()
     }
 
+    @Test
+    fun aHotPhoneOrALowBatteryPausesBackgroundWork() {
+        val conditions = AndroidDeviceConditions(context)
+        try {
+            shell("dumpsys battery set level 50")
+            awaitValue(null) { conditions.pauseReason() }.shouldBeNull()
+
+            shell("dumpsys battery set level 19")
+            awaitValue(PauseReason.LOW_BATTERY) { conditions.pauseReason() } shouldBe PauseReason.LOW_BATTERY
+
+            shell("dumpsys battery set level 50")
+            shell("cmd thermalservice override-status ${PowerManager.THERMAL_STATUS_SEVERE}")
+            awaitValue(PauseReason.HOT) { conditions.pauseReason() } shouldBe PauseReason.HOT
+        } finally {
+            shell("cmd thermalservice reset")
+            shell("dumpsys battery reset")
+        }
+    }
+
+    @Test
+    fun nightlySyncsNeedUnrestrictedBatteryOnAndroid12AndUp() {
+        val setup = BackgroundSetup(context)
+        val app = context.packageName
+        try {
+            shell("cmd deviceidle whitelist -$app")
+            setup.batteryRestricted() shouldBe (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+
+            shell("cmd deviceidle whitelist +$app") // What choosing Unrestricted does.
+            setup.batteryRestricted() shouldBe false
+        } finally {
+            shell("cmd deviceidle whitelist -$app")
+        }
+    }
+
+    @Test
+    fun progressNotificationsNeedThePermissionOnAndroid13AndUp() {
+        val setup = BackgroundSetup(context)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            setup.canNotify() shouldBe true
+            return
+        }
+        // Revoking it would end this test's process, so this only grants it.
+        val granted = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        setup.canNotify() shouldBe granted
+
+        shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
+        setup.canNotify() shouldBe true
+    }
+
+    @Test
+    fun turboNeedsWifiDirectAndItsPermissionAndNeverLeavesAGroupBehind() = runBlocking<Unit> {
+        val direct = WifiDirect(context)
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
+            direct.availability() shouldBe TurboAvailability.UNSUPPORTED
+            return@runBlocking
+        }
+        shell("pm grant ${context.packageName} ${TurboPermissions.needed}")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // Before Android 13, Wi-Fi Direct also needs location on.
+            shell("settings put secure location_mode 3")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) shell("cmd location set-location-enabled true")
+        }
+        assumeTrue("Location stays off here", direct.availability() != TurboAvailability.LOCATION_OFF)
+        direct.availability() shouldBe TurboAvailability.AVAILABLE
+
+        // Emulators have Wi-Fi Direct turned off: the group fails, cleanly. On a phone, it's MediaSync's own.
+        when (val answer = direct.open(port = 47_420)) {
+            is TurboAnswer.Ready -> {
+                answer.link.networkName shouldContain DirectLink.NAME_MARKER
+                direct.close(answer.link.networkName)
+            }
+
+            is TurboAnswer.Unavailable -> answer.reason shouldBe TurboUnavailable.FAILED
+        }
+        val nowhere = DirectLink("DIRECT-zz-MediaSync", "no-such-group-passphrase", "192.168.49.1", 47_420)
+        direct.join(nowhere, timeoutMillis = 5_000).shouldBeNull()
+        direct.leave()
+    }
+
     /**
      * Emulators join their virtual Wi-Fi ("AndroidWifi") a while after booting, which is when CI starts testing,
      * and drop it when the host's network changes. Asks for it and waits; a test without it is skipped, not failed.
@@ -96,6 +217,17 @@ class AndroidPlatformTest {
         shell("svc wifi enable")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) shell("cmd wifi connect-network AndroidWifi open")
         assumeTrue("This emulator has no Wi-Fi", wifiIsUp())
+    }
+
+    /** Android tells apps about the battery by a broadcast, which arrives a moment after the change. */
+    private fun <T> awaitValue(expected: T, read: () -> T): T {
+        val deadline = SystemClock.uptimeMillis() + SETTLE_MILLIS
+        var value = read()
+        while (value != expected && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(POLL_MILLIS)
+            value = read()
+        }
+        return value
     }
 
     private fun shell(command: String) {
@@ -126,5 +258,7 @@ class AndroidPlatformTest {
 
     private companion object {
         const val WIFI_TIMEOUT_SECONDS = 60L
+        const val SETTLE_MILLIS = 10_000L
+        const val POLL_MILLIS = 100L
     }
 }

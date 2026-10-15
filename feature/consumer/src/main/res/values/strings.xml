@@ -3,15 +3,75 @@
     <string name="consumer_home_title">This phone receives</string>
     <string name="consumer_status_ready_title">Ready to receive</string>
     <string name="consumer_status_ready_body">No sending phones yet. Add one to start.</string>
-    <string name="consumer_status_waiting_body">Keep MediaSync open while your other phones sync.</string>
+    <string name="consumer_status_waiting_body">Your sending phones sync with this phone on the schedule below while it\'s charging. While MediaSync is open, they can also sync at any time.</string>
     <string name="consumer_status_offline_title">Not receiving</string>
     <string name="consumer_status_offline_body">Connect this phone to Wi-Fi to receive photos.</string>
     <string name="consumer_status_receiving_title">Receiving from %1$s</string>
     <string name="consumer_status_receiving_body">%1$d of %2$d · %3$s of %4$s</string>
     <string name="consumer_add_producer">Add sending phone</string>
     <string name="consumer_producers_heading">Sending phones</string>
+
+    <!-- Storage guard: MediaSync keeps 2 GB free. -->
+    <string name="consumer_storage_full_title">Storage full</string>
+    <string name="consumer_storage_full_body">Free up space on this phone to keep receiving. MediaSync leaves 2 GB free for your other apps.</string>
+    <plurals name="consumer_waiting">
+        <item quantity="one">%d photo or video is waiting.</item>
+        <item quantity="other">%d photos and videos are waiting.</item>
+    </plurals>
+    <string name="consumer_storage_didnt_fit_title">Some didn\'t fit</string>
+    <plurals name="consumer_storage_didnt_fit_body">
+        <item quantity="one">%d photo or video was too large for the free space. It arrives with a later sync once there\'s room.</item>
+        <item quantity="other">%d photos and videos were too large for the free space. They arrive with a later sync once there\'s room.</item>
+    </plurals>
+    <string name="consumer_storage_open">Free up space</string>
     <plurals name="consumer_received_count">
         <item quantity="one">%d photo or video received so far. They\'re saved in DCIM/MediaSync, where Google Photos backs them up.</item>
         <item quantity="other">%d photos and videos received so far. They\'re saved in DCIM/MediaSync, where Google Photos backs them up.</item>
     </plurals>
+
+    <!-- Sync schedule -->
+    <string name="consumer_schedule_row_title">Sync schedule</string>
+    <string name="consumer_schedule_change">Change</string>
+    <string name="consumer_schedule_title">Sync schedule</string>
+    <string name="consumer_schedule_done">Done</string>
+    <string name="consumer_schedule_intro">Your sending phones sync with this phone at these times while they\'re charging. A phone that isn\'t charging then syncs as soon as it\'s plugged in.</string>
+    <string name="consumer_schedule_daily">Once a day</string>
+    <string name="consumer_schedule_every_hours">Every few hours</string>
+    <string name="consumer_schedule_every_days">Every few days</string>
+    <string name="consumer_schedule_weekly">Once a week</string>
+    <string name="consumer_schedule_while_charging">Whenever charging</string>
+    <string name="consumer_schedule_while_charging_description">Phones sync as soon as they\'re charging and have new photos. This phone listens while it\'s charging.</string>
+    <string name="consumer_schedule_manual">Only when you tap Sync now</string>
+    <string name="consumer_schedule_manual_description">Nothing runs in the background. Keep MediaSync open on this phone while syncing.</string>
+    <plurals name="consumer_schedule_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="consumer_schedule_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <!-- "At 3:00 AM" / "From 3:00 AM" on the time button -->
+    <string name="consumer_schedule_at">At %1$s</string>
+    <string name="consumer_schedule_from">From %1$s</string>
+    <string name="consumer_schedule_time_ok">OK</string>
+    <string name="consumer_schedule_time_cancel">Cancel</string>
+    <string name="consumer_schedule_window_hint">While it\'s charging, this phone gets ready to receive 5 minutes before each time and stays ready until your phones are done.</string>
+    <string name="consumer_schedule_open_hint">While MediaSync is open, your phones can sync with this phone at any time.</string>
+
+    <!-- Turbo transfer (docs/PLAN.md §8.3): a direct Wi-Fi link between the two phones. -->
+    <string name="consumer_turbo_title">A sending phone asked for Turbo transfer</string>
+    <string name="consumer_turbo_body">Allow MediaSync to connect to nearby devices, so the two phones can link up directly. Then start Turbo on the sending phone again. MediaSync doesn\'t use your location.</string>
+    <string name="consumer_turbo_allow">Allow</string>
+    <string name="consumer_turbo_location_off">Turn on location, so the two phones can link up directly: before Android 13, direct Wi-Fi links need it. Then start Turbo on the sending phone again.</string>
+    <string name="consumer_turbo_location_settings">Location settings</string>
+    <string name="consumer_turbo_open_title">Ready for Turbo</string>
+    <string name="consumer_turbo_open_body">The sending phone is joining a direct Wi-Fi link to this phone. Keep the two phones close together.</string>
+    <string name="consumer_turbo_receive_title">Turbo receive</string>
+    <string name="consumer_turbo_receive_body">For a sending phone away from this Wi-Fi: links the two phones directly. Start here, then Start Turbo there.</string>
+    <string name="consumer_turbo_receive_start">Start</string>
+    <string name="consumer_turbo_receive_waiting_title">Waiting for a sending phone</string>
+    <string name="consumer_turbo_receive_waiting_body">On the sending phone, tap Start Turbo. Keep the two phones close together.</string>
+    <string name="consumer_turbo_receive_stop">Stop Turbo receive</string>
+    <string name="consumer_turbo_receiving_title">Receiving from %1$s over Turbo</string>
 </resources>

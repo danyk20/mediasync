@@ -16,7 +16,8 @@
     <string name="producer_status_checking_body">Comparing with what %1$s already has.</string>
     <string name="producer_status_up_to_date_title">Up to date</string>
     <string name="producer_status_up_to_date_body">%1$s has all your photos and videos.</string>
-    <string name="producer_last_sync">Last sync at %1$s</string>
+    <!-- "Last sync today at 3:04 AM" -->
+    <string name="producer_last_sync">Last sync %1$s</string>
     <plurals name="producer_status_pending_title">
         <item quantity="one">%d new photo or video</item>
         <item quantity="other">%d new photos and videos</item>
@@ -37,9 +38,28 @@
     <string name="producer_failure_not_allowed">%1$s no longer recognises this phone. Pair them again.</string>
     <string name="producer_failure_incompatible">%1$s runs a different MediaSync version. Update the app on both phones.</string>
 
+    <!-- A scheduled sync that didn't happen. "The sync planned for today at 3:00 AM didn't run" -->
+    <string name="producer_missed_title">The sync planned for %1$s didn\'t run</string>
+    <string name="producer_missed_no_wifi">This phone wasn\'t on Wi-Fi. It tries again while charging.</string>
+    <string name="producer_missed_unreachable">%1$s couldn\'t be found on the Wi-Fi. This phone tries again while charging.</string>
+    <string name="producer_missed_connection_lost">The connection to %1$s dropped. This phone tries again while charging and continues where it stopped.</string>
+    <string name="producer_missed_hot">This phone was too warm. It tries again once it has cooled down.</string>
+    <string name="producer_missed_low_battery" formatted="false">The battery was below 20%. This phone tries again once it has charged more.</string>
+    <string name="producer_missed_battery_restricted">Android may have paused MediaSync to save battery. In MediaSync\'s settings, open the battery settings and choose Unrestricted.</string>
+    <string name="producer_missed_unknown">Syncs run while this phone is charging, so leave it plugged in, e.g. overnight. If it was charging, the phone\'s battery saver may have stopped MediaSync: allow it to run in the background in the phone\'s battery settings.</string>
+    <string name="producer_waiting_for_space_title">%1$s is full</string>
+    <plurals name="producer_waiting_for_space_body">
+        <item quantity="one">%1$d photo or video is waiting. It\'s sent once there\'s space on %2$s.</item>
+        <item quantity="other">%1$d photos and videos are waiting. They\'re sent once there\'s space on %2$s.</item>
+    </plurals>
+
     <string name="producer_location_missing">Locations won\'t be included in your photos until you allow MediaSync to read them.</string>
     <string name="producer_location_grant">Keep locations</string>
-    <string name="producer_keep_open_hint">For now, keep MediaSync open on both phones while syncing. Automatic sync while charging is coming.</string>
+    <string name="producer_keep_open_hint">Sync now reaches %1$s while MediaSync is open on it, or during its scheduled sync.</string>
+    <!-- "Next sync tomorrow at 3:00 AM, while charging." -->
+    <string name="producer_next_sync">Next sync %1$s, while charging.</string>
+    <string name="producer_sync_while_charging">Syncs whenever this phone is charging and has new photos.</string>
+    <string name="producer_sync_manual">Syncs only when you tap Sync now.</string>
     <!-- Folders to send -->
     <string name="producer_sources_title">Folders to send</string>
     <string name="producer_sources_change">Change</string>
@@ -50,6 +70,46 @@
     </plurals>
     <string name="producer_status_no_folders_title">No folders chosen</string>
     <string name="producer_status_no_folders_body">Choose which folders to send to %1$s.</string>
+
+    <!-- Photo details: what the sending phone removes before sending (docs/PLAN.md §6.3) -->
+    <string name="producer_details_row_title">Photo details</string>
+    <string name="producer_details_title">Photo details sent</string>
+    <string name="producer_details_intro">Photos and videos carry details: where they were taken, which phone took them, captions. Choose what this phone sends to %1$s.</string>
+    <string name="producer_details_intro_unpaired">Photos and videos carry details: where they were taken, which phone took them, captions. Choose what this phone sends.</string>
+    <string name="producer_details_keep_all">Keep all</string>
+    <string name="producer_details_keep_all_description">Photos and videos arrive exactly as they are on this phone.</string>
+    <string name="producer_details_remove_location">Remove location</string>
+    <string name="producer_details_remove_location_description">Places are removed: GPS, place names and video location. Everything else stays.</string>
+    <string name="producer_details_remove_all">Remove all details</string>
+    <string name="producer_details_remove_all_description">Location, camera, phone, captions, album and favorite are removed. The date, orientation and colours stay.</string>
+    <string name="producer_details_remove_all_note">Motion Photos and Ultra HDR photos arrive as ordinary photos. RAW photos aren\'t sent: their details can\'t be removed.</string>
+    <string name="producer_details_scope">Applies to photos and videos sent from now on. Those already sent keep their details.</string>
+    <plurals name="producer_withheld_title">
+        <item quantity="one">%d photo or video isn\'t sent</item>
+        <item quantity="other">%d photos and videos aren\'t sent</item>
+    </plurals>
+    <string name="producer_withheld_body">MediaSync can\'t remove the details of RAW photos and some other files. Choose another Photo details setting to send them.</string>
+
+    <!-- Turbo transfer (docs/PLAN.md §8.3): a direct Wi-Fi link between the two phones. -->
+    <string name="producer_turbo_title">Turbo transfer</string>
+    <!-- "4.3 GB waiting: try Turbo transfer" -->
+    <string name="producer_turbo_suggestion_title">%1$s waiting: try Turbo transfer</string>
+    <string name="producer_turbo_body">Sends straight to %1$s over a direct Wi-Fi link, without the router. Faster for big backlogs. Keep the two phones close together.</string>
+    <string name="producer_turbo_start">Start Turbo</string>
+    <string name="producer_turbo_battery_low">The battery is low: plug this phone in, as Turbo uses more power.</string>
+    <string name="producer_turbo_location_off">Turn on location first: before Android 13, direct Wi-Fi links need it. MediaSync doesn\'t use your location.</string>
+    <string name="producer_turbo_location_settings">Location settings</string>
+    <string name="producer_turbo_declined">Turbo needs permission to connect to nearby devices (location, before Android 13). Allow it in MediaSync\'s settings.</string>
+    <string name="producer_turbo_setting_up_title">Setting up Turbo with %1$s…</string>
+    <string name="producer_turbo_setting_up_body">Linking the two phones directly. This takes a few seconds.</string>
+    <string name="producer_turbo_sending_title">Sending to %1$s over Turbo</string>
+    <string name="producer_failure_turbo_unreachable">%1$s wasn\'t found, on this Wi-Fi or directly. On %1$s, open MediaSync and tap Turbo receive, then try again here.</string>
+    <string name="producer_failure_turbo_not_set_up">%1$s isn\'t on this Wi-Fi. For Turbo away from a shared Wi-Fi, the two phones need to sync once on the same Wi-Fi first.</string>
+    <string name="producer_turbo_problem_title">Turbo wasn\'t used</string>
+    <string name="producer_turbo_problem_unsupported">%1$s can\'t do Turbo transfer: it has no Wi-Fi Direct. Everything went over Wi-Fi instead.</string>
+    <string name="producer_turbo_problem_not_allowed">Turbo needs your OK on %1$s: open MediaSync there and allow it to connect to nearby devices. Then try again. Meanwhile, everything went over Wi-Fi.</string>
+    <string name="producer_turbo_problem_no_link">The direct link to %1$s didn\'t connect, so everything went over Wi-Fi. Keep the phones close together and try again.</string>
+    <string name="producer_turbo_problem_dropped">The direct link to %1$s dropped, so the rest went over Wi-Fi.</string>
 
     <string name="producer_folders_title">Folders to send</string>
     <string name="producer_folders_done">Done</string>

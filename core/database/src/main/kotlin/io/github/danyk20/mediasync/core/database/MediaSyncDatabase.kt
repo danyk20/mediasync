@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.core.database
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
@@ -14,9 +15,16 @@ import androidx.room.RoomDatabase
         ReceivedItemEntity::class,
         PartialTransferEntity::class,
         MediaFingerprintEntity::class,
+        ConnectorAccountEntity::class,
+        BackupReceiptEntity::class,
     ],
-    version = 1,
+    version = 4,
     exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2), // peers.schedule
+        AutoMigration(from = 2, to = 3), // peers.turboKey
+        AutoMigration(from = 3, to = 4), // connector_accounts, backup_receipts
+    ],
 )
 abstract class MediaSyncDatabase : RoomDatabase() {
     abstract fun peerDao(): PeerDao
@@ -28,6 +36,8 @@ abstract class MediaSyncDatabase : RoomDatabase() {
     abstract fun partialTransferDao(): PartialTransferDao
 
     abstract fun mediaFingerprintDao(): MediaFingerprintDao
+
+    abstract fun backupDao(): BackupDao
 
     companion object {
         const val NAME = "mediasync.db"

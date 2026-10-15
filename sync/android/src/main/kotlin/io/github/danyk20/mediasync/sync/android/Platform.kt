@@ -5,25 +5,37 @@
 package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import java.io.Closeable
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import javax.inject.Inject
 import javax.net.SocketFactory
 import okio.ByteString.Companion.encodeUtf8
 
 // Small seams around Android services, so the sync runtime can be tested on the JVM.
 
-/** How this phone introduces itself to others. */
+/** How this phone introduces itself to others, and how its user set it up. */
 fun interface DeviceInfo {
     fun local(): LocalDevice
+
+    /** As a sending phone: the details it sends (docs/PLAN.md §6.3). */
+    fun photoDetails(): PhotoDetails = PhotoDetails.Default
 }
 
 /** This phone's addresses on the local network, or none when it isn't on Wi-Fi or Ethernet. */
 fun interface AddressProvider {
     fun localAddresses(): List<InetAddress>
+
+    /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a receiving phone. */
+    fun <T> keepingAwake(session: () -> T): T = session()
 }
 
 /**
@@ -32,6 +44,98 @@ fun interface AddressProvider {
  */
 fun interface LanSockets {
     fun factoryFor(address: InetSocketAddress): SocketFactory
+
+    /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a sending phone. */
+    fun <T> keepingAwake(session: () -> T): T = session()
+
+    /** Whether a sync may open another connection: not on a warm phone, as more mean more radio and CPU work. */
+    fun canUseMoreConnections(): Boolean = true
+}
+
+/** How this phone reaches other phones: its local network, mDNS on it, and direct links (docs/PLAN.md §8). */
+class Connectivity @Inject constructor(
+    val addresses: AddressProvider,
+    val sockets: LanSockets,
+    val discovery: ServiceDiscovery,
+    val directLinks: DirectLinks,
+)
+
+/** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
+enum class TurboAvailability {
+    AVAILABLE,
+
+    /** It has no Wi-Fi Direct. */
+    UNSUPPORTED,
+
+    /** The user hasn't allowed MediaSync to connect to nearby devices (location, before Android 13). */
+    NOT_ALLOWED,
+
+    /** Before Android 13, Wi-Fi Direct also needs location to be on. */
+    LOCATION_OFF,
+}
+
+/**
+ * Wi-Fi Direct links between the two phones, for Turbo transfer (docs/PLAN.md §8.3). The receiving phone creates
+ * a fresh one for each transfer, and the sending phone joins it with what it was told in an encrypted session.
+ */
+interface DirectLinks {
+    fun availability(): TurboAvailability
+
+    /**
+     * As a receiving phone: creates a link that sending phones join with [credentials] (network name and
+     * passphrase), listening on it at [port]. Blocks.
+     */
+    fun open(port: Int, credentials: Pair<String, String> = DirectLink.credentials()): TurboAnswer
+
+    /** As a receiving phone: removes the link named [networkName], if it's still up. */
+    fun close(networkName: String)
+
+    /** As a sending phone: joins [link]; the address of the phone that opened it, or `null` if not joined in time. */
+    suspend fun join(link: DirectLink, timeoutMillis: Long): String?
+
+    /** As a sending phone: leaves the link it joined. */
+    fun leave()
+
+    /** For phones without Wi-Fi Direct, and for tests. */
+    object None : DirectLinks {
+        override fun availability() = TurboAvailability.UNSUPPORTED
+
+        override fun open(port: Int, credentials: Pair<String, String>): TurboAnswer =
+            TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+
+        override fun close(networkName: String) = Unit
+
+        override suspend fun join(link: DirectLink, timeoutMillis: Long): String? = null
+
+        override fun leave() = Unit
+    }
+}
+
+/** Why background work waits for better conditions (docs/PLAN.md §10.5). */
+enum class PauseReason {
+    /** The phone is hot: transfers would heat it further. */
+    HOT,
+
+    /** Below 20 %, even while charging: slow chargers exist. */
+    LOW_BATTERY,
+}
+
+/** Whether background work should wait; `null` to go ahead. User-started syncs don't ask. */
+fun interface DeviceConditions {
+    fun pauseReason(): PauseReason?
+
+    /** Below 30 % and not charging: Turbo transfer (docs/PLAN.md §8.3) warns that it uses more power. */
+    fun lowForTurbo(): Boolean = false
+}
+
+/** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
+fun interface PhotoDetailsSource {
+    fun current(): PhotoDetails
+}
+
+/** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */
+fun interface ScheduleSource {
+    fun current(): SyncSchedule
 }
 
 /** Advertising and finding MediaSync receivers on the local network (mDNS / DNS-SD). */

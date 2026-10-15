@@ -23,3 +23,26 @@ kover {
         }
     }
 }
+
+// Throughput benchmark (docs/PLAN.md §7): not part of the tests; CI runs it in its own job and keeps the trend.
+tasks.named<Test>("test") { useJUnitPlatform { excludeTags("benchmark") } }
+
+val benchmark by tasks.registering(Test::class) {
+    description = "Measures sync throughput; writes build/benchmark/results.json."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("benchmark") }
+    maxHeapSize = "2g"
+    outputs.upToDateWhen { false }
+    systemProperty("benchmark.output", layout.buildDirectory.file("benchmark/results.json").get().asFile.path)
+    testLogging.showStandardStreams = true
+}
+
+kover {
+    currentProject {
+        instrumentation {
+            disabledForTestTasks.add("benchmark")
+        }
+    }
+}

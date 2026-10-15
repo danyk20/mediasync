@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.io.Closeable
 import okio.ByteString
 import okio.Source
@@ -19,7 +20,15 @@ interface MediaSource {
 
     /** Opens the original bytes (location metadata included). */
     fun open(item: SourceItem): Source
+
+    /** Opens the original bytes for reading anywhere, to find their metadata before sending (docs/PLAN.md §6.4). */
+    fun openRanges(item: SourceItem): RangeReader
 }
+
+/** Reads parts of one file; close it when done. */
+interface RangeReader :
+    ByteRangeReader,
+    Closeable
 
 /** Producer side: what each consumer has confirmed (docs/PLAN.md §5.6). */
 interface SentLedger {
@@ -86,5 +95,19 @@ fun interface PairingGate {
     fun decide(request: PairingRequest): PairingDecision
 }
 
-/** How this device introduces itself in `Hello`. */
-data class LocalDevice(val name: String, val appVersion: String)
+/**
+ * How this device introduces itself in `Hello`.
+ *
+ * @property schedule consumer only: the sync schedule its producers follow (docs/PLAN.md §10.1).
+ * @property turboKey consumer only: what its *Turbo receive* links derive from, told to paired producers only
+ *   (docs/PLAN.md §8.3).
+ */
+data class LocalDevice(
+    val name: String,
+    val appVersion: String,
+    val schedule: SyncSchedule? = null,
+    val turboKey: ByteString? = null,
+) {
+    /** Never the key: this ends up in logs. */
+    override fun toString() = "LocalDevice($name, $appVersion, $schedule)"
+}

@@ -36,6 +36,11 @@ value class FrameType(val code: Int) {
 
         /** Reserved for v1.1: the consumer reports cloud backup state back to producers. */
         val BACKUP_STATUS = FrameType(0x0B)
+        val LINK_TEST_BEGIN = FrameType(0x0C)
+        val LINK_TEST_END = FrameType(0x0D)
+        val LINK_TEST_RESULT = FrameType(0x0E)
+        val TURBO_REQUEST = FrameType(0x0F)
+        val TURBO_READY = FrameType(0x10)
     }
 }
 

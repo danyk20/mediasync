@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.core.database
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PeerRegistry
 import io.github.danyk20.mediasync.sync.engine.ReceivedItem
@@ -26,7 +27,14 @@ data class Peer(
     val pairedAtMillis: Long,
     val lastAddress: String?,
     val lastSeenMillis: Long?,
-)
+    /** Producer side: the schedule the consumer asked for; `null` until it says. */
+    val schedule: SyncSchedule? = null,
+    /** Producer side: the consumer's *Turbo receive* key (docs/PLAN.md §8.3); `null` until it says. */
+    val turboKey: ByteString? = null,
+) {
+    /** Never the key: this may end up in logs. */
+    override fun toString() = "Peer($id, $name, $role, paired at $pairedAtMillis, last at $lastAddress)"
+}
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
 @Singleton
@@ -44,15 +52,39 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
 
     fun observeAll(): Flow<List<Peer>> = dao.observeAll().map { peers -> peers.map { it.toPeer() } }
 
-    /** The consumer this producer sends to (one in v1.0). */
+    /** The consumer this producer sends to (one in v1.0): the most recently paired. */
     fun consumer(): Peer? = dao.withRole(DeviceRole.CONSUMER.name).firstOrNull()?.toPeer()
+
+    /** [consumer], as it changes. */
+    fun observeConsumer(): Flow<Peer?> =
+        dao.observeWithRole(DeviceRole.CONSUMER.name).map { it.firstOrNull()?.toPeer() }
+
+    /** Producer side: pairing with a consumer replaces any earlier one (one in v1.0); what was sent stays recorded. */
+    fun keepOnlyConsumer(id: DeviceId) = dao.deleteOthersWithRole(DeviceRole.CONSUMER.name, id.hex)
 
     fun recordAddress(id: DeviceId, address: String) = dao.recordAddress(id.hex, address, System.currentTimeMillis())
 
+    /**
+     * Producer side: keeps what the consumer said in a session, its [schedule] and its *Turbo receive* [turboKey]
+     * (docs/PLAN.md §8.3). A `null` (an older consumer didn't say) changes nothing.
+     */
+    fun recordConsumer(id: DeviceId, schedule: SyncSchedule?, turboKey: ByteString? = null) {
+        schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
+        turboKey?.let { dao.recordTurboKey(id.hex, it.hex()) }
+    }
+
     fun forget(id: DeviceId) = dao.delete(id.hex)
 
-    private fun PeerEntity.toPeer() =
-        Peer(DeviceId(deviceId), name, DeviceRole.valueOf(role), pairedAtMillis, lastAddress, lastSeenMillis)
+    private fun PeerEntity.toPeer() = Peer(
+        DeviceId(deviceId),
+        name,
+        DeviceRole.valueOf(role),
+        pairedAtMillis,
+        lastAddress,
+        lastSeenMillis,
+        schedule?.let(SyncSchedule::decode),
+        turboKey?.decodeHex(),
+    )
 }
 
 @Singleton

@@ -5,8 +5,11 @@
 package io.github.danyk20.mediasync.core.testing
 
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 class FakeSettingsRepository(
     initialRole: DeviceRole? = null,
     initialSourceSelection: SourceSelection = SourceSelection.Default,
+    initialSyncSchedule: SyncSchedule = SyncSchedule.Default,
 ) : SettingsRepository {
     private val roleState = MutableStateFlow(initialRole)
     private val sourceSelectionState = MutableStateFlow(initialSourceSelection)
@@ -28,5 +32,29 @@ class FakeSettingsRepository(
 
     override suspend fun setSourceSelection(selection: SourceSelection) {
         sourceSelectionState.value = selection
+    }
+
+    private val syncScheduleState = MutableStateFlow(initialSyncSchedule)
+
+    override val syncSchedule: StateFlow<SyncSchedule> = syncScheduleState
+
+    override suspend fun setSyncSchedule(schedule: SyncSchedule) {
+        syncScheduleState.value = schedule
+    }
+
+    private val photoDetailsState = MutableStateFlow(PhotoDetails.Default)
+
+    override val photoDetails: StateFlow<PhotoDetails> = photoDetailsState
+
+    override suspend fun setPhotoDetails(details: PhotoDetails) {
+        photoDetailsState.value = details
+    }
+
+    private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
+
+    override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState
+
+    override suspend fun dismissPrompt(prompt: SetupPrompt) {
+        dismissedPromptsState.value += prompt
     }
 }

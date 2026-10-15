@@ -16,6 +16,7 @@ import io.github.danyk20.mediasync.sync.engine.PairingDecision
 import io.github.danyk20.mediasync.sync.engine.PairingGate
 import io.github.danyk20.mediasync.sync.engine.PairingRequest
 import io.github.danyk20.mediasync.sync.engine.PeerRegistry
+import io.github.danyk20.mediasync.sync.engine.RangeReader
 import io.github.danyk20.mediasync.sync.engine.ReceivedItem
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.SentLedger
@@ -57,6 +58,18 @@ class FakeMediaSource(media: List<FakeMedia> = emptyList()) : MediaSource {
         val found = media[item.key] ?: throw IOException("${item.key} no longer exists")
         synchronized(opened) { opened += item.key }
         return Buffer().write(found.bytes)
+    }
+
+    override fun openRanges(item: SourceItem): RangeReader {
+        val bytes = media[item.key]?.bytes ?: throw IOException("${item.key} no longer exists")
+        return object : RangeReader {
+            override fun read(offset: Long, byteCount: Int): ByteArray {
+                if (offset < 0 || offset + byteCount > bytes.size) throw java.io.EOFException("Past the end")
+                return bytes.copyOfRange(offset.toInt(), offset.toInt() + byteCount)
+            }
+
+            override fun close() = Unit
+        }
     }
 }
 
