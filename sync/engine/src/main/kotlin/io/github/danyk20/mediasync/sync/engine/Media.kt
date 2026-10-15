@@ -29,8 +29,11 @@ data class MediaDescriptor(
     val meta: MediaMeta = MediaMeta(),
 )
 
-/** A producer-side item: [key] is the source's own handle, e.g. a MediaStore id. */
-data class SourceItem(val key: String, val descriptor: MediaDescriptor)
+/**
+ * A producer-side item: [key] is the source's own handle, e.g. a MediaStore id. [shared]: the user shared it to
+ * MediaSync from a gallery app, to send now, so it goes before everything else.
+ */
+data class SourceItem(val key: String, val descriptor: MediaDescriptor, val shared: Boolean = false)
 
 /** A consumer-side record of a stored item; kept even after a connector app deletes the file. */
 data class ReceivedItem(

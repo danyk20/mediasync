@@ -84,6 +84,7 @@ dependencies {
     implementation(projects.feature.pairing)
     implementation(projects.feature.producer)
     implementation(projects.feature.quickaccess)
+    implementation(projects.feature.share)
     implementation(projects.sync.android)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.work.runtime)

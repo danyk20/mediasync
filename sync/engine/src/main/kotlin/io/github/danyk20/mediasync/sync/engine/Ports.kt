@@ -23,6 +23,9 @@ interface MediaSource {
 
     /** Opens the original bytes for reading anywhere, to find their metadata before sending (docs/PLAN.md §6.4). */
     fun openRanges(item: SourceItem): RangeReader
+
+    /** The consumer has [item] now, sent or already there: a source lets go of what it kept only to send it. */
+    fun confirmed(item: SourceItem) = Unit
 }
 
 /** Reads parts of one file; close it when done. */

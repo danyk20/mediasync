@@ -14,6 +14,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.feature.quickaccess.QuickAccess
+import io.github.danyk20.mediasync.feature.share.ShareTarget
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import javax.inject.Inject
@@ -41,6 +42,9 @@ class MediaSyncApplication :
     @Inject
     lateinit var quickAccess: QuickAccess
 
+    @Inject
+    lateinit var shareTarget: ShareTarget
+
     /** Background work gets its dependencies from Hilt (the default initializer is removed in the manifest). */
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -57,5 +61,7 @@ class MediaSyncApplication :
         cloudBackup.start()
         // The home-screen widget shows how syncing stands.
         quickAccess.start()
+        // Lists MediaSync in the share sheet on a paired sending phone.
+        shareTarget.start()
     }
 }

@@ -13,6 +13,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
@@ -26,6 +27,7 @@ import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.RangeReader
 import io.github.danyk20.mediasync.sync.engine.SourceItem
+import java.io.File
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -53,6 +55,7 @@ import okio.source
 class MediaStoreSource internal constructor(
     private val context: Context,
     private val fingerprints: MediaFingerprintDao,
+    private val shared: SharedItems = SharedItems(context),
     private val selection: suspend () -> SourceSelection,
 ) : MediaSource {
 
@@ -60,8 +63,9 @@ class MediaStoreSource internal constructor(
     constructor(
         @ApplicationContext context: Context,
         fingerprints: MediaFingerprintDao,
+        shared: SharedItems,
         settings: SettingsRepository,
-    ) : this(context, fingerprints, { settings.sourceSelection.first() })
+    ) : this(context, fingerprints, shared, { settings.sourceSelection.first() })
 
     private val resolver: ContentResolver = context.contentResolver
 
@@ -69,17 +73,66 @@ class MediaStoreSource internal constructor(
     fun canReadLocation(): Boolean =
         context.checkSelfPermission(Manifest.permission.ACCESS_MEDIA_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    /** Called on I/O threads, which may wait for the stored choice. */
+    /**
+     * What the user shared to send now, and everything in the chosen folders. Called on I/O threads, which may wait
+     * for the stored choice.
+     */
     override fun items(): List<SourceItem> {
         val chosen = runBlocking { selection() }
         val original = canReadLocation()
-        return COLLECTIONS.flatMap { collection ->
+        return sharedItems(original) + COLLECTIONS.flatMap { collection ->
             query(collection) { row ->
                 row.stringOrNull(MediaStore.MediaColumns.RELATIVE_PATH)
                     ?.takeIf(chosen::includes)
                     ?.let { toItem(collection, row, original) }
             }
         }
+    }
+
+    /** What the user shared; what's no longer there is dropped from the queue. */
+    private fun sharedItems(original: Boolean): List<SourceItem> {
+        val gone = mutableListOf<String>()
+        val items = shared.all().mapNotNull { location ->
+            val uri = location.toUri()
+            val item = if (uri.scheme == "file") copiedItem(uri) else galleryItem(uri, original)
+            item?.copy(shared = true).also { if (it == null) gone += location }
+        }
+        shared.remove(gone)
+        return items
+    }
+
+    /** A shared gallery item, read like those in the chosen folders. */
+    private fun galleryItem(uri: Uri, original: Boolean): SourceItem? {
+        val collection = uri.buildUpon().path(uri.path?.substringBeforeLast('/')).build()
+        val cursor = try {
+            resolver.query(uri, PROJECTION, null, null, null)
+        } catch (_: SecurityException) {
+            null
+        } ?: return null
+        return cursor.use { if (it.moveToFirst()) toItem(collection, it, original) else null }
+    }
+
+    /** A copy of a shared file that isn't in the gallery: no gallery details, so the receiving phone dates it. */
+    private fun copiedItem(uri: Uri): SourceItem? {
+        val file = File(uri.path ?: return null).takeIf { it.isFile } ?: return null
+        val (fingerprint, byteCount) = fingerprintOf(uri, file.length(), file.lastModified(), false) ?: return null
+        val descriptor = MediaDescriptor(
+            fingerprint = fingerprint,
+            size = byteCount,
+            mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
+                ?: "application/octet-stream",
+            displayName = file.name,
+            meta = MediaMeta(modifiedAtMillis = file.lastModified()),
+        )
+        return SourceItem(uri.toString(), descriptor)
+    }
+
+    /**
+     * A shared item is dropped from the queue once the receiving phone has it, and its copy deleted. A gallery item
+     * is read with `requireOriginal`, so it's queued under its URI without that.
+     */
+    override fun confirmed(item: SourceItem) {
+        if (item.shared) shared.remove(listOf(item.key.toUri().buildUpon().clearQuery().build().toString()))
     }
 
     override fun open(item: SourceItem): Source =

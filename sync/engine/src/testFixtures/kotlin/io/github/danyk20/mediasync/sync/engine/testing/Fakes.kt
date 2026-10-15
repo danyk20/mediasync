@@ -37,9 +37,10 @@ class FakeMedia(
     val displayName: String = "$key.jpg",
     val mimeType: String = "image/jpeg",
     val meta: MediaMeta = MediaMeta(capturedAtMillis = key.hashCode().toLong()),
+    val shared: Boolean = false,
 ) {
     val descriptor = MediaDescriptor(Fingerprints.of(bytes), bytes.size.toLong(), mimeType, displayName, meta)
-    val item = SourceItem(key, descriptor)
+    val item = SourceItem(key, descriptor, shared)
 }
 
 class FakeMediaSource(media: List<FakeMedia> = emptyList()) : MediaSource {
@@ -54,7 +55,14 @@ class FakeMediaSource(media: List<FakeMedia> = emptyList()) : MediaSource {
         media.remove(key)
     }
 
+    /** The keys of items the consumer confirmed, in order. */
+    val confirmed: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
     override fun items(): List<SourceItem> = media.values.map { it.item }
+
+    override fun confirmed(item: SourceItem) {
+        confirmed += item.key
+    }
 
     override fun open(item: SourceItem): Source {
         val found = media[item.key] ?: throw IOException("${item.key} no longer exists")
