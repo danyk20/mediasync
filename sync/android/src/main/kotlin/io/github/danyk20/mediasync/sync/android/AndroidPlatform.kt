@@ -44,11 +44,12 @@ class AndroidDeviceInfo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val schedule: ScheduleSource,
     private val details: PhotoDetailsSource,
+    private val turboKeys: TurboKeyStore,
 ) : DeviceInfo {
     private val device by lazy { LocalDevice(name(), version()) }
 
-    /** As a receiving phone, it also tells its current schedule; sending phones ignore that part. */
-    override fun local(): LocalDevice = device.copy(schedule = schedule.current())
+    /** As a receiving phone, it also tells its schedule and Turbo key; sending phones ignore those. */
+    override fun local(): LocalDevice = device.copy(schedule = schedule.current(), turboKey = turboKeys.current())
 
     override fun photoDetails(): PhotoDetails = details.current()
 
@@ -83,9 +84,17 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
         }
     }
 
+    override fun lowForTurbo(): Boolean {
+        val battery = battery() ?: return false
+        val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        return !plugged && (batteryPercent() ?: PERCENT) < TURBO_WARNING_PERCENT
+    }
+
+    private fun battery(): Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
     /** From the last battery broadcast: what the system shows, unlike a direct reading from the battery. */
     private fun batteryPercent(): Int? {
-        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+        val battery = battery() ?: return null
         val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         return if (level < 0 || scale <= 0) null else level * PERCENT / scale
@@ -93,6 +102,7 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
 
     private companion object {
         const val MIN_BATTERY_PERCENT = 20
+        const val TURBO_WARNING_PERCENT = 30
         const val PERCENT = 100
     }
 }
@@ -127,11 +137,14 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
     LanSockets {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val wifi = context.getSystemService(WifiManager::class.java)
+    private val power = context.getSystemService(PowerManager::class.java)
 
     /**
      * Holds Wi-Fi locks while a session runs: Wi-Fi power saving would otherwise slow transfers down, the screen
      * being off at night. No wake lock: background jobs and foreground services already keep the phone awake.
      */
+    override fun canUseMoreConnections(): Boolean = power.currentThermalStatus < PowerManager.THERMAL_STATUS_MODERATE
+
     override fun <T> keepingAwake(session: () -> T): T {
         @Suppress("DEPRECATION") // Low latency needs the screen on; high performance covers the night.
         val locks = listOf(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, WifiManager.WIFI_MODE_FULL_HIGH_PERF)

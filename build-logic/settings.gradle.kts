@@ -17,5 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
+apply(from = "../gradle/patched-build-libraries.settings.gradle.kts")
+
 rootProject.name = "build-logic"
 include(":convention")

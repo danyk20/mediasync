@@ -21,10 +21,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotBeBlank
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -45,7 +49,10 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val info = AndroidDeviceInfo(context, { SyncSchedule.WhileCharging }, { PhotoDetails.REMOVE_LOCATION })
+        val info =
+            AndroidDeviceInfo(context, {
+                SyncSchedule.WhileCharging
+            }, { PhotoDetails.REMOVE_LOCATION }, TurboKeyStore(context))
         val device = info.local()
 
         device.name.shouldNotBeBlank()
@@ -170,6 +177,36 @@ class AndroidPlatformTest {
 
         shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
         setup.canNotify() shouldBe true
+    }
+
+    @Test
+    fun turboNeedsWifiDirectAndItsPermissionAndNeverLeavesAGroupBehind() = runBlocking<Unit> {
+        val direct = WifiDirect(context)
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
+            direct.availability() shouldBe TurboAvailability.UNSUPPORTED
+            return@runBlocking
+        }
+        shell("pm grant ${context.packageName} ${TurboPermissions.needed}")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // Before Android 13, Wi-Fi Direct also needs location on.
+            shell("settings put secure location_mode 3")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) shell("cmd location set-location-enabled true")
+        }
+        assumeTrue("Location stays off here", direct.availability() != TurboAvailability.LOCATION_OFF)
+        direct.availability() shouldBe TurboAvailability.AVAILABLE
+
+        // Emulators have Wi-Fi Direct turned off: the group fails, cleanly. On a phone, it's MediaSync's own.
+        when (val answer = direct.open(port = 47_420)) {
+            is TurboAnswer.Ready -> {
+                answer.link.networkName shouldContain DirectLink.NAME_MARKER
+                direct.close(answer.link.networkName)
+            }
+
+            is TurboAnswer.Unavailable -> answer.reason shouldBe TurboUnavailable.FAILED
+        }
+        val nowhere = DirectLink("DIRECT-zz-MediaSync", "no-such-group-passphrase", "192.168.49.1", 47_420)
+        direct.join(nowhere, timeoutMillis = 5_000).shouldBeNull()
+        direct.leave()
     }
 
     /**

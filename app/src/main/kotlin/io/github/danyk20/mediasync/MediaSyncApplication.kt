@@ -9,9 +9,11 @@ import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import io.github.danyk20.mediasync.connector.android.CloudBackup
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
+import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import javax.inject.Inject
 
@@ -27,7 +29,13 @@ class MediaSyncApplication :
     lateinit var scheduler: SyncScheduler
 
     @Inject
+    lateinit var receiver: ConsumerReceiver
+
+    @Inject
     lateinit var diagnosticLog: FileDiagnosticLog
+
+    @Inject
+    lateinit var cloudBackup: CloudBackup
 
     /** Background work gets its dependencies from Hilt (the default initializer is removed in the manifest). */
     override val workManagerConfiguration: Configuration
@@ -39,5 +47,9 @@ class MediaSyncApplication :
         Diagnostics.log(Area.APP, "Started: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         // Keeps the background sync in step with the role and the schedule (docs/PLAN.md §10).
         scheduler.start()
+        // Receiving with MediaSync open, or during Turbo receive, carries on with the screen off (§7).
+        scheduler.followReceiving(receiver.state)
+        // Backs up what arrives as soon as it's stored, whatever the schedule (§9.6).
+        cloudBackup.start()
     }
 }

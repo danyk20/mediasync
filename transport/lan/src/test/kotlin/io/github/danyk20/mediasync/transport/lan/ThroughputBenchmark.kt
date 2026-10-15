@@ -8,7 +8,9 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.sync.engine.ConsumerSession
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
+import io.github.danyk20.mediasync.sync.engine.ParallelSync
 import io.github.danyk20.mediasync.sync.engine.ProducerSession
+import io.github.danyk20.mediasync.sync.engine.SpaceBudget
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
@@ -51,6 +53,10 @@ class ThroughputBenchmark {
             Result("One 128 MB video over TLS", best { overTls(listOf(128 * MB)) }),
             Result("500 photos of 200 kB over TLS", best { overTls(List(500) { 200 * KB }) }),
             Result("300 photos of 100 kB, 5 ms Wi-Fi latency", best { overLatentLink(List(300) { 100 * KB }, 5) }),
+            Result(
+                "300 photos of 100 kB, 5 ms latency, up to 4 connections",
+                best { overLatentLinks(List(300) { 100 * KB }, 5) },
+            ),
         )
         executor.shutdownNow()
 
@@ -98,15 +104,42 @@ class ThroughputBenchmark {
         return megabytesPerSecond(sizes, System.nanoTime() - start)
     }
 
+    private fun overLatentLinks(sizes: List<Int>, latencyMillis: Long): Double {
+        val media = media(sizes)
+        val source = FakeMediaSource(media)
+        val sink = FakeMediaSink()
+        val received = FakeReceivedLedger()
+        val space = SpaceBudget(sink)
+        fun connect() =
+            ConnectionPair(producerIdentity.id, consumerIdentity.id, latencyMillis = latencyMillis).also { pair ->
+                executor.submit { consumer(sink, received, space).serve(pair.consumerEnd) }
+            }.producerEnd
+        val start = System.nanoTime()
+        val result = ParallelSync(
+            session = { progress ->
+                ProducerSession(LocalDevice("Sending phone", "benchmark"), source, FakeSentLedger(), progress)
+            },
+            connect = ::connect,
+            probeMillis = PROBE_MILLIS,
+        ).sync(connect())
+        result.sent shouldBe sizes.size
+        return megabytesPerSecond(sizes, System.nanoTime() - start)
+    }
+
     private fun producer(media: List<FakeMedia>) =
         ProducerSession(LocalDevice("Sending phone", "benchmark"), FakeMediaSource(media), FakeSentLedger())
 
-    private fun consumer(sink: FakeMediaSink) = ConsumerSession(
+    private fun consumer(
+        sink: FakeMediaSink,
+        received: FakeReceivedLedger = FakeReceivedLedger(),
+        space: SpaceBudget = SpaceBudget(sink),
+    ) = ConsumerSession(
         LocalDevice("Receiving phone", "benchmark"),
         FakePeerRegistry(PairedPeer(producerIdentity.id, "Sending phone", DeviceRole.PRODUCER)),
-        FakeReceivedLedger(),
+        received,
         sink,
         FakePairingGate("unused-token-xx!".encodeUtf8()),
+        space = space,
     )
 
     private fun media(sizes: List<Int>) = sizes.mapIndexed { i, size -> FakeMedia("m$i", Random(i).nextBytes(size)) }
@@ -118,6 +151,9 @@ class ThroughputBenchmark {
         const val KB = 1024
         const val MB = 1024 * KB
         const val RUNS = 3
+
+        /** Short, so connections are added within these brief runs; a real sync probes every 3 seconds. */
+        const val PROBE_MILLIS = 100L
         const val NANOS_PER_SECOND = 1e9
     }
 }

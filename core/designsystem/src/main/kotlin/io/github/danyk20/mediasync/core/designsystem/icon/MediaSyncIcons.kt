@@ -24,4 +24,6 @@ object MediaSyncIcons {
     @DrawableRes val Battery: Int = R.drawable.ic_battery
 
     @DrawableRes val More: Int = R.drawable.ic_more
+
+    @DrawableRes val Turbo: Int = R.drawable.ic_turbo
 }

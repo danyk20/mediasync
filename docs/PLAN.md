@@ -551,9 +551,7 @@ Three choices, offered in two places:
   - Applied only to the cloud copy. The consumer's archive keeps everything it received.
 - **The stricter setting wins.** The consumer can't add back what a producer removed.
 - **Why orientation and color profile always stay:** without them, photos show sideways or with wrong colors, and neither says anything about a person or a place.
-- **Why the capture date stays by default:** without it, Google Photos files the photo under the upload day.
-  - An advanced switch, *Also remove capture date*, warns about this (later).
-  - It also renames files to neutral names, because camera filenames contain the date.
+- **Why the capture date always stays:** without it, Google Photos files the photo under the upload day. There is no option to remove it (decided against: it's rarely sensitive, and it would scramble the timeline).
 - **Motion Photo and Ultra HDR extras depend on XMP.** *Remove all details* therefore turns them into normal still photos, and the UI says so. *Remove location* keeps them working.
 - **Scope:** a changed setting applies to items sent or uploaded afterwards. Already-synced items are not changed.
 
@@ -611,11 +609,15 @@ Three choices, offered in two places:
 Speed is the top non-functional requirement. The strategy has six parts:
 
 1. **Pick the fastest path automatically, and switch paths mid-session.**
+   - Built so far (M3): when Turbo's direct link drops, the rest goes over Wi-Fi. Switching from the internet to Wi-Fi comes with the internet paths (M5).
    - Automatic sync uses **normal Wi-Fi**, plus the internet if the user allows it. The ranking is: same Wi-Fi network > internet direct > relay.
    - When a better path appears, the session switches between files. Example: a producer that started over the internet comes home and switches to Wi-Fi.
    - **Turbo transfer** (§8.3) is the manual fast lane: a direct Wi-Fi link between the two phones. Through a router, every byte crosses the air twice (phone → router → phone). A direct link sends it once and can use a clean 5 GHz channel.
 2. **Saturate the link.**
    - N parallel streams (adaptive 1 → 4, increased while throughput keeps rising).
+     - Each connection runs an ordinary session. They share one work queue and take items in batches of 64 or 32 MiB, whichever comes first, so each item goes exactly once and big videos are left for connections added later.
+     - A sync starts with one connection. Every 3 seconds another is added, as long as the last one added made the total at least 10 % faster.
+     - On the receiving phone, all connections share one space budget. Each file reserves its size before it is accepted, so together they never take more space than there is.
    - Large socket buffers (4–8 MB).
    - 1 MiB chunks.
    - Pipelining: the next file starts immediately, and ACKs are asynchronous and windowed, so there is no round trip per file. This matters a lot for thousands of small photos.
@@ -628,18 +630,23 @@ Speed is the top non-functional requirement. The strategy has six parts:
 4. **Keep the radio awake.**
    - Hold Wi-Fi locks during a session only: low-latency (screen on) and high-performance (screen off at night).
    - No partial wake lock: background jobs and foreground services already hold one, and another would only risk Play's "excessive wake locks" warning.
+   - Every transfer therefore runs as foreground work. The sending phone already does (*Sync now*, scheduled syncs, Turbo), and so does the receiving phone in its receive window. Outside it, with MediaSync open on screen or during *Turbo receive*, a session starts foreground work of its own ("Receiving…"), so the transfer carries on when the screen goes off or the user switches apps. It ends after a quiet minute.
    - Turbo groups request the 5 GHz band.
 5. **Never redo work.** Fingerprint dedupe, `HAVE` replies, and byte-offset resume.
 6. **Stay thermally aware.** Watch `PowerManager` thermal status and reduce streams before the SoC throttles. Throttling would cost more speed than backing off.
+   - From "moderate" upward, no connection is added. The ones already open finish their items.
 
 **Measuring:**
 
 - A built-in **link test** (Diagnostics) measures raw throughput between the paired devices over Wi-Fi and over Turbo. The UI shows achieved speed against link capacity.
+  - On a sending phone, *Diagnostics → Link test* sends incompressible filler for 5 seconds over one connection, then over four at once.
+  - The receiving phone measures it from the first to the last byte and stores nothing. Only paired phones may run it.
+  - Both results go into the diagnostic log.
 - **Target:** ≥ 85 % of the measured raw link throughput on Wi-Fi and Turbo, for both large videos and 1,000-photo batches.
 - A JVM loopback benchmark runs in CI, and an on-device benchmark runs before each release, to catch regressions.
-  - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency.
+  - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency, over one connection and over up to four.
   - The CI job compares each run with the history kept from `main`, and fails when a case runs at half the speed or less (shared CI machines vary too much for a tighter bound).
-  - First results (a 2026 Mac): 487 MB/s for the video, 616 MB/s for the photos, and 92 MB/s with 5 ms latency, where one confirmation per file would allow about 10 MB/s.
+  - First results (a 2026 Mac): 487 MB/s for the video, 616 MB/s for the photos, and 92 MB/s with 5 ms latency, where one confirmation per file would allow about 10 MB/s. Up to four connections raised that to 115 MB/s. Between two emulators (about 2 MB/s through adb), 40 photos of 3 MB took 38 s over four connections instead of 45 s over one.
 - Internet throughput is usually limited by the uplink. The WebRTC data channel (SCTP) is good enough for that today. A QUIC transport can be added later behind the same `Transport` interface if ever needed.
 
 ---
@@ -691,16 +698,25 @@ interface SecureSession : Closeable {
   - It is user-started, so it works anytime, not only while charging.
   - It ends by itself when everything is sent, or when the user taps **Stop**.
 - **One tap, no system pairing dialogs:**
-  - The consumer creates the Wi-Fi Direct group. The network name and passphrase come from the pairing secret plus a fresh per-session value, set through `WifiP2pConfig.Builder` (Android 10+).
-  - The producer joins with the same derived values.
+  - The consumer creates the Wi-Fi Direct group through `WifiP2pConfig.Builder` (Android 10+), on 5 GHz where it can, otherwise on any band. The network name (`DIRECT-xy-MediaSync`) and a 24-character passphrase are random for each Turbo transfer.
+  - They reach the producer inside the encrypted session that asked for them (`TURBO_REQUEST` → `TURBO_READY`, with where the consumer listens on the link). The producer joins with them.
   - Mutual TLS then authenticates both phones, as on any other path.
+  - Only groups whose name ends in `-MediaSync` are ever removed. If another app's group is up (Android Auto, say), Turbo isn't used.
 - **Signaling the consumer:**
-  - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session.
-  - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**.
-- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster.
+  - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session. *Built (M3).*
+  - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**. *Built (M3):*
+    - The consumer keeps a random 32-byte Turbo key (outside backups) and tells it to paired producers in every session (`Hello.turboKey`, only once the producer is paired). Phones paired earlier learn it at their next sync: no new pairing.
+    - *Turbo receive* opens a group whose name (`DIRECT-xy-MediaSync-abcdef`) and passphrase are an HMAC of the key and the 15-minute epoch, so the name changes on its own and isn't a lasting trace of the phone.
+    - A producer that can't reach the consumer over Wi-Fi derives the same for the current and the previous epoch, joins, and sends. If it hasn't learned the key yet, it says one sync on the same Wi-Fi is needed first.
+    - The group stays until the user taps **Stop**, or 10 minutes without a session over it.
+    - *To do once phones can be unpaired:* a new key on unpairing, so a removed phone can't find the link any more.
+- **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.
+- **Closing:** the consumer removes the group a minute after the last session over it; the producer leaves it when its sync ends.
+- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster and it disturbs the normal Wi-Fi less. *Planned for M6:* it needs real phones to test (emulators don't have it), and Wi-Fi Direct stays as the fallback.
 - **Fallbacks:**
-  - If the direct group fails, the transfer continues over normal Wi-Fi automatically.
+  - If the direct group fails, the transfer continues over normal Wi-Fi automatically: when the consumer can't open a group, when the producer can't join it within 30 seconds, and when the link drops mid-transfer (the rest goes over Wi-Fi). The home screen says why Turbo wasn't used.
   - If the phone isn't charging, a warning appears when the battery is below 30 %.
+- **Testing:** unit tests cover the request, and runtime tests cover every fallback over loopback. API 36 emulators run Wi-Fi Direct between each other: there, the consumer created the group, the producer joined it within 4 seconds, and the photos went over it. Speeds and 5 GHz need real phones (the emulators refused 5 GHz and fell back to any band).
 - **Protocol:** Turbo is just another `Transport`, running the same TLS/TCP protocol and parallel streams. Relay usage is unaffected.
 
 ### 8.4 Internet
@@ -775,6 +791,8 @@ A Worker deployed from the phone has no analytics token (the deployment token is
 
 > **v1.0 scope:** MediaSync only places files in the consumer's folder. A **connector app** on the consumer (default: Google Photos, §9.3.1) uploads and deletes them. In v1.0 a connector is therefore a small *connector app profile*: which folder layout to use, how to guide setup, and which app or setting to open for cleanup. The full in-app connector framework below, for MediaSync uploading itself, starts in v1.1. The interfaces are designed now so both kinds fit.
 
+**Built (M4, part 1): the framework.** `:connector:api` (pure Kotlin) has the interfaces below, the registry, the four decorators, the pipeline (`BackupOrchestrator`) and `BackupCoordinator`, which runs it as soon as items arrive (§9.6). `:connector:contract-tests` is the kit (§9.5), with its own tests: well-behaved sample connectors pass it, and each way of misbehaving fails the check meant for it. `:connector:android` registers connectors through Hilt (`@ConnectorKey`), keeps the accounts and the backup ledger in the app's database (schema version 4: `connector_accounts`, `backup_receipts`), and starts backing up when the app starts on a receiving phone. How to write a connector is in [connectors.md](connectors.md). No connector ships in part 1, so nothing is backed up yet.
+
 ### 9.1 Pattern overview
 
 Adding a new cloud should mean **one new Gradle module and no changes elsewhere**. The design uses these patterns:
@@ -787,6 +805,12 @@ Adding a new cloud should mean **one new Gradle module and no changes elsewhere*
 | **Pipeline / Template Method** | `BackupOrchestrator` runs the same steps for every connector: select → **preprocess** → upload → record receipt → verify. Preprocessing applies the *Photo details* policy and date repair (§6), then the quality option (Original or Storage saver). These steps are shared strategies, so every connector gets them for free. |
 | **Declarative settings schema** | A connector describes its settings (fields, validation, auth kind). A generic Compose screen renders them, so simple connectors need no UI code. |
 | **Contract test kit** | An abstract test suite that every connector must pass (§13). |
+
+As built (M4):
+
+- **Decorators,** outermost first: `Instrumented` (counts, durations, failures by kind in the diagnostic log; a connector that throws fails its run instead of the app) → `Retrying` (up to 4 tries, exponential backoff with jitter, honouring the service's *retry after* up to a minute; a longer wait is left to the next run) → `RateLimited` → `QuotaTracking` (counts requests per day in the service's time zone, and stops for the day when the service says the allowance is used up, as it's shared with other users). The last two only wrap connectors that declare those limits.
+- **Pipeline:** select what has no receipt for the account → skip what the service can't take (videos without `VIDEO`, sizes over the limits, checked after preprocessing so a smaller upload copy can still go) → preprocess (uploading connectors only) → upload → record a receipt. A run stops at the first failure; the next arrival starts another. Retrying a failed run on a timer comes with the first uploading connector (v1.1).
+- **Settings schema:** fields (toggle, choice, text with a pattern, secret) and their validation. The generic screen that shows them comes with the first connector that has settings (v1.1).
 
 ### 9.2 Interfaces
 
@@ -884,12 +908,13 @@ This section applies to uploading connectors (v1.1+). In Google Photos app mode,
   - Files MediaSync created are deleted directly. Other files are deleted through legacy storage mode.
 - **Optional rule:** "Automatically move items to trash 30 days after verified backup" (off by default; Android 11+ only).
 
-### 9.5 "Write a new connector" checklist (goes in `docs/connectors.md`)
+### 9.5 "Write a new connector" checklist (in [connectors.md](connectors.md))
 
-1. Copy `connector/_template` to `connector/<name>`.
+1. Create `connector/<name>` (Android library + Hilt). *There's no `connector/_template` module: the checklist in connectors.md replaces it.*
 2. Implement `BackupConnectorFactory` and `BackupConnector`, and declare the descriptor (capabilities, limits) and settings schema.
 3. Add `@IntoMap` registration in the module's Hilt module.
 4. Subclass `BackupConnectorContractTest` with a fake server (MockWebServer or Testcontainers). The kit includes metadata round-trip checks.
+   - *As built (M4):* JUnit 4, so connectors in Android modules run it under Robolectric. Its checks: the descriptors agree; a photo and a video reach the destination byte for byte (so their date and place do); backing up twice keeps one copy; progress stays within the item; checks find deleted copies (and a connector that can't check never claims to); rate limits, server errors, a used-up allowance and an expired sign-in come back as results that say whether to retry; another app's connector skips what isn't on the phone and counts only what the app removed, never what's in the trash.
 5. Add the module to `:app` dependencies. No other code changes are needed.
 
 Likely next connectors: **Immich** (self-hosted; supports checksum lookup → true hash verification), **Nextcloud/WebDAV**, **S3-compatible** (MinIO, Backblaze), **SMB/NAS**, **OneDrive**.
@@ -1121,6 +1146,8 @@ mediasync/
 - All third-party actions are **pinned by commit SHA**.
 - Least-privilege `permissions:` in every workflow.
 - Dependabot covers Gradle, npm and GitHub Actions.
+  - Build tools' own libraries that Gradle or AGP pull in at an old version are raised to patched ones in `gradle/patched-build-libraries.settings.gradle.kts`. Each entry goes once the tool ships the fix itself.
+  - **Open follow-up:** the Kotlin Gradle plugin is below 2.4.20 (Dependabot alert #8: unsafe deserialization in the Kotlin build cache). Gradle 9.8.1 embeds Kotlin 2.4.10, which can't be raised from the build. Only local build caches are affected, so the alert was dismissed as a tolerable risk. **Upgrade to the first Gradle release that ships Kotlin 2.4.20 or newer as soon as it exists.**
 
 ### 14.3 Engineering standards
 
@@ -1179,9 +1206,9 @@ Estimates assume one developer working full-time with AI assistance. They are ro
 | **M1** | Wi-Fi MVP | Identity keys, QR pairing, mDNS + last-known IP, TLS session, protocol v1, MediaStore indexing (with the Android 10 fallback), outbox/receive, **full metadata preservation** (unredacted GPS, sidecar, album folders), manual *Sync now* | Two real phones (one on Android 10) pair and transfer 1,000 photos + 5 videos with zero loss and **byte-identical metadata**. Resume works after killing either app. | 3 wks |
 | **M2** | Schedule, background, privacy | **Sync schedule** (default 03:00, catch-up at the next charge, consumer receive windows), charging-only WorkManager, `dataSync` foreground service, UIDT, the 6 h timeout path, source selection UI *(delivered early, in M1: folders with presets and a live count)*, notifications, storage guard, battery-optimization onboarding, diagnostics/log export, **Photo details setting** (JPEG/PNG/WebP/MP4 removal; HEIC spike) | Overnight test on Pixel + Samsung: photos taken in the evening arrive after the 03:00 window without opening the app. A producer unplugged at 03:00 syncs at its next charge. The golden set passes for every *Photo details* choice. | 3 wks |
 | **M3** | Speed + Turbo | Parallel adaptive streams, pipelining, path switching, **Turbo transfer** (Wi-Fi Direct, Wi-Fi Aware when available), link test, benchmarks | ≥ 85 % of raw link throughput on Wi-Fi and Turbo. Turbo starts with one tap and no system dialogs. CI benchmark trend in place. | 2 wks |
-| **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
+| **M4** | Backup via the Google Photos app + connector framework | Connector API, registry, decorators, contract-test kit *(built: §9, part 1)*, **Google Photos app on this phone** connector: single folder, guided setup, date repair on stored files, status inference, links to *Free up space* and *Smart Storage* (§9.3.1) | On the Pixel 2 XL, a photo received in the 03:00 window is backed up by Google Photos within minutes. It lands on the correct date and place (including WhatsApp images) without using Google storage. After Google's *Free up space*, MediaSync shows it as backed up and removed. | 1.5 wks |
 | **M5** | Internet sync | **Worker + FCM wake-up** (moved from M2: Wi-Fi sync needs no outside service) *(Worker built: mailbox, device authentication, TURN credentials, FCM sending, meter and guard, CI and deploy workflow; ADR 0009)*, **bring your own Cloudflare** (the receiving phone deploys the Worker into the household's free account), Durable Object mailbox, encrypted signaling, WebRTC transport, Cloudflare TURN credentials, **relay usage meter + budget guard**, network-policy UI, mobile-data cap | Producer on mobile data (CGNAT) → consumer at home syncs successfully. A relay fallback is verified by forcing a symmetric NAT. The meter matches Cloudflare's dashboard, and the relay pauses at the budget. | 2.5 wks |
-| **M6** | Polish and release | Onboarding polish, accessibility pass, widget + Quick Settings tile, translations scaffold, Play listing/policies/data safety, **closed test with ≥ 12 testers for 14 continuous days**, production rollout, first GitHub Release | The closed test passes with no data-loss bugs. Production access is granted, and v1.0 is live on Play and GitHub. | 3 wks |
+| **M6** | Polish and release | Onboarding polish, accessibility pass, **Wi-Fi Aware for Turbo** (on phones that have it, Wi-Fi Direct otherwise), widget + Quick Settings tile, translations scaffold, Play listing/policies/data safety, **closed test with ≥ 12 testers for 14 continuous days**, production rollout, first GitHub Release | The closed test passes with no data-loss bugs. Production access is granted, and v1.0 is live on Play and GitHub. | 3 wks |
 | **v1.1** | Google Photos API connector | OAuth verification (submitted during M6), upload pipeline that backs up as soon as items are received (§9.6), per-connector *Photo details*, metadata-preserving Storage saver, ledger and verification, MediaSync's own Free-up flow (trash on 11+, permanent delete on 10), `MANAGE_MEDIA` | End to end: received → uploaded → verified → trashed. Remote deletion blocks the local delete. | 3 wks |
 
 Total ≈ **16 weeks** to 1.0, and v1.1 about 3 weeks later. M1 already gives you a usable app for Wi-Fi sync with full metadata.

@@ -11,6 +11,9 @@ enum class Area(val label: String) {
     WORK("work"),
     SEND("send"),
     RECEIVE("receive"),
+
+    /** Cloud backup through connectors (docs/PLAN.md §9). */
+    BACKUP("backup"),
 }
 
 /** Where diagnostic entries go. */

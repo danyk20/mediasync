@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -42,18 +43,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.sync.android.DiagnosticsReport
 import io.github.danyk20.mediasync.sync.android.Fact
+import io.github.danyk20.mediasync.sync.android.ProducerSync
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,19 +69,69 @@ data class DiagnosticsUiState(
     val facts: List<Fact> = emptyList(),
     /** The newest log entries, oldest first. */
     val recent: List<String> = emptyList(),
+    /** On a paired sending phone only. */
+    val linkTest: LinkTestUi? = null,
+)
+
+/** The link test (docs/PLAN.md §7): speeds in MB/s once it ran. */
+data class LinkTestUi(
+    val consumerName: String,
+    val running: Boolean = false,
+    val oneConnection: Double? = null,
+    val fourConnections: Double? = null,
+    val failed: Boolean = false,
 )
 
 @HiltViewModel
-class DiagnosticsViewModel @Inject constructor(private val report: DiagnosticsReport) : ViewModel() {
+class DiagnosticsViewModel @Inject constructor(
+    private val report: DiagnosticsReport,
+    private val sync: ProducerSync,
+    settings: SettingsRepository,
+    peers: PeerStore,
+) : ViewModel() {
     private val state = MutableStateFlow(DiagnosticsUiState())
     val uiState: StateFlow<DiagnosticsUiState> = state.asStateFlow()
 
     init {
         refresh()
+        viewModelScope.launch {
+            combine(settings.role, peers.observeConsumer()) { role, consumer ->
+                consumer?.name?.takeIf { role == DeviceRole.PRODUCER }
+            }.collect { name ->
+                state.update {
+                    it.copy(linkTest = name?.let { n -> it.linkTest?.copy(consumerName = n) ?: LinkTestUi(n) })
+                }
+            }
+        }
     }
 
     fun refresh() {
-        viewModelScope.launch { state.value = DiagnosticsUiState(report.facts(), report.recent(RECENT)) }
+        viewModelScope.launch {
+            val facts = report.facts()
+            val recent = report.recent(RECENT)
+            state.update { it.copy(facts = facts, recent = recent) }
+        }
+    }
+
+    /** Measures over one connection, then over four at once: about 10 seconds. */
+    fun runLinkTest() {
+        val test = state.value.linkTest?.takeIf { !it.running } ?: return
+        state.update { it.copy(linkTest = test.copy(running = true, failed = false)) }
+        viewModelScope.launch {
+            val one = sync.linkTest(streams = 1)
+            val four = one?.let { sync.linkTest(streams = PARALLEL) }
+            state.update {
+                it.copy(
+                    linkTest = test.copy(
+                        running = false,
+                        oneConnection = one?.megabytesPerSecond,
+                        fourConnections = four?.megabytesPerSecond,
+                        failed = one == null,
+                    ),
+                )
+            }
+            refresh()
+        }
     }
 
     /** The report and the whole log, as one text. */
@@ -88,6 +146,7 @@ class DiagnosticsViewModel @Inject constructor(private val report: DiagnosticsRe
 
     private companion object {
         const val RECENT = 40
+        const val PARALLEL = 4
     }
 }
 
@@ -105,6 +164,7 @@ fun DiagnosticsRoute(
     }
     DiagnosticsScreen(
         state = state,
+        onTestLink = viewModel::runLinkTest,
         onShare = { scope.launch { share(context, viewModel.export()) } },
         onSave = { save.launch(FILE_NAME) },
         onClear = viewModel::clear,
@@ -121,6 +181,7 @@ fun DiagnosticsRoute(
 @Composable
 fun DiagnosticsScreen(
     state: DiagnosticsUiState,
+    onTestLink: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
@@ -155,12 +216,48 @@ fun DiagnosticsScreen(
             OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.diagnostics_save))
             }
+            state.linkTest?.let { LinkTestSection(it, onTestLink) }
             Facts(state.facts)
             Recent(state.recent)
             TextButton(onClick = onClear) { Text(stringResource(R.string.diagnostics_clear)) }
         }
     }
 }
+
+@Composable
+private fun LinkTestSection(test: LinkTestUi, onTestLink: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.diagnostics_link_test),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = stringResource(R.string.diagnostics_link_test_intro, test.consumerName),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (test.running) {
+            Text(stringResource(R.string.diagnostics_link_test_running), style = MaterialTheme.typography.bodyMedium)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            OutlinedButton(onClick = onTestLink, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.diagnostics_link_test_start))
+            }
+        }
+        if (test.failed) {
+            Text(
+                text = stringResource(R.string.diagnostics_link_test_failed, test.consumerName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        test.oneConnection?.let { Text(stringResource(R.string.diagnostics_link_test_one, speed(it))) }
+        test.fourConnections?.let { Text(stringResource(R.string.diagnostics_link_test_four, speed(it))) }
+    }
+}
+
+private fun speed(megabytesPerSecond: Double) = String.format(Locale.getDefault(), "%.1f", megabytesPerSecond)
 
 @Composable
 private fun Facts(facts: List<Fact>) {
@@ -233,6 +330,7 @@ private fun DiagnosticsScreenPreview() {
                 facts = listOf(Fact("App", "MediaSync 0.1.0"), Fact("Role", "producer")),
                 recent = listOf("2026-10-14 09:30:00.250 +0200 send     Sync done in 4.2 s: sent 3 (12.0 MB)"),
             ),
+            onTestLink = {},
             onShare = {},
             onSave = {},
             onClear = {},

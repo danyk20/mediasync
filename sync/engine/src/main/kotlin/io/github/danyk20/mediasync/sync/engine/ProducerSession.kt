@@ -24,6 +24,7 @@ import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -52,7 +53,14 @@ data class SyncResult(
      * formats MediaSync can't read). They're sent once the setting allows it.
      */
     val withheld: Int = 0,
-)
+    /** What the consumer's *Turbo receive* links derive from (docs/PLAN.md §8.3); `null` if it didn't say. */
+    val consumerTurboKey: ByteString? = null,
+) {
+    /** Never the key: this ends up in logs. */
+    override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
+        "deferred=$deferred, bytesSent=$bytesSent, cancelled=$cancelled, consumerSchedule=$consumerSchedule, " +
+        "withheld=$withheld)"
+}
 
 /**
  * Sends everything the consumer hasn't confirmed yet, newest first (docs/PLAN.md §5), with the [details] the user
@@ -75,7 +83,10 @@ class ProducerSession(
     private val window: Int = WINDOW,
 ) {
 
-    fun sync(connection: PeerConnection): SyncResult {
+    fun sync(connection: PeerConnection): SyncResult = sync(connection, WorkQueue(pendingFor(connection.peerId)))
+
+    /** Sends items from [queue], which other sessions on other connections may share (docs/PLAN.md §7). */
+    fun sync(connection: PeerConnection, queue: WorkQueue): SyncResult {
         val channel = FrameChannel(connection)
         val consumer = connection.peerId
         channel.send(Hello(PROTOCOL_VERSION, local.name, WireRole.PRODUCER, local.appVersion))
@@ -85,14 +96,14 @@ class ProducerSession(
             throw IncompatiblePeerException("Peer speaks v${hello.protocolVersion} as role ${hello.role}")
         }
 
-        val pending = pendingFor(consumer)
-        val run = Run(connection, channel, consumer, pending.size, pending.sumOf { it.descriptor.size })
+        val run = Run(connection, channel, consumer, queue.total, queue.totalBytes)
         run.consumerSchedule = SyncSchedule.decode(hello.schedule)
-        return run.send(pending)
+        run.consumerTurboKey = hello.turboKey.takeIf { it.size == TURBO_KEY_BYTES }
+        return run.send(queue)
     }
 
     /** Items the consumer hasn't confirmed, without duplicates, newest first. */
-    private fun pendingFor(consumer: DeviceId): List<SourceItem> {
+    internal fun pendingFor(consumer: DeviceId): List<SourceItem> {
         val confirmed = ledger.sentFingerprints(consumer)
         return source.items()
             .filter { it.descriptor.fingerprint !in confirmed }
@@ -134,13 +145,15 @@ class ProducerSession(
         private var bytesSent = 0L
         private var cancelled = false
         var consumerSchedule: SyncSchedule? = null
+        var consumerTurboKey: ByteString? = null
 
-        fun send(pending: List<SourceItem>): SyncResult {
+        fun send(queue: WorkQueue): SyncResult {
             replies.start()
             try {
-                for (batch in pending.chunked(OFFER_BATCH_SIZE)) {
+                while (!cancelled) {
                     if (!shouldContinue()) cancelled = true
-                    if (cancelled) break
+                    val batch = if (cancelled) emptyList() else queue.take(OFFER_BATCH_SIZE, OFFER_BATCH_BYTES)
+                    if (batch.isEmpty()) break
                     offerBatch(batch)
                 }
                 awaitInFlight(0)
@@ -152,7 +165,17 @@ class ProducerSession(
                 finished = true
             }
             return lock.withLock {
-                SyncResult(sent, alreadyOnConsumer, failed, deferred, bytesSent, cancelled, consumerSchedule, withheld)
+                SyncResult(
+                    sent,
+                    alreadyOnConsumer,
+                    failed,
+                    deferred,
+                    bytesSent,
+                    cancelled,
+                    consumerSchedule,
+                    withheld,
+                    consumerTurboKey,
+                )
             }
         }
 
@@ -288,11 +311,13 @@ class ProducerSession(
         }
 
         private fun onAck(ack: FileAck) {
-            val prepared = lock.withLock { inFlight.remove(ack.offerId) }
+            val prepared = lock.withLock { inFlight[ack.offerId] }
                 ?: throw ProtocolException("ACK for offer ${ack.offerId}, which isn't in flight")
             val confirmed = ack.status == FileAck.Status.OK
             if (confirmed) ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
+            // In flight until recorded and counted: the session, waiting for nothing to be in flight, then counts it.
             lock.withLock {
+                inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")
                 if (confirmed) sent++ else failed++
                 changed.signalAll()
             }
@@ -354,3 +379,25 @@ internal fun OfferItem.toDescriptor() = MediaDescriptor(
     displayName = displayName,
     meta = MediaMeta(capturedAtMillis, utcOffsetMinutes, album, favorite, modifiedAtMillis),
 )
+
+/**
+ * The items one sync sends, shared by its connections: each takes the next batch when it's ready for more, so no
+ * item goes twice and a faster connection simply takes more.
+ */
+class WorkQueue(items: List<SourceItem>) {
+    private val queue = ConcurrentLinkedQueue(items)
+    val total: Int = items.size
+    val totalBytes: Long = items.sumOf { it.descriptor.size }
+
+    /** Up to [maxItems], ending once they reach [maxBytes]; always at least one while there is one. */
+    fun take(maxItems: Int, maxBytes: Long = Long.MAX_VALUE): List<SourceItem> = buildList {
+        var bytes = 0L
+        while (size < maxItems && bytes < maxBytes) {
+            val item = queue.poll() ?: break
+            add(item)
+            bytes += item.descriptor.size
+        }
+    }
+
+    fun isEmpty(): Boolean = queue.isEmpty()
+}

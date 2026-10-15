@@ -90,6 +90,27 @@
     </plurals>
     <string name="producer_withheld_body">MediaSync can\'t remove the details of RAW photos and some other files. Choose another Photo details setting to send them.</string>
 
+    <!-- Turbo transfer (docs/PLAN.md §8.3): a direct Wi-Fi link between the two phones. -->
+    <string name="producer_turbo_title">Turbo transfer</string>
+    <!-- "4.3 GB waiting: try Turbo transfer" -->
+    <string name="producer_turbo_suggestion_title">%1$s waiting: try Turbo transfer</string>
+    <string name="producer_turbo_body">Sends straight to %1$s over a direct Wi-Fi link, without the router. Faster for big backlogs. Keep the two phones close together.</string>
+    <string name="producer_turbo_start">Start Turbo</string>
+    <string name="producer_turbo_battery_low">The battery is low: plug this phone in, as Turbo uses more power.</string>
+    <string name="producer_turbo_location_off">Turn on location first: before Android 13, direct Wi-Fi links need it. MediaSync doesn\'t use your location.</string>
+    <string name="producer_turbo_location_settings">Location settings</string>
+    <string name="producer_turbo_declined">Turbo needs permission to connect to nearby devices (location, before Android 13). Allow it in MediaSync\'s settings.</string>
+    <string name="producer_turbo_setting_up_title">Setting up Turbo with %1$s…</string>
+    <string name="producer_turbo_setting_up_body">Linking the two phones directly. This takes a few seconds.</string>
+    <string name="producer_turbo_sending_title">Sending to %1$s over Turbo</string>
+    <string name="producer_failure_turbo_unreachable">%1$s wasn\'t found, on this Wi-Fi or directly. On %1$s, open MediaSync and tap Turbo receive, then try again here.</string>
+    <string name="producer_failure_turbo_not_set_up">%1$s isn\'t on this Wi-Fi. For Turbo away from a shared Wi-Fi, the two phones need to sync once on the same Wi-Fi first.</string>
+    <string name="producer_turbo_problem_title">Turbo wasn\'t used</string>
+    <string name="producer_turbo_problem_unsupported">%1$s can\'t do Turbo transfer: it has no Wi-Fi Direct. Everything went over Wi-Fi instead.</string>
+    <string name="producer_turbo_problem_not_allowed">Turbo needs your OK on %1$s: open MediaSync there and allow it to connect to nearby devices. Then try again. Meanwhile, everything went over Wi-Fi.</string>
+    <string name="producer_turbo_problem_no_link">The direct link to %1$s didn\'t connect, so everything went over Wi-Fi. Keep the phones close together and try again.</string>
+    <string name="producer_turbo_problem_dropped">The direct link to %1$s dropped, so the rest went over Wi-Fi.</string>
+
     <string name="producer_folders_title">Folders to send</string>
     <string name="producer_folders_done">Done</string>
     <string name="producer_folders_intro">Photos and videos in these folders are sent to your receiving phone. Turning a folder off doesn\'t remove what it already received.</string>

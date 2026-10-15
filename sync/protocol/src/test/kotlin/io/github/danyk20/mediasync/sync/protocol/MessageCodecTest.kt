@@ -33,6 +33,14 @@ class MessageCodecTest {
             Hello(PROTOCOL_VERSION, "Anna's Pixel", WireRole.PRODUCER, "0.2.0"),
             Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, freeSpaceBytes = 12_345_678_901),
             Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, schedule = "hours:6@03:00"),
+            Hello(
+                PROTOCOL_VERSION,
+                "Pixel 2 XL",
+                WireRole.CONSUMER,
+                turboKey = ByteArray(32) {
+                    it.toByte()
+                }.toByteString(),
+            ),
             PairRequest(token = "0123456789abcdef".encodeUtf8()),
             PairResult(accepted = false, reason = PairResult.Reason.DECLINED),
             Offer(listOf(offerItem(1), offerItem(2).copy(capturedAtMillis = null, album = null))),
@@ -41,6 +49,12 @@ class MessageCodecTest {
             FileEnd(offerId = 7, sha256 = sha),
             FileAck(offerId = 7, status = FileAck.Status.OK, contentId = sha),
             Bye(Bye.Reason.CANCELLED),
+            LinkTestBegin(),
+            LinkTestEnd(bytes = 1_234_567_890),
+            LinkTestResult(bytes = 1_234_567_890, micros = 5_000_123),
+            TurboRequest(),
+            TurboReady(TurboReady.Status.OK, "DIRECT-ab-MediaSync", "passphrase-1234", "192.168.49.1", 47_420),
+            TurboReady(TurboReady.Status.NOT_ALLOWED),
         )
 
         messages.forEach { message ->

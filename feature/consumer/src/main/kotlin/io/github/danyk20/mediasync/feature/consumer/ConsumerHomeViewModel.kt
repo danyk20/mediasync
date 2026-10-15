@@ -15,7 +15,9 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,10 +50,22 @@ data class ConsumerHomeUiState(
     val askNotifications: Boolean = false,
     /** Android 12+: ask for *Unrestricted* battery use, which receive windows at night need. */
     val askBattery: Boolean = false,
+    /** A direct link for Turbo transfer (docs/PLAN.md §8.3) is open. */
+    val directLinkOpen: Boolean = false,
+    /** A sending phone asked for Turbo transfer, which needs the user's permission (or location on) here. */
+    val askTurbo: Boolean = false,
+    val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
+    /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's Wi-Fi. */
+    val turboReceiving: Boolean = false,
 )
 
 /** What the phone allows MediaSync, and its free space. */
-private data class DeviceAccess(val canNotify: Boolean, val batteryRestricted: Boolean, val freeBytes: Long)
+private data class DeviceAccess(
+    val canNotify: Boolean,
+    val batteryRestricted: Boolean,
+    val freeBytes: Long,
+    val turbo: TurboAvailability,
+)
 
 @HiltViewModel
 class ConsumerHomeViewModel @Inject constructor(
@@ -100,6 +114,10 @@ class ConsumerHomeViewModel @Inject constructor(
             askBattery = access.batteryRestricted &&
                 schedule != SyncSchedule.Manual &&
                 SetupPrompt.BATTERY !in dismissed,
+            directLinkOpen = state.directLinkOpen,
+            askTurbo = state.turboNeedsPermission && access.turbo != TurboAvailability.AVAILABLE,
+            turbo = access.turbo,
+            turboReceiving = state.turboReceiving,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
@@ -113,9 +131,32 @@ class ConsumerHomeViewModel @Inject constructor(
         viewModelScope.launch { settings.dismissPrompt(prompt) }
     }
 
+    /**
+     * *Turbo receive* (docs/PLAN.md §8.3), for a sending phone that isn't on this Wi-Fi. Setting up the link takes a
+     * few seconds, off the main thread.
+     */
+    fun startTurboReceive() {
+        refresh()
+        if (access.value.turbo != TurboAvailability.AVAILABLE) return
+        viewModelScope.launch(Dispatchers.IO) { receiver.turbo.startReceive() }
+    }
+
+    fun stopTurboReceive() = receiver.turbo.stopReceive()
+
+    /** The answer to Turbo's permission request, or *Not now*: the card goes either way. */
+    fun onTurboAnswered() {
+        receiver.turbo.permissionHandled()
+        refresh()
+    }
+
     override fun onCleared() = receiver.release(HOLDER)
 
-    private fun checkAccess() = DeviceAccess(setup.canNotify(), setup.batteryRestricted(), receiver.freeBytes())
+    private fun checkAccess() = DeviceAccess(
+        setup.canNotify(),
+        setup.batteryRestricted(),
+        receiver.freeBytes(),
+        receiver.turbo.availability(),
+    )
 
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L

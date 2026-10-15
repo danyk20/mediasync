@@ -23,7 +23,7 @@ spotless {
         licenseHeader("/*\n * Copyright \$YEAR The MediaSync Authors\n * SPDX-License-Identifier: Apache-2.0\n */\n")
     }
     kotlinGradle {
-        target("*.kts", "build-logic/**/*.kts")
+        target("*.kts", "gradle/*.kts", "build-logic/**/*.kts")
         targetExclude("**/build/**")
         ktlint(libs.versions.ktlint.get())
     }
@@ -32,6 +32,9 @@ spotless {
 // Aggregated coverage over every module: `./gradlew :koverXmlReportCi :koverVerifyCi`.
 dependencies {
     kover(projects.app)
+    kover(projects.connector.android)
+    kover(projects.connector.api)
+    kover(projects.connector.contractTests)
     kover(projects.core.crypto)
     kover(projects.core.database)
     kover(projects.core.datastore)

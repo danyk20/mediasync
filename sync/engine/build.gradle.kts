@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(projects.core.model)
     implementation(projects.core.metadata)
+    implementation(projects.core.diagnostics)
     api(projects.sync.protocol)
     api(projects.transport.api)
 

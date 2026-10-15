@@ -99,5 +99,15 @@ fun interface PairingGate {
  * How this device introduces itself in `Hello`.
  *
  * @property schedule consumer only: the sync schedule its producers follow (docs/PLAN.md §10.1).
+ * @property turboKey consumer only: what its *Turbo receive* links derive from, told to paired producers only
+ *   (docs/PLAN.md §8.3).
  */
-data class LocalDevice(val name: String, val appVersion: String, val schedule: SyncSchedule? = null)
+data class LocalDevice(
+    val name: String,
+    val appVersion: String,
+    val schedule: SyncSchedule? = null,
+    val turboKey: ByteString? = null,
+) {
+    /** Never the key: this ends up in logs. */
+    override fun toString() = "LocalDevice($name, $appVersion, $schedule)"
+}

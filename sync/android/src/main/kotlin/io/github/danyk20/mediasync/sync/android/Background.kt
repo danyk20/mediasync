@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import androidx.core.content.edit
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
@@ -128,14 +129,39 @@ class SyncScheduler @Inject constructor(
         scope.launch { plans().distinctUntilChanged().collect { apply(it) } }
     }
 
-    /** Sends now as a foreground job that carries on when the user leaves the app (docs/PLAN.md §10.2). */
-    fun syncNow() {
-        val request = OneTimeWorkRequest.Builder(SyncNowWorker::class.java)
+    /**
+     * Receiving outside a receive window, with MediaSync open on screen or during *Turbo receive*, runs as foreground
+     * work too, so it carries on when the screen goes off or the user switches apps (docs/PLAN.md §7, §10.2). Call
+     * once, at start-up, with the receiver's state.
+     */
+    fun followReceiving(states: Flow<ReceiverState>) {
+        scope.launch {
+            states.map { it.sessions > 0 || it.directLinkOpen }
+                .distinctUntilChanged()
+                .collect { busy -> if (busy) receiveNow() }
+        }
+    }
+
+    private fun receiveNow() {
+        val request = OneTimeWorkRequest.Builder(ReceiveNowWorker::class.java)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)
             .build()
+        workManager.enqueueUniqueWork(RECEIVE_NOW, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /**
+     * Sends now as a foreground job that carries on when the user leaves the app (docs/PLAN.md §10.2). With
+     * [turbo], over a direct link (§8.3).
+     */
+    fun syncNow(turbo: Boolean = false) {
+        val request = OneTimeWorkRequest.Builder(SyncNowWorker::class.java)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setInputData(Data.Builder().putBoolean(SyncNowWorker.TURBO, turbo).build())
+            .addTag(TAG)
+            .build()
         workManager.enqueueUniqueWork(SYNC_NOW, ExistingWorkPolicy.KEEP, request)
-        Diagnostics.log(Area.SCHEDULE, "Sync now requested")
+        Diagnostics.log(Area.SCHEDULE, if (turbo) "Turbo transfer requested" else "Sync now requested")
     }
 
     /**
@@ -269,9 +295,10 @@ class SyncScheduler @Inject constructor(
         val RETRY_INTERVAL: Duration = Duration.ofMinutes(15)
         private val MISSED_AFTER: Duration = Duration.ofHours(1)
         private const val SYNC_NOW = "sync-now"
+        private const val RECEIVE_NOW = "receive-now"
 
         /** Every background job MediaSync has, for diagnostics. */
-        val WORK_NAMES = listOf(nameOf(DeviceRole.PRODUCER), nameOf(DeviceRole.CONSUMER), SYNC_NOW)
+        val WORK_NAMES = listOf(nameOf(DeviceRole.PRODUCER), nameOf(DeviceRole.CONSUMER), SYNC_NOW, RECEIVE_NOW)
         private const val WINDOW_LEAD_MINUTES = 5L
         private const val STAGGER_SECONDS = 180L
     }

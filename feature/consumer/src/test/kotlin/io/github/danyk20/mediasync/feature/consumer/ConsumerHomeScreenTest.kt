@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.kotest.matchers.shouldBe
 import java.time.LocalTime
 import org.junit.Rule
@@ -135,6 +136,101 @@ class ConsumerHomeScreenTest {
         composeRule.onRoot().captureScreenshot("consumer_home_receiving_dark")
     }
 
+    @Test
+    fun aTurboRequest_asksForPermission() {
+        show(ConsumerHomeUiState(listening = true, askTurbo = true, turbo = TurboAvailability.NOT_ALLOWED))
+
+        composeRule.onNodeWithText("A sending phone asked for Turbo transfer").assertIsDisplayed()
+        composeRule.onNodeWithText("Allow").performClick()
+        events shouldBe listOf("allow turbo")
+    }
+
+    @Test
+    fun aTurboRequest_withLocationOff_leadsToItsSettings() {
+        show(ConsumerHomeUiState(listening = true, askTurbo = true, turbo = TurboAvailability.LOCATION_OFF))
+
+        composeRule.onNodeWithText("Turn on location", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Location settings").performClick()
+        events shouldBe listOf("allow turbo")
+    }
+
+    @Test
+    fun anOpenDirectLink_isShownAndThenWhoSendsOverIt() {
+        show(ConsumerHomeUiState(listening = true, directLinkOpen = true))
+        composeRule.onNodeWithText("Ready for Turbo").assertIsDisplayed()
+    }
+
+    @Test
+    fun receivingOverTurbo_saysSo() {
+        show(receiving.copy(directLinkOpen = true))
+        composeRule.onNodeWithText("Receiving from Anna's Pixel over Turbo").assertIsDisplayed()
+    }
+
+    @Test
+    fun turboReceive_isOfferedForSendingPhonesAwayFromThisWifi() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                producers = listOf("Anna's Pixel"),
+                turbo = TurboAvailability.AVAILABLE,
+            ),
+        )
+
+        composeRule.onNodeWithText("Turbo receive").assertIsDisplayed().performClick()
+        events shouldBe listOf("turbo receive")
+    }
+
+    @Test
+    fun turboReceive_isntOfferedWithoutSendingPhonesOrWifiDirect() {
+        show(ConsumerHomeUiState(listening = true, turbo = TurboAvailability.AVAILABLE))
+        composeRule.onAllNodesWithText("Turbo receive").fetchSemanticsNodes().size shouldBe 0
+    }
+
+    @Test
+    fun turboReceive_waitsAndCanBeStopped() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                producers = listOf("Anna's Pixel"),
+                directLinkOpen = true,
+                turboReceiving = true,
+                turbo = TurboAvailability.AVAILABLE,
+            ),
+        )
+
+        composeRule.onNodeWithText("Waiting for a sending phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Stop Turbo receive").performClick()
+        events shouldBe listOf("stop turbo receive")
+    }
+
+    @Test
+    fun screenshot_turboReceive_dark() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                producers = listOf("Anna's Pixel"),
+                directLinkOpen = true,
+                turboReceiving = true,
+                turbo = TurboAvailability.AVAILABLE,
+            ),
+            darkTheme = true,
+        )
+        composeRule.onRoot().captureScreenshot("consumer_home_turbo_receive_dark")
+    }
+
+    @Test
+    fun screenshot_turboRequest_light() {
+        show(
+            ConsumerHomeUiState(
+                listening = true,
+                producers = listOf("Anna's Pixel"),
+                askTurbo = true,
+                turbo = TurboAvailability.NOT_ALLOWED,
+            ),
+        )
+        composeRule.onRoot().captureScreenshot("consumer_home_turbo_request_light")
+    }
+
     private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false) {
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
@@ -147,6 +243,10 @@ class ConsumerHomeScreenTest {
                     onOpenStorage = { events += "storage" },
                     onDismiss = { events += "dismiss $it" },
                     onOpenDiagnostics = { events += "diagnostics" },
+                    onAllowTurbo = { events += "allow turbo" },
+                    onDismissTurbo = { events += "dismiss turbo" },
+                    onStartTurboReceive = { events += "turbo receive" },
+                    onStopTurboReceive = { events += "stop turbo receive" },
                 )
             }
         }

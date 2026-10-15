@@ -42,8 +42,12 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -98,7 +102,7 @@ class BackgroundTest {
 
     private fun pairWithConsumer(schedule: SyncSchedule? = null) {
         peers.register(PairedPeer(consumer, "Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        peers.recordSchedule(consumer, schedule)
+        peers.recordConsumer(consumer, schedule)
     }
 
     private fun millis(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]").toInstant().toEpochMilli()
@@ -285,6 +289,50 @@ class BackgroundTest {
 
         history.recordSync(millis("2026-10-15T06:30+02:00"), waitingForSpace = 0) // Sync now.
         scheduler.missedSync(SyncSchedule.Default).shouldBeNull()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class) // runCurrent
+    @Test
+    fun receivingOutsideAReceiveWindowRunsAsForegroundWork() = runTest {
+        val states = MutableStateFlow(ReceiverState(listening = true))
+        scheduler().followReceiving(states)
+        fun receiving() = workManager.getWorkInfosForUniqueWork("receive-now").get()
+        runCurrent()
+        receiving() shouldBe emptyList()
+
+        states.value = states.value.copy(sessions = 1) // A sending phone connected while MediaSync is open.
+        runCurrent()
+        receiving().size shouldBe 1
+
+        states.value = states.value.copy(sessions = 0, directLinkOpen = true) // Turbo receive waits for one.
+        runCurrent()
+        receiving().size shouldBe 1 // The same work keeps going.
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class) // runCurrent, advanceTimeBy
+    @Test
+    fun foregroundReceivingEndsAfterAQuietMinute() = runTest {
+        val states =
+            MutableStateFlow(ReceiverState(listening = true, sessions = 1, lastActivityMillis = clock.millis()))
+        val receiver = mockk<ConsumerReceiver>(relaxed = true) { every { state } returns states }
+        val done = async {
+            runWorker<ReceiveNowWorker> { appContext, parameters ->
+                ReceiveNowWorker(appContext, parameters, receiver, peers, notifications, clock)
+            }
+        }
+        runCurrent()
+        verify { receiver.hold(any()) }
+
+        // The session ends; a minute later, still nothing.
+        states.value = states.value.copy(sessions = 0)
+        now = now.plusSeconds(30)
+        advanceTimeBy(10_000)
+        done.isCompleted shouldBe false
+        now = now.plusSeconds(31)
+        advanceTimeBy(10_000)
+
+        done.await() shouldBe ListenableWorker.Result.success()
+        verify { receiver.release(any()) }
     }
 
     @Test

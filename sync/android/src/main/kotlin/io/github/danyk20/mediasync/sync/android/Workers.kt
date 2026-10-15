@@ -122,13 +122,21 @@ class SyncNowWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result = logged("Sync now") {
-        val consumer = withContext(Dispatchers.IO) { peers.consumer() }
-        send(sync, notifications, consumer?.name) { sync.syncAndWait() }
-        Result.success() // However it went, the home screen shows it.
+    override suspend fun doWork(): Result {
+        val turbo = inputData.getBoolean(TURBO, false)
+        return logged(if (turbo) "Turbo transfer" else "Sync now") {
+            val consumer = withContext(Dispatchers.IO) { peers.consumer() }
+            send(sync, notifications, consumer?.name) { sync.syncAndWait(turbo = turbo) }
+            Result.success() // However it went, the home screen shows it.
+        }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.sending(consumerName = null)
+
+    companion object {
+        /** Input: over a direct link (docs/PLAN.md §8.3). */
+        const val TURBO = "turbo"
+    }
 }
 
 /** Runs [work], noting in the diagnostic log when it starts, how it ends, and why Android stopped it. */
@@ -203,7 +211,7 @@ class ReceiveWindowWorker @AssistedInject constructor(
         val opened = clock.millis()
         val paused = coroutineScope {
             receiver.hold(HOLDER)
-            val progress = launch { notifications.showReceivingProgress(incoming()) }
+            val progress = launch { notifications.showReceivingProgress(incoming(receiver, peers)) }
             try {
                 while (!receiveWindowDone(due, opened, clock.millis(), receiver.state.value)) {
                     if (conditions.pauseReason() != null) return@coroutineScope true
@@ -226,17 +234,62 @@ class ReceiveWindowWorker @AssistedInject constructor(
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.receiving()
 
-    /** The transfer the notification shows, with the sending phone's name. */
-    private fun incoming(): Flow<Incoming?> = receiver.state.map { state ->
-        state.transfers.entries.firstOrNull()?.let { (producer, progress) ->
-            val known = withContext(Dispatchers.IO) { peers.observeAll().first() }
-            Incoming(known.firstOrNull { it.id == producer }?.name, progress)
-        }
-    }
-
     private companion object {
         const val HOLDER = "receive-window"
         val CHECK_INTERVAL: Duration = Duration.ofSeconds(30)
+    }
+}
+
+/**
+ * Receiving outside a receive window (docs/PLAN.md §7, §10.2): while MediaSync is open on screen, or during *Turbo
+ * receive*, a session runs as this foreground work, so it carries on when the screen goes off or the user leaves
+ * the app. Android keeps the phone awake for it, without a wake lock of MediaSync's own. It ends after a quiet minute.
+ */
+@HiltWorker
+class ReceiveNowWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val receiver: ConsumerReceiver,
+    private val peers: PeerStore,
+    private val notifications: SyncNotifications,
+    private val clock: Clock,
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result = logged("Receiving") {
+        notifications.runInForeground(this, notifications.receiving())
+        coroutineScope {
+            receiver.hold(HOLDER)
+            val progress = launch { notifications.showReceivingProgress(incoming(receiver, peers)) }
+            try {
+                while (!quiet(receiver.state.value)) delay(CHECK_INTERVAL_MILLIS)
+            } finally {
+                progress.cancel()
+                receiver.release(HOLDER)
+            }
+        }
+        Result.success()
+    }
+
+    override suspend fun getForegroundInfo(): ForegroundInfo = notifications.receiving()
+
+    /** Nothing coming in, no direct link open, and nothing happened for a minute. */
+    private fun quiet(state: ReceiverState): Boolean {
+        val idle = clock.millis() - (state.lastActivityMillis ?: 0L)
+        return state.sessions == 0 && !state.directLinkOpen && idle >= QUIET_MILLIS
+    }
+
+    private companion object {
+        const val HOLDER = "receive-now"
+        const val CHECK_INTERVAL_MILLIS = 5_000L
+        const val QUIET_MILLIS = 60_000L
+    }
+}
+
+/** The transfer a receiving notification shows, with the sending phone's name. */
+private fun incoming(receiver: ConsumerReceiver, peers: PeerStore): Flow<Incoming?> = receiver.state.map { state ->
+    state.transfers.entries.firstOrNull()?.let { (producer, progress) ->
+        val known = withContext(Dispatchers.IO) { peers.observeAll().first() }
+        Incoming(known.firstOrNull { it.id == producer }?.name, progress)
     }
 }
 
