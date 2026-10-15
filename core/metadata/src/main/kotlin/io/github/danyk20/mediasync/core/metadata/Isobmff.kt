@@ -62,6 +62,25 @@ internal class Isobmff(
         }
     }
 
+    /** Where a video keeps its times: the movie header (`mvhd`), and each track's (`tkhd`) and media's (`mdhd`). */
+    fun timeHeaders(): List<Box> = top.filter { it.type == "moov" }.flatMap { moov ->
+        children(moov).flatMap { child ->
+            when (child.type) {
+                "mvhd" -> listOf(child)
+
+                "trak" -> children(child).flatMap { trackChild ->
+                    when (trackChild.type) {
+                        "tkhd" -> listOf(trackChild)
+                        "mdia" -> children(trackChild).filter { it.type == "mdhd" }
+                        else -> emptyList()
+                    }
+                }
+
+                else -> emptyList()
+            }
+        }
+    }
+
     private fun metadata(box: Box, remove: Remove): List<Edit> = when (box.type) {
         "udta" -> if (remove == Remove.ALL) free(box) else userDataLocation(box)
         "meta" -> meta(box, remove)
