@@ -7,7 +7,7 @@ import { authenticate } from "./auth.ts";
 import type { RequestContext } from "./context.ts";
 import { deletePair, getPair, openSignaling, registerPair } from "./handlers/pairs.ts";
 import { getRelayUsage, iceServers, reportRelayUsage, updateRelaySettings } from "./handlers/relay.ts";
-import { wake } from "./handlers/wake.ts";
+import { relayedWake, wake } from "./handlers/wake.ts";
 import { ApiError, errorResponse, json, readBody } from "./http.ts";
 import { isPairId } from "./identity.ts";
 import { clientKey, enforceLimit } from "./rate-limit.ts";
@@ -61,6 +61,12 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
         if (url.pathname === "/v1/health") {
             if (request.method !== "GET") throw new ApiError(405, "method_not_allowed", "Use GET", { allow: "GET" });
             return json({ status: "ok" });
+        }
+        // The developer's wake relay: called by households' Workers, which have no device identity (PLAN §10.4).
+        if (url.pathname === "/v1/relay/wake") {
+            if (request.method !== "POST") throw new ApiError(405, "method_not_allowed", "Use POST", { allow: "POST" });
+            await enforceLimit(env.IP_LIMITER, clientKey(request));
+            return await relayedWake(env, await readBody(request));
         }
         const { handler, pairId } = match(url, request.method);
         await enforceLimit(env.IP_LIMITER, clientKey(request));

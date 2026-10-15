@@ -1261,23 +1261,49 @@ function serviceAccount(env) {
   }
 }
 __name(serviceAccount, "serviceAccount");
+function sender(env) {
+  if (env.FCM_SERVICE_ACCOUNT) {
+    const account = serviceAccount(env);
+    return async (token, data, collapseKey) => {
+      try {
+        return await sendWake({ account, token, data, collapseKey });
+      } catch (error) {
+        if (!(error instanceof FcmConfigError)) throw error;
+        console.warn(error.message);
+        throw new ApiError(503, "push_not_configured", "This rendezvous' FCM service account is invalid");
+      }
+    };
+  }
+  if (env.WAKE_RELAY_URL) return (token, data, collapseKey) => relayWake(env.WAKE_RELAY_URL, token, data, collapseKey);
+  throw new ApiError(503, "push_not_configured", "This rendezvous has no FCM service account or wake relay");
+}
+__name(sender, "sender");
+async function relayWake(relayUrl, token, data, collapseKey) {
+  let response;
+  try {
+    response = await fetch(new URL("/v1/relay/wake", relayUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, data, collapseKey })
+    });
+  } catch {
+    return "failed";
+  }
+  if (response.ok) return "sent";
+  if (response.status === 410) return "unregistered";
+  return "failed";
+}
+__name(relayWake, "relayWake");
 async function wake(context) {
   const body = parseJsonObject(context.body);
   const payload = optionalString(body, "payload", MAX_PAYLOAD_LENGTH);
   if (payload !== void 0 && !PAYLOAD_PATTERN.test(payload)) throw badRequest('"payload" must be base64url');
-  const account = serviceAccount(context.env);
+  const send = sender(context.env);
   const pair = pairStub(context.env, context.pairId);
   const { token } = unwrap(await pair.claimWake(caller(context), context.now));
   const data = { type: "wake", v: "1", pair: context.pairId };
   if (payload !== void 0) data.payload = payload;
-  let outcome;
-  try {
-    outcome = await sendWake({ account, token, data, collapseKey: `wake-${pairTag(context.pairId)}` });
-  } catch (error) {
-    if (!(error instanceof FcmConfigError)) throw error;
-    console.warn(error.message);
-    throw new ApiError(503, "push_not_configured", "This rendezvous' FCM service account is invalid");
-  }
+  const outcome = await send(token, data, `wake-${pairTag(context.pairId)}`);
   switch (outcome) {
     case "sent":
       return json({ sent: true });
@@ -1289,6 +1315,45 @@ async function wake(context) {
   }
 }
 __name(wake, "wake");
+var MAX_TOKEN_LENGTH = 4096;
+var MAX_DATA_ENTRIES = 8;
+var MAX_DATA_LENGTH = 3072;
+var MAX_COLLAPSE_KEY_LENGTH = 100;
+async function relayedWake(env, body) {
+  if (env.WAKE_RELAY_ENABLED !== "true") throw new ApiError(404, "not_found", "No such endpoint");
+  const account = serviceAccount(env);
+  const fields = parseJsonObject(body);
+  const token = optionalString(fields, "token", MAX_TOKEN_LENGTH);
+  const collapseKey = optionalString(fields, "collapseKey", MAX_COLLAPSE_KEY_LENGTH);
+  const data = fields.data;
+  if (!token || !collapseKey) throw badRequest('"token" and "collapseKey" are required');
+  if (typeof data !== "object" || data === null || Array.isArray(data)) throw badRequest('"data" must be an object');
+  const entries = Object.entries(data);
+  const strings = entries.every(([, value]) => typeof value === "string");
+  if (!strings || entries.length > MAX_DATA_ENTRIES || JSON.stringify(data).length > MAX_DATA_LENGTH) {
+    throw badRequest('"data" must be a few short strings');
+  }
+  const key = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  const hex = Array.from(key.slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
+  await enforceLimit(env.TURN_LIMITER, `wake:${hex}`);
+  let outcome;
+  try {
+    outcome = await sendWake({ account, token, data, collapseKey });
+  } catch (error) {
+    if (!(error instanceof FcmConfigError)) throw error;
+    console.warn(error.message);
+    throw new ApiError(503, "push_not_configured", "The wake relay's FCM service account is invalid");
+  }
+  switch (outcome) {
+    case "sent":
+      return json({ sent: true });
+    case "unregistered":
+      throw new ApiError(410, "push_token_unregistered", "The FCM token is no longer valid");
+    case "failed":
+      throw new ApiError(502, "push_failed", "FCM didn't accept the wake-up; try again later");
+  }
+}
+__name(relayedWake, "relayedWake");
 
 // src/router.ts
 var PAIR = "(?<pairId>[0-9a-f]{64})";
@@ -1323,6 +1388,11 @@ async function handleRequest(request, env, ctx) {
     if (url.pathname === "/v1/health") {
       if (request.method !== "GET") throw new ApiError(405, "method_not_allowed", "Use GET", { allow: "GET" });
       return json({ status: "ok" });
+    }
+    if (url.pathname === "/v1/relay/wake") {
+      if (request.method !== "POST") throw new ApiError(405, "method_not_allowed", "Use POST", { allow: "POST" });
+      await enforceLimit(env.IP_LIMITER, clientKey(request));
+      return await relayedWake(env, await readBody(request));
     }
     const { handler, pairId } = match(url, request.method);
     await enforceLimit(env.IP_LIMITER, clientKey(request));
