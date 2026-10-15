@@ -36,6 +36,11 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Cache the emulator image
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.ANDROID_HOME }}/system-images/android-${{ matrix.api }}
+          key: emulator-image-api${{ matrix.api }}-${{ runner.os }}-${{ hashFiles('build-logic/convention/src/main/kotlin/io/github/danyk20/mediasync/buildlogic/KotlinAndroid.kt') }}
       # Every module sets up the same emulator in parallel, and two of them installing one system image at
       # once can fail ("System Image ... does not exist for this architecture"). Install it once first.
       - name: Install the emulator image
