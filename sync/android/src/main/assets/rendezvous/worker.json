@@ -1,0 +1,40 @@
+{
+  "compatibilityDate": "2026-10-01",
+  "migrationTag": "v1",
+  "durableObjects": {
+    "PAIRS": "PairMailbox",
+    "METER": "UsageMeter"
+  },
+  "rateLimits": [
+    {
+      "name": "IP_LIMITER",
+      "namespaceId": "3001",
+      "limit": 120,
+      "period": 60
+    },
+    {
+      "name": "DEVICE_LIMITER",
+      "namespaceId": "3002",
+      "limit": 60,
+      "period": 60
+    },
+    {
+      "name": "TURN_LIMITER",
+      "namespaceId": "3003",
+      "limit": 10,
+      "period": 60
+    }
+  ],
+  "vars": {
+    "RELAY_BUDGET_GB": "950",
+    "RELAY_FREE_ALLOWANCE_GB": "1000",
+    "RELAY_PRICE_USD_PER_GB": "0.05",
+    "RELAY_PERIOD_START_DAY": "1",
+    "RELAY_ALLOW_PAID": "false",
+    "RELAY_PAID_CAP_USD": "0",
+    "TURN_CREDENTIAL_TTL_SECONDS": "3600"
+  },
+  "crons": [
+    "*/15 * * * *"
+  ]
+}

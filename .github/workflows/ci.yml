@@ -176,6 +176,17 @@ jobs:
         run: npm test
       - name: Bundle as for deployment (dry run, no Cloudflare account needed)
         run: npm run bundle
+      # The app carries the Worker, to deploy it into the user's own Cloudflare account (PLAN §8.4): its copy must be
+      # what this source builds. The bundle is reproducible.
+      - name: The app's copy of the Worker is current
+        run: |
+          npm run bundle:app
+          changed=$(git status --porcelain -- ../../sync/android/src/main/assets/rendezvous)
+          if [ -n "$changed" ]; then
+            echo "::error::The app's copy of the Worker is out of date: run 'npm run bundle:app' in infra/rendezvous and commit it."
+            echo "$changed"
+            exit 1
+          fi
 
   instrumented-tests:
     name: Instrumented tests (API 29, 36)

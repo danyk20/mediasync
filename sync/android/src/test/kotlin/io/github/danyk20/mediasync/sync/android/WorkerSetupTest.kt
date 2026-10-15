@@ -16,8 +16,11 @@ import java.io.IOException
 import java.net.URLDecoder
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /** Setting up internet sync with the user's Cloudflare account, against Cloudflare as faked here. */
+@RunWith(RobolectricTestRunner::class)
 class WorkerSetupTest {
 
     private val script = WorkerScript(
@@ -144,6 +147,25 @@ class WorkerSetupTest {
         )
 
         deploy(offline) shouldBe SetupResult.Failed(SetupFailure.OFFLINE)
+    }
+
+    @Test
+    fun theAppCarriesTheWorkerWithItsSettings() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val carried = context.assets.open("rendezvous/worker.json").use { manifest ->
+            WorkerScript.of(
+                context.assets.open("rendezvous/worker.js").use {
+                    it.readBytes()
+                },
+                manifest.readBytes().decodeToString(),
+            )
+        }
+
+        WorkerSetup(context, settings, receiver).available() shouldBe true
+        carried.durableObjects shouldBe mapOf("PAIRS" to "PairMailbox", "METER" to "UsageMeter")
+        carried.migrationTag shouldBe "v1"
+        carried.crons shouldBe listOf("*/15 * * * *")
+        carried.module.decodeToString() shouldContain "PairMailbox"
     }
 
     @Test
