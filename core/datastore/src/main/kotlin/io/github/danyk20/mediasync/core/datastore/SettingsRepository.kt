@@ -32,6 +32,29 @@ interface SettingsRepository {
 
     suspend fun setPhotoDetails(details: PhotoDetails)
 
+    /** A receiving phone's rendezvous Worker for internet sync (PLAN §8.4); `null` while it has none. */
+    val rendezvousUrl: Flow<String?>
+
+    suspend fun setRendezvousUrl(url: String?)
+
+    /** A sending phone: internet sync (PLAN §8.4) also over mobile data, not only over Wi-Fi; off at first. */
+    val internetOverMobileData: Flow<Boolean>
+
+    suspend fun setInternetOverMobileData(allowed: Boolean)
+
+    /** A sending phone: how much internet sync may send over mobile data a month; `null`: no limit (at first). */
+    val mobileDataCapBytes: Flow<Long?>
+
+    suspend fun setMobileDataCapBytes(bytes: Long?)
+
+    /**
+     * A sending phone: videos also go through the relay; off at first, so over the relay they wait for Wi-Fi or a
+     * direct connection (PLAN §17, relay saver).
+     */
+    val videosOverRelay: Flow<Boolean>
+
+    suspend fun setVideosOverRelay(allowed: Boolean)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

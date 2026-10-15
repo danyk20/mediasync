@@ -19,6 +19,7 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(projects.core.media)
     implementation(projects.transport.lan)
+    implementation(projects.transport.webrtc)
 
     testImplementation(testFixtures(projects.sync.engine))
     testImplementation(testFixtures(projects.core.metadata))
@@ -34,4 +35,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotest.assertions)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(testFixtures(projects.sync.engine))
+    androidTestImplementation(testFixtures(projects.transport.rendezvous))
 }

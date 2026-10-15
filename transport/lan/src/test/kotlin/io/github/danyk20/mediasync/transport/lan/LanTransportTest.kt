@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.transport.lan
 
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.kotest.assertions.throwables.shouldThrowAny
+import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldStartWith
@@ -111,6 +112,24 @@ class LanTransportTest {
                 timeouts,
             )
         }.shouldBeInstanceOf<IOException>()
+    }
+
+    @Test
+    fun `something at the address that doesn't answer as MediaSync fails within the handshake timeout`() {
+        java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { silent ->
+            executor.submit { silent.accept() } // Accepts, then never speaks TLS.
+            val started = System.nanoTime()
+
+            shouldThrowAny {
+                LanClient.connect(
+                    InetSocketAddress(InetAddress.getLoopbackAddress(), silent.localPort),
+                    producer,
+                    consumer.id,
+                    timeouts.copy(handshakeMillis = 300),
+                )
+            }.shouldBeInstanceOf<IOException>()
+            (System.nanoTime() - started) / 1_000_000 shouldBeLessThan timeouts.readMillis.toLong()
+        }
     }
 
     @Test

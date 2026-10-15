@@ -18,6 +18,7 @@ import androidx.navigation3.ui.NavDisplay
 import io.github.danyk20.mediasync.MainUiState
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.feature.consumer.ConsumerHomeRoute
+import io.github.danyk20.mediasync.feature.consumer.InternetSyncRoute
 import io.github.danyk20.mediasync.feature.consumer.SyncScheduleRoute
 import io.github.danyk20.mediasync.feature.diagnostics.DiagnosticsRoute
 import io.github.danyk20.mediasync.feature.onboarding.RoleChoiceRoute
@@ -91,10 +92,12 @@ private fun MediaSyncNavDisplay(
                 ConsumerHomeRoute(
                     onAddProducer = { backStack.add(Destination.ConsumerPairing) },
                     onChangeSchedule = { backStack.add(Destination.ConsumerSchedule) },
+                    onSetUpInternet = { backStack.add(Destination.ConsumerInternet) },
                     onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                 )
             }
             entry<Destination.ConsumerSchedule> { SyncScheduleRoute(onDone = { backStack.removeLastOrNull() }) }
+            entry<Destination.ConsumerInternet> { InternetSyncRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ConsumerPairing> { ConsumerPairingRoute(onDone = { backStack.removeLastOrNull() }) }
         },
     )

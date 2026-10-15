@@ -742,6 +742,7 @@ interface SecureSession : Closeable {
 - The Worker lives in `infra/rendezvous/`. It has unit tests (Vitest with the Workers pool), rate limiting, and **no logging of IPs beyond Cloudflare defaults**.
 - CI deploys it to a `staging` environment on main, for testing. There's no production deployment of the developer's: every household's Worker is its own (bring your own Cloudflare).
 - *Built in M5 (server side):* the Worker with one Durable Object mailbox per pair (WebSocket hibernation, a 10-minute queue while the other phone is offline), signed requests with nonce replay protection, 1 h TURN credentials tagged per pair, FCM wake-ups, rate limits per address, device and credential request, and the deploy workflow (skipped until Cloudflare credentials are set up). See `infra/rendezvous/README.md`. The Android transport follows.
+- *Built in M5 (Android):* the pair secret and the Worker's address travel in the paired TLS session; requests are signed with the keystore identity; WebRTC (`transport:webrtc`, one ordered data channel carrying an ordinary sync session) is set up through the pair's sealed mailbox. The sending phone tries the internet when the local network can't reach the receiving phone, wakes it through the Worker when it's offline, and stays off mobile data unless allowed. The receiving phone listens through its Worker while it listens on Wi-Fi. *Internet sync* on the receiving phone sets up the Worker in the user's Cloudflare account with a token (or takes a Worker's address), and shows the relay meter. A device test syncs over WebRTC through a fake Worker.
 
 ### 8.5 Relay usage meter and budget guard
 
@@ -783,7 +784,7 @@ A Worker deployed from the phone has no analytics token (the deployment token is
 - **Billing period:** the period start is configurable to match the Cloudflare billing date (default: the 1st of the month, UTC).
 - **Analytics access:** the Worker needs a Cloudflare API token with *Account Analytics: Read*, stored as a Worker secret.
 
-*Built in M5 (server side):* the usage meter Durable Object, the 15-minute cron refresh (one GraphQL request: the summed total plus a breakdown by credential tag), live reports (cumulative per WebRTC session, so repeats don't count twice; live bytes from the 10 minutes before each analytics read count again, never missing traffic), and the guard: at the limit, `ice-servers` returns STUN only with the reset date. The app side (Settings → Data usage, notifications) follows.
+*Built in M5 (server side):* the usage meter Durable Object, the 15-minute cron refresh (one GraphQL request: the summed total plus a breakdown by credential tag), live reports (cumulative per WebRTC session, so repeats don't count twice; live bytes from the 10 minutes before each analytics read count again, never missing traffic), and the guard: at the limit, `ice-servers` returns STUN only with the reset date. *Built in M5 (app):* the sending phone's live reports; the meter on the receiving phone's *Internet sync* screen and a one-line meter on its home; notifications at 80 % of the free allowance, at 95 % of the budget, and when the relay stopped, each once a month.
 
 ---
 
@@ -1245,7 +1246,7 @@ Total ≈ **16 weeks** to 1.0, and v1.1 about 3 weeks later. M1 already gives yo
 Ranked by value for effort:
 
 1. **Free up space on producers.** Once the consumer confirms an item is received, or backed up *and* verified, the producer offers "Free up 8.2 GB on this phone". The protocol already includes `BACKUP_STATUS` for this; it also reports whether the consumer still holds the file and at which quality it was backed up. An item only qualifies while a full-quality copy exists elsewhere (§1.1). With the Pixel setup, that means while the consumer still keeps the original. After Google's cleanup on the consumer, the producer keeps its copy. *(M4–M6)*
-2. **Relay saver.** Over the relay, send photos right away but hold videos until Wi-Fi. This stretches the 1,000 GB allowance a long way. *(M5)*
+2. **Relay saver.** Over the relay, send photos right away but hold videos until Wi-Fi. This stretches the 1,000 GB allowance a long way. *(M5; built: on by default, "Send videos through the relay" on the sending phone turns it off.)*
 3. **Per-producer albums in Google Photos** ("Anna's Pixel"). *(v1.1; API connector only, because the Google Photos app can't be told which album to use)*
 4. **Smart filters:** exclude screenshots, WhatsApp, files under X KB, or anything before a date. Optionally sync only on specific home Wi-Fi networks. That last one needs the location permission, so it's off by default.
 5. **"Not synced for N days" alerts** on the consumer, e.g. "Dad's phone hasn't synced in 7 days".

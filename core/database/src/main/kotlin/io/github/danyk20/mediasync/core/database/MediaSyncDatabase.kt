@@ -18,12 +18,13 @@ import androidx.room.RoomDatabase
         ConnectorAccountEntity::class,
         BackupReceiptEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // peers.schedule
         AutoMigration(from = 2, to = 3), // peers.turboKey
         AutoMigration(from = 3, to = 4), // connector_accounts, backup_receipts
+        AutoMigration(from = 4, to = 5), // peers.pairSecret, peers.rendezvousUrl
     ],
 )
 abstract class MediaSyncDatabase : RoomDatabase() {

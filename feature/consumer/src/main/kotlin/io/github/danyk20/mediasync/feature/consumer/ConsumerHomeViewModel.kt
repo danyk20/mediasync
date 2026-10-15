@@ -15,17 +15,21 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** A transfer in progress, as the home screen shows it. */
 data class IncomingTransfer(
@@ -57,6 +61,10 @@ data class ConsumerHomeUiState(
     val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
     /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's Wi-Fi. */
     val turboReceiving: Boolean = false,
+    /** Internet sync (docs/PLAN.md §8.4) is set up: this phone has a rendezvous Worker. */
+    val internetSync: Boolean = false,
+    /** This month's relay usage (docs/PLAN.md §8.5), for the one-line meter; `null` until known. */
+    val relay: RelayUsage? = null,
 )
 
 /** What the phone allows MediaSync, and its free space. */
@@ -77,21 +85,32 @@ class ConsumerHomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
+    private val relay = MutableStateFlow<RelayUsage?>(null)
 
     init {
         // Receives while this screen is open; scheduled receive windows also run in the background.
         receiver.hold(HOLDER)
         // A sync that ran into a full storage: check the free space again.
         viewModelScope.launch { receiver.state.map { it.waitingForSpace }.distinctUntilChanged().collect { refresh() } }
+        // The relay meter, while internet sync is on: read again now and then, as relayed transfers run.
+        viewModelScope.launch {
+            settings.rendezvousUrl.collectLatest { worker ->
+                relay.value = null
+                while (worker != null) {
+                    relay.value = withContext(Dispatchers.IO) { receiver.relayUsage() }
+                    delay(RELAY_REFRESH_MILLIS)
+                }
+            }
+        }
     }
 
     val uiState: StateFlow<ConsumerHomeUiState> = combine(
         receiver.state,
         peers.observeAll(),
         received.observeCount(),
-        settings.syncSchedule,
+        combine(settings.syncSchedule, settings.rendezvousUrl, relay, ::Triple),
         combine(access, settings.dismissedPrompts, ::Pair),
-    ) { state, allPeers, count, schedule, (access, dismissed) ->
+    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed) ->
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
             IncomingTransfer(
@@ -118,6 +137,8 @@ class ConsumerHomeViewModel @Inject constructor(
             askTurbo = state.turboNeedsPermission && access.turbo != TurboAvailability.AVAILABLE,
             turbo = access.turbo,
             turboReceiving = state.turboReceiving,
+            internetSync = worker != null,
+            relay = relay?.takeIf { worker != null },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
@@ -161,6 +182,7 @@ class ConsumerHomeViewModel @Inject constructor(
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         const val HOLDER = "home-screen"
+        const val RELAY_REFRESH_MILLIS = 5 * 60_000L
 
         /** Above the 2 GB the storage guard keeps free: less than this, and hardly anything fits. */
         const val LOW_SPACE_BYTES = 100L * 1024 * 1024

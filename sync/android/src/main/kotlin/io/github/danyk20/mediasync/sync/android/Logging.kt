@@ -48,6 +48,7 @@ internal fun SyncResult.describe(): String = buildList {
     if (alreadyOnConsumer > 0) add("already there $alreadyOnConsumer")
     if (failed > 0) add("failed $failed")
     if (deferred > 0) add("no space for $deferred")
+    if (heldBack > 0) add("held back $heldBack")
     if (withheld > 0) add("withheld $withheld")
     if (cancelled) add("stopped early")
 }.joinToString(", ")

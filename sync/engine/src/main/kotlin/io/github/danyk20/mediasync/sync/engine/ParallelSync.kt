@@ -26,6 +26,8 @@ import java.util.concurrent.Future
  *
  * @param session a new session reporting to the given listener.
  * @param connect a new connection to the same consumer, or `null` if there isn't one.
+ * @param holdBack what isn't sent over this connection, such as videos over the relay (PLAN §17, relay saver): it's
+ *   counted in the result and sent another time.
  */
 class ParallelSync(
     private val session: (ProgressListener) -> ProducerSession,
@@ -34,16 +36,18 @@ class ParallelSync(
     private val maxStreams: Int = MAX_STREAMS,
     private val mayAddStream: () -> Boolean = { true },
     private val probeMillis: Long = PROBE_MILLIS,
+    private val holdBack: (SourceItem) -> Boolean = { false },
 ) {
     private val latest = ConcurrentHashMap<Int, TransferProgress>()
 
     fun sync(first: PeerConnection): SyncResult {
-        val queue = WorkQueue(session(ProgressListener {}).pendingFor(first.peerId))
+        val (held, pending) = session(ProgressListener {}).pendingFor(first.peerId).partition(holdBack)
+        val queue = WorkQueue(pending)
         val pool = Executors.newCachedThreadPool { task -> Thread(task, "mediasync-stream").apply { isDaemon = true } }
         try {
             val streams = mutableListOf(start(pool, 0, queue) { session(it).sync(first, queue) })
             grow(pool, queue, streams)
-            return merge(streams)
+            return merge(streams).copy(heldBack = held.size)
         } finally {
             pool.shutdown()
         }
@@ -134,6 +138,8 @@ class ParallelSync(
                 consumerSchedule = a.consumerSchedule ?: b.consumerSchedule,
                 withheld = a.withheld + b.withheld,
                 consumerTurboKey = a.consumerTurboKey ?: b.consumerTurboKey,
+                consumerPairSecret = a.consumerPairSecret ?: b.consumerPairSecret,
+                consumerRendezvousUrl = a.consumerRendezvousUrl ?: b.consumerRendezvousUrl,
             )
         }
     }

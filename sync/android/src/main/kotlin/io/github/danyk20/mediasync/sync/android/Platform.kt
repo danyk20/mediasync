@@ -11,13 +11,17 @@ import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
+import io.github.danyk20.mediasync.transport.PeerConnection
 import java.io.Closeable
+import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.time.Instant
 import javax.inject.Inject
 import javax.net.SocketFactory
+import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 
 // Small seams around Android services, so the sync runtime can be tested on the JVM.
@@ -28,6 +32,12 @@ fun interface DeviceInfo {
 
     /** As a sending phone: the details it sends (docs/PLAN.md §6.3). */
     fun photoDetails(): PhotoDetails = PhotoDetails.Default
+
+    /**
+     * As a sending phone: whether videos also go through the relay; otherwise they wait for Wi-Fi or a direct
+     * connection (docs/PLAN.md §17, relay saver).
+     */
+    fun videosOverRelay(): Boolean = false
 }
 
 /** This phone's addresses on the local network, or none when it isn't on Wi-Fi or Ethernet. */
@@ -52,12 +62,86 @@ fun interface LanSockets {
     fun canUseMoreConnections(): Boolean = true
 }
 
-/** How this phone reaches other phones: its local network, mDNS on it, and direct links (docs/PLAN.md §8). */
+/**
+ * How this phone reaches other phones: its local network, mDNS on it, direct links, and the internet
+ * (docs/PLAN.md §8).
+ */
 class Connectivity @Inject constructor(
     val addresses: AddressProvider,
     val sockets: LanSockets,
     val discovery: ServiceDiscovery,
     val directLinks: DirectLinks,
+    val internet: InternetLinks = InternetLinks.None,
+)
+
+/**
+ * Internet sync (docs/PLAN.md §8.4): connections between the paired phones through the receiving phone's
+ * rendezvous Worker, when they share no network.
+ */
+interface InternetLinks {
+    /**
+     * As a sending phone: whether it may sync over the internet now: over Wi-Fi, or over mobile data if allowed and
+     * this month's limit isn't used up.
+     */
+    fun allowed(): Boolean
+
+    /**
+     * As a sending phone on mobile data: how much more it may send over it this month ([Long.MAX_VALUE] without a
+     * limit); `null` when it isn't on mobile data.
+     */
+    fun mobileDataLeft(): Long? = null
+
+    /** As a sending phone: [bytes] went over mobile data. */
+    fun countMobileData(bytes: Long) = Unit
+
+    /**
+     * As a sending phone: a connection to [consumer] through its Worker at [worker], with their [pairSecret].
+     * Blocks.
+     *
+     * @throws IOException if there's no way to it now; the message says why.
+     */
+    fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection
+
+    /**
+     * As a receiving phone: answers the sending phones in [pairs] (each with its pair secret) that connect
+     * through the Worker at [worker]. Each connection goes to [serve] on a thread of its own, until the
+     * returned handle is closed.
+     */
+    fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable
+
+    /**
+     * As a receiving phone: this month's relay usage at its Worker at [worker] (docs/PLAN.md §8.5), asked as the
+     * pair with [producer]. Blocks.
+     *
+     * @throws IOException if the Worker can't be asked now.
+     */
+    fun relayUsage(worker: String, producer: DeviceId): RelayUsage
+
+    /** Without internet sync. */
+    object None : InternetLinks {
+        override fun allowed() = false
+
+        override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection =
+            throw IOException("No internet sync on this phone")
+
+        override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit) =
+            Closeable {}
+
+        override fun relayUsage(worker: String, producer: DeviceId): RelayUsage =
+            throw IOException("No internet sync on this phone")
+    }
+}
+
+/**
+ * The relay allowance this month (docs/PLAN.md §8.5): [usedBytes] of the [freeBytes] Cloudflare gives for free; the
+ * relay stops at [limitBytes] (a margin below), and is [available] until then. It starts over at [resetsAt].
+ */
+data class RelayUsage(
+    val usedBytes: Long,
+    val limitBytes: Long,
+    val freeBytes: Long,
+    val available: Boolean,
+    val resetsAt: Instant?,
 )
 
 /** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
@@ -131,6 +215,24 @@ fun interface DeviceConditions {
 /** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
 fun interface PhotoDetailsSource {
     fun current(): PhotoDetails
+}
+
+/** As a sending phone: whether videos also go through the relay (PLAN §17, relay saver), as the user set it. */
+fun interface RelayVideosSource {
+    fun allowed(): Boolean
+}
+
+/** As a sending phone: whether internet sync (PLAN §8.4) may also use mobile data, and how much, as the user set it. */
+interface MobileDataSource {
+    fun allowed(): Boolean
+
+    /** How much it may send over mobile data a month; `null`: no limit. */
+    fun capBytes(): Long? = null
+}
+
+/** The receiving phone's rendezvous Worker for internet sync (PLAN §8.4), as set up; `null` while it has none. */
+fun interface RendezvousSource {
+    fun current(): String?
 }
 
 /** The receiving phone's sync schedule as the user set it; told to every sending phone in each session. */

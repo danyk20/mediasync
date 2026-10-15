@@ -43,6 +43,10 @@ sealed interface Destination : NavKey {
     /** The consumer sets when its producers sync. */
     @Serializable
     data object ConsumerSchedule : Destination
+
+    /** The consumer sets up internet sync (docs/PLAN.md §8.4). */
+    @Serializable
+    data object ConsumerInternet : Destination
 }
 
 /** Where the app starts for a device with the given role. */

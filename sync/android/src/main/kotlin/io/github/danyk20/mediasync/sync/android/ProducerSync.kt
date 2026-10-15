@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.crypto.IdentityProvider
+import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
@@ -24,6 +25,7 @@ import io.github.danyk20.mediasync.sync.engine.ParallelSync
 import io.github.danyk20.mediasync.sync.engine.PeerEndedSessionException
 import io.github.danyk20.mediasync.sync.engine.ProducerSession
 import io.github.danyk20.mediasync.sync.engine.SentLedger
+import io.github.danyk20.mediasync.sync.engine.SourceItem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
@@ -33,6 +35,7 @@ import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.LanClient
 import io.github.danyk20.mediasync.transport.lan.LanTimeouts
+import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import java.io.IOException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -98,8 +101,9 @@ sealed interface ProducerState {
     /** Asking the receiving phone for a direct link, and joining it. */
     data object SettingUpTurbo : ProducerState
 
-    /** [turbo]: over the direct link of Turbo transfer. */
-    data class Syncing(val progress: TransferProgress?, val turbo: Boolean = false) : ProducerState
+    /** [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4). */
+    data class Syncing(val progress: TransferProgress?, val turbo: Boolean = false, val internet: Boolean = false) :
+        ProducerState
 
     data class Failed(val reason: SyncFailure) : ProducerState
 }
@@ -135,6 +139,7 @@ class ProducerSync @Inject constructor(
     private val discovery = network.discovery
     private val sockets = network.sockets
     private val directLinks = network.directLinks
+    private val internet = network.internet
     private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
     private var job: Job? = null
 
@@ -165,7 +170,7 @@ class ProducerSync @Inject constructor(
                 } else {
                     peers.register(consumer, it.remoteAddress)
                     peers.keepOnlyConsumer(consumer.id)
-                    peers.recordConsumer(consumer.id, outcome.consumerSchedule)
+                    peers.recordConsumer(consumer.id, ConsumerFacts(schedule = outcome.consumerSchedule))
                     PairingResult.Paired(consumer.name)
                 }
             }
@@ -280,7 +285,7 @@ class ProducerSync @Inject constructor(
                 connection != null && turbo -> run.overTurbo(connection)
                 connection != null -> run.overWifi(connection)
                 turbo -> run.overTurboReceive()
-                else -> ProducerState.Failed(SyncFailure.UNREACHABLE)
+                else -> run.overInternet() ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
             }
         } catch (e: IOException) {
             // Where it stopped tells which side stalled: during a file, or waiting for the other phone.
@@ -292,10 +297,12 @@ class ProducerSync @Inject constructor(
 
     /** One sync to [consumer]: over Wi-Fi, or over a direct link while that works. */
     private inner class Run(val consumer: Peer, val details: PhotoDetails, val started: Long) {
+        /** On mobile data: how much more this month allows (docs/PLAN.md §2.2); `null` off mobile data. */
+        var mobileDataLeft: Long? = null
 
         fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
             _state.value = ProducerState.Syncing(progress = null)
-            return sockets.keepingAwake { send(connection, direct = false) }.copy(turboProblem = turboProblem)
+            return sockets.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
         }
 
         /**
@@ -366,7 +373,7 @@ class ProducerSync @Inject constructor(
             Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at $owner:${link.port}")
             _state.value = ProducerState.Syncing(progress = null, turbo = true)
             return try {
-                sockets.keepingAwake { send(direct, direct = true) }
+                sockets.keepingAwake { send(direct, Path.DIRECT) }
             } catch (e: IOException) {
                 if (failureOf(e) != SyncFailure.CONNECTION_LOST) throw e
                 Diagnostics.log(Area.SEND, "Turbo: the direct link dropped; going on over Wi-Fi", e)
@@ -380,20 +387,82 @@ class ProducerSync @Inject constructor(
             return overWifi(connection, problem)
         }
 
-        private fun send(connection: PeerConnection, direct: Boolean): ProducerState.Idle = connection.use {
-            val turbo = if (direct) " over Turbo" else ""
+        /**
+         * Not on a network with the consumer: through its rendezvous Worker (docs/PLAN.md §8.4), if it has one and
+         * this phone isn't on mobile data. `null` if there's no way to it that way.
+         */
+        fun overInternet(): ProducerState? {
+            val worker = consumer.rendezvousUrl ?: return null
+            val secret = consumer.pairSecret ?: return null
+            if (!internet.allowed()) {
+                Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed or its limit is used")
+                return null
+            }
+            mobileDataLeft = internet.mobileDataLeft()
+            val connection = try {
+                internet.connect(consumer.id, worker, secret)
+            } catch (e: IOException) {
+                Diagnostics.log(Area.SEND, "Internet: no connection to the receiving phone", e)
+                return null
+            }
+            Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone")
+            _state.value = ProducerState.Syncing(progress = null, internet = true)
+            return sockets.keepingAwake { send(connection, Path.INTERNET) }
+        }
+
+        /**
+         * Through the relay, videos wait for Wi-Fi or a direct connection unless the user lets them go (docs/PLAN.md
+         * §17, relay saver): they'd use most of the free allowance.
+         */
+        private fun relaySaver(connection: PeerConnection): (SourceItem) -> Boolean {
+            val relayed = (connection as? RelayCounter)?.throughRelay() == true
+            if (!relayed || device.videosOverRelay()) return { false }
+            Diagnostics.log(Area.SEND, "Internet: through the relay; videos wait for Wi-Fi or a direct connection")
+            return { item -> item.descriptor.mimeType.startsWith("video/") }
+        }
+
+        private fun send(connection: PeerConnection, path: Path): ProducerState.Idle = connection.use {
+            val direct = path == Path.DIRECT
+            val over = when (path) {
+                Path.WIFI -> ""
+                Path.DIRECT -> " over Turbo"
+                Path.INTERNET -> " over the internet"
+            }
             val result = ParallelSync(
                 session = { progress ->
                     ProducerSession(device.local(), source, ledger, progress, { !cancelled && !pauseWhen() }, details)
                 },
                 connect = { connectToFirst(listOf(it.remoteAddress), consumer.id, direct) },
-                progress = { progress -> _state.value = ProducerState.Syncing(progress, turbo = direct) },
-                mayAddStream = sockets::canUseMoreConnections,
+                progress = { progress ->
+                    _state.value = ProducerState.Syncing(progress, turbo = direct, internet = path == Path.INTERNET)
+                    // This month's mobile data limit reached: stops after the current file.
+                    if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
+                },
+                // Over the internet, one connection carries it all.
+                mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
+                holdBack = relaySaver(it),
             ).sync(it)
-            if (!direct) peers.recordAddress(consumer.id, it.remoteAddress) // A direct link's address is fleeting.
-            peers.recordConsumer(consumer.id, result.consumerSchedule, result.consumerTurboKey)
+            mobileDataLeft?.let { left ->
+                internet.countMobileData(result.bytesSent)
+                if (result.bytesSent >=
+                    left
+                ) {
+                    Diagnostics.log(Area.SEND, "Internet: this month's mobile data limit is used")
+                }
+            }
+            peers.recordConsumer(
+                consumer.id,
+                ConsumerFacts(
+                    // A direct link's address is fleeting; over the internet, there's none.
+                    address = it.remoteAddress.takeIf { path == Path.WIFI },
+                    schedule = result.consumerSchedule,
+                    turboKey = result.consumerTurboKey,
+                    pairSecret = result.consumerPairSecret,
+                    rendezvousUrl = result.consumerRendezvousUrl,
+                ),
+            )
             if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
-            Diagnostics.log(Area.SEND, "Sync done$turbo in ${since(started)}: ${result.describe()}")
+            Diagnostics.log(Area.SEND, "Sync done$over in ${since(started)}: ${result.describe()}")
             ProducerState.Idle(result)
         }
     }
@@ -456,3 +525,6 @@ private fun TurboUnavailable.toProblem() = when (this) {
     TurboUnavailable.NOT_ALLOWED -> TurboProblem.RECEIVER_NOT_ALLOWED
     TurboUnavailable.FAILED -> TurboProblem.NO_LINK
 }
+
+/** How a sync reaches the consumer (docs/PLAN.md §8). */
+private enum class Path { WIFI, DIRECT, INTERNET }

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
@@ -21,6 +22,7 @@ import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboProblem
+import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import java.time.ZonedDateTime
@@ -237,6 +239,98 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun mobileDataIsOfferedOnlyWithInternetSync() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Sync over mobile data").performScrollTo().performClick()
+
+        events shouldBe listOf("mobile data true")
+    }
+
+    @Test
+    fun theMobileDataLimitIsChosenFromTheList() {
+        show(
+            paired.copy(
+                pendingCount = 3,
+                internetSync = true,
+                internetOverMobileData = true,
+                mobileDataSent = 300_000_000,
+            ),
+        )
+
+        composeRule.onNodeWithText("No limit · 300 MB used this month").performScrollTo().performClick()
+        composeRule.onNodeWithText("2.0 GB a month").performClick()
+
+        events shouldBe listOf("cap 2000000000")
+    }
+
+    @Test
+    fun aReachedLimitSaysSyncsWaitForWifi() {
+        show(
+            paired.copy(
+                internetSync = true,
+                internetOverMobileData = true,
+                mobileDataCap = 1_000_000_000,
+                mobileDataSent = 1_020_000_000,
+            ),
+        )
+
+        composeRule.onNodeWithText("1.0 GB used: until next month, syncs wait for Wi-Fi").performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun noLimitWithoutMobileData() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Monthly mobile data limit").assertDoesNotExist()
+    }
+
+    @Test
+    fun videosThroughTheRelayAreTheUsersChoice() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Send videos through the relay").performScrollTo().performClick()
+
+        events shouldBe listOf("relay videos true")
+    }
+
+    @Test
+    fun videosTheRelaySaverKeptAreShown() {
+        show(paired.copy(pendingCount = 2, sync = ProducerState.Idle(SyncResult(sent = 4, heldBack = 2))))
+
+        composeRule.onNodeWithText("2 videos wait for Wi-Fi").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun unreachableWithInternetSyncDoesntBlameTheWifi() {
+        show(paired.copy(internetSync = true, sync = ProducerState.Failed(SyncFailure.UNREACHABLE)))
+
+        composeRule.onNodeWithText("Couldn't reach Pixel 2 XL, over Wi-Fi or the internet", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun noMobileDataWithoutInternetSync() {
+        show(paired.copy(pendingCount = 3))
+
+        composeRule.onNodeWithText("Sync over mobile data").assertDoesNotExist()
+    }
+
+    @Test
+    fun screenshot_internet_dark() = screenshot(
+        paired.copy(
+            pendingCount = 3,
+            internetSync = true,
+            internetOverMobileData = true,
+            mobileDataCap = 5_000_000_000,
+            mobileDataSent = 1_200_000_000,
+        ),
+        "producer_home_internet_dark",
+        darkTheme = true,
+    )
+
+    @Test
     fun screenshot_notPaired_light() = screenshot(ProducerHomeUiState(), "producer_home_not_paired_light")
 
     @Test
@@ -346,6 +440,12 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun internet_sendingSaysSo() {
+        show(syncing.copy(sync = ProducerState.Syncing(TransferProgress(1, 9, 1, 9, null), internet = true)))
+        composeRule.onNodeWithText("Sending to Pixel 2 XL over the internet").assertIsDisplayed()
+    }
+
+    @Test
     fun turbo_whyItWasntUsed() {
         show(paired.copy(sync = ProducerState.Idle(turboProblem = TurboProblem.RECEIVER_NOT_ALLOWED)))
 
@@ -410,6 +510,9 @@ class ProducerHomeScreenTest {
                     onAllowNotifications = { events += "notifications" },
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
+                    onInternetOverMobileData = { events += "mobile data $it" },
+                    onVideosOverRelay = { events += "relay videos $it" },
+                    onMobileDataCap = { events += "cap $it" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },

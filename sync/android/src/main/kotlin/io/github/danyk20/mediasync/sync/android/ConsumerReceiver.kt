@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okio.ByteString
 
 /** What the consumer's home screen shows. */
 data class ReceiverState(
@@ -64,11 +65,13 @@ data class ReceiverState(
     val turboReceiving: Boolean = false,
     /** Sessions running now; while there are any, receiving runs as foreground work (docs/PLAN.md §7). */
     val sessions: Int = 0,
+    /** Paired phones can also reach this one through its rendezvous Worker (docs/PLAN.md §8.4). */
+    val overInternet: Boolean = false,
 )
 
 /**
- * The receiving side: listens for paired phones on the local network and stores what they send
- * (docs/PLAN.md §5, §8.2).
+ * The receiving side: listens for paired phones on the local network, and through its rendezvous Worker once it
+ * has one, and stores what they send (docs/PLAN.md §5, §8.2, §8.4).
  *
  * It listens while something needs it ([hold]): an open screen, or a scheduled receive window running in the
  * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule.
@@ -100,13 +103,20 @@ class ConsumerReceiver internal constructor(
     private val addresses = network.addresses
     private val discovery = network.discovery
     private val directLinks = network.directLinks
+    private val internet = network.internet
     private val window = PairingWindow()
     private val approvals = PairingApprovals()
     private val gate = pairingGate(window, approvals)
     private val _state = MutableStateFlow(ReceiverState())
+
+    @Volatile
     private var server: LanServer? = null
     private var advertisement: Closeable? = null
     private var acceptJob: Job? = null
+    private val internetLock = Any()
+
+    /** What it listens for over the internet now, and the handle that stops it; under [internetLock]. */
+    private var overInternet: Pair<InternetSetup, Closeable>? = null
     private val holders = mutableSetOf<String>()
 
     /** One budget for every session at once: a sender's parallel connections, or several senders. */
@@ -157,6 +167,31 @@ class ConsumerReceiver internal constructor(
         _state.update { it.copy(listening = true, port = server.port) }
         acceptJob = scope.launch(Dispatchers.IO) { acceptLoop(server) }
         Diagnostics.log(Area.RECEIVE, "Listening on port ${server.port} for ${holders.joinToString()}")
+        refreshInternet()
+    }
+
+    /**
+     * While listening: listens over the internet as set up now (docs/PLAN.md §8.4), after its Worker changed or a
+     * sending phone got its pair secret (in its first session).
+     */
+    fun refreshInternet() {
+        scope.launch(Dispatchers.IO) { listenOverInternet() }
+    }
+
+    private fun listenOverInternet() = synchronized(internetLock) {
+        val worker = device.local().rendezvousUrl
+        val pairs = peers.producers().mapNotNull { peer -> peer.pairSecret?.let { peer.id to it } }.toMap()
+        val wanted = worker?.takeIf { pairs.isNotEmpty() && server != null }?.let { InternetSetup(it, pairs) }
+        if (wanted == overInternet?.first) return@synchronized
+        overInternet?.second?.close()
+        overInternet = wanted?.let { it to internet.listen(it.worker, it.pairs, ::serveOverInternet) }
+        _state.update { it.copy(overInternet = wanted != null) }
+        if (wanted != null) Diagnostics.log(Area.RECEIVE, "Internet: listening for ${pairs.size} sending phones")
+    }
+
+    private fun stopListeningOverInternet() = synchronized(internetLock) {
+        overInternet?.second?.close()
+        overInternet = null
     }
 
     @Synchronized
@@ -168,7 +203,8 @@ class ConsumerReceiver internal constructor(
         advertisement?.close()
         server = null
         advertisement = null
-        _state.update { it.copy(listening = false, port = null, transfers = emptyMap()) }
+        stopListeningOverInternet()
+        _state.update { it.copy(listening = false, port = null, transfers = emptyMap(), overInternet = false) }
     }
 
     /**
@@ -187,6 +223,21 @@ class ConsumerReceiver internal constructor(
 
     /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
     fun freeBytes(): Long = sink.availableBytes()
+
+    /**
+     * This month's relay usage at this phone's Worker (docs/PLAN.md §8.5); `null` without internet sync, before a
+     * sending phone could use it, or while the Worker can't be asked. Blocks.
+     */
+    fun relayUsage(): RelayUsage? {
+        val worker = device.local().rendezvousUrl ?: return null
+        val producer = peers.producers().firstOrNull { it.pairSecret != null } ?: return null
+        return try {
+            internet.relayUsage(worker, producer.id)
+        } catch (e: IOException) {
+            Diagnostics.log(Area.RECEIVE, "Internet: couldn't read the relay meter", e)
+            null
+        }
+    }
 
     private suspend fun acceptLoop(server: LanServer) {
         while (scope.isActive) {
@@ -207,16 +258,27 @@ class ConsumerReceiver internal constructor(
             Diagnostics.log(Area.RECEIVE, "A connection failed its handshake", e)
             return // Not a paired phone (or not MediaSync at all).
         }
-        val producer = connection.peerId
+        Diagnostics.log(Area.RECEIVE, "Session from ${connection.peerId.short()} at ${connection.remoteAddress}")
+        counted(connection)
+    }
+
+    private fun serveOverInternet(connection: PeerConnection) {
+        Diagnostics.log(Area.RECEIVE, "Session from ${connection.peerId.short()} over the internet")
+        counted(connection)
+        relayUsage() // It may have gone through the relay: the meter, read, tells the user if it runs low.
+    }
+
+    /** A session, counted while it runs: receiving then runs as foreground work (docs/PLAN.md §7). */
+    private fun counted(connection: PeerConnection) {
         val started = System.currentTimeMillis()
-        Diagnostics.log(Area.RECEIVE, "Session from ${producer.short()} at ${connection.remoteAddress}")
         markActivity()
         countSession(+1)
         try {
-            addresses.keepingAwake { receive(producer, connection, started) }
+            addresses.keepingAwake { receive(connection.peerId, connection, started) }
         } finally {
             countSession(-1)
             markActivity()
+            if (server != null) listenOverInternet() // It may have just got its pair secret.
         }
     }
 
@@ -408,4 +470,9 @@ class ConsumerReceiver internal constructor(
         private const val DIRECT_LINK_IDLE_MILLIS = 60_000L
         private const val IDLE_CHECK_MILLIS = 5_000L
     }
+}
+
+/** What a receiving phone listens for over the internet: its Worker, and each sending phone's pair secret. */
+private data class InternetSetup(val worker: String, val pairs: Map<DeviceId, ByteString>) {
+    override fun toString() = "InternetSetup(${pairs.size} sending phones)"
 }

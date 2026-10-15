@@ -12,13 +12,21 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,18 +36,25 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -118,6 +133,9 @@ fun ProducerHomeRoute(
         },
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
+        onInternetOverMobileData = viewModel::setInternetOverMobileData,
+        onVideosOverRelay = viewModel::setVideosOverRelay,
+        onMobileDataCap = viewModel::setMobileDataCap,
         onOpenDiagnostics = onOpenDiagnostics,
         onStartTurbo = {
             if (state.turbo == TurboAvailability.NOT_ALLOWED) {
@@ -145,6 +163,9 @@ fun ProducerHomeScreen(
     modifier: Modifier = Modifier,
     onAllowNotifications: () -> Unit = {},
     onChooseDetails: () -> Unit = {},
+    onInternetOverMobileData: (Boolean) -> Unit = {},
+    onVideosOverRelay: (Boolean) -> Unit = {},
+    onMobileDataCap: (Long?) -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onStartTurbo: () -> Unit = {},
@@ -185,6 +206,7 @@ fun ProducerHomeScreen(
                         onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
                     )
                     WithheldNotice(state, onChooseDetails)
+                    HeldBackNotice(state)
                     TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
                     SettingRow(
                         title = stringResource(R.string.producer_sources_title),
@@ -197,6 +219,11 @@ fun ProducerHomeScreen(
                         summary = stringResource(state.photoDetails.title),
                         icon = MediaSyncIcons.Info,
                         onClick = onChooseDetails,
+                    )
+                    InternetCard(
+                        state,
+                        consumer,
+                        InternetActions(onInternetOverMobileData, onVideosOverRelay, onMobileDataCap),
                     )
                     Hints(state, consumer, onGrantAccess)
                 }
@@ -234,7 +261,7 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
 private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -> Unit, onStop: () -> Unit) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync.progress, sync.turbo)
+            Sending(consumer, sync)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
@@ -255,7 +282,7 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, onSyncNow: () -
         is ProducerState.Failed -> {
             StatusCard(
                 title = stringResource(R.string.producer_status_failed_title),
-                body = failureMessage(sync.reason, consumer),
+                body = failureMessage(sync.reason, consumer, state.internetSync),
                 icon = MediaSyncIcons.Info,
             )
             SyncNowButton(onSyncNow)
@@ -379,6 +406,155 @@ private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, o
     }
 }
 
+/**
+ * Internet sync (docs/PLAN.md §8.4), as this phone uses it: over Wi-Fi networks, and over mobile data only if the user
+ * allows it; through the relay, videos wait unless the user lets them go (§17, relay saver). Shown once the receiving
+ * phone has set it up.
+ */
+@Composable
+private fun InternetCard(state: ProducerHomeUiState, consumer: String, actions: InternetActions) {
+    if (!state.internetSync) return
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        SwitchRow(
+            title = stringResource(R.string.producer_mobile_data_title),
+            body = stringResource(R.string.producer_mobile_data_body, consumer),
+            icon = MediaSyncIcons.MobileData,
+            checked = state.internetOverMobileData,
+            onChange = actions.mobileData,
+        )
+        if (state.internetOverMobileData) MobileDataCapRow(state, actions.mobileDataCap)
+        SwitchRow(
+            title = stringResource(R.string.producer_relay_videos_title),
+            body = stringResource(R.string.producer_relay_videos_body),
+            icon = MediaSyncIcons.Send,
+            checked = state.videosOverRelay,
+            onChange = actions.videosOverRelay,
+        )
+    }
+}
+
+/** What the user can change about internet sync on this phone. */
+private class InternetActions(
+    val mobileData: (Boolean) -> Unit,
+    val videosOverRelay: (Boolean) -> Unit,
+    val mobileDataCap: (Long?) -> Unit,
+)
+
+/** The monthly mobile data limit (docs/PLAN.md §2.2), and what this month used of it. */
+@Composable
+private fun MobileDataCapRow(state: ProducerHomeUiState, onChange: (Long?) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    val cap = state.mobileDataCap
+    val reached = cap != null && state.mobileDataSent >= cap
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.producer_mobile_data_cap_title)) },
+        supportingContent = {
+            Text(
+                text = when {
+                    cap == null -> stringResource(
+                        R.string.producer_mobile_data_cap_none,
+                        formatBytes(state.mobileDataSent),
+                    )
+
+                    reached -> stringResource(R.string.producer_mobile_data_cap_reached, formatBytes(cap))
+
+                    else -> stringResource(
+                        R.string.producer_mobile_data_cap_used,
+                        formatBytes(state.mobileDataSent),
+                        formatBytes(cap),
+                    )
+                },
+                color = if (reached) MaterialTheme.colorScheme.error else Color.Unspecified,
+            )
+        },
+        leadingContent = { Spacer(Modifier.size(24.dp)) },
+        trailingContent = {
+            Text(
+                text = stringResource(R.string.producer_sources_change),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { choosing = true },
+    )
+    if (choosing) {
+        MobileDataCapDialog(
+            current = cap,
+            onChoose = {
+                choosing = false
+                onChange(it)
+            },
+            onDismiss = { choosing = false },
+        )
+    }
+}
+
+@Composable
+private fun MobileDataCapDialog(current: Long?, onChoose: (Long?) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.producer_mobile_data_cap_title)) },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                (listOf<Long?>(null) + MOBILE_DATA_CAPS).forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = option == current, role = Role.RadioButton) { onChoose(option) }
+                            .padding(vertical = 8.dp),
+                    ) {
+                        RadioButton(selected = option == current, onClick = null)
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            option?.let { stringResource(R.string.producer_mobile_data_cap_option, formatBytes(it)) }
+                                ?: stringResource(R.string.producer_mobile_data_cap_option_none),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.producer_mobile_data_cap_cancel)) }
+        },
+    )
+}
+
+/** The limits offered: 1, 2, 5, 10 and 20 GB a month. */
+private val MOBILE_DATA_CAPS = listOf(1L, 2L, 5L, 10L, 20L).map { it * 1_000_000_000L }
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    body: String,
+    @DrawableRes icon: Int,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(body) },
+        leadingContent = { Icon(painterResource(icon), contentDescription = null) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+    )
+}
+
+/** Videos the relay saver kept for Wi-Fi or a direct connection in the last sync (docs/PLAN.md §17). */
+@Composable
+private fun HeldBackNotice(state: ProducerHomeUiState) {
+    val held = (state.sync as? ProducerState.Idle)?.lastResult?.heldBack ?: 0
+    if (held == 0) return
+    NoticeCard(
+        title = pluralStringResource(R.plurals.producer_held_back_title, held, held),
+        body = stringResource(R.string.producer_held_back_body),
+        icon = MediaSyncIcons.Info,
+    )
+}
+
 /** Files the *Photo details* setting holds back, and the way to change it (docs/PLAN.md §6.4). */
 @Composable
 private fun WithheldNotice(state: ProducerHomeUiState, onChooseDetails: () -> Unit) {
@@ -486,11 +662,17 @@ private fun SyncNowButton(onSyncNow: () -> Unit) {
 }
 
 @Composable
-private fun Sending(consumer: String, progress: TransferProgress?, turbo: Boolean) {
+private fun Sending(consumer: String, sync: ProducerState.Syncing) {
+    val progress = sync.progress
+    val turbo = sync.turbo
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusCard(
             title = stringResource(
-                if (turbo) R.string.producer_turbo_sending_title else R.string.producer_status_sending_title,
+                when {
+                    turbo -> R.string.producer_turbo_sending_title
+                    sync.internet -> R.string.producer_internet_sending_title
+                    else -> R.string.producer_status_sending_title
+                },
                 consumer,
             ),
             body = if (progress == null) {
@@ -549,13 +731,23 @@ private fun IdleStatus(consumer: String, pending: Int?, lastSyncMillis: Long?, n
 }
 
 @Composable
-private fun failureMessage(reason: SyncFailure, consumer: String): String = when (reason) {
+private fun failureMessage(reason: SyncFailure, consumer: String, internetSync: Boolean): String = when (reason) {
     SyncFailure.NOT_PAIRED -> stringResource(R.string.producer_status_not_paired_body)
-    SyncFailure.UNREACHABLE -> stringResource(R.string.producer_failure_unreachable, consumer)
+
+    // With internet sync, the same Wi-Fi isn't needed: the other phone must be listening.
+    SyncFailure.UNREACHABLE -> stringResource(
+        if (internetSync) R.string.producer_failure_unreachable_internet else R.string.producer_failure_unreachable,
+        consumer,
+    )
+
     SyncFailure.CONNECTION_LOST -> stringResource(R.string.producer_failure_connection_lost, consumer)
+
     SyncFailure.NOT_ALLOWED -> stringResource(R.string.producer_failure_not_allowed, consumer)
+
     SyncFailure.INCOMPATIBLE -> stringResource(R.string.producer_failure_incompatible, consumer)
+
     SyncFailure.TURBO_UNREACHABLE -> stringResource(R.string.producer_failure_turbo_unreachable, consumer)
+
     SyncFailure.TURBO_NOT_SET_UP -> stringResource(R.string.producer_failure_turbo_not_set_up, consumer)
 }
 

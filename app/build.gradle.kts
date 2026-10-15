@@ -39,6 +39,17 @@ android {
         }
     }
 
+    // WebRTC brings native code for every phone CPU, about 12 MB each. Play's App Bundle gives each phone its own;
+    // the release workflow (-Pmediasync.abiSplits) also builds one APK per CPU for downloads, beside the universal one.
+    splits {
+        abi {
+            isEnable = providers.gradleProperty("mediasync.abiSplits").isPresent
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

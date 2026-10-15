@@ -18,6 +18,7 @@ import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.MobileDataUsage
 import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
@@ -77,6 +78,25 @@ data class ProducerHomeUiState(
     val askNotifications: Boolean = false,
     /** Android 12+: ask for *Unrestricted* battery use, which syncs at night need. */
     val askBattery: Boolean = false,
+    /** The receiving phone has a rendezvous Worker: this phone can sync with it over the internet (PLAN §8.4). */
+    val internetSync: Boolean = false,
+    /** Internet sync may also use mobile data. */
+    val internetOverMobileData: Boolean = false,
+    /** Videos also go through the relay; otherwise they wait for Wi-Fi or a direct connection (relay saver). */
+    val videosOverRelay: Boolean = false,
+    /** How much internet sync may send over mobile data a month; `null`: no limit. */
+    val mobileDataCap: Long? = null,
+    /** What it sent over mobile data this month. */
+    val mobileDataSent: Long = 0,
+)
+
+/** How this phone uses internet sync, as the user set it. */
+private data class InternetSettings(
+    val sources: SourceSelection,
+    val mobileData: Boolean,
+    val videosOverRelay: Boolean,
+    val mobileDataCap: Long?,
+    val mobileDataSent: Long,
 )
 
 /**
@@ -106,6 +126,7 @@ private data class DeviceAccess(
 )
 
 @HiltViewModel
+@Suppress("LongParameterList") // Injected collaborators, one each.
 class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
@@ -116,6 +137,7 @@ class ProducerHomeViewModel @Inject constructor(
     history: SyncHistory,
     private val setup: BackgroundSetup,
     private val clock: Clock,
+    mobileDataUsage: MobileDataUsage,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -126,9 +148,17 @@ class ProducerHomeViewModel @Inject constructor(
         peers.observeConsumer(),
         sync.state,
         pending,
-        settings.sourceSelection,
+        combine(
+            settings.sourceSelection,
+            settings.internetOverMobileData,
+            settings.videosOverRelay,
+            settings.mobileDataCapBytes,
+            mobileDataUsage.sentThisMonth,
+            ::InternetSettings,
+        ),
         combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
-    ) { consumer, state, count, sources, extras ->
+    ) { consumer, state, count, internet, extras ->
+        val sources = internet.sources
         val (access, record, dismissed) = extras
         val schedule = consumer?.let { it.schedule ?: SyncSchedule.Default }
         val now = ZonedDateTime.now(clock)
@@ -156,6 +186,11 @@ class ProducerHomeViewModel @Inject constructor(
             askBattery = access.batteryRestricted &&
                 schedule != SyncSchedule.Manual &&
                 SetupPrompt.BATTERY !in dismissed,
+            internetSync = consumer?.rendezvousUrl != null,
+            internetOverMobileData = internet.mobileData,
+            videosOverRelay = internet.videosOverRelay,
+            mobileDataCap = internet.mobileDataCap,
+            mobileDataSent = internet.mobileDataSent,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
@@ -177,6 +212,18 @@ class ProducerHomeViewModel @Inject constructor(
     fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
+
+    fun setInternetOverMobileData(allowed: Boolean) {
+        viewModelScope.launch { settings.setInternetOverMobileData(allowed) }
+    }
+
+    fun setMobileDataCap(bytes: Long?) {
+        viewModelScope.launch { settings.setMobileDataCapBytes(bytes) }
+    }
+
+    fun setVideosOverRelay(allowed: Boolean) {
+        viewModelScope.launch { settings.setVideosOverRelay(allowed) }
+    }
 
     /** Sends over a direct link (docs/PLAN.md §8.3), in the background like [syncNow]. */
     fun startTurbo() {

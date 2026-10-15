@@ -50,6 +50,38 @@ class FakeSettingsRepository(
         photoDetailsState.value = details
     }
 
+    private val rendezvousUrlState = MutableStateFlow<String?>(null)
+
+    override val rendezvousUrl: StateFlow<String?> = rendezvousUrlState
+
+    override suspend fun setRendezvousUrl(url: String?) {
+        rendezvousUrlState.value = url
+    }
+
+    private val internetOverMobileDataState = MutableStateFlow(false)
+
+    override val internetOverMobileData: StateFlow<Boolean> = internetOverMobileDataState
+
+    override suspend fun setInternetOverMobileData(allowed: Boolean) {
+        internetOverMobileDataState.value = allowed
+    }
+
+    private val mobileDataCapState = MutableStateFlow<Long?>(null)
+
+    override val mobileDataCapBytes: StateFlow<Long?> = mobileDataCapState
+
+    override suspend fun setMobileDataCapBytes(bytes: Long?) {
+        mobileDataCapState.value = bytes
+    }
+
+    private val videosOverRelayState = MutableStateFlow(false)
+
+    override val videosOverRelay: StateFlow<Boolean> = videosOverRelayState
+
+    override suspend fun setVideosOverRelay(allowed: Boolean) {
+        videosOverRelayState.value = allowed
+    }
+
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
 
     override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState

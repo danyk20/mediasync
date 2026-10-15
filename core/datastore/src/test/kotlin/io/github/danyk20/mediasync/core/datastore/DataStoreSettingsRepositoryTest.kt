@@ -135,6 +135,29 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun internetSyncHasNoWorkerAndStaysOffMobileDataUntilSetUp() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+        repository.rendezvousUrl.first() shouldBe null
+        repository.internetOverMobileData.first() shouldBe false
+        repository.videosOverRelay.first() shouldBe false
+        repository.mobileDataCapBytes.first() shouldBe null
+        repository.setMobileDataCapBytes(2_000_000_000)
+        repository.mobileDataCapBytes.first() shouldBe 2_000_000_000
+        repository.setMobileDataCapBytes(null)
+        repository.mobileDataCapBytes.first() shouldBe null
+
+        repository.setRendezvousUrl("https://mediasync.anna.workers.dev")
+        repository.setInternetOverMobileData(true)
+        repository.setVideosOverRelay(true)
+        repository.videosOverRelay.first() shouldBe true
+        repository.rendezvousUrl.first() shouldBe "https://mediasync.anna.workers.dev"
+        repository.internetOverMobileData.first() shouldBe true
+
+        repository.setRendezvousUrl(null)
+        repository.rendezvousUrl.first() shouldBe null
+    }
+
+    @Test
     fun aDismissedSetupCardStaysDismissed() = runTest {
         val dataStore = dataStore()
         val repository = DataStoreSettingsRepository(dataStore)

@@ -17,6 +17,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -102,7 +103,7 @@ class BackgroundTest {
 
     private fun pairWithConsumer(schedule: SyncSchedule? = null) {
         peers.register(PairedPeer(consumer, "Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        peers.recordConsumer(consumer, schedule)
+        peers.recordConsumer(consumer, ConsumerFacts(schedule = schedule))
     }
 
     private fun millis(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]").toInstant().toEpochMilli()

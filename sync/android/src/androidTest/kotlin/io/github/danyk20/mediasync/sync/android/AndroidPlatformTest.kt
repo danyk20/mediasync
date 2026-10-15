@@ -49,16 +49,22 @@ class AndroidPlatformTest {
 
     @Test
     fun deviceHasANameAndVersion() {
-        val info =
-            AndroidDeviceInfo(context, {
-                SyncSchedule.WhileCharging
-            }, { PhotoDetails.REMOVE_LOCATION }, TurboKeyStore(context))
+        val info = AndroidDeviceInfo(
+            context,
+            schedule = { SyncSchedule.WhileCharging },
+            details = { PhotoDetails.REMOVE_LOCATION },
+            turboKeys = TurboKeyStore(context),
+            rendezvous = { "https://rendezvous.example.com" },
+            relayVideos = { true },
+        )
         val device = info.local()
 
         device.name.shouldNotBeBlank()
         device.appVersion.shouldNotBeBlank()
         device.schedule shouldBe SyncSchedule.WhileCharging
         info.photoDetails() shouldBe PhotoDetails.REMOVE_LOCATION
+        info.videosOverRelay() shouldBe true
+        device.rendezvousUrl shouldBe "https://rendezvous.example.com"
     }
 
     @Test

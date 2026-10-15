@@ -81,7 +81,16 @@ interface PeerRegistry {
 
     /** Also called when a paired device pairs again; that updates it and keeps its ledgers. */
     fun register(peer: PairedPeer)
+
+    /**
+     * Consumer side: the secret shared with [producer] for internet signaling (ADR 0009 §4), made on first use and the
+     * same afterwards; `null` where there is none to give.
+     */
+    fun pairSecret(producer: DeviceId): ByteString? = null
 }
+
+/** A pair's secret for internet signaling: 32 random bytes. */
+const val PAIR_SECRET_BYTES = 32
 
 data class PairingRequest(val peerId: DeviceId, val peerName: String, val token: ByteString)
 
@@ -101,12 +110,14 @@ fun interface PairingGate {
  * @property schedule consumer only: the sync schedule its producers follow (docs/PLAN.md §10.1).
  * @property turboKey consumer only: what its *Turbo receive* links derive from, told to paired producers only
  *   (docs/PLAN.md §8.3).
+ * @property rendezvousUrl consumer only: its rendezvous Worker for internet sync (PLAN §8.4), told to paired producers.
  */
 data class LocalDevice(
     val name: String,
     val appVersion: String,
     val schedule: SyncSchedule? = null,
     val turboKey: ByteString? = null,
+    val rendezvousUrl: String? = null,
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "LocalDevice($name, $appVersion, $schedule)"

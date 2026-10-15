@@ -62,6 +62,7 @@ class ParallelSyncTest {
         photos: List<FakeMedia>,
         latencyMillis: Long = 0,
         mayAddStream: () -> Boolean = { true },
+        holdBack: (SourceItem) -> Boolean = { false },
         progress: ProgressListener = ProgressListener {},
     ): SyncResult {
         val source = FakeMediaSource(photos)
@@ -71,6 +72,7 @@ class ParallelSyncTest {
             progress = progress,
             mayAddStream = mayAddStream,
             probeMillis = 150,
+            holdBack = holdBack,
         ).sync(connection(latencyMillis))
     }
 
@@ -88,6 +90,22 @@ class ParallelSyncTest {
         (sink as FakeMediaSink).storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         synchronized(last) { last.maxOf { it.itemsDone } } shouldBe 200
         last.first().itemsTotal shouldBe 200
+    }
+
+    @Test
+    fun whatsHeldBackIsCountedNotSentAndGoesNextTime() {
+        val photos = photos(count = 6, size = 10_000)
+        val videos = List(3) { FakeMedia("v$it", Random(100 + it).nextBytes(20_000), "v$it.mp4", "video/mp4") }
+        val isVideo = { item: SourceItem -> item.descriptor.mimeType.startsWith("video/") }
+
+        val overRelay = parallel(photos + videos, holdBack = isVideo)
+
+        overRelay.sent shouldBe 6
+        overRelay.heldBack shouldBe 3
+        received.items.none { it.descriptor.mimeType == "video/mp4" } shouldBe true
+        val overWifi = parallel(photos + videos)
+        overWifi.sent shouldBe 3
+        overWifi.heldBack shouldBe 0
     }
 
     @Test

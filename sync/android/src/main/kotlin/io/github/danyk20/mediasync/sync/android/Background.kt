@@ -67,6 +67,42 @@ class SettingsPhotoDetailsSource @Inject constructor(
     override fun current(): PhotoDetails = details.value
 }
 
+/** The receiving phone's rendezvous Worker from its settings, told to paired phones in every session (PLAN §8.4). */
+@Singleton
+class SettingsRendezvousSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : RendezvousSource {
+    private val url = settings.rendezvousUrl.stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun current(): String? = url.value
+}
+
+/** Whether the sending phone's internet sync may use mobile data, from its settings. */
+@Singleton
+class SettingsMobileDataSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : MobileDataSource {
+    private val allowed = settings.internetOverMobileData.stateIn(scope, SharingStarted.Eagerly, false)
+    private val cap = settings.mobileDataCapBytes.stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun allowed(): Boolean = allowed.value
+
+    override fun capBytes(): Long? = cap.value
+}
+
+/** Whether the sending phone sends videos through the relay too, from its settings. */
+@Singleton
+class SettingsRelayVideosSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : RelayVideosSource {
+    private val allowed = settings.videosOverRelay.stateIn(scope, SharingStarted.Eagerly, false)
+
+    override fun allowed(): Boolean = allowed.value
+}
+
 /** The settings the sync runtime follows as they change. */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -76,6 +112,15 @@ internal abstract class SettingsSourcesModule {
 
     @Binds
     abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
+
+    @Binds
+    abstract fun bindRendezvousSource(impl: SettingsRendezvousSource): RendezvousSource
+
+    @Binds
+    abstract fun bindMobileDataSource(impl: SettingsMobileDataSource): MobileDataSource
+
+    @Binds
+    abstract fun bindRelayVideosSource(impl: SettingsRelayVideosSource): RelayVideosSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */

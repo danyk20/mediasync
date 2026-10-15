@@ -12,6 +12,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
@@ -87,7 +88,8 @@ class DiagnosticsReportTest {
         settings.setRole(DeviceRole.PRODUCER)
         settings.setPhotoDetails(PhotoDetails.REMOVE_LOCATION)
         peers.register(PairedPeer(deviceId(7), "Anna's Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        peers.recordConsumer(deviceId(7), SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0)))
+        val everySix = SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0))
+        peers.recordConsumer(deviceId(7), ConsumerFacts(schedule = everySix))
         history.recordProblem(SyncProblem.UNREACHABLE)
 
         val facts = report().facts().associate { it.label to it.value }

@@ -11,6 +11,7 @@ import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.MediaSink
 import io.github.danyk20.mediasync.sync.engine.MediaSource
+import io.github.danyk20.mediasync.sync.engine.PAIR_SECRET_BYTES
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PairingDecision
 import io.github.danyk20.mediasync.sync.engine.PairingGate
@@ -23,6 +24,7 @@ import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.sync.engine.SourceItem
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.random.Random
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -95,13 +97,22 @@ class FakeReceivedLedger : ReceivedLedger {
     }
 }
 
-class FakePeerRegistry(vararg paired: PairedPeer) : PeerRegistry {
+/** [pairSecrets]: hands out a secret per producer, as the database does; off, the consumer gives none. */
+class FakePeerRegistry(vararg paired: PairedPeer, private val pairSecrets: Boolean = false) : PeerRegistry {
     val peers = ConcurrentHashMap(paired.associateBy { it.id })
 
     override fun isPaired(id: DeviceId) = peers.containsKey(id)
 
     override fun register(peer: PairedPeer) {
         peers[peer.id] = peer
+    }
+
+    private val secrets = ConcurrentHashMap<DeviceId, ByteString>()
+
+    override fun pairSecret(producer: DeviceId): ByteString? = if (!pairSecrets) {
+        null
+    } else {
+        secrets.getOrPut(producer) { Random.nextBytes(PAIR_SECRET_BYTES).toByteString() }
     }
 }
 

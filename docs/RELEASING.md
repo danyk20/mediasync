@@ -9,7 +9,7 @@ Until the Play Store launch (M6, docs/PLAN.md §15) versions stay below 1.0: the
 1. Pull requests are merged into `main`.
 2. The **Release** workflow keeps a release pull request open, titled `chore(main): release x.y.z`. It updates `version.txt` and `CHANGELOG.md`.
 3. Merging that pull request creates the tag `vx.y.z` and a GitHub Release. The same workflow then:
-   - builds the signed APK and AAB;
+   - builds the signed APK and AAB: a universal APK (`mediasync-vx.y.z.apk`), which runs on every phone, and one per CPU (`-arm64-v8a`, `-armeabi-v7a`, `-x86_64`), smaller because they hold only that CPU's native code (WebRTC's, about 12 MB each). Most phones want `arm64-v8a`;
    - writes SHA-256 checksums;
    - creates a build provenance attestation;
    - attaches everything to the release.

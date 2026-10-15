@@ -11,6 +11,7 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.database.RoomSentLedger
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
@@ -19,9 +20,11 @@ import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
+import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
+import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.testIdentity
 import io.kotest.matchers.doubles.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -31,6 +34,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
 import java.time.LocalTime
+import java.util.concurrent.ConcurrentHashMap
 import javax.net.SocketFactory
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +46,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.junit.After
 import org.junit.Test
@@ -69,13 +74,17 @@ class RuntimeEndToEndTest {
     private var consumerSchedule: SyncSchedule = SyncSchedule.Default
     private val consumerKey = ByteArray(TURBO_KEY_BYTES) { 9 }.toByteString()
     private val consumerLinks = FakeDirectLinks()
+
+    /** The receiving phone's rendezvous Worker, once set up (docs/PLAN.md §8.4). */
+    private var consumerWorker: String? = null
+    private val internet = FakeInternet { producerIdentity.id }
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
         ledger = received,
         sink = sink,
-        device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule, consumerKey) },
-        network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, consumerLinks),
+        device = { LocalDevice("Pixel 2 XL", "test", consumerSchedule, consumerKey, consumerWorker) },
+        network = Connectivity(loopback, { SocketFactory.getDefault() }, noDiscovery, consumerLinks, internet),
         scope = scope,
         preferredPort = 0,
         directLinkIdleMillis = 300,
@@ -94,6 +103,7 @@ class RuntimeEndToEndTest {
     private val producerIdentity = testIdentity("Anna's Pixel")
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private var photoDetails = PhotoDetails.KEEP_ALL
+    private var videosOverRelay = false
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
@@ -103,10 +113,12 @@ class RuntimeEndToEndTest {
             override fun local() = LocalDevice("Anna's Pixel", "test")
 
             override fun photoDetails() = photoDetails
+
+            override fun videosOverRelay() = videosOverRelay
         },
         network = Connectivity(loopback, {
             if (offWifi) NoNetwork else SocketFactory.getDefault()
-        }, noDiscovery, producerLinks),
+        }, noDiscovery, producerLinks, internet),
         history = history,
         conditions = { null },
         scope = scope,
@@ -118,6 +130,131 @@ class RuntimeEndToEndTest {
         scope.cancel()
         consumerDb.close()
         producerDb.close()
+    }
+
+    @Test
+    fun awayFromTheReceivingPhonesWifiItSyncsThroughTheInternet() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        // A sync over Wi-Fi tells the sending phone the receiving phone's Worker and gives the pair its secret.
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        val address = producerPeers.consumer()?.lastAddress
+
+        source.put(FakeMedia("away", Random(9).nextBytes(200_000)))
+        offWifi = true
+        producer.syncNow()
+        val done = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.sent == 1 }
+        }
+
+        (done as ProducerState.Idle).lastResult?.alreadyOnConsumer shouldBe 0
+        sink.stored.size shouldBe photos.size + 1
+        internet.connects.get() shouldBe 1
+        producerPeers.consumer()?.lastAddress shouldBe address // Not an address on the local network.
+    }
+
+    @Test
+    fun theReceivingPhoneReadsItsRelayMeterAsAPair() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        receiver.relayUsage() shouldBe null // No Worker.
+
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.relayUsage() shouldBe null // No sending phone with a pair secret yet.
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        receiver.relayUsage()?.usedBytes shouldBe 312_000_000_000
+        internet.meterAsked shouldBe listOf("https://mediasync.example.workers.dev" to producerIdentity.id)
+    }
+
+    @Test
+    fun throughTheRelayVideosWaitUnlessTheUserLetsThemGo() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        source.put(FakeMedia("photo", Random(11).nextBytes(100_000)))
+        source.put(FakeMedia("video", Random(12).nextBytes(300_000), "video.mp4", "video/mp4"))
+        offWifi = true
+        internet.throughRelay = true
+
+        producer.syncNow()
+        val saved = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.heldBack == 1 }
+        } as ProducerState.Idle
+        saved.lastResult?.sent shouldBe 1
+
+        videosOverRelay = true
+        producer.syncNow()
+        val sent = withTimeout(TIMEOUT) {
+            producer.state.first {
+                it is ProducerState.Idle &&
+                    it.lastResult?.let { result -> result.heldBack == 0 && result.sent == 1 } == true
+            }
+        } as ProducerState.Idle
+        sent.lastResult?.sent shouldBe 1
+        sink.stored.size shouldBe photos.size + 2
+    }
+
+    @Test
+    fun onMobileDataASyncStopsAtTheMonthsLimitAndCountsWhatItSent() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        repeat(5) { source.put(FakeMedia("away$it", Random(20 + it).nextBytes(200_000))) }
+        offWifi = true
+        internet.mobileDataLeft = 250_000 // About one photo's worth.
+
+        producer.syncNow()
+        val done = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.cancelled == true }
+        } as ProducerState.Idle
+
+        val result = done.lastResult.shouldNotBeNull()
+        result.sent shouldBe 2 // The one that reached the limit is finished, then it stops.
+        internet.mobileDataCounted.get() shouldBe result.bytesSent
+    }
+
+    @Test
+    fun overMobileDataItDoesntSyncThroughTheInternet() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        internet.allowed = false
+        offWifi = true
+        producer.syncNow()
+
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Failed } } shouldBe
+            ProducerState.Failed(SyncFailure.UNREACHABLE)
+        internet.connects.get() shouldBe 0
+    }
+
+    @Test
+    fun withoutAWorkerTheReceivingPhoneDoesntListenOnTheInternet() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+
+        receiver.state.value.overInternet shouldBe false
+        consumerWorker = "https://mediasync.example.workers.dev" // Set up in settings, which refresh it.
+        receiver.refreshInternet()
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        receiver.stop()
+        receiver.state.value.overInternet shouldBe false
+        internet.listening shouldBe emptyMap()
     }
 
     @Test
@@ -154,10 +291,13 @@ class RuntimeEndToEndTest {
                 bytesSent = photos.sumOf { it.bytes.size.toLong() },
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe Pending()
         history.record.value.lastSyncMillis.shouldNotBeNull()
+        // Both phones now share their pair's secret for internet signaling (ADR 0009 §4).
+        producerPeers.consumer()?.pairSecret shouldBe consumerPeers.pairSecret(producerIdentity.id)
 
         // Nothing new: the next sync transfers nothing.
         producer.syncNow()
@@ -165,7 +305,11 @@ class RuntimeEndToEndTest {
             producer.state.first { it is ProducerState.Idle && it.lastResult != done.lastResult }
         }
         again.shouldBeInstanceOf<ProducerState.Idle>().lastResult shouldBe
-            SyncResult(consumerSchedule = SyncSchedule.Default, consumerTurboKey = consumerKey)
+            SyncResult(
+                consumerSchedule = SyncSchedule.Default,
+                consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
+            )
     }
 
     @Test
@@ -196,6 +340,7 @@ class RuntimeEndToEndTest {
                 bytesSent = newPhoto.bytes.size.toLong(),
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
+                consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
             )
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
     }
@@ -488,6 +633,63 @@ private class FakeDirectLinks : DirectLinks {
 
     /** As a receiving phone: the links it opened and hasn't closed. */
     fun isOpen(link: DirectLink) = (link.networkName to link.passphrase) in opened && link.networkName !in closed
+}
+
+/** The receiving phone's Worker and WebRTC, as far as the two phones see them: connections in memory. */
+private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks {
+    @Volatile
+    var allowed = true
+
+    /** Connections go through the relay, as when the phones can't reach each other directly. */
+    @Volatile
+    var throughRelay = false
+
+    /** On mobile data: what this month's limit leaves; `null` on Wi-Fi. */
+    @Volatile
+    var mobileDataLeft: Long? = null
+    val mobileDataCounted = java.util.concurrent.atomic.AtomicLong()
+
+    override fun mobileDataLeft() = mobileDataLeft
+
+    override fun countMobileData(bytes: Long) {
+        mobileDataCounted.addAndGet(bytes)
+    }
+    val connects = java.util.concurrent.atomic.AtomicInteger()
+    val listening = ConcurrentHashMap<String, Pair<Map<DeviceId, ByteString>, (PeerConnection) -> Unit>>()
+
+    override fun allowed() = allowed
+
+    override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection {
+        connects.incrementAndGet()
+        val (pairs, serve) = listening[worker] ?: throw java.io.IOException("The receiving phone isn't online")
+        val sender = producer()
+        if (pairs[sender] != pairSecret) throw java.io.IOException("Not sealed with this pair's secret")
+        val connection = ConnectionPair(sender, consumer)
+        kotlin.concurrent.thread(isDaemon = true) { serve(connection.consumerEnd) }
+        val end = connection.producerEnd
+        return if (!throughRelay) {
+            end
+        } else {
+            object : PeerConnection by end, io.github.danyk20.mediasync.transport.rendezvous.RelayCounter {
+                override fun relayedBytes() = 0L
+
+                override fun throughRelay() = true
+            }
+        }
+    }
+
+    override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit): Closeable {
+        listening[worker] = pairs to serve
+        return Closeable { listening.remove(worker) }
+    }
+
+    /** The Worker's meter, as asked: by which Worker, for which pair. */
+    val meterAsked = java.util.concurrent.CopyOnWriteArrayList<Pair<String, DeviceId>>()
+
+    override fun relayUsage(worker: String, producer: DeviceId): RelayUsage {
+        meterAsked += worker to producer
+        return RelayUsage(312_000_000_000, 950_000_000_000, 1_000_000_000_000, true, null)
+    }
 }
 
 /** Forwards connections to [target] on loopback, and breaks every one once [dropAfterBytes] went through. */

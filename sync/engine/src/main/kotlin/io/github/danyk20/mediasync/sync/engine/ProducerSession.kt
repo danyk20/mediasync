@@ -55,11 +55,17 @@ data class SyncResult(
     val withheld: Int = 0,
     /** What the consumer's *Turbo receive* links derive from (docs/PLAN.md §8.3); `null` if it didn't say. */
     val consumerTurboKey: ByteString? = null,
+    /** The secret this pair's internet signaling is sealed with (ADR 0009 §4); `null` if the consumer didn't say. */
+    val consumerPairSecret: ByteString? = null,
+    /** The consumer's rendezvous Worker (PLAN §8.4); `null` if it has none or didn't say. */
+    val consumerRendezvousUrl: String? = null,
+    /** Held back for this connection, such as videos over the relay (PLAN §17, relay saver); sent another time. */
+    val heldBack: Int = 0,
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
         "deferred=$deferred, bytesSent=$bytesSent, cancelled=$cancelled, consumerSchedule=$consumerSchedule, " +
-        "withheld=$withheld)"
+        "withheld=$withheld, heldBack=$heldBack)"
 }
 
 /**
@@ -99,6 +105,8 @@ class ProducerSession(
         val run = Run(connection, channel, consumer, queue.total, queue.totalBytes)
         run.consumerSchedule = SyncSchedule.decode(hello.schedule)
         run.consumerTurboKey = hello.turboKey.takeIf { it.size == TURBO_KEY_BYTES }
+        run.consumerPairSecret = hello.pairSecret.takeIf { it.size == PAIR_SECRET_BYTES }
+        run.consumerRendezvousUrl = hello.rendezvousUrl.takeIf { it.startsWith("https://") }
         return run.send(queue)
     }
 
@@ -146,6 +154,8 @@ class ProducerSession(
         private var cancelled = false
         var consumerSchedule: SyncSchedule? = null
         var consumerTurboKey: ByteString? = null
+        var consumerPairSecret: ByteString? = null
+        var consumerRendezvousUrl: String? = null
 
         fun send(queue: WorkQueue): SyncResult {
             replies.start()
@@ -175,6 +185,8 @@ class ProducerSession(
                     consumerSchedule,
                     withheld,
                     consumerTurboKey,
+                    consumerPairSecret,
+                    consumerRendezvousUrl,
                 )
             }
         }

@@ -52,6 +52,7 @@ dependencies {
     kover(projects.sync.engine)
     kover(projects.sync.protocol)
     kover(projects.transport.lan)
+    kover(projects.transport.rendezvous)
 }
 
 kover {

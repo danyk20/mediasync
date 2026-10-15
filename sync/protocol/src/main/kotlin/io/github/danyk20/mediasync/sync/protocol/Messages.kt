@@ -39,6 +39,16 @@ data class Hello(
      * §8.3), so the producer can join one when the two share no network. Empty otherwise.
      */
     @ProtoNumber(7) @Serializable(with = ByteStringSerializer::class) val turboKey: ByteString = ByteString.EMPTY,
+    /**
+     * Consumer only, and only to that paired producer: the secret their internet signaling is sealed with (ADR 0009
+     * §4), the same in every session. Empty otherwise.
+     */
+    @ProtoNumber(8) @Serializable(with = ByteStringSerializer::class) val pairSecret: ByteString = ByteString.EMPTY,
+    /**
+     * Consumer only, and only to a paired producer: the address of its rendezvous Worker, through which the two sync
+     * over the internet (PLAN §8.4); empty when it has none.
+     */
+    @ProtoNumber(9) val rendezvousUrl: String = "",
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */
