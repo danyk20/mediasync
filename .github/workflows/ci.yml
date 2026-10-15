@@ -263,8 +263,8 @@ jobs:
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
       # alive: each test task boots its own, and they keep running for a while after it ends. Two API 36 emulators
-      # at once already run a runner out of memory (nightly), so each job runs one at a time. Memory, disk and
-      # emulators are logged.
+      # at once already run a runner out of memory (nightly), so gradle.properties allows one at a time. Memory,
+      # disk and emulators are logged.
       - name: Record memory and disk while testing
         run: |
           nohup bash -c 'while true; do
@@ -274,7 +274,7 @@ jobs:
       - name: Run on API ${{ matrix.api }}
         id: device-tests
         run: >
-          ./gradlew api${{ matrix.api }}DebugAndroidTest --max-workers=1
+          ./gradlew api${{ matrix.api }}DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # always(): when the runner is stopped from outside, failure() steps are skipped.
       - name: Show why the tests stopped

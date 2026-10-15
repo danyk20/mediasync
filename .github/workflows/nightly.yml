@@ -47,11 +47,11 @@ jobs:
         run: >
           ./gradlew :app:api${{ matrix.api }}Setup --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-      # Each test task boots its own emulator; one at a time, or the runner runs out of memory and systemd-oomd
-      # stops the job (exit code 143): two API 36 emulators already do.
+      # Each test task boots its own emulator; gradle.properties allows one at a time, or the runner runs out of
+      # memory and systemd-oomd stops the job (exit code 143): two API 36 emulators already do.
       - name: Run on API ${{ matrix.api }}
         run: >
-          ./gradlew api${{ matrix.api }}DebugAndroidTest --max-workers=1
+          ./gradlew api${{ matrix.api }}DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       - name: Upload reports
         if: failure()

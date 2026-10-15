@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.DeviceTestBuilder
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
 import io.github.danyk20.mediasync.buildlogic.configureJava
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
@@ -34,6 +36,14 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             testOptions.targetSdk = libs.version("targetSdk").toInt()
             testOptions.unitTests.configureUnitTests()
             testOptions.configureManagedDevices()
+        }
+        // A module without device tests would still build a test APK and start an emulator for nothing: on CI,
+        // that was 13 of 18 modules and about a third of the instrumented job.
+        val hasDeviceTests = file("src/androidTest").exists()
+        extensions.configure<LibraryAndroidComponentsExtension> {
+            beforeVariants { variant ->
+                variant.deviceTests[DeviceTestBuilder.ANDROID_TEST_TYPE]?.enable = hasDeviceTests
+            }
         }
 
         dependencies {
