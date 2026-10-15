@@ -12,10 +12,16 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
+  # One job per API level, each on its own runner: four emulator types booting on one runner exhausted it
+  # (nightly #1: "The runner has received a shutdown signal").
   device-matrix:
-    name: Instrumented tests (API 29, 31, 34, 36)
+    name: Instrumented tests (API ${{ matrix.api }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 31, 34, 36]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -30,23 +36,23 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      # Every module sets up the same emulators in parallel, and two of them installing one system image at
-      # once can fail ("System Image ... does not exist for this architecture"). Install them once first.
-      - name: Install emulator images
+      # Every module sets up the same emulator in parallel, and two of them installing one system image at
+      # once can fail ("System Image ... does not exist for this architecture"). Install it once first.
+      - name: Install the emulator image
         run: >
-          ./gradlew :app:api29Setup :app:api31Setup :app:api34Setup :app:api36Setup --max-workers=1
+          ./gradlew :app:api${{ matrix.api }}Setup --max-workers=1
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # Each test task boots its own emulator; at most two at a time, or the runner runs out of memory and
       # systemd-oomd stops the job (exit code 143).
-      - name: Run on every supported API level
+      - name: Run on API ${{ matrix.api }}
         run: >
-          ./gradlew nightlyGroupDebugAndroidTest --max-workers=2
+          ./gradlew api${{ matrix.api }}DebugAndroidTest --max-workers=2
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       - name: Upload reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nightly-instrumented-reports
+          name: nightly-instrumented-reports-api${{ matrix.api }}
           path: |
             **/build/reports/androidTests/
             **/build/outputs/androidTest-results/
