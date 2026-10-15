@@ -25,6 +25,7 @@ import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlin.random.Random
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
 
@@ -91,6 +92,41 @@ class SyncSessionTest {
         served.getOrThrow() shouldBe ServeResult.Synced(received = 0, alreadyHad = 0, failed = 0, bytesReceived = 0)
         producer.source.opened.shouldBeEmpty()
         consumer.sink.stored.size shouldBe 2
+    }
+
+    @Test
+    fun `shared photos go first, then the newest`() {
+        val old = FakeMedia("old", byteArrayOf(1), meta = MediaMeta(capturedAtMillis = 1_000))
+        val new = FakeMedia("new", byteArrayOf(2), meta = MediaMeta(capturedAtMillis = 3_000))
+        val shared = FakeMedia("shared", byteArrayOf(3), meta = MediaMeta(capturedAtMillis = 2_000), shared = true)
+        // The same photo, both in a synced folder and shared: it goes once, as shared.
+        val sharedToo =
+            FakeMedia("new-shared", byteArrayOf(2), meta = MediaMeta(capturedAtMillis = 3_000), shared = true)
+        val producer = Producer(listOf(old, new, shared, sharedToo))
+
+        val pending = ProducerSession(local, producer.source, producer.ledger).pendingFor(consumerId)
+
+        pending.map { it.key } shouldBe listOf("new-shared", "shared", "old")
+    }
+
+    @Test
+    fun `the source hears about everything the consumer confirmed`() {
+        val sent = FakeMedia("sent", byteArrayOf(4), shared = true)
+        val there = FakeMedia("there", byteArrayOf(5))
+        val producer = Producer(listOf(sent))
+        val consumer = Consumer()
+        sync(producer, consumer).first.getOrThrow()
+        // Already on the consumer from another phone: confirmed without sending.
+        val other = Producer(listOf(there, FakeMedia("sent-again", byteArrayOf(4), shared = true)))
+        sync(
+            other,
+            consumer.also {
+                it.ledger.record(ReceivedItem(producerId, there.descriptor, ByteString.EMPTY, "x"))
+            },
+        )
+
+        producer.source.confirmed shouldBe listOf("sent")
+        other.source.confirmed shouldContainExactlyInAnyOrder listOf("there", "sent-again")
     }
 
     @Test

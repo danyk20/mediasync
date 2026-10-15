@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- How MediaSync is listed in the share sheet. -->
+    <string name="share_target_label">MediaSync</string>
+    <string name="share_preparing">Getting them ready… %1$d/%2$d</string>
+    <plurals name="share_sending">
+        <item quantity="one">Sending %1$d photo or video to %2$s now.</item>
+        <item quantity="other">Sending %1$d photos and videos to %2$s now.</item>
+    </plurals>
+    <string name="share_unreachable_note">If it can\'t be reached right now, they go with the next sync.</string>
+    <plurals name="share_unreadable">
+        <item quantity="one">%1$d couldn\'t be read, so it isn\'t sent.</item>
+        <item quantity="other">%1$d couldn\'t be read, so they aren\'t sent.</item>
+    </plurals>
+    <string name="share_nothing">Nothing here can be sent.</string>
+    <string name="share_receiving_phone">your receiving phone</string>
+    <string name="share_ok">OK</string>
+</resources>

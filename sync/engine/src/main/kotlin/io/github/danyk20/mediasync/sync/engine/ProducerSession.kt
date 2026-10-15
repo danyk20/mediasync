@@ -110,13 +110,18 @@ class ProducerSession(
         return run.send(queue)
     }
 
-    /** Items the consumer hasn't confirmed, without duplicates, newest first. */
+    /** Items the consumer hasn't confirmed, without duplicates: those the user shared first, then newest first. */
     internal fun pendingFor(consumer: DeviceId): List<SourceItem> {
         val confirmed = ledger.sentFingerprints(consumer)
         return source.items()
             .filter { it.descriptor.fingerprint !in confirmed }
+            .sortedWith(
+                compareByDescending<SourceItem> { it.shared }
+                    .thenByDescending {
+                        it.descriptor.meta.capturedAtMillis ?: it.descriptor.meta.modifiedAtMillis ?: 0L
+                    },
+            )
             .distinctBy { it.descriptor.fingerprint }
-            .sortedByDescending { it.descriptor.meta.capturedAtMillis ?: it.descriptor.meta.modifiedAtMillis ?: 0L }
     }
 
     /**
@@ -201,6 +206,7 @@ class ProducerSession(
                 val prepared =
                     offered[have.offerId] ?: throw ProtocolException("HAVE for unknown offer ${have.offerId}")
                 ledger.markSent(consumer, prepared.descriptor.fingerprint, have.contentId)
+                source.confirmed(prepared.item)
                 count { alreadyOnConsumer++ }
                 completeItem(prepared.item)
             }
@@ -326,7 +332,10 @@ class ProducerSession(
             val prepared = lock.withLock { inFlight[ack.offerId] }
                 ?: throw ProtocolException("ACK for offer ${ack.offerId}, which isn't in flight")
             val confirmed = ack.status == FileAck.Status.OK
-            if (confirmed) ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
+            if (confirmed) {
+                ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
+                source.confirmed(prepared.item)
+            }
             // In flight until recorded and counted: the session, waiting for nothing to be in flight, then counts it.
             lock.withLock {
                 inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")

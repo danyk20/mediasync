@@ -31,6 +31,7 @@ import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -289,6 +290,29 @@ class MediaStoreTest {
         sentWith(SourceSelection(SourcePreset.EVERYTHING)) shouldBe listOf("camera-choice.jpg", "other-choice.jpg")
         sentWith(SourceSelection.of(setOf(TEST_FOLDER))) shouldBe listOf("other-choice.jpg")
         sentWith(SourceSelection.of(emptySet())) shouldBe emptyList()
+    }
+
+    @Test
+    fun sharedItemsAreSentWhateverTheFoldersAndDroppedOnceConfirmed() {
+        val shared = SharedItems(context)
+        val photo = insertInto(TEST_FOLDER, jpeg(Color.GREEN), "shared-photo.jpg")
+        val copy = File(shared.copies, "test/IMG-20250512-WA0009.jpg").apply {
+            parentFile!!.mkdirs()
+            writeBytes(jpeg(Color.RED))
+        }
+        shared.add(listOf(photo.toString(), Uri.fromFile(copy).toString()))
+        // Folders chosen that hold neither.
+        val source =
+            MediaStoreSource(context, database.mediaFingerprintDao(), shared) { SourceSelection.of(emptySet()) }
+
+        val items = source.items().filter { it.shared }
+
+        items.map { it.descriptor.displayName }.sorted() shouldBe listOf("IMG-20250512-WA0009.jpg", "shared-photo.jpg")
+        items.single { it.descriptor.displayName == "IMG-20250512-WA0009.jpg" }.descriptor.mimeType shouldBe
+            "image/jpeg"
+        items.forEach(source::confirmed)
+        source.items().filter { it.shared }.shouldBeEmpty()
+        copy.exists() shouldBe false
     }
 
     @Test
