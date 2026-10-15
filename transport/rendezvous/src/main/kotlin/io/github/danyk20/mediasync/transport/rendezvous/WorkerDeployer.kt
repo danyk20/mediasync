@@ -7,6 +7,8 @@ package io.github.danyk20.mediasync.transport.rendezvous
 import java.io.IOException
 import java.net.URI
 import java.security.SecureRandom
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -42,7 +44,42 @@ class WorkerScript(
     val migrationTag: String,
 ) {
     /** A Workers Rate Limiting binding: [limit] requests per [periodSeconds] (10 or 60). */
-    data class RateLimit(val name: String, val namespaceId: String, val limit: Int, val periodSeconds: Int)
+    @Serializable
+    data class RateLimit(
+        val name: String,
+        val namespaceId: String,
+        val limit: Int,
+        @SerialName("period") val periodSeconds: Int,
+    )
+
+    /** The settings, as the Worker's bundle step writes them beside the module (infra/rendezvous). */
+    @Serializable
+    private class Manifest(
+        val compatibilityDate: String,
+        val migrationTag: String,
+        val durableObjects: Map<String, String>,
+        val rateLimits: List<RateLimit>,
+        val vars: Map<String, String>,
+        val crons: List<String>,
+    )
+
+    companion object {
+        private val MANIFEST_JSON = Json { ignoreUnknownKeys = true }
+
+        /** The bundled [module] with the settings of its [manifest] (JSON). */
+        fun of(module: ByteArray, manifest: String): WorkerScript =
+            MANIFEST_JSON.decodeFromString(Manifest.serializer(), manifest).let {
+                WorkerScript(
+                    module,
+                    it.compatibilityDate,
+                    it.vars,
+                    it.durableObjects,
+                    it.rateLimits,
+                    it.crons,
+                    it.migrationTag,
+                )
+            }
+    }
 }
 
 /** Where a deployment went: the Worker's address, and whether its TURN relay could be set up. */

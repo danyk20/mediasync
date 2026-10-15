@@ -184,6 +184,28 @@ class WorkerDeployerTest {
     }
 
     @Test
+    fun theBundleStepsManifestDescribesTheScript() {
+        val manifest = """
+            {"compatibilityDate":"2026-10-01","migrationTag":"v1",
+             "durableObjects":{"PAIRS":"PairMailbox","METER":"UsageMeter"},
+             "rateLimits":[{"name":"IP_LIMITER","namespaceId":"1001","limit":120,"period":60}],
+             "vars":{"RELAY_BUDGET_GB":"950"},"crons":["*/15 * * * *"],"comment":"from wrangler.toml"}
+        """.trimIndent()
+
+        val parsed = WorkerScript.of(script.module, manifest)
+
+        listOf(
+            parsed.compatibilityDate,
+            parsed.migrationTag,
+            parsed.durableObjects,
+            parsed.rateLimits,
+            parsed.vars,
+        ) shouldBe
+            listOf(script.compatibilityDate, script.migrationTag, script.durableObjects, script.rateLimits, script.vars)
+        parsed.crons shouldBe script.crons
+    }
+
+    @Test
     fun theWorkerIsLiveOnceItsHealthAnswers() {
         var up = false
         val deployer = WorkerDeployer("t", { request ->
