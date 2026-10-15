@@ -6,7 +6,13 @@
 import { describe, expect, it } from "vitest";
 import { MAX_BODY_BYTES } from "../src/http.ts";
 import { BASE_URL, TestDevice } from "./support/device.ts";
-import { errorCode, registeredPair, send } from "./support/worker.ts";
+import {
+    errorCode,
+    RATE_LIMIT_TEST_TIMEOUT_MILLIS,
+    registeredPair,
+    roomInRateLimitWindow,
+    send,
+} from "./support/worker.ts";
 
 describe("routing", () => {
     it("answers the health check without authentication", async () => {
@@ -64,6 +70,7 @@ describe("routing", () => {
 
 describe("rate limiting", () => {
     it("limits requests per client address before authentication", async () => {
+        await roomInRateLimitWindow();
         const address = "192.0.2.77";
         const statuses: number[] = [];
         for (let i = 0; i < 121; i++) {
@@ -74,9 +81,10 @@ describe("rate limiting", () => {
         }
         expect(statuses.slice(0, 120).every((status) => status === 401)).toBe(true);
         expect(statuses[120]).toBe(429);
-    });
+    }, RATE_LIMIT_TEST_TIMEOUT_MILLIS);
 
     it("limits requests per device", async () => {
+        await roomInRateLimitWindow();
         const { consumer, pairId } = await registeredPair();
         const statuses: number[] = [];
         // Registration counted once already.
@@ -85,5 +93,5 @@ describe("rate limiting", () => {
         }
         expect(statuses.slice(0, 59).every((status) => status === 200)).toBe(true);
         expect(statuses[59]).toBe(429);
-    });
+    }, RATE_LIMIT_TEST_TIMEOUT_MILLIS);
 });

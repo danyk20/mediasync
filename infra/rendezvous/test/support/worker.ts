@@ -15,6 +15,20 @@ export function send(request: Request): Promise<Response> {
     return exports.default.fetch(request);
 }
 
+/**
+ * Makes sure the rest of a rate-limit test fits in the limiters' current window, waiting for the next one if not.
+ * The test runtime counts requests in windows aligned to the clock (every 60 seconds): a test that crossed into the
+ * next window started counting again, and its last request wasn't refused. Call it before the first counted request,
+ * and give the test a longer timeout.
+ */
+export async function roomInRateLimitWindow(neededMillis = 5_000, periodMillis = 60_000): Promise<void> {
+    const left = periodMillis - (Date.now() % periodMillis);
+    if (left < neededMillis) await new Promise((resolve) => setTimeout(resolve, left + 100));
+}
+
+/** For tests that may wait for [roomInRateLimitWindow]. */
+export const RATE_LIMIT_TEST_TIMEOUT_MILLIS = 15_000;
+
 export interface ErrorBody {
     error: { code: string; message: string };
 }
