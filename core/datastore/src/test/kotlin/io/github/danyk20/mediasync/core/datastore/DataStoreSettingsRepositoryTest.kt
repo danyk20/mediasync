@@ -140,6 +140,11 @@ class DataStoreSettingsRepositoryTest {
         repository.rendezvousUrl.first() shouldBe null
         repository.internetOverMobileData.first() shouldBe false
         repository.videosOverRelay.first() shouldBe false
+        repository.mobileDataCapBytes.first() shouldBe null
+        repository.setMobileDataCapBytes(2_000_000_000)
+        repository.mobileDataCapBytes.first() shouldBe 2_000_000_000
+        repository.setMobileDataCapBytes(null)
+        repository.mobileDataCapBytes.first() shouldBe null
 
         repository.setRendezvousUrl("https://mediasync.anna.workers.dev")
         repository.setInternetOverMobileData(true)

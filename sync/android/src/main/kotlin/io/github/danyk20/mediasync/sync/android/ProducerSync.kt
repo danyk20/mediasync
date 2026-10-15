@@ -297,6 +297,8 @@ class ProducerSync @Inject constructor(
 
     /** One sync to [consumer]: over Wi-Fi, or over a direct link while that works. */
     private inner class Run(val consumer: Peer, val details: PhotoDetails, val started: Long) {
+        /** On mobile data: how much more this month allows (docs/PLAN.md §2.2); `null` off mobile data. */
+        var mobileDataLeft: Long? = null
 
         fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
             _state.value = ProducerState.Syncing(progress = null)
@@ -393,9 +395,10 @@ class ProducerSync @Inject constructor(
             val worker = consumer.rendezvousUrl ?: return null
             val secret = consumer.pairSecret ?: return null
             if (!internet.allowed()) {
-                Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed")
+                Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed or its limit is used")
                 return null
             }
+            mobileDataLeft = internet.mobileDataLeft()
             val connection = try {
                 internet.connect(consumer.id, worker, secret)
             } catch (e: IOException) {
@@ -432,11 +435,21 @@ class ProducerSync @Inject constructor(
                 connect = { connectToFirst(listOf(it.remoteAddress), consumer.id, direct) },
                 progress = { progress ->
                     _state.value = ProducerState.Syncing(progress, turbo = direct, internet = path == Path.INTERNET)
+                    // This month's mobile data limit reached: stops after the current file.
+                    if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
                 },
                 // Over the internet, one connection carries it all.
                 mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
                 holdBack = relaySaver(it),
             ).sync(it)
+            mobileDataLeft?.let { left ->
+                internet.countMobileData(result.bytesSent)
+                if (result.bytesSent >=
+                    left
+                ) {
+                    Diagnostics.log(Area.SEND, "Internet: this month's mobile data limit is used")
+                }
+            }
             peers.recordConsumer(
                 consumer.id,
                 ConsumerFacts(

@@ -85,8 +85,11 @@ class SettingsMobileDataSource @Inject constructor(
     @ApplicationScope scope: CoroutineScope,
 ) : MobileDataSource {
     private val allowed = settings.internetOverMobileData.stateIn(scope, SharingStarted.Eagerly, false)
+    private val cap = settings.mobileDataCapBytes.stateIn(scope, SharingStarted.Eagerly, null)
 
     override fun allowed(): Boolean = allowed.value
+
+    override fun capBytes(): Long? = cap.value
 }
 
 /** Whether the sending phone sends videos through the relay too, from its settings. */

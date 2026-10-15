@@ -66,6 +66,14 @@ class FakeSettingsRepository(
         internetOverMobileDataState.value = allowed
     }
 
+    private val mobileDataCapState = MutableStateFlow<Long?>(null)
+
+    override val mobileDataCapBytes: StateFlow<Long?> = mobileDataCapState
+
+    override suspend fun setMobileDataCapBytes(bytes: Long?) {
+        mobileDataCapState.value = bytes
+    }
+
     private val videosOverRelayState = MutableStateFlow(false)
 
     override val videosOverRelay: StateFlow<Boolean> = videosOverRelayState

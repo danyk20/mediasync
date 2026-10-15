@@ -35,6 +35,7 @@ class AndroidInternetLinks @Inject internal constructor(
     private val identity: IdentityProvider,
     private val mobileData: MobileDataSource,
     private val alerts: RelayAlerts,
+    private val usage: MobileDataUsage,
 ) : InternetLinks {
     private val links by lazy { WebRtcLink(context) }
     private val signer by lazy {
@@ -50,9 +51,24 @@ class AndroidInternetLinks @Inject internal constructor(
     private val sending by lazy { path(Area.SEND) }
     private val receiving by lazy { path(Area.RECEIVE) }
 
-    override fun allowed(): Boolean {
+    override fun allowed(): Boolean = when (onMobileData()) {
+        null -> false
+        false -> true
+        true -> mobileData.allowed() && (mobileDataLeft() ?: 0L) > 0
+    }
+
+    override fun mobileDataLeft(): Long? {
+        if (onMobileData() != true) return null
+        val cap = mobileData.capBytes() ?: return Long.MAX_VALUE
+        return (cap - usage.current()).coerceAtLeast(0)
+    }
+
+    override fun countMobileData(bytes: Long) = usage.add(bytes)
+
+    /** Whether the phone is on a metered network (mobile data, or a hotspot set as one); `null` without a network. */
+    private fun onMobileData(): Boolean? {
         val network = context.getSystemService(ConnectivityManager::class.java)
-        return network.activeNetwork != null && (!network.isActiveNetworkMetered || mobileData.allowed())
+        return network.isActiveNetworkMetered.takeIf { network.activeNetwork != null }
     }
 
     override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection =

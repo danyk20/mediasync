@@ -105,6 +105,13 @@
     <string name="producer_turbo_setting_up_body">Linking the two phones directly. This takes a few seconds.</string>
     <string name="producer_turbo_sending_title">Sending to %1$s over Turbo</string>
     <string name="producer_internet_sending_title">Sending to %1$s over the internet</string>
+    <string name="producer_mobile_data_cap_title">Monthly mobile data limit</string>
+    <string name="producer_mobile_data_cap_none">No limit · %1$s used this month</string>
+    <string name="producer_mobile_data_cap_used">%1$s of %2$s used this month</string>
+    <string name="producer_mobile_data_cap_reached">%1$s used: until next month, syncs wait for Wi-Fi</string>
+    <string name="producer_mobile_data_cap_option">%1$s a month</string>
+    <string name="producer_mobile_data_cap_option_none">No limit</string>
+    <string name="producer_mobile_data_cap_cancel">Cancel</string>
     <string name="producer_relay_videos_title">Send videos through the relay</string>
     <string name="producer_relay_videos_body">When the phones can\'t connect directly, Cloudflare\'s relay carries what\'s sent. Off: videos wait for Wi-Fi or a direct connection, to spare the free allowance.</string>
     <plurals name="producer_held_back_title">

@@ -203,6 +203,28 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun onMobileDataASyncStopsAtTheMonthsLimitAndCountsWhatItSent() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        repeat(5) { source.put(FakeMedia("away$it", Random(20 + it).nextBytes(200_000))) }
+        offWifi = true
+        internet.mobileDataLeft = 250_000 // About one photo's worth.
+
+        producer.syncNow()
+        val done = withTimeout(TIMEOUT) {
+            producer.state.first { it is ProducerState.Idle && it.lastResult?.cancelled == true }
+        } as ProducerState.Idle
+
+        val result = done.lastResult.shouldNotBeNull()
+        result.sent shouldBe 2 // The one that reached the limit is finished, then it stops.
+        internet.mobileDataCounted.get() shouldBe result.bytesSent
+    }
+
+    @Test
     fun overMobileDataItDoesntSyncThroughTheInternet() = runBlocking<Unit> {
         consumerWorker = "https://mediasync.example.workers.dev"
         receiver.start()
@@ -621,6 +643,17 @@ private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks
     /** Connections go through the relay, as when the phones can't reach each other directly. */
     @Volatile
     var throughRelay = false
+
+    /** On mobile data: what this month's limit leaves; `null` on Wi-Fi. */
+    @Volatile
+    var mobileDataLeft: Long? = null
+    val mobileDataCounted = java.util.concurrent.atomic.AtomicLong()
+
+    override fun mobileDataLeft() = mobileDataLeft
+
+    override fun countMobileData(bytes: Long) {
+        mobileDataCounted.addAndGet(bytes)
+    }
     val connects = java.util.concurrent.atomic.AtomicInteger()
     val listening = ConcurrentHashMap<String, Pair<Map<DeviceId, ByteString>, (PeerConnection) -> Unit>>()
 

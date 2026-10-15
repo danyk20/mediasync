@@ -79,8 +79,20 @@ class Connectivity @Inject constructor(
  * rendezvous Worker, when they share no network.
  */
 interface InternetLinks {
-    /** As a sending phone: whether it may sync over the internet now: over Wi-Fi, or mobile data if allowed. */
+    /**
+     * As a sending phone: whether it may sync over the internet now: over Wi-Fi, or over mobile data if allowed and
+     * this month's limit isn't used up.
+     */
     fun allowed(): Boolean
+
+    /**
+     * As a sending phone on mobile data: how much more it may send over it this month ([Long.MAX_VALUE] without a
+     * limit); `null` when it isn't on mobile data.
+     */
+    fun mobileDataLeft(): Long? = null
+
+    /** As a sending phone: [bytes] went over mobile data. */
+    fun countMobileData(bytes: Long) = Unit
 
     /**
      * As a sending phone: a connection to [consumer] through its Worker at [worker], with their [pairSecret].
@@ -210,9 +222,12 @@ fun interface RelayVideosSource {
     fun allowed(): Boolean
 }
 
-/** As a sending phone: whether internet sync (PLAN §8.4) may also use mobile data, as the user set it. */
-fun interface MobileDataSource {
+/** As a sending phone: whether internet sync (PLAN §8.4) may also use mobile data, and how much, as the user set it. */
+interface MobileDataSource {
     fun allowed(): Boolean
+
+    /** How much it may send over mobile data a month; `null`: no limit. */
+    fun capBytes(): Long? = null
 }
 
 /** The receiving phone's rendezvous Worker for internet sync (PLAN §8.4), as set up; `null` while it has none. */

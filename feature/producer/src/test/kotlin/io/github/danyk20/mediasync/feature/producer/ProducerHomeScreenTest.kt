@@ -248,6 +248,45 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun theMobileDataLimitIsChosenFromTheList() {
+        show(
+            paired.copy(
+                pendingCount = 3,
+                internetSync = true,
+                internetOverMobileData = true,
+                mobileDataSent = 300_000_000,
+            ),
+        )
+
+        composeRule.onNodeWithText("No limit · 300 MB used this month").performScrollTo().performClick()
+        composeRule.onNodeWithText("2.0 GB a month").performClick()
+
+        events shouldBe listOf("cap 2000000000")
+    }
+
+    @Test
+    fun aReachedLimitSaysSyncsWaitForWifi() {
+        show(
+            paired.copy(
+                internetSync = true,
+                internetOverMobileData = true,
+                mobileDataCap = 1_000_000_000,
+                mobileDataSent = 1_020_000_000,
+            ),
+        )
+
+        composeRule.onNodeWithText("1.0 GB used: until next month, syncs wait for Wi-Fi").performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun noLimitWithoutMobileData() {
+        show(paired.copy(pendingCount = 3, internetSync = true))
+
+        composeRule.onNodeWithText("Monthly mobile data limit").assertDoesNotExist()
+    }
+
+    @Test
     fun videosThroughTheRelayAreTheUsersChoice() {
         show(paired.copy(pendingCount = 3, internetSync = true))
 
@@ -280,7 +319,13 @@ class ProducerHomeScreenTest {
 
     @Test
     fun screenshot_internet_dark() = screenshot(
-        paired.copy(pendingCount = 3, internetSync = true, internetOverMobileData = true),
+        paired.copy(
+            pendingCount = 3,
+            internetSync = true,
+            internetOverMobileData = true,
+            mobileDataCap = 5_000_000_000,
+            mobileDataSent = 1_200_000_000,
+        ),
         "producer_home_internet_dark",
         darkTheme = true,
     )
@@ -467,6 +512,7 @@ class ProducerHomeScreenTest {
                     onChooseDetails = { events += "details" },
                     onInternetOverMobileData = { events += "mobile data $it" },
                     onVideosOverRelay = { events += "relay videos $it" },
+                    onMobileDataCap = { events += "cap $it" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },

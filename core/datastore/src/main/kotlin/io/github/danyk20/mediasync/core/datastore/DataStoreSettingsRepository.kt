@@ -8,6 +8,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -83,6 +84,13 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[InternetOverMobileDataKey] = allowed }
     }
 
+    override val mobileDataCapBytes: Flow<Long?> =
+        dataStore.data.map { it[MobileDataCapKey]?.takeIf { cap -> cap > 0 } }.distinctUntilChanged()
+
+    override suspend fun setMobileDataCapBytes(bytes: Long?) {
+        dataStore.edit { if (bytes == null) it.remove(MobileDataCapKey) else it[MobileDataCapKey] = bytes }
+    }
+
     override val videosOverRelay: Flow<Boolean> =
         dataStore.data.map { it[VideosOverRelayKey] ?: false }.distinctUntilChanged()
 
@@ -112,6 +120,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
         val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
+        val MobileDataCapKey = longPreferencesKey("mobile_data_cap_bytes")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

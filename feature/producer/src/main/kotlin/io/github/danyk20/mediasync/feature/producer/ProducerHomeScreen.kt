@@ -12,14 +12,21 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,6 +36,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,6 +44,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -123,6 +135,7 @@ fun ProducerHomeRoute(
         onChooseDetails = onChooseDetails,
         onInternetOverMobileData = viewModel::setInternetOverMobileData,
         onVideosOverRelay = viewModel::setVideosOverRelay,
+        onMobileDataCap = viewModel::setMobileDataCap,
         onOpenDiagnostics = onOpenDiagnostics,
         onStartTurbo = {
             if (state.turbo == TurboAvailability.NOT_ALLOWED) {
@@ -152,6 +165,7 @@ fun ProducerHomeScreen(
     onChooseDetails: () -> Unit = {},
     onInternetOverMobileData: (Boolean) -> Unit = {},
     onVideosOverRelay: (Boolean) -> Unit = {},
+    onMobileDataCap: (Long?) -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onStartTurbo: () -> Unit = {},
@@ -206,7 +220,11 @@ fun ProducerHomeScreen(
                         icon = MediaSyncIcons.Info,
                         onClick = onChooseDetails,
                     )
-                    InternetCard(state, consumer, onInternetOverMobileData, onVideosOverRelay)
+                    InternetCard(
+                        state,
+                        consumer,
+                        InternetActions(onInternetOverMobileData, onVideosOverRelay, onMobileDataCap),
+                    )
                     Hints(state, consumer, onGrantAccess)
                 }
             }
@@ -394,12 +412,7 @@ private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, o
  * phone has set it up.
  */
 @Composable
-private fun InternetCard(
-    state: ProducerHomeUiState,
-    consumer: String,
-    onMobileData: (Boolean) -> Unit,
-    onRelayVideos: (Boolean) -> Unit,
-) {
+private fun InternetCard(state: ProducerHomeUiState, consumer: String, actions: InternetActions) {
     if (!state.internetSync) return
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         SwitchRow(
@@ -407,17 +420,110 @@ private fun InternetCard(
             body = stringResource(R.string.producer_mobile_data_body, consumer),
             icon = MediaSyncIcons.MobileData,
             checked = state.internetOverMobileData,
-            onChange = onMobileData,
+            onChange = actions.mobileData,
         )
+        if (state.internetOverMobileData) MobileDataCapRow(state, actions.mobileDataCap)
         SwitchRow(
             title = stringResource(R.string.producer_relay_videos_title),
             body = stringResource(R.string.producer_relay_videos_body),
             icon = MediaSyncIcons.Send,
             checked = state.videosOverRelay,
-            onChange = onRelayVideos,
+            onChange = actions.videosOverRelay,
         )
     }
 }
+
+/** What the user can change about internet sync on this phone. */
+private class InternetActions(
+    val mobileData: (Boolean) -> Unit,
+    val videosOverRelay: (Boolean) -> Unit,
+    val mobileDataCap: (Long?) -> Unit,
+)
+
+/** The monthly mobile data limit (docs/PLAN.md §2.2), and what this month used of it. */
+@Composable
+private fun MobileDataCapRow(state: ProducerHomeUiState, onChange: (Long?) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    val cap = state.mobileDataCap
+    val reached = cap != null && state.mobileDataSent >= cap
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.producer_mobile_data_cap_title)) },
+        supportingContent = {
+            Text(
+                text = when {
+                    cap == null -> stringResource(
+                        R.string.producer_mobile_data_cap_none,
+                        formatBytes(state.mobileDataSent),
+                    )
+
+                    reached -> stringResource(R.string.producer_mobile_data_cap_reached, formatBytes(cap))
+
+                    else -> stringResource(
+                        R.string.producer_mobile_data_cap_used,
+                        formatBytes(state.mobileDataSent),
+                        formatBytes(cap),
+                    )
+                },
+                color = if (reached) MaterialTheme.colorScheme.error else Color.Unspecified,
+            )
+        },
+        leadingContent = { Spacer(Modifier.size(24.dp)) },
+        trailingContent = {
+            Text(
+                text = stringResource(R.string.producer_sources_change),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { choosing = true },
+    )
+    if (choosing) {
+        MobileDataCapDialog(
+            current = cap,
+            onChoose = {
+                choosing = false
+                onChange(it)
+            },
+            onDismiss = { choosing = false },
+        )
+    }
+}
+
+@Composable
+private fun MobileDataCapDialog(current: Long?, onChoose: (Long?) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.producer_mobile_data_cap_title)) },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                (listOf<Long?>(null) + MOBILE_DATA_CAPS).forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = option == current, role = Role.RadioButton) { onChoose(option) }
+                            .padding(vertical = 8.dp),
+                    ) {
+                        RadioButton(selected = option == current, onClick = null)
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            option?.let { stringResource(R.string.producer_mobile_data_cap_option, formatBytes(it)) }
+                                ?: stringResource(R.string.producer_mobile_data_cap_option_none),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.producer_mobile_data_cap_cancel)) }
+        },
+    )
+}
+
+/** The limits offered: 1, 2, 5, 10 and 20 GB a month. */
+private val MOBILE_DATA_CAPS = listOf(1L, 2L, 5L, 10L, 20L).map { it * 1_000_000_000L }
 
 @Composable
 private fun SwitchRow(

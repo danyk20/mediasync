@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.MobileDataUsage
 import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
@@ -77,6 +78,8 @@ class ProducerHomeViewModelTest {
     }
     private val library = FakeMediaLibrary()
     private val settings = FakeSettingsRepository(initialRole = DeviceRole.PRODUCER)
+    private val mobileDataSent = MutableStateFlow(0L)
+    private val mobileData = mockk<MobileDataUsage> { every { sentThisMonth } returns mobileDataSent }
 
     /** 20:00 in Zurich: the next scheduled sync is at 03:00. */
     private val clock = Clock.fixed(Instant.parse("2026-10-14T18:00:00Z"), ZoneId.of("Europe/Zurich"))
@@ -93,7 +96,7 @@ class ProducerHomeViewModelTest {
     }
 
     private fun viewModel() =
-        ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock)
+        ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock, mobileData)
 
     @Test
     fun turboStartsInTheBackgroundWhenThisPhoneCanUseIt() = runTest {
@@ -290,6 +293,10 @@ class ProducerHomeViewModelTest {
 
         viewModel.setInternetOverMobileData(true)
         settings.internetOverMobileData.value shouldBe true
+        mobileDataSent.value = 700_000_000
+        viewModel.setMobileDataCap(2_000_000_000)
+        settings.mobileDataCapBytes.value shouldBe 2_000_000_000
+        viewModel.uiState.first { it.mobileDataCap == 2_000_000_000L }.mobileDataSent shouldBe 700_000_000
         viewModel.setVideosOverRelay(true)
         settings.videosOverRelay.value shouldBe true
         viewModel.uiState.first { it.videosOverRelay }

@@ -42,6 +42,11 @@ interface SettingsRepository {
 
     suspend fun setInternetOverMobileData(allowed: Boolean)
 
+    /** A sending phone: how much internet sync may send over mobile data a month; `null`: no limit (at first). */
+    val mobileDataCapBytes: Flow<Long?>
+
+    suspend fun setMobileDataCapBytes(bytes: Long?)
+
     /**
      * A sending phone: videos also go through the relay; off at first, so over the relay they wait for Wi-Fi or a
      * direct connection (PLAN §17, relay saver).
