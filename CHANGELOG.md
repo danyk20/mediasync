@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.0](https://github.com/danyk20/mediasync/compare/v0.3.0...v0.4.0) (2026-10-16)
+
+
+### Features
+
+* accessibility pass: labels, touch targets, headings, large text ([#40](https://github.com/danyk20/mediasync/issues/40)) ([aa048b2](https://github.com/danyk20/mediasync/commit/aa048b2acb9d182faccf3412574118f9e99ec659))
+* check GitHub for updates on copies installed from GitHub ([#43](https://github.com/danyk20/mediasync/issues/43)) ([3be2a08](https://github.com/danyk20/mediasync/commit/3be2a089df1169863d927dad2bfdc35b09980d29))
+* choose the order a sending phone sends in ([#48](https://github.com/danyk20/mediasync/issues/48)) ([37ddb50](https://github.com/danyk20/mediasync/commit/37ddb503a46aa4b7c11773c07e6995a18a2594c0))
+* MediaSync in nine more languages ([#42](https://github.com/danyk20/mediasync/issues/42)) ([a746e20](https://github.com/danyk20/mediasync/commit/a746e209e029632777500004eac5c9f9c42a2472))
+* remove a sending phone, unpair a receiving phone, reset MediaSync ([#39](https://github.com/danyk20/mediasync/issues/39)) ([1c1410c](https://github.com/danyk20/mediasync/commit/1c1410c6f95c0a7ff7b52b564df8dfbd1bcf0def))
+* send only photos and videos taken within chosen days ([#49](https://github.com/danyk20/mediasync/issues/49)) ([cfab587](https://github.com/danyk20/mediasync/commit/cfab5872ac264f58a84fd2d0cbbc11bad91ebff1))
+* share photos and videos to MediaSync to send them now ([#37](https://github.com/danyk20/mediasync/issues/37)) ([3dc01e7](https://github.com/danyk20/mediasync/commit/3dc01e7adb2e89fdf4cfb8dc2108cae7c75d7caf))
+* Sync now from the Quick Settings tile and a home-screen widget ([#35](https://github.com/danyk20/mediasync/issues/35)) ([1e3eecb](https://github.com/danyk20/mediasync/commit/1e3eecbb675c498c7f8112e7802eaadbe949b49f))
+* the welcome screen says how MediaSync works ([#41](https://github.com/danyk20/mediasync/issues/41)) ([d4e71db](https://github.com/danyk20/mediasync/commit/d4e71dbdedfad42168d8e80c6cb51d8d34f819d2))
+* Turbo goes over Wi-Fi Aware where both phones have it ([#47](https://github.com/danyk20/mediasync/issues/47)) ([c1b2d08](https://github.com/danyk20/mediasync/commit/c1b2d08aee15d30a3f5a6798aa3a0f4f6538421e))
+
+
+### Bug Fixes
+
+* a removed sending phone can't find Turbo receive any more ([#45](https://github.com/danyk20/mediasync/issues/45)) ([f4abc8e](https://github.com/danyk20/mediasync/commit/f4abc8e01c17e81fec4f48c0dd0b992f5a62e357))
+
 ## [0.3.0](https://github.com/danyk20/mediasync/compare/v0.2.0...v0.3.0) (2026-10-15)
 
 
