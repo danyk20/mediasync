@@ -33,6 +33,17 @@ class TurboKeyStoreTest {
     }
 
     @Test
+    fun aRenewedKeyIsNewAndKept() {
+        val store = TurboKeyStore(file)
+        val old = store.current()
+
+        store.renew()
+
+        store.current() shouldNotBe old
+        TurboKeyStore(file).current() shouldBe store.current() // After a restart too.
+    }
+
+    @Test
     fun aDamagedKeyIsReplaced() {
         file.writeBytes(ByteArray(5))
 

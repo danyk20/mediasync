@@ -28,6 +28,15 @@ class TurboKeyStore internal constructor(private val file: File) {
     @Synchronized
     fun current(): ByteString = key ?: (read() ?: create()).also { key = it }
 
+    /**
+     * Replaces the key after a sending phone was removed, so it can't find *Turbo receive* any more. The phones still
+     * paired learn the new one in their next session.
+     */
+    @Synchronized
+    fun renew() {
+        key = create()
+    }
+
     private fun read(): ByteString? =
         file.takeIf { it.length() == TURBO_KEY_BYTES.toLong() }?.readBytes()?.toByteString()
 

@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.sync.android.BackgroundSetup
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.TurboKeyStore
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -96,6 +97,7 @@ private data class DeviceAccess(
 class ConsumerHomeViewModel @Inject constructor(
     private val receiver: ConsumerReceiver,
     private val peers: PeerStore,
+    private val turboKeys: TurboKeyStore,
     received: RoomReceivedLedger,
     private val settings: SettingsRepository,
     private val setup: BackgroundSetup,
@@ -167,12 +169,13 @@ class ConsumerHomeViewModel @Inject constructor(
     }
 
     /**
-     * Forgets the sending phone [id]: it no longer syncs to this phone, over Wi-Fi or the internet, until it's paired
-     * again. What it sent stays.
+     * Forgets the sending phone [id]: it no longer syncs to this phone, over Wi-Fi, the internet or *Turbo receive*,
+     * until it's paired again. What it sent stays.
      */
     fun removeProducer(id: DeviceId) {
         viewModelScope.launch(Dispatchers.IO) {
             peers.forget(id)
+            turboKeys.renew()
             receiver.refreshInternet()
         }
     }
