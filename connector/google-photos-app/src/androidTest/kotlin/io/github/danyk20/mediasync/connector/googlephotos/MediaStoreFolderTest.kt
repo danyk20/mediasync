@@ -80,7 +80,7 @@ class MediaStoreFolderTest {
 
         // Found either way, so never counted as removed, even before the gallery reports the trash.
         connector.removedFromPhone(listOf(receipt(trashed, 3))) shouldBe emptySet()
-        // Android 16 once reported it as not trashed yet a moment after the update (nightly, API 36): wait a little.
+        // Android reports the trash a while after the update: a moment on API 36, over 5 s once on API 34 (nightly).
         var file = folder.find(trashed.toString())
         val end = System.currentTimeMillis() + TRASH_TIMEOUT_MILLIS
         while ((file as? PhoneFile.Found)?.trashed != true && System.currentTimeMillis() < end) {
@@ -148,7 +148,7 @@ class MediaStoreFolderTest {
         val JPEG_START = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
         const val CHANGE_TIMEOUT_MILLIS = 10_000L
         const val OBSERVER_START_MILLIS = 500L
-        const val TRASH_TIMEOUT_MILLIS = 5_000L
+        const val TRASH_TIMEOUT_MILLIS = 20_000L
         const val DELETE_TIMEOUT_MILLIS = 3_000L
         const val POLL_MILLIS = 100L
     }
