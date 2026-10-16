@@ -25,6 +25,7 @@ import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -382,10 +383,36 @@ class SyncSessionTest {
         updates.last() shouldBe TransferProgress(2, 2, 2L * MIB + 500, 2L * MIB + 500, updates.last().currentItem)
     }
 
+    @Test
+    fun `the last progress comes before the session ends, never after`() {
+        val producer = Producer(List(3) { media("item$it", 500) })
+        val consumer = Consumer()
+        val connection = ConnectionPair(producerId, consumerId)
+        val itemsReported = AtomicInteger()
+
+        val (reportedWhenDone, _) = runBothSides(
+            producer = {
+                val session = ProducerSession(local, producer.source, producer.ledger, progress = { update ->
+                    Thread.sleep(SLOW_LISTENER_MILLIS) // A slow screen update, so one coming late would show.
+                    itemsReported.set(update.itemsDone)
+                })
+                session.sync(connection.producerEnd)
+                itemsReported.get()
+            },
+            consumer = {
+                ConsumerSession(local, consumer.registry, consumer.ledger, consumer.sink, FakePairingGate(TOKEN))
+                    .serve(connection.consumerEnd)
+            },
+        )
+
+        reportedWhenDone.getOrThrow() shouldBe 3
+    }
+
     private fun media(key: String, size: Int) = FakeMedia(key, Random(key.hashCode()).nextBytes(size))
 
     private companion object {
         const val MIB = 1024 * 1024
+        const val SLOW_LISTENER_MILLIS = 50L
         val TOKEN = "one-time-token!!".encodeToByteArray().toByteString()
     }
 }

@@ -334,13 +334,15 @@ class ProducerSession(
                 ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
                 source.confirmed(prepared.item)
             }
-            // In flight until recorded and counted: the session, waiting for nothing to be in flight, then counts it.
+            // In flight until recorded, reported and counted: the session, waiting for nothing to be in flight, ends
+            // only after it. Reported after leaving the flight, its progress could come after the sync had ended, and
+            // the sending phone would show it as still syncing.
+            completeItem(prepared.item)
             lock.withLock {
                 inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")
                 if (confirmed) sent++ else failed++
                 changed.signalAll()
             }
-            completeItem(prepared.item)
         }
 
         private fun awaitResponse(): OfferResponse = when (val next = responses.take()) {
