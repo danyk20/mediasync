@@ -20,6 +20,7 @@ import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintEntity
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
@@ -32,6 +33,7 @@ import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.time.ZoneId
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -45,7 +47,8 @@ import okio.source
 
 /**
  * The producer's photos and videos, read from MediaStore: those in the folders the user chose to send
- * (docs/PLAN.md §2.2), read again before every listing so a new choice applies right away.
+ * (docs/PLAN.md §2.2), and taken within the days the user chose, if any. Both are read again before every listing,
+ * so a new choice applies right away.
  *
  * Files are read as originals whenever the user granted `ACCESS_MEDIA_LOCATION`. Otherwise Android strips
  * the location from what the app can read (docs/PLAN.md §6.2).
@@ -56,6 +59,7 @@ class MediaStoreSource internal constructor(
     private val context: Context,
     private val fingerprints: MediaFingerprintDao,
     private val shared: SharedItems = SharedItems(context),
+    private val range: suspend () -> SendRange = { SendRange.Everything },
     private val selection: suspend () -> SourceSelection,
 ) : MediaSource {
 
@@ -65,7 +69,7 @@ class MediaStoreSource internal constructor(
         fingerprints: MediaFingerprintDao,
         shared: SharedItems,
         settings: SettingsRepository,
-    ) : this(context, fingerprints, shared, { settings.sourceSelection.first() })
+    ) : this(context, fingerprints, shared, { settings.sendRange.first() }, { settings.sourceSelection.first() })
 
     private val resolver: ContentResolver = context.contentResolver
 
@@ -79,9 +83,12 @@ class MediaStoreSource internal constructor(
      */
     override fun items(): List<SourceItem> {
         val chosen = runBlocking { selection() }
+        // Days outside the range are left out by MediaStore itself, so their files are never read to be fingerprinted.
+        val days = runBlocking { range() }
+        val zone = ZoneId.systemDefault()
         val original = canReadLocation()
         return sharedItems(original) + COLLECTIONS.flatMap { collection ->
-            query(collection) { row ->
+            query(collection, days.startMillis(zone), days.endMillis(zone)) { row ->
                 row.stringOrNull(MediaStore.MediaColumns.RELATIVE_PATH)
                     ?.takeIf(chosen::includes)
                     ?.let { toItem(collection, row, original) }
@@ -156,12 +163,13 @@ class MediaStoreSource internal constructor(
         }
     }
 
-    private fun <T : Any> query(collection: Uri, map: (Cursor) -> T?): List<T> {
+    private fun <T : Any> query(collection: Uri, startMillis: Long?, endMillis: Long?, map: (Cursor) -> T?): List<T> {
+        val (where, args) = readyItems(startMillis, endMillis)
         val cursor = resolver.query(
             collection,
             PROJECTION,
-            "${MediaStore.MediaColumns.IS_PENDING} = 0",
-            null,
+            where,
+            args,
             "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
         ) ?: return emptyList()
         return cursor.use { generateSequence { if (it.moveToNext()) it else null }.mapNotNull(map).toList() }
@@ -274,4 +282,22 @@ private fun Cursor.longOrNull(column: String): Long? {
 private fun Cursor.stringOrNull(column: String): String? {
     val index = getColumnIndex(column)
     return if (index == -1 || isNull(index)) null else getString(index)
+}
+
+/**
+ * MediaStore's selection of items that are ready (not still being written), taken from [startMillis] on and before
+ * [endMillis], where set. An item without a date taken counts by when its file last changed.
+ */
+internal fun readyItems(startMillis: Long?, endMillis: Long?): Pair<String, Array<String>?> {
+    val ready = "${MediaStore.MediaColumns.IS_PENDING} = 0"
+    if (startMillis == null && endMillis == null) return ready to null
+    val taken = MediaStore.MediaColumns.DATE_TAKEN
+    val modified = MediaStore.MediaColumns.DATE_MODIFIED // In seconds, unlike the date taken.
+    val bounds = listOfNotNull(startMillis?.let { ">= ?" to it }, endMillis?.let { "< ?" to it })
+    val takenWithin = bounds.joinToString("") { (op, _) -> " AND $taken $op" }
+    val modifiedWithin = bounds.joinToString("") { (op, _) -> " AND $modified $op" }
+    val args = bounds.map { (_, millis) -> millis.toString() } +
+        bounds.map { (_, millis) -> TimeUnit.MILLISECONDS.toSeconds(millis).toString() }
+    return "$ready AND (($taken > 0$takenWithin) OR (($taken IS NULL OR $taken = 0)$modifiedWithin))" to
+        args.toTypedArray()
 }

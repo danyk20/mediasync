@@ -181,6 +181,7 @@ The **LAN-only** setting needs no internet services at all. The Worker is only u
 
 - Pair with a consumer by scanning a QR code. Fallback: a 6-digit code.
 - Choose sources: albums/folders such as Camera, Screenshots or WhatsApp Images, each showing a thumbnail, item count and size. Presets: *Camera only* (default), *Camera + Screenshots*, *Everything*.
+- Optionally limit the **dates taken** (*Built (M6)*): *From* a first day, *Until* a last day, or both, **both days included**; by default everything in the chosen folders is sent. An item without a date taken counts by its file's date. MediaStore filters them in its query, so older files are never read or fingerprinted. While *Until* is set, nothing taken later is sent, new photos included, and the screen says so; it also says that what's outside the days isn't backed up through MediaSync. Photos shared to MediaSync are sent whatever their date.
   - Per source: photos and/or videos.
   - During setup: "Sync existing photos too?" → *All* / *Only new from today*.
 - Network policy, per consumer:

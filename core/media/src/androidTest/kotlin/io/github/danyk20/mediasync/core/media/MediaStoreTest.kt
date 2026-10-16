@@ -26,6 +26,7 @@ import io.github.danyk20.mediasync.core.metadata.Redaction
 import io.github.danyk20.mediasync.core.metadata.VideoDates
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
@@ -290,6 +291,25 @@ class MediaStoreTest {
         sentWith(SourceSelection(SourcePreset.EVERYTHING)) shouldBe listOf("camera-choice.jpg", "other-choice.jpg")
         sentWith(SourceSelection.of(setOf(TEST_FOLDER))) shouldBe listOf("other-choice.jpg")
         sentWith(SourceSelection.of(emptySet())) shouldBe emptyList()
+    }
+
+    @Test
+    fun onlyWhatWasTakenWithinTheChosenDaysIsSentBothDaysIncluded() {
+        insertInto(TEST_FOLDER, jpeg(Color.CYAN), "today-range.jpg")
+        val today = LocalDate.now()
+        fun sentWithin(range: SendRange) =
+            MediaStoreSource(context, database.mediaFingerprintDao(), range = { range }) {
+                SourceSelection.of(setOf(TEST_FOLDER))
+            }.items()
+                .map { it.descriptor.displayName }
+                .filter { it.endsWith("-range.jpg") }
+
+        sentWithin(SendRange.Everything) shouldBe listOf("today-range.jpg")
+        sentWithin(SendRange(from = today)) shouldBe listOf("today-range.jpg")
+        sentWithin(SendRange(until = today)) shouldBe listOf("today-range.jpg")
+        sentWithin(SendRange(today, today)) shouldBe listOf("today-range.jpg")
+        sentWithin(SendRange(from = today.plusDays(1))) shouldBe emptyList()
+        sentWithin(SendRange(until = today.minusDays(1))) shouldBe emptyList()
     }
 
     @Test

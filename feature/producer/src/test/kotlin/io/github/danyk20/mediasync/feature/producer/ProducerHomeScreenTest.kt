@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -29,6 +30,7 @@ import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
+import java.time.LocalDate
 import java.time.ZonedDateTime
 import org.junit.Rule
 import org.junit.Test
@@ -237,6 +239,12 @@ class ProducerHomeScreenTest {
         composeRule.onNodeWithText("Remove location").assertIsDisplayed()
         composeRule.onNodeWithText("Photo details").performClick()
         events shouldBe listOf("details")
+    }
+
+    @Test
+    fun limitedDays_areShownWithTheFolders() {
+        show(paired.copy(pendingCount = 0, sendRange = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))))
+        composeRule.onNodeWithText("Camera only, Jan 1, 2025 – Mar 31, 2025").assertIsDisplayed()
     }
 
     @Test

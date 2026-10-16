@@ -5,12 +5,14 @@
 package io.github.danyk20.mediasync.feature.producer
 
 import io.github.danyk20.mediasync.core.media.MediaFolder
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -42,6 +44,17 @@ class SourceFoldersViewModelTest {
         state.selection shouldBe SourceSelection.Default
         state.folders.map { it.folder } shouldBe listOf(whatsApp, camera, screenshots)
         sent() shouldBe listOf(camera)
+    }
+
+    @Test
+    fun everythingIsSentUntilDaysAreChosenAndThoseAreSaved() = runTest {
+        ready().range shouldBe SendRange.Everything
+        val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
+
+        viewModel.choose(firstQuarter)
+
+        settings.sendRange.value shouldBe firstQuarter
+        viewModel.uiState.first { (it as SourceFoldersUiState.Ready).range == firstQuarter }
     }
 
     @Test

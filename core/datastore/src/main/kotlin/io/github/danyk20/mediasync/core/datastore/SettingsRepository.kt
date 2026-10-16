@@ -6,12 +6,14 @@ package io.github.danyk20.mediasync.core.datastore
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.Flow
 
 /** Device-level settings that survive app restarts. */
+@Suppress("TooManyFunctions") // One setter per setting.
 interface SettingsRepository {
     /** This device's role, or `null` until the user has chosen one. */
     val role: Flow<DeviceRole?>
@@ -22,6 +24,11 @@ interface SettingsRepository {
     val sourceSelection: Flow<SourceSelection>
 
     suspend fun setSourceSelection(selection: SourceSelection)
+
+    /** From which days a sending phone sends; [SendRange.Everything] until the user chooses. */
+    val sendRange: Flow<SendRange>
+
+    suspend fun setSendRange(range: SendRange)
 
     /** A receiving phone's sync schedule, which its sending phones follow; [SyncSchedule.Default] until changed. */
     val syncSchedule: Flow<SyncSchedule>

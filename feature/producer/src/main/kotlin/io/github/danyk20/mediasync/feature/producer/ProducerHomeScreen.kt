@@ -73,6 +73,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaPermissions
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.ProducerState
@@ -238,7 +239,7 @@ private fun WhatIsSent(
 ) {
     SettingRow(
         title = stringResource(R.string.producer_sources_title),
-        summary = sourcesSummary(state.sources),
+        summary = rangeSummary(sourcesSummary(state.sources), state.sendRange),
         icon = MediaSyncIcons.Folder,
         onClick = onChooseFolders,
     )
@@ -699,6 +700,19 @@ private fun TurboCard(
 
 /** More than this waiting, Turbo is worth suggesting: a first sync, or after a holiday. */
 private const val TURBO_SUGGESTED_BYTES = 2_000_000_000L
+
+/** The [folders] summary, with the days sent when they're limited. */
+@Composable
+private fun rangeSummary(folders: String, range: SendRange): String {
+    val from = range.from?.format(DAY_SHOWN)
+    val until = range.until?.format(DAY_SHOWN)
+    return when {
+        from != null && until != null -> stringResource(R.string.producer_sources_between, folders, from, until)
+        from != null -> stringResource(R.string.producer_sources_from, folders, from)
+        until != null -> stringResource(R.string.producer_sources_until, folders, until)
+        else -> folders
+    }
+}
 
 /** "Camera only", or the chosen folders' names: "Camera, WhatsApp Images and 2 more". */
 @Composable

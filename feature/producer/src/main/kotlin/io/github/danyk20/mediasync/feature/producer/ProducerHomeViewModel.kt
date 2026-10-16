@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -66,6 +67,8 @@ data class ProducerHomeUiState(
     val photoDetails: PhotoDetails = PhotoDetails.Default,
     val sendingOrder: SendingOrder = SendingOrder.Default,
     val sources: SourceSelection = SourceSelection.Default,
+    /** The days whose photos and videos are sent. */
+    val sendRange: SendRange = SendRange.Everything,
     /** The receiving phone's schedule, which this phone follows; `null` until paired. */
     val schedule: SyncSchedule? = null,
     /** When the next scheduled sync is due, as of [now]; `null` without a timed schedule. */
@@ -93,9 +96,12 @@ data class ProducerHomeUiState(
     val mobileDataSent: Long = 0,
 )
 
+/** Which folders this phone sends, and from which days. */
+private data class Sources(val selection: SourceSelection, val range: SendRange)
+
 /** How this phone uses internet sync, as the user set it. */
 private data class InternetSettings(
-    val sources: SourceSelection,
+    val sources: Sources,
     val mobileData: Boolean,
     val videosOverRelay: Boolean,
     val mobileDataCap: Long?,
@@ -155,7 +161,7 @@ class ProducerHomeViewModel @Inject constructor(
         sync.state,
         pending,
         combine(
-            settings.sourceSelection,
+            combine(settings.sourceSelection, settings.sendRange, ::Sources),
             settings.internetOverMobileData,
             settings.videosOverRelay,
             settings.mobileDataCapBytes,
@@ -188,7 +194,8 @@ class ProducerHomeViewModel @Inject constructor(
             withheldCount = count?.withheld ?: 0,
             photoDetails = extras.choices.details,
             sendingOrder = extras.choices.order,
-            sources = sources,
+            sources = sources.selection,
+            sendRange = sources.range,
             schedule = schedule,
             nextSyncAt = schedule?.nextDue(now),
             now = now,
@@ -209,12 +216,19 @@ class ProducerHomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
     init {
-        // Recount whenever a sync ends, the receiving phone or the chosen folders change, or photos are added,
+        // Recount whenever a sync ends, the receiving phone, folders or day change, or photos are added,
         // edited or deleted. A newer reason cancels a count still running.
         @OptIn(FlowPreview::class)
         val reasons = merge(
             uiState.distinctUntilChangedBy {
-                listOf(it.consumerName, it.canReadLibrary, it.sync is ProducerState.Idle, it.sources, it.photoDetails)
+                listOf(
+                    it.consumerName,
+                    it.canReadLibrary,
+                    it.sync is ProducerState.Idle,
+                    it.sources,
+                    it.sendRange,
+                    it.photoDetails,
+                )
             }
                 .map { },
             library.changes().debounce(LIBRARY_SETTLE_MILLIS),
