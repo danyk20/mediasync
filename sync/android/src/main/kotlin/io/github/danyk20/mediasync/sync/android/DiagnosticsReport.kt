@@ -51,6 +51,7 @@ class DiagnosticsReport @Inject constructor(
     private val peers: PeerStore,
     private val history: SyncHistory,
     private val network: AddressProvider,
+    private val directLinks: DirectLinks,
     private val workManager: WorkManager,
     private val log: FileDiagnosticLog,
     private val clock: Clock,
@@ -70,6 +71,7 @@ class DiagnosticsReport @Inject constructor(
             add(Fact("Power", power()))
             val addresses = network.localAddresses().map { Sanitizer.clean(it.hostAddress.orEmpty()) }
             add(Fact("Local network", addresses.joinToString().ifEmpty { "none" }))
+            add(Fact("Turbo", turbo()))
             add(Fact("Free space", bytes(StatFs(Environment.getExternalStorageDirectory().path).availableBytes)))
             SyncScheduler.WORK_NAMES.forEach { name -> add(Fact("Work: $name", work(name))) }
             add(Fact("Report made", TIME.format(ZonedDateTime.now(clock))))
@@ -106,6 +108,13 @@ class DiagnosticsReport @Inject constructor(
         )
 
         null -> emptyList()
+    }
+
+    /** What this phone can link up directly with (docs/PLAN.md §8.3). */
+    private fun turbo(): String {
+        val direct = directLinks.availability().name.lowercase().replace('_', ' ')
+        val aware = if (directLinks.awareAvailable()) "available" else "no"
+        return "Wi-Fi Direct: $direct; Wi-Fi Aware: $aware"
     }
 
     private suspend fun work(name: String): String {

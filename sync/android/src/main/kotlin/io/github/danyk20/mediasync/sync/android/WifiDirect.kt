@@ -21,6 +21,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import java.net.Inet4Address
@@ -84,7 +85,14 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
         else -> TurboAvailability.AVAILABLE
     }
 
-    override fun open(port: Int, credentials: Pair<String, String>): TurboAnswer = when (availability()) {
+    override fun open(port: Int, credentials: Pair<String, String>, kind: LinkKind): TurboAnswer =
+        if (kind == LinkKind.WIFI_DIRECT) {
+            openGroup(port, credentials)
+        } else {
+            TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+        }
+
+    private fun openGroup(port: Int, credentials: Pair<String, String>): TurboAnswer = when (availability()) {
         TurboAvailability.UNSUPPORTED -> TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
 
         TurboAvailability.NOT_ALLOWED, TurboAvailability.LOCATION_OFF ->
@@ -142,7 +150,7 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
         }
     }
 
-    override suspend fun join(link: DirectLink, timeoutMillis: Long): String? {
+    override suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? {
         if (availability() != TurboAvailability.AVAILABLE) return null
         return withTimeoutOrNull(timeoutMillis) {
             val channel = channel()
@@ -158,7 +166,7 @@ class WifiDirect @Inject constructor(@ApplicationContext private val context: Co
                 val owner = info.groupOwnerAddress
                 info.groupFormed && !info.isGroupOwner && owner != null && hasAddressNear(owner)
             }
-            info.groupOwnerAddress?.hostAddress
+            info.groupOwnerAddress?.let(::JoinedLink)
         }
     }
 

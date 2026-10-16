@@ -36,6 +36,7 @@ class TurboTest {
     private val local = LocalDevice("Test phone", "0.0.0-test")
     private val link = DirectLink("DIRECT-ab-MediaSync", "secret-passphrase-123456", "192.168.49.1", 47_420)
     private var opened = 0
+    private var askedForAware: Boolean? = null
 
     private fun consumer(paired: Boolean = true, turbo: TurboHost? = TurboHost { TurboAnswer.Ready(link) }) =
         ConsumerSession(
@@ -51,17 +52,21 @@ class TurboTest {
             FakeMediaSink(),
             FakePairingGate("one-time-token!!".encodeToByteArray().toByteString()),
             turbo = turbo?.let { host ->
-                TurboHost {
+                TurboHost { aware ->
                     opened++
-                    host.open()
+                    askedForAware = aware
+                    host.open(aware)
                 }
             },
         )
 
-    private fun request(consumer: ConsumerSession): Pair<Result<TurboAnswer>, Result<ServeResult>> {
+    private fun request(
+        consumer: ConsumerSession,
+        aware: Boolean = false,
+    ): Pair<Result<TurboAnswer>, Result<ServeResult>> {
         val connection = ConnectionPair(producerId, consumerId)
         return runBothSides(
-            producer = { TurboSetup(local).request(connection.producerEnd) },
+            producer = { TurboSetup(local).request(connection.producerEnd, aware) },
             consumer = { consumer.serve(connection.consumerEnd) },
         )
     }
@@ -73,6 +78,19 @@ class TurboTest {
         answer.getOrThrow() shouldBe TurboAnswer.Ready(link)
         served.getOrThrow() shouldBe ServeResult.TurboAnswered(TurboAnswer.Ready(link))
         opened shouldBe 1
+        askedForAware shouldBe false
+    }
+
+    @Test
+    fun aPhoneThatCanUseWifiAwareSaysSoAndLearnsTheAwareLink() {
+        val aware =
+            DirectLink("MediaSync-abcdefghijklmnop", "secret-passphrase-123456", "", 47_420, LinkKind.WIFI_AWARE)
+
+        val (answer, _) = request(consumer(turbo = { TurboAnswer.Ready(aware) }), aware = true)
+
+        askedForAware shouldBe true
+        answer.getOrThrow() shouldBe TurboAnswer.Ready(aware)
+        aware.toString() shouldNotContain aware.passphrase
     }
 
     @Test
@@ -99,6 +117,12 @@ class TurboTest {
     @Test
     fun aReasonFromALaterVersionIsAFailure() {
         TurboReady(status = 42).toAnswer() shouldBe TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+    }
+
+    @Test
+    fun aKindOfLinkFromALaterVersionIsAFailure() {
+        TurboReady(TurboReady.Status.OK, "name", "passphrase", "", 1, kind = 42).toAnswer() shouldBe
+            TurboAnswer.Unavailable(TurboUnavailable.FAILED)
     }
 
     @Test
@@ -193,5 +217,17 @@ class TurboTest {
         }
         all.map { it.second }.toSet() shouldHaveSize 20
         link.toString() shouldNotContain link.passphrase
+    }
+
+    @Test
+    fun eachAwareTransferGetsAFreshServiceNameAndPassphrase() {
+        val all = List(20) { DirectLink.awareCredentials() }
+
+        all.forEach { (name, passphrase) ->
+            name shouldMatch Regex("MediaSync-[A-Za-z0-9]{16}")
+            passphrase shouldMatch Regex("[A-Za-z0-9]{24}") // Wi-Fi Aware takes 8 to 63 characters.
+        }
+        all.map { it.first }.toSet() shouldHaveSize 20
+        all.map { it.second }.toSet() shouldHaveSize 20
     }
 }

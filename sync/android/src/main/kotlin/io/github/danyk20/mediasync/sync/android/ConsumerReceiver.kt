@@ -11,6 +11,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.ConsumerSession
 import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.MediaSink
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PairingLink
@@ -362,7 +363,7 @@ class ConsumerReceiver internal constructor(
         private val opening = Any()
 
         /** Answers sending phones that ask over Wi-Fi. */
-        internal val host = TurboHost { open() }
+        internal val host = TurboHost { aware -> open(aware = aware) }
 
         /** Whether sending phones can use Turbo transfer with this phone now. */
         fun availability(): TurboAvailability = directLinks.availability()
@@ -397,17 +398,30 @@ class ConsumerReceiver internal constructor(
 
         /**
          * Opens a direct link for a sending phone that asked for Turbo transfer, or hands out the one already open.
-         * It stays open, and this phone keeps listening, until [idleMillis] after the last session.
+         * It stays open, and this phone keeps listening, until [idleMillis] after the last session. [aware]: the
+         * sending phone can join over Wi-Fi Aware, which is then tried first.
          */
         private fun open(
             credentials: Pair<String, String> = DirectLink.credentials(),
             idleMillis: Long = directLinkIdleMillis,
+            aware: Boolean = false,
         ): TurboAnswer {
+            // A Wi-Fi Aware link only suits phones that can join one: it makes way for Wi-Fi Direct, while this
+            // phone keeps listening.
+            link.get()?.takeIf { !aware && it.link.kind == LinkKind.WIFI_AWARE }?.let { old ->
+                hold(DIRECT_LINK_SWAP_HOLDER)
+                try {
+                    if (forget(old)) directLinks.close(old.link.networkName)
+                    return open(credentials, idleMillis, aware)
+                } finally {
+                    release(DIRECT_LINK_SWAP_HOLDER)
+                }
+            }
             var opened: TurboAnswer.Ready? = null
             val answer = synchronized(opening) {
                 link.get() ?: run {
                     val port = _state.value.port ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
-                    directLinks.open(port, credentials).also { answer ->
+                    openLink(port, credentials, aware).also { answer ->
                         Diagnostics.log(Area.RECEIVE, "Turbo: ${answer.describe()}")
                         if (answer is TurboAnswer.Ready) {
                             link.set(answer)
@@ -430,6 +444,16 @@ class ConsumerReceiver internal constructor(
                 }
             }
             return answer
+        }
+
+        /** Over Wi-Fi Aware if [aware] and this phone can, else (or if that fails) over Wi-Fi Direct. */
+        private fun openLink(port: Int, credentials: Pair<String, String>, aware: Boolean): TurboAnswer {
+            if (aware && directLinks.awareAvailable()) {
+                val answer = directLinks.open(port, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE)
+                if (answer is TurboAnswer.Ready) return answer
+                Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Aware ${answer.describe()}; Wi-Fi Direct instead")
+            }
+            return directLinks.open(port, credentials)
         }
 
         /** Closes [open] once nothing came over it (or anywhere) for [idleMillis]; done if it closed before. */
@@ -462,6 +486,7 @@ class ConsumerReceiver internal constructor(
         const val PREFERRED_PORT = 47_420
         private const val MAX_NAME = 64
         private const val DIRECT_LINK_HOLDER = "turbo"
+        private const val DIRECT_LINK_SWAP_HOLDER = "turbo-swap"
         private const val TURBO_RECEIVE_HOLDER = "turbo-receive"
 
         /** Time for the user to walk over to the sending phone and start Turbo there. */

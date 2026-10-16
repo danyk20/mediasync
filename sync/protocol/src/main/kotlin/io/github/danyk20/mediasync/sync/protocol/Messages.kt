@@ -161,15 +161,17 @@ data class LinkTestResult(@ProtoNumber(1) val bytes: Long, @ProtoNumber(2) val m
 
 /**
  * Producer → consumer: asks for Turbo transfer (docs/PLAN.md §8.3), a direct Wi-Fi link between the two phones. The
- * consumer answers with [TurboReady].
+ * consumer answers with [TurboReady]. [aware]: the producer can join a Wi-Fi Aware link now; consumers before M6
+ * ignore it and answer with Wi-Fi Direct.
  */
 @Serializable
-data class TurboRequest(@ProtoNumber(1) val reserved: Int = 0) : ControlMessage
+data class TurboRequest(@ProtoNumber(1) val reserved: Int = 0, @ProtoNumber(2) val aware: Boolean = false) :
+    ControlMessage
 
 /**
- * Consumer → producer: the direct link to join, when [status] is [Status.OK]: its Wi-Fi Direct [networkName] and
- * [passphrase], fresh for each Turbo transfer, and where this phone listens on it. They travel inside the encrypted
- * session, so only the paired phone learns them.
+ * Consumer → producer: the direct link to join, when [status] is [Status.OK]: its Wi-Fi Direct network or Wi-Fi Aware
+ * service ([kind]) by [networkName], its [passphrase], fresh for each Turbo transfer, and where this phone listens on
+ * it. They travel inside the encrypted session, so only the paired phone learns them.
  */
 @Serializable
 data class TurboReady(
@@ -178,7 +180,15 @@ data class TurboReady(
     @ProtoNumber(3) val passphrase: String = "",
     @ProtoNumber(4) val host: String = "",
     @ProtoNumber(5) val port: Int = 0,
+    @ProtoNumber(6) val kind: Int = Kind.WIFI_DIRECT,
 ) : ControlMessage {
+    object Kind {
+        const val WIFI_DIRECT = 0
+
+        /** Only to a producer that asked with [TurboRequest.aware]; [host] is empty, as the link tells it. */
+        const val WIFI_AWARE = 1
+    }
+
     object Status {
         const val OK = 1
 

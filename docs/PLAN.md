@@ -716,7 +716,12 @@ interface SecureSession : Closeable {
     - Removing a sending phone gives the receiving phone a new key, so the removed phone can't find the link any more. The phones still paired learn it in their next session over Wi-Fi or the internet. *Built (M6).*
 - **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.
 - **Closing:** the consumer removes the group a minute after the last session over it; the producer leaves it when its sync ends.
-- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster and it disturbs the normal Wi-Fi less. *Planned for M6:* it needs real phones to test (emulators don't have it), and Wi-Fi Direct stays as the fallback.
+- **Wi-Fi Aware** is used instead of Wi-Fi Direct when both phones support it, because setup is faster and it disturbs the normal Wi-Fi less. *Built (M6):*
+  - The producer says in its request that it can join a Wi-Fi Aware link now (`TurboRequest.aware`; older consumers ignore it). The consumer then publishes a Wi-Fi Aware service with a random name and passphrase instead of creating a group.
+  - The producer finds the service, says hello, and both ask Android for a data path protected by the passphrase: a network of its own, with link-local IPv6 addresses. The producer connects through it, and mutual TLS runs as on any other path.
+  - Fallbacks: a consumer that can't publish opens Wi-Fi Direct at once. A producer that can't join within 15 seconds asks again without Wi-Fi Aware, and the consumer replaces the link with a Wi-Fi Direct group.
+  - *Turbo receive* stays on Wi-Fi Direct, as the producer can't ask what the consumer has.
+  - Emulators have no Wi-Fi Aware: unit tests cover the choice and every fallback, and the radio part needs real phones. Diagnostics shows whether each phone has Wi-Fi Direct and Wi-Fi Aware.
 - **Fallbacks:**
   - If the direct group fails, the transfer continues over normal Wi-Fi automatically: when the consumer can't open a group, when the producer can't join it within 30 seconds, and when the link drops mid-transfer (the rest goes over Wi-Fi). The home screen says why Turbo wasn't used.
   - If the phone isn't charging, a warning appears when the battery is below 30 %.

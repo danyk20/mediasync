@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
@@ -30,6 +31,7 @@ import io.kotest.matchers.doubles.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
@@ -523,6 +525,69 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun turboGoesOverWifiAwareWhenBothPhonesHaveIt() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        consumerLinks.aware = true
+        producerLinks.aware = true
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 4
+        done.turboProblem shouldBe null
+        consumerLinks.kinds shouldBe listOf(LinkKind.WIFI_AWARE)
+        producerLinks.joined?.kind shouldBe LinkKind.WIFI_AWARE
+        producerLinks.joined?.networkName shouldStartWith "MediaSync-"
+        producerLinks.left shouldBe true
+    }
+
+    @Test
+    fun aWifiAwareLinkThatCantBeJoinedMakesWayForWifiDirect() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        consumerLinks.aware = true
+        consumerLinks.answer = { port, _ ->
+            TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port))
+        }
+        producerLinks.aware = true
+        producerLinks.joinable = { it.kind == LinkKind.WIFI_DIRECT }
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 4
+        done.turboProblem shouldBe null
+        consumerLinks.kinds shouldBe listOf(LinkKind.WIFI_AWARE, LinkKind.WIFI_DIRECT)
+        consumerLinks.closed.first() shouldStartWith "MediaSync-" // The Wi-Fi Aware link made way.
+        producerLinks.joined?.networkName shouldBe "DIRECT-ab-MediaSync"
+    }
+
+    @Test
+    fun withoutWifiAwareOnBothPhonesTurboGoesOverWifiDirect() = runBlocking<Unit> {
+        receiver.hold("screen") // Listening on after the first link closes.
+        pairWithApproval()
+        consumerLinks.answer = { port, _ ->
+            TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port))
+        }
+        producerLinks.aware = true // The receiving phone has none.
+
+        withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+            .shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe null
+        consumerLinks.kinds shouldBe listOf(LinkKind.WIFI_DIRECT)
+
+        // It has Wi-Fi Aware, but it won't start now.
+        source.put(FakeMedia("new", Random(9).nextBytes(100_000)))
+        consumerLinks.aware = true
+        consumerLinks.awareAnswer = { _, _ -> TurboAnswer.Unavailable(TurboUnavailable.FAILED) }
+        withTimeout(TIMEOUT) { receiver.state.first { !it.directLinkOpen } }
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        done.turboProblem shouldBe null
+        consumerLinks.kinds shouldBe listOf(LinkKind.WIFI_DIRECT, LinkKind.WIFI_DIRECT)
+    }
+
+    @Test
     fun aDirectLinkThatDropsLeavesTheRestToWifi() = runBlocking<Unit> {
         receiver.start()
         pairWithApproval()
@@ -605,26 +670,42 @@ private class FakeDirectLinks : DirectLinks {
         Pair<String, String>,
     ) -> TurboAnswer = { _, _ -> TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED) }
 
+    /** This phone has Wi-Fi Aware; its links answer with [awareAnswer]. */
+    var aware = false
+    var awareAnswer: (Int, Pair<String, String>) -> TurboAnswer = { port, (name, passphrase) ->
+        TurboAnswer.Ready(DirectLink(name, passphrase, host = "", port = port, kind = LinkKind.WIFI_AWARE))
+    }
+
     /** Which links this phone can join: any, or only those another phone opened. */
     var joinable: (DirectLink) -> Boolean = { true }
     var joined: DirectLink? = null
     var left = false
     val opened = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
+    val kinds = java.util.concurrent.CopyOnWriteArrayList<LinkKind>()
     val closed = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     override fun availability() = TurboAvailability.AVAILABLE
 
-    override fun open(port: Int, credentials: Pair<String, String>) =
-        answer(port, credentials).also { if (it is TurboAnswer.Ready) opened += credentials }
+    override fun awareAvailable() = aware
+
+    override fun open(port: Int, credentials: Pair<String, String>, kind: LinkKind): TurboAnswer {
+        val answers = if (kind == LinkKind.WIFI_AWARE) awareAnswer else answer
+        return answers(port, credentials).also {
+            if (it is TurboAnswer.Ready) {
+                opened += credentials
+                kinds += kind
+            }
+        }
+    }
 
     override fun close(networkName: String) {
         closed += networkName
     }
 
-    override suspend fun join(link: DirectLink, timeoutMillis: Long): String? {
+    override suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? {
         val joins = joinable(link)
         if (joins) joined = link
-        return if (joins) "127.0.0.1" else null
+        return if (joins) JoinedLink(InetAddress.getByName("127.0.0.1")) else null
     }
 
     override fun leave() {

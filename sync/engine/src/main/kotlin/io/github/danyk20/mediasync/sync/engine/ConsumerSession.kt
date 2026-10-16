@@ -107,7 +107,7 @@ class ConsumerSession(
 
             first is LinkTestBegin && registry.isPaired(producer) -> linkTest(channel)
 
-            first is TurboRequest && registry.isPaired(producer) -> turbo(channel)
+            first is TurboRequest && registry.isPaired(producer) -> turbo(channel, first.aware)
 
             registry.isPaired(producer) -> Receiver(channel, producer).run(first)
 
@@ -162,8 +162,8 @@ class ConsumerSession(
     }
 
     /** Opens the direct link, says how to join it (or why not), and leaves the rest to new sessions over it. */
-    private fun turbo(channel: FrameChannel): ServeResult {
-        val answer = turbo?.open() ?: TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
+    private fun turbo(channel: FrameChannel, aware: Boolean): ServeResult {
+        val answer = turbo?.open(aware) ?: TurboAnswer.Unavailable(TurboUnavailable.UNSUPPORTED)
         channel.send(answer.toWire())
         awaitEnd(channel)
         return ServeResult.TurboAnswered(answer)
