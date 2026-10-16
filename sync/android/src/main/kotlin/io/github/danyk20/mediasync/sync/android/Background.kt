@@ -27,6 +27,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.time.Clock
 import java.time.Duration
@@ -65,6 +66,17 @@ class SettingsPhotoDetailsSource @Inject constructor(
     private val details = settings.photoDetails.stateIn(scope, SharingStarted.Eagerly, PhotoDetails.Default)
 
     override fun current(): PhotoDetails = details.value
+}
+
+/** The sending phone's sending order from its settings, kept current for the syncs that follow it. */
+@Singleton
+class SettingsSendingOrderSource @Inject constructor(
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+) : SendingOrderSource {
+    private val order = settings.sendingOrder.stateIn(scope, SharingStarted.Eagerly, SendingOrder.Default)
+
+    override fun current(): SendingOrder = order.value
 }
 
 /** The receiving phone's rendezvous Worker from its settings, told to paired phones in every session (PLAN §8.4). */
@@ -112,6 +124,9 @@ internal abstract class SettingsSourcesModule {
 
     @Binds
     abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
+
+    @Binds
+    abstract fun bindSendingOrderSource(impl: SettingsSendingOrderSource): SendingOrderSource
 
     @Binds
     abstract fun bindRendezvousSource(impl: SettingsRendezvousSource): RendezvousSource

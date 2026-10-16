@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LinkKind
@@ -54,6 +55,7 @@ class AndroidPlatformTest {
             context,
             schedule = { SyncSchedule.WhileCharging },
             details = { PhotoDetails.REMOVE_LOCATION },
+            order = { SendingOrder.OLDEST_FIRST },
             turboKeys = TurboKeyStore(context),
             rendezvous = { "https://rendezvous.example.com" },
             relayVideos = { true },
@@ -64,6 +66,7 @@ class AndroidPlatformTest {
         device.appVersion.shouldNotBeBlank()
         device.schedule shouldBe SyncSchedule.WhileCharging
         info.photoDetails() shouldBe PhotoDetails.REMOVE_LOCATION
+        info.sendingOrder() shouldBe SendingOrder.OLDEST_FIRST
         info.videosOverRelay() shouldBe true
         device.rendezvousUrl shouldBe "https://rendezvous.example.com"
     }

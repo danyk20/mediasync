@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.android
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LinkKind
@@ -33,6 +34,9 @@ fun interface DeviceInfo {
 
     /** As a sending phone: the details it sends (docs/PLAN.md §6.3). */
     fun photoDetails(): PhotoDetails = PhotoDetails.Default
+
+    /** As a sending phone: in which order it sends what's waiting. */
+    fun sendingOrder(): SendingOrder = SendingOrder.Default
 
     /**
      * As a sending phone: whether videos also go through the relay; otherwise they wait for Wi-Fi or a direct
@@ -230,6 +234,11 @@ fun interface DeviceConditions {
 /** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
 fun interface PhotoDetailsSource {
     fun current(): PhotoDetails
+}
+
+/** The order a sending phone sends in, as the user set it. */
+fun interface SendingOrderSource {
+    fun current(): SendingOrder
 }
 
 /** As a sending phone: whether videos also go through the relay (PLAN §17, relay saver), as the user set it. */

@@ -8,6 +8,7 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,14 @@ class FakeSettingsRepository(
 
     override suspend fun setPhotoDetails(details: PhotoDetails) {
         photoDetailsState.value = details
+    }
+
+    private val sendingOrderState = MutableStateFlow(SendingOrder.Default)
+
+    override val sendingOrder: StateFlow<SendingOrder> = sendingOrderState
+
+    override suspend fun setSendingOrder(order: SendingOrder) {
+        sendingOrderState.value = order
     }
 
     private val rendezvousUrlState = MutableStateFlow<String?>(null)

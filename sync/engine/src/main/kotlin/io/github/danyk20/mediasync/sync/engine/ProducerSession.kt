@@ -9,6 +9,7 @@ import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
 import io.github.danyk20.mediasync.core.metadata.Redaction
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.FileAck
@@ -69,8 +70,8 @@ data class SyncResult(
 }
 
 /**
- * Sends everything the consumer hasn't confirmed yet, newest first (docs/PLAN.md §5), with the [details] the user
- * chose to send (docs/PLAN.md §6.3): removed details never leave this phone.
+ * Sends everything the consumer hasn't confirmed yet, in the [order] the user chose (docs/PLAN.md §5), with the
+ * [details] the user chose to send (docs/PLAN.md §6.3): removed details never leave this phone.
  *
  * The session is blocking: run it on an I/O thread. Closing the connection aborts it; everything
  * already confirmed stays recorded, and a partly sent file resumes next time.
@@ -82,6 +83,8 @@ class ProducerSession(
     private val progress: ProgressListener = ProgressListener {},
     private val shouldContinue: () -> Boolean = { true },
     private val details: PhotoDetails = PhotoDetails.KEEP_ALL,
+    /** Resolved for the connection already: [SendingOrder.AUTOMATIC] counts as newest first. */
+    private val order: SendingOrder = SendingOrder.Default,
     /**
      * Files sent ahead of the consumer's confirmation (docs/PLAN.md §7, pipelining): the next file starts while the
      * consumer still verifies and stores the previous ones, so there's no round trip per file.
@@ -110,17 +113,12 @@ class ProducerSession(
         return run.send(queue)
     }
 
-    /** Items the consumer hasn't confirmed, without duplicates: those the user shared first, then newest first. */
+    /** Items the consumer hasn't confirmed, without duplicates: those the user shared first, then in [order]. */
     internal fun pendingFor(consumer: DeviceId): List<SourceItem> {
         val confirmed = ledger.sentFingerprints(consumer)
         return source.items()
             .filter { it.descriptor.fingerprint !in confirmed }
-            .sortedWith(
-                compareByDescending<SourceItem> { it.shared }
-                    .thenByDescending {
-                        it.descriptor.meta.capturedAtMillis ?: it.descriptor.meta.modifiedAtMillis ?: 0L
-                    },
-            )
+            .sortedWith(compareByDescending<SourceItem> { it.shared }.then(order.comparator()))
             .distinctBy { it.descriptor.fingerprint }
     }
 
@@ -336,13 +334,15 @@ class ProducerSession(
                 ledger.markSent(consumer, prepared.descriptor.fingerprint, ack.contentId)
                 source.confirmed(prepared.item)
             }
-            // In flight until recorded and counted: the session, waiting for nothing to be in flight, then counts it.
+            // In flight until recorded, reported and counted: the session, waiting for nothing to be in flight, ends
+            // only after it. Reported after leaving the flight, its progress could come after the sync had ended, and
+            // the sending phone would show it as still syncing.
+            completeItem(prepared.item)
             lock.withLock {
                 inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")
                 if (confirmed) sent++ else failed++
                 changed.signalAll()
             }
-            completeItem(prepared.item)
         }
 
         private fun awaitResponse(): OfferResponse = when (val next = responses.take()) {
@@ -422,3 +422,20 @@ class WorkQueue(items: List<SourceItem>) {
 
     fun isEmpty(): Boolean = queue.isEmpty()
 }
+
+/** Sorts what's waiting in this order, apart from shared items; within photos or videos, the newest first. */
+internal fun SendingOrder.comparator(): Comparator<SourceItem> {
+    val newestFirst = compareByDescending<SourceItem> { it.takenAtMillis() }
+    return when (resolved(overInternet = false)) {
+        SendingOrder.OLDEST_FIRST -> compareBy { it.takenAtMillis() }
+        SendingOrder.PHOTOS_FIRST -> compareBy<SourceItem> { it.isVideo() }.then(newestFirst)
+        SendingOrder.VIDEOS_FIRST -> compareBy<SourceItem> { !it.isVideo() }.then(newestFirst)
+        else -> newestFirst
+    }
+}
+
+/** When it was taken, or else when its file last changed (screenshots, saved images). */
+private fun SourceItem.takenAtMillis(): Long =
+    descriptor.meta.capturedAtMillis ?: descriptor.meta.modifiedAtMillis ?: 0L
+
+private fun SourceItem.isVideo(): Boolean = descriptor.mimeType.startsWith("video/")

@@ -13,10 +13,12 @@ import io.github.danyk20.mediasync.core.database.RoomSentLedger
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
+import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
@@ -106,6 +108,7 @@ class RuntimeEndToEndTest {
     private val history = SyncHistory(ApplicationProvider.getApplicationContext())
     private var photoDetails = PhotoDetails.KEEP_ALL
     private var videosOverRelay = false
+    private var sendingOrder = SendingOrder.Default
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
@@ -117,6 +120,8 @@ class RuntimeEndToEndTest {
             override fun photoDetails() = photoDetails
 
             override fun videosOverRelay() = videosOverRelay
+
+            override fun sendingOrder() = sendingOrder
         },
         network = Connectivity(loopback, {
             if (offWifi) NoNetwork else SocketFactory.getDefault()
@@ -156,6 +161,33 @@ class RuntimeEndToEndTest {
         sink.stored.size shouldBe photos.size + 1
         internet.connects.get() shouldBe 1
         producerPeers.consumer()?.lastAddress shouldBe address // Not an address on the local network.
+    }
+
+    @Test
+    fun theSendingOrderIsFollowedAndOverTheInternetThePhoneSendsPhotosFirst() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        videosOverRelay = true
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        val video = FakeMedia("video", Random(1).nextBytes(1_000), "video.mp4", "video/mp4", MediaMeta(3_000))
+        val photo = FakeMedia("photo", Random(2).nextBytes(1_000), meta = MediaMeta(1_000))
+        suspend fun sendAway(order: SendingOrder): List<String> {
+            sendingOrder = order
+            val before = synchronized(source.opened) { source.opened.size }
+            source.put(video.copyAs("${video.key}-$order"))
+            source.put(photo.copyAs("${photo.key}-$order"))
+            producer.syncNow()
+            withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult?.sent == 2 } }
+            return synchronized(source.opened) { source.opened.drop(before).map { it.substringBefore('-') } }
+        }
+        offWifi = true // Over the internet: one connection, so the order is exact.
+
+        sendAway(SendingOrder.AUTOMATIC) shouldBe listOf("photo", "video")
+        sendAway(SendingOrder.NEWEST_FIRST) shouldBe listOf("video", "photo")
+        sendAway(SendingOrder.OLDEST_FIRST) shouldBe listOf("photo", "video")
     }
 
     @Test
@@ -837,3 +869,7 @@ private object NoNetwork : SocketFactory() {
         localPort: Int,
     ): java.net.Socket = none()
 }
+
+/** The same media under another key, with other bytes, so it counts as new. */
+private fun FakeMedia.copyAs(key: String) =
+    FakeMedia(key, bytes + key.encodeToByteArray(), displayName, mimeType, meta, shared)

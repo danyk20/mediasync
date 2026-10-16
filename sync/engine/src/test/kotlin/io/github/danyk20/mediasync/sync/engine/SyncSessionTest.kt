@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
@@ -24,6 +25,7 @@ import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -107,6 +109,50 @@ class SyncSessionTest {
         val pending = ProducerSession(local, producer.source, producer.ledger).pendingFor(consumerId)
 
         pending.map { it.key } shouldBe listOf("new-shared", "shared", "old")
+    }
+
+    @Test
+    fun `each sending order sorts what's waiting, after what was shared`() {
+        fun media(key: String, takenAt: Long, video: Boolean = false, shared: Boolean = false) = FakeMedia(
+            key,
+            key.encodeToByteArray(),
+            mimeType = if (video) "video/mp4" else "image/jpeg",
+            meta = MediaMeta(capturedAtMillis = takenAt),
+            shared = shared,
+        )
+        // A screenshot has no capture date: its file's date counts.
+        val screenshot =
+            FakeMedia("screenshot", byteArrayOf(9), meta = MediaMeta(capturedAtMillis = null, modifiedAtMillis = 2_500))
+        val all = listOf(
+            media("photo-1", 1_000),
+            media("video-2", 2_000, video = true),
+            screenshot,
+            media("photo-3", 3_000),
+            media("video-4", 4_000, video = true),
+            media("shared-video-0", 0, video = true, shared = true),
+        )
+        fun order(order: SendingOrder) =
+            ProducerSession(local, Producer(all).source, FakeSentLedger(), order = order).pendingFor(consumerId)
+                .map { it.key }
+
+        order(SendingOrder.NEWEST_FIRST) shouldBe
+            listOf("shared-video-0", "video-4", "photo-3", "screenshot", "video-2", "photo-1")
+        order(SendingOrder.AUTOMATIC) shouldBe order(SendingOrder.NEWEST_FIRST) // Unless resolved otherwise.
+        order(SendingOrder.OLDEST_FIRST) shouldBe
+            listOf("shared-video-0", "photo-1", "video-2", "screenshot", "photo-3", "video-4")
+        order(SendingOrder.PHOTOS_FIRST) shouldBe
+            listOf("shared-video-0", "photo-3", "screenshot", "photo-1", "video-4", "video-2")
+        order(SendingOrder.VIDEOS_FIRST) shouldBe
+            listOf("shared-video-0", "video-4", "video-2", "photo-3", "screenshot", "photo-1")
+    }
+
+    @Test
+    fun `automatically, photos go first over the internet and the newest first elsewhere`() {
+        SendingOrder.AUTOMATIC.resolved(overInternet = true) shouldBe SendingOrder.PHOTOS_FIRST
+        SendingOrder.AUTOMATIC.resolved(overInternet = false) shouldBe SendingOrder.NEWEST_FIRST
+        SendingOrder.entries.filter { it != SendingOrder.AUTOMATIC }.forEach { chosen ->
+            chosen.resolved(overInternet = true) shouldBe chosen
+        }
     }
 
     @Test
@@ -337,10 +383,36 @@ class SyncSessionTest {
         updates.last() shouldBe TransferProgress(2, 2, 2L * MIB + 500, 2L * MIB + 500, updates.last().currentItem)
     }
 
+    @Test
+    fun `the last progress comes before the session ends, never after`() {
+        val producer = Producer(List(3) { media("item$it", 500) })
+        val consumer = Consumer()
+        val connection = ConnectionPair(producerId, consumerId)
+        val itemsReported = AtomicInteger()
+
+        val (reportedWhenDone, _) = runBothSides(
+            producer = {
+                val session = ProducerSession(local, producer.source, producer.ledger, progress = { update ->
+                    Thread.sleep(SLOW_LISTENER_MILLIS) // A slow screen update, so one coming late would show.
+                    itemsReported.set(update.itemsDone)
+                })
+                session.sync(connection.producerEnd)
+                itemsReported.get()
+            },
+            consumer = {
+                ConsumerSession(local, consumer.registry, consumer.ledger, consumer.sink, FakePairingGate(TOKEN))
+                    .serve(connection.consumerEnd)
+            },
+        )
+
+        reportedWhenDone.getOrThrow() shouldBe 3
+    }
+
     private fun media(key: String, size: Int) = FakeMedia(key, Random(key.hashCode()).nextBytes(size))
 
     private companion object {
         const val MIB = 1024 * 1024
+        const val SLOW_LISTENER_MILLIS = 50L
         val TOKEN = "one-time-token!!".encodeToByteArray().toByteString()
     }
 }

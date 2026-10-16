@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -132,6 +133,19 @@ class DataStoreSettingsRepositoryTest {
 
         dataStore.edit { it[DataStoreSettingsRepository.PhotoDetailsKey] = "FROM_A_NEWER_VERSION" }
         repository.photoDetails.first() shouldBe PhotoDetails.KEEP_ALL
+    }
+
+    @Test
+    fun thePhoneChoosesTheSendingOrderUntilTheUserDoes() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+        repository.sendingOrder.first() shouldBe SendingOrder.AUTOMATIC
+
+        repository.setSendingOrder(SendingOrder.OLDEST_FIRST)
+        repository.sendingOrder.first() shouldBe SendingOrder.OLDEST_FIRST
+
+        dataStore.edit { it[DataStoreSettingsRepository.SendingOrderKey] = "FROM_A_NEWER_VERSION" }
+        repository.sendingOrder.first() shouldBe SendingOrder.AUTOMATIC
     }
 
     @Test

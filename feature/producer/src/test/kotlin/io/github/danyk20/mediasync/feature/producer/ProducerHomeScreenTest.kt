@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
@@ -236,6 +237,15 @@ class ProducerHomeScreenTest {
         composeRule.onNodeWithText("Remove location").assertIsDisplayed()
         composeRule.onNodeWithText("Photo details").performClick()
         events shouldBe listOf("details")
+    }
+
+    @Test
+    fun sendingOrder_isShownAndCanBeChanged() {
+        show(paired.copy(pendingCount = 0, sendingOrder = SendingOrder.OLDEST_FIRST))
+
+        composeRule.onNodeWithText("Oldest first").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Sending order").performClick()
+        events shouldBe listOf("order")
     }
 
     @Test
@@ -538,6 +548,7 @@ class ProducerHomeScreenTest {
                     onAllowNotifications = { events += "notifications" },
                     onDismiss = { events += "dismiss $it" },
                     onChooseDetails = { events += "details" },
+                    onChooseOrder = { events += "order" },
                     onInternetOverMobileData = { events += "mobile data $it" },
                     onVideosOverRelay = { events += "relay videos $it" },
                     onMobileDataCap = { events += "cap $it" },
