@@ -9,15 +9,18 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaFolder
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.kotest.matchers.shouldBe
+import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +46,7 @@ class SourceFoldersScreenTest {
         FolderChoice(MediaFolder("Pictures/Instagram/", 1, 2_400_000, null), included = false),
     )
     private val cameraOnly = SourceFoldersUiState.Ready(SourceSelection.Default, folders)
+    private val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
     private val events = mutableListOf<String>()
 
     @Test
@@ -90,7 +94,59 @@ class SourceFoldersScreenTest {
     }
 
     @Test
+    fun everythingIsSentAtFirst() {
+        show(cameraOnly)
+        composeRule.onNodeWithText("whenever it was taken", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("No start").assertIsSelected()
+        composeRule.onNodeWithText("No end").assertIsSelected()
+        composeRule.onAllNodesWithText("isn't backed up", substring = true).fetchSemanticsNodes() shouldBe emptyList()
+    }
+
+    @Test
+    fun aRangeSaysThatBothChosenDaysAreSentAndNothingLater() {
+        show(cameraOnly.copy(range = firstQuarter))
+        composeRule.onNodeWithText("Jan 1, 2025").assertIsSelected()
+        composeRule.onNodeWithText("Mar 31, 2025").assertIsSelected()
+        composeRule.onNodeWithText(
+            "Sent: photos and videos taken from Jan 1, 2025 through Mar 31, 2025, both days included.",
+            substring = true,
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("new photos included", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("isn't backed up through MediaSync", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun onlyAFirstDaySendsThatDayAndLater() {
+        show(cameraOnly.copy(range = SendRange(from = LocalDate.of(2025, 1, 1))))
+
+        composeRule.onNodeWithText("Sent: photos and videos taken on Jan 1, 2025 or later.").assertIsDisplayed()
+    }
+
+    @Test
+    fun anEndIsOpenedAgainWithNoEnd() {
+        show(cameraOnly.copy(range = firstQuarter))
+
+        composeRule.onNodeWithText("No end").performClick()
+
+        events shouldBe listOf("range 2025-01-01 null")
+    }
+
+    @Test
+    fun aFirstDayIsPickedInADialogTodayAtFirst() {
+        show(cameraOnly)
+
+        composeRule.onAllNodesWithText("Choose a day…")[0].performClick()
+        composeRule.onNodeWithText("First day sent").assertIsDisplayed()
+        composeRule.onNodeWithText("OK").performClick()
+
+        events shouldBe listOf("range ${LocalDate.now()} null")
+    }
+
+    @Test
     fun screenshot_light() = screenshot(cameraOnly, "producer_folders_light")
+
+    @Test
+    fun screenshot_range_light() = screenshot(cameraOnly.copy(range = firstQuarter), "producer_folders_range_light")
 
     @Test
     fun screenshot_dark() = screenshot(
@@ -118,6 +174,7 @@ class SourceFoldersScreenTest {
                     onChoosePreset = { events += "preset $it" },
                     onToggle = { events += "toggle $it" },
                     onDone = { events += "done" },
+                    onChooseRange = { events += "range ${it.from} ${it.until}" },
                 )
             }
         }

@@ -156,6 +156,22 @@
     <string name="producer_folders_preset_everything">All folders</string>
     <string name="producer_folders_hint_preset">Matching folders added later are included automatically.</string>
     <string name="producer_folders_hint_chosen">Only the folders you check are sent.</string>
+    <string name="producer_range_title">Dates taken</string>
+    <string name="producer_range_from">From</string>
+    <string name="producer_range_until">Until</string>
+    <string name="producer_range_no_start">No start</string>
+    <string name="producer_range_no_end">No end</string>
+    <string name="producer_range_choose_day">Choose a day…</string>
+    <string name="producer_range_pick_from">First day sent</string>
+    <string name="producer_range_pick_until">Last day sent</string>
+    <string name="producer_range_note_everything">Every photo and video in these folders is sent, whenever it was taken.</string>
+    <string name="producer_range_note_from">Sent: photos and videos taken on %1$s or later.</string>
+    <string name="producer_range_note_until">Sent: photos and videos taken on %1$s or earlier. Anything taken later isn\'t sent, new photos included.</string>
+    <string name="producer_range_note_between">Sent: photos and videos taken from %1$s through %2$s, both days included. Anything taken later isn\'t sent, new photos included.</string>
+    <string name="producer_range_backup_note">What\'s outside these days isn\'t backed up through MediaSync. What was already sent stays on the receiving phone.</string>
+    <string name="producer_sources_from">%1$s, from %2$s</string>
+    <string name="producer_sources_until">%1$s, until %2$s</string>
+    <string name="producer_sources_between">%1$s, %2$s – %3$s</string>
     <string name="producer_folders_empty">No photos or videos on this phone yet.</string>
     <!-- The count is already formatted for the locale: "2,814". -->
     <plurals name="producer_folders_items">

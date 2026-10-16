@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
@@ -17,6 +18,7 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.io.File
+import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -133,6 +135,22 @@ class DataStoreSettingsRepositoryTest {
 
         dataStore.edit { it[DataStoreSettingsRepository.PhotoDetailsKey] = "FROM_A_NEWER_VERSION" }
         repository.photoDetails.first() shouldBe PhotoDetails.KEEP_ALL
+    }
+
+    @Test
+    fun everythingIsSentUntilTheUserChoosesDays() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+        repository.sendRange.first() shouldBe SendRange.Everything
+
+        val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
+        repository.setSendRange(firstQuarter)
+        repository.sendRange.first() shouldBe firstQuarter
+
+        repository.setSendRange(firstQuarter.copy(from = null))
+        repository.sendRange.first() shouldBe SendRange(until = LocalDate.of(2025, 3, 31))
+
+        repository.setSendRange(SendRange.Everything)
+        repository.sendRange.first().isEverything shouldBe true
     }
 
     @Test

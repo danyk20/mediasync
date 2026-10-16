@@ -8,6 +8,7 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** In-memory [SettingsRepository] for ViewModel and UI tests. */
+@Suppress("TooManyFunctions") // One setter per setting.
 class FakeSettingsRepository(
     initialRole: DeviceRole? = null,
     initialSourceSelection: SourceSelection = SourceSelection.Default,
@@ -49,6 +51,14 @@ class FakeSettingsRepository(
 
     override suspend fun setPhotoDetails(details: PhotoDetails) {
         photoDetailsState.value = details
+    }
+
+    private val sendRangeState = MutableStateFlow(SendRange.Everything)
+
+    override val sendRange: StateFlow<SendRange> = sendRangeState
+
+    override suspend fun setSendRange(range: SendRange) {
+        sendRangeState.value = range
     }
 
     private val sendingOrderState = MutableStateFlow(SendingOrder.Default)

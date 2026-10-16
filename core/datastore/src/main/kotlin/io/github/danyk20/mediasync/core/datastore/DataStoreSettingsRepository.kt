@@ -13,15 +13,18 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
+@Suppress("TooManyFunctions") // One setter per setting.
 internal class DataStoreSettingsRepository @Inject constructor(private val dataStore: DataStore<Preferences>) :
     SettingsRepository {
 
@@ -70,6 +73,22 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
 
     override suspend fun setPhotoDetails(details: PhotoDetails) {
         dataStore.edit { it[PhotoDetailsKey] = details.name }
+    }
+
+    override val sendRange: Flow<SendRange> = dataStore.data
+        .map { preferences ->
+            SendRange(
+                from = preferences[SendFromKey]?.let(LocalDate::ofEpochDay),
+                until = preferences[SendUntilKey]?.let(LocalDate::ofEpochDay),
+            )
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setSendRange(range: SendRange) {
+        dataStore.edit { preferences ->
+            range.from?.let { preferences[SendFromKey] = it.toEpochDay() } ?: preferences.remove(SendFromKey)
+            range.until?.let { preferences[SendUntilKey] = it.toEpochDay() } ?: preferences.remove(SendUntilKey)
+        }
     }
 
     override val sendingOrder: Flow<SendingOrder> = dataStore.data
@@ -130,6 +149,8 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
         val PhotoDetailsKey = stringPreferencesKey("photo_details")
         val SendingOrderKey = stringPreferencesKey("sending_order")
+        val SendFromKey = longPreferencesKey("send_from_epoch_day")
+        val SendUntilKey = longPreferencesKey("send_until_epoch_day")
         val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
         val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
