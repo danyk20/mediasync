@@ -469,7 +469,10 @@ The `meta` sidecar carries details that live *outside* the file, in the producer
 
 ### 5.4 Ordering and fairness
 
-- **Default order:** newest first, so recent memories are safe sooner. Photos are interleaved before large videos so the item count rises quickly. Users can choose *oldest first*.
+- **Sending order** (each sending phone's setting; *Built (M6)*): it decides what arrives first when a big backlog is cut short. Photos shared to MediaSync always go first.
+  - *Automatic* (the default): newest first, so recent memories are safe sooner. Over the internet, photos before videos, so the item count rises quickly on a slow connection.
+  - *Newest first*, *Oldest first*, *Photos first* and *Videos first* (the newest first within each). Under *Videos first*, a note says that a nearly full receiving phone then gets fewer items.
+  - "Newest" means when it was taken, or the file's date without one (screenshots, saved images). A change applies from the next sync. With parallel connections, the order holds batch by batch, not file by file.
 - With several producers connected at once, the consumer splits its stream budget fairly between them.
 
 ### 5.5 Failure handling

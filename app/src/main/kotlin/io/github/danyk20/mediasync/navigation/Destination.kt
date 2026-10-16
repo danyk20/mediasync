@@ -40,6 +40,10 @@ sealed interface Destination : NavKey {
     @Serializable
     data object ProducerPhotoDetails : Destination
 
+    /** The sending phone's *Sending order* setting. */
+    @Serializable
+    data object ProducerSendingOrder : Destination
+
     /** The consumer sets when its producers sync. */
     @Serializable
     data object ConsumerSchedule : Destination

@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.core.datastore
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,11 @@ interface SettingsRepository {
     val photoDetails: Flow<PhotoDetails>
 
     suspend fun setPhotoDetails(details: PhotoDetails)
+
+    /** In which order a sending phone sends what's waiting; [SendingOrder.Default] until the user chooses. */
+    val sendingOrder: Flow<SendingOrder>
+
+    suspend fun setSendingOrder(order: SendingOrder)
 
     /** A receiving phone's rendezvous Worker for internet sync (PLAN §8.4); `null` while it has none. */
     val rendezvousUrl: Flow<String?>

@@ -15,6 +15,7 @@ import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
@@ -63,6 +64,7 @@ data class ProducerHomeUiState(
     /** Photos and videos the *Photo details* setting holds back: their details can't be removed. */
     val withheldCount: Int = 0,
     val photoDetails: PhotoDetails = PhotoDetails.Default,
+    val sendingOrder: SendingOrder = SendingOrder.Default,
     val sources: SourceSelection = SourceSelection.Default,
     /** The receiving phone's schedule, which this phone follows; `null` until paired. */
     val schedule: SyncSchedule? = null,
@@ -106,12 +108,15 @@ private data class InternetSettings(
  */
 data class MissedSync(val due: ZonedDateTime, val problem: SyncProblem?, val batteryRestricted: Boolean)
 
+/** What the user chose about how this phone sends. */
+private data class SendingChoices(val details: PhotoDetails, val order: SendingOrder)
+
 /** What the home screen shows besides the sync itself. */
 private data class Extras(
     val access: DeviceAccess,
     val record: SyncRecord,
     val dismissed: Set<SetupPrompt>,
-    val details: PhotoDetails,
+    val choices: SendingChoices,
     val turboDeclined: Boolean,
 )
 
@@ -157,7 +162,14 @@ class ProducerHomeViewModel @Inject constructor(
             mobileDataUsage.sentThisMonth,
             ::InternetSettings,
         ),
-        combine(access, history.record, settings.dismissedPrompts, settings.photoDetails, turboDeclined, ::Extras),
+        combine(
+            access,
+            history.record,
+            settings.dismissedPrompts,
+            combine(settings.photoDetails, settings.sendingOrder, ::SendingChoices),
+            turboDeclined,
+            ::Extras,
+        ),
     ) { consumer, state, count, internet, extras ->
         val sources = internet.sources
         val (access, record, dismissed) = extras
@@ -174,7 +186,8 @@ class ProducerHomeViewModel @Inject constructor(
             turboBatteryLow = access.turboBatteryLow,
             turboDeclined = extras.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
             withheldCount = count?.withheld ?: 0,
-            photoDetails = extras.details,
+            photoDetails = extras.choices.details,
+            sendingOrder = extras.choices.order,
             sources = sources,
             schedule = schedule,
             nextSyncAt = schedule?.nextDue(now),

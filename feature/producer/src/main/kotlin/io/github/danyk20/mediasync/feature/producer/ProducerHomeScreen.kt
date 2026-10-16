@@ -91,6 +91,7 @@ fun ProducerHomeRoute(
     onChooseFolders: () -> Unit,
     modifier: Modifier = Modifier,
     onChooseDetails: () -> Unit = {},
+    onChooseOrder: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     viewModel: ProducerHomeViewModel = hiltViewModel(),
 ) {
@@ -135,6 +136,7 @@ fun ProducerHomeRoute(
         },
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
+        onChooseOrder = onChooseOrder,
         onInternetOverMobileData = viewModel::setInternetOverMobileData,
         onVideosOverRelay = viewModel::setVideosOverRelay,
         onMobileDataCap = viewModel::setMobileDataCap,
@@ -165,6 +167,7 @@ fun ProducerHomeScreen(
     modifier: Modifier = Modifier,
     onAllowNotifications: () -> Unit = {},
     onChooseDetails: () -> Unit = {},
+    onChooseOrder: () -> Unit = {},
     onInternetOverMobileData: (Boolean) -> Unit = {},
     onVideosOverRelay: (Boolean) -> Unit = {},
     onMobileDataCap: (Long?) -> Unit = {},
@@ -211,7 +214,7 @@ fun ProducerHomeScreen(
                     WithheldNotice(state, onChooseDetails)
                     HeldBackNotice(state)
                     TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
-                    WhatIsSent(state, onChooseFolders, onChooseDetails)
+                    WhatIsSent(state, onChooseFolders, onChooseDetails, onChooseOrder)
                     InternetCard(
                         state,
                         consumer,
@@ -225,9 +228,14 @@ fun ProducerHomeScreen(
     }
 }
 
-/** What this phone sends: from which folders, and with which photo details. */
+/** What this phone sends: from which folders, with which photo details, and in which order. */
 @Composable
-private fun WhatIsSent(state: ProducerHomeUiState, onChooseFolders: () -> Unit, onChooseDetails: () -> Unit) {
+private fun WhatIsSent(
+    state: ProducerHomeUiState,
+    onChooseFolders: () -> Unit,
+    onChooseDetails: () -> Unit,
+    onChooseOrder: () -> Unit,
+) {
     SettingRow(
         title = stringResource(R.string.producer_sources_title),
         summary = sourcesSummary(state.sources),
@@ -239,6 +247,12 @@ private fun WhatIsSent(state: ProducerHomeUiState, onChooseFolders: () -> Unit, 
         summary = stringResource(state.photoDetails.title),
         icon = MediaSyncIcons.Info,
         onClick = onChooseDetails,
+    )
+    SettingRow(
+        title = stringResource(R.string.producer_order_row_title),
+        summary = stringResource(state.sendingOrder.title),
+        icon = MediaSyncIcons.Order,
+        onClick = onChooseOrder,
     )
 }
 

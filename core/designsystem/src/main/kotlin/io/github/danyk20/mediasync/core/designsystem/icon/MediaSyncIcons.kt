@@ -17,6 +17,8 @@ object MediaSyncIcons {
 
     @DrawableRes val Folder: Int = R.drawable.ic_folder
 
+    @DrawableRes val Order: Int = R.drawable.ic_sort
+
     @DrawableRes val Warning: Int = R.drawable.ic_warning
 
     @DrawableRes val Notifications: Int = R.drawable.ic_notifications

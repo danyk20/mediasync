@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -71,6 +72,17 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[PhotoDetailsKey] = details.name }
     }
 
+    override val sendingOrder: Flow<SendingOrder> = dataStore.data
+        .map { preferences ->
+            preferences[SendingOrderKey]?.let { name -> SendingOrder.entries.firstOrNull { it.name == name } }
+                ?: SendingOrder.Default
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setSendingOrder(order: SendingOrder) {
+        dataStore.edit { it[SendingOrderKey] = order.name }
+    }
+
     override val rendezvousUrl: Flow<String?> = dataStore.data.map { it[RendezvousUrlKey] }.distinctUntilChanged()
 
     override suspend fun setRendezvousUrl(url: String?) {
@@ -117,6 +129,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val SourceFoldersKey = stringSetPreferencesKey("source_folders")
         val DismissedPromptsKey = stringSetPreferencesKey("dismissed_prompts")
         val PhotoDetailsKey = stringPreferencesKey("photo_details")
+        val SendingOrderKey = stringPreferencesKey("sending_order")
         val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
         val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")

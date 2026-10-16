@@ -23,6 +23,7 @@ import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.InetAddress
@@ -44,6 +45,7 @@ class AndroidDeviceInfo @Inject constructor(
     @ApplicationContext private val context: Context,
     private val schedule: ScheduleSource,
     private val details: PhotoDetailsSource,
+    private val order: SendingOrderSource,
     private val turboKeys: TurboKeyStore,
     private val rendezvous: RendezvousSource,
     private val relayVideos: RelayVideosSource,
@@ -58,6 +60,8 @@ class AndroidDeviceInfo @Inject constructor(
     )
 
     override fun photoDetails(): PhotoDetails = details.current()
+
+    override fun sendingOrder(): SendingOrder = order.current()
 
     override fun videosOverRelay(): Boolean = relayVideos.allowed()
 

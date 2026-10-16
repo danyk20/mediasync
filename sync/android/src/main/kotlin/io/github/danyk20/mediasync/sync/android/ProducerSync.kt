@@ -13,6 +13,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.metadata.isWithheld
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
 import io.github.danyk20.mediasync.sync.engine.LinkKind
@@ -278,9 +279,14 @@ class ProducerSync @Inject constructor(
     private suspend fun runSync(turbo: Boolean): ProducerState {
         val consumer = peers.consumer() ?: return ProducerState.Failed(SyncFailure.NOT_PAIRED)
         val details = device.photoDetails()
+        val order = device.sendingOrder()
         val over = if (turbo) ", Turbo asked for" else ""
-        Diagnostics.log(Area.SEND, "Sync to ${consumer.id.short()} (photo details: ${details.name.lowercase()}$over)")
-        val run = Run(consumer, details, System.currentTimeMillis())
+        Diagnostics.log(
+            Area.SEND,
+            "Sync to ${consumer.id.short()} (photo details: ${details.name.lowercase()}, " +
+                "order: ${order.name.lowercase()}$over)",
+        )
+        val run = Run(consumer, details, order, System.currentTimeMillis())
         return try {
             val connection = connect(consumer)
             when {
@@ -298,7 +304,12 @@ class ProducerSync @Inject constructor(
     }
 
     /** One sync to [consumer]: over Wi-Fi, or over a direct link while that works. */
-    private inner class Run(val consumer: Peer, val details: PhotoDetails, val started: Long) {
+    private inner class Run(
+        val consumer: Peer,
+        val details: PhotoDetails,
+        val order: SendingOrder,
+        val started: Long,
+    ) {
         /** On mobile data: how much more this month allows (docs/PLAN.md §2.2); `null` off mobile data. */
         var mobileDataLeft: Long? = null
 
@@ -446,9 +457,19 @@ class ProducerSync @Inject constructor(
                 Path.DIRECT -> " over Turbo"
                 Path.INTERNET -> " over the internet"
             }
+            // Over the internet, the phone's own order sends photos first: more of them arrive per minute.
+            val order = order.resolved(overInternet = path == Path.INTERNET)
             val result = ParallelSync(
                 session = { progress ->
-                    ProducerSession(device.local(), source, ledger, progress, { !cancelled && !pauseWhen() }, details)
+                    ProducerSession(
+                        device.local(),
+                        source,
+                        ledger,
+                        progress,
+                        { !cancelled && !pauseWhen() },
+                        details,
+                        order,
+                    )
                 },
                 connect = { another() },
                 progress = { progress ->
