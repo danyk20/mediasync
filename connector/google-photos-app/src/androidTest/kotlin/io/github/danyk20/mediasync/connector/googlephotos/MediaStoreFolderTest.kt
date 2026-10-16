@@ -8,6 +8,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,7 +43,7 @@ class MediaStoreFolderTest {
 
     @After
     fun tearDown() {
-        created.forEach { context.contentResolver.delete(it, null, null) }
+        created.forEach(::deleteQuietly)
     }
 
     @Test
@@ -116,6 +117,19 @@ class MediaStoreFolderTest {
         return uri
     }
 
+    /**
+     * Tidying up, not what's tested. Android 16 sometimes refuses to delete a file a moment after it was trashed, as
+     * if it weren't this app's (main, API 36): tries again for a while, then leaves it to the trash's own cleanup.
+     */
+    private fun deleteQuietly(uri: Uri) {
+        val end = SystemClock.uptimeMillis() + DELETE_TIMEOUT_MILLIS
+        while (runCatching { context.contentResolver.delete(uri, null, null) }.isFailure &&
+            SystemClock.uptimeMillis() < end
+        ) {
+            SystemClock.sleep(POLL_MILLIS)
+        }
+    }
+
     private fun item(uri: Uri) = BackupItem(
         contentId = contentId(0),
         displayName = "photo.jpg",
@@ -135,6 +149,7 @@ class MediaStoreFolderTest {
         const val CHANGE_TIMEOUT_MILLIS = 10_000L
         const val OBSERVER_START_MILLIS = 500L
         const val TRASH_TIMEOUT_MILLIS = 5_000L
+        const val DELETE_TIMEOUT_MILLIS = 3_000L
         const val POLL_MILLIS = 100L
     }
 }
