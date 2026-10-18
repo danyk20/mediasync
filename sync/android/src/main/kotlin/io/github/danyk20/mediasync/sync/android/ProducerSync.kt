@@ -28,6 +28,7 @@ import io.github.danyk20.mediasync.sync.engine.PeerEndedSessionException
 import io.github.danyk20.mediasync.sync.engine.ProducerSession
 import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.sync.engine.SourceItem
+import io.github.danyk20.mediasync.sync.engine.SpeedSample
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferEstimator
@@ -225,11 +226,16 @@ class ProducerSync @Inject constructor(
 
     /** The speed and time left of the sync running now: progress stops coming while a link stalls. */
     private val estimator = TransferEstimator()
+    private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
+
+    /** The speed every second of the sync running now, or of the last one, for its chart. */
+    val speedHistory: StateFlow<List<SpeedSample>> = _speedHistory.asStateFlow()
 
     /** Keeps the estimate current every second, also while nothing comes. */
     private suspend fun refreshEstimate() {
         while (true) {
             delay(ESTIMATE_REFRESH_MILLIS)
+            _speedHistory.value = estimator.history()
             _state.update { state ->
                 if (state is ProducerState.Syncing && state.progress != null) {
                     state.copy(estimate = estimator.refresh())

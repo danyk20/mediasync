@@ -42,4 +42,14 @@
     <string name="transfer_left_hours">quedan unas %1$d h %2$d min</string>
     <string name="transfer_left_whole_hours">quedan unas %1$d h</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <string name="speed_chart_open">Velocidad a lo largo del tiempo</string>
+    <string name="speed_chart_title">Velocidad de transferencia</string>
+    <string name="speed_chart_now">Ahora</string>
+    <string name="speed_chart_average">Media</string>
+    <string name="speed_chart_peak">Máximo</string>
+    <string name="speed_chart_hint">Desliza hacia los lados para ver lo anterior. Toca la línea para ver la velocidad en ese momento.</string>
+    <string name="speed_chart_waiting">El gráfico empieza tras unos segundos de transferencia.</string>
+    <string name="speed_chart_summary">Velocidad de transferencia durante %1$s: ahora %2$s, media %3$s, máximo %4$s.</string>
+    <string name="speed_chart_minutes">%1$d min</string>
+    <string name="speed_chart_seconds">%1$d s</string>
 </resources>

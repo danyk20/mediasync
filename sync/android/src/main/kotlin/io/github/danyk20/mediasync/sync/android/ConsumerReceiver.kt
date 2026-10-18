@@ -18,6 +18,7 @@ import io.github.danyk20.mediasync.sync.engine.PairingLink
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SpaceBudget
+import io.github.danyk20.mediasync.sync.engine.SpeedSample
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferEstimator
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -142,6 +143,10 @@ class ConsumerReceiver internal constructor(
     private val endedBytes = ConcurrentHashMap<DeviceId, Long>()
     private val estimators = ConcurrentHashMap<DeviceId, TransferEstimator>()
     private var speedsJob: Job? = null
+    private val _speedHistory = MutableStateFlow<Map<DeviceId, List<SpeedSample>>>(emptyMap())
+
+    /** Each producer's speed every second of its sync running now, or of its last one, for the chart. */
+    val speedHistory: StateFlow<Map<DeviceId, List<SpeedSample>>> = _speedHistory.asStateFlow()
 
     /** Turbo transfer, as the receiving phone (docs/PLAN.md §8.3). */
     val turbo = Turbo()
@@ -377,6 +382,8 @@ class ConsumerReceiver internal constructor(
         while (true) {
             delay(SPEED_REFRESH_MILLIS)
             if (estimators.isEmpty()) continue
+            // A producer whose sync ended keeps its last chart until its next sync.
+            _speedHistory.update { shown -> shown + estimators.mapValues { (_, estimator) -> estimator.history() } }
             _state.update { state ->
                 state.copy(
                     speeds = state.transfers.keys.mapNotNull { producer ->

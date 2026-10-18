@@ -45,4 +45,15 @@
     <string name="transfer_left_hours">about %1$d h %2$d min left</string>
     <string name="transfer_left_whole_hours">about %1$d h left</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <!-- The chart of a transfer's speed over time, from the ⓘ next to its speed. -->
+    <string name="speed_chart_open">Speed over time</string>
+    <string name="speed_chart_title">Transfer speed</string>
+    <string name="speed_chart_now">Now</string>
+    <string name="speed_chart_average">Average</string>
+    <string name="speed_chart_peak">Peak</string>
+    <string name="speed_chart_hint">Drag sideways to see earlier. Tap the line for the speed at that moment.</string>
+    <string name="speed_chart_waiting">The chart starts after a few seconds of transfer.</string>
+    <string name="speed_chart_summary">Transfer speed over %1$s: now %2$s, average %3$s, peak %4$s.</string>
+    <string name="speed_chart_minutes">%1$d min</string>
+    <string name="speed_chart_seconds">%1$d s</string>
 </resources>
