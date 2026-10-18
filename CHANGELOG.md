@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/danyk20/mediasync/compare/v0.4.0...v0.5.0) (2026-10-18)
+
+
+### Features
+
+* progress shows the transfer speed and the time left ([#54](https://github.com/danyk20/mediasync/issues/54)) ([a7b36d6](https://github.com/danyk20/mediasync/commit/a7b36d605d8654745e66e0e0a5458bc7921acbdf))
+
 ## [0.4.0](https://github.com/danyk20/mediasync/compare/v0.3.0...v0.4.0) (2026-10-16)
 
 
