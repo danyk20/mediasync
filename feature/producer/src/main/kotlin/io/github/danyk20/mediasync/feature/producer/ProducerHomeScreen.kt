@@ -70,6 +70,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.pastMoment
 import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
+import io.github.danyk20.mediasync.core.designsystem.component.transferRate
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaPermissions
@@ -797,6 +798,13 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing) {
             LinearProgressIndicator(
                 progress = { progress.bytesDone.toFloat() / progress.bytesTotal },
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        sync.estimate?.let { estimate ->
+            Text(
+                text = transferRate(estimate.bytesPerSecond, estimate.minutesLeft()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

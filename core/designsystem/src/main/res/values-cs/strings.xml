@@ -37,4 +37,11 @@
     <string name="setup_battery_title">Nechte synchronizace běžet v noci</string>
     <string name="setup_battery_body">Android pozastavuje aplikace na pozadí, aby šetřil baterii. V nastavení MediaSync otevřete nastavení baterie a zvolte Bez omezení. MediaSync synchronizuje jen při nabíjení.</string>
     <string name="setup_battery_open">Otevřít nastavení</string>
+    <string name="transfer_speed">%1$s/s</string>
+    <string name="transfer_waiting">Čekání na připojení…</string>
+    <string name="transfer_left_soon">zbývá méně než minuta</string>
+    <string name="transfer_left_minutes">zbývá asi %1$d min</string>
+    <string name="transfer_left_hours">zbývá asi %1$d h %2$d min</string>
+    <string name="transfer_left_whole_hours">zbývá asi %1$d h</string>
+    <string name="transfer_speed_and_left">%1$s · %2$s</string>
 </resources>

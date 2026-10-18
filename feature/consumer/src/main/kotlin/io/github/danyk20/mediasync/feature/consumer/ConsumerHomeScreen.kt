@@ -62,6 +62,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
+import io.github.danyk20.mediasync.core.designsystem.component.transferRate
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
@@ -347,6 +348,14 @@ private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean) {
             },
             modifier = Modifier.fillMaxWidth(),
         )
+        // The speed only: this phone learns how much is coming batch by batch, so it can't tell the time left.
+        transfer.bytesPerSecond?.let { speed ->
+            Text(
+                text = transferRate(speed, minutesLeft = null),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

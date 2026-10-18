@@ -28,6 +28,7 @@ import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import java.time.LocalDate
@@ -56,7 +57,10 @@ class ProducerHomeScreenTest {
         now = ZonedDateTime.parse("2026-10-14T20:00+02:00[Europe/Zurich]"),
     )
     private val syncing = paired.copy(
-        sync = ProducerState.Syncing(TransferProgress(12, 40, 145_000_000, 830_000_000, "PXL_1.jpg")),
+        sync = ProducerState.Syncing(
+            TransferProgress(12, 40, 145_000_000, 830_000_000, "PXL_1.jpg"),
+            estimate = TransferEstimate(8_400_000, 81_500), // 685 MB left at 8.4 MB/s.
+        ),
     )
     private val events = mutableListOf<String>()
 
@@ -111,11 +115,27 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun syncing_saysHowLongALongTransferTakesAndWhenItWaits() {
+        fun rate(estimate: TransferEstimate) = syncing.copy(
+            sync = (syncing.sync as ProducerState.Syncing).copy(estimate = estimate),
+        )
+        show(rate(TransferEstimate(1_000_000, 65 * 60_000L)))
+        composeRule.onNodeWithText("1.0 MB/s · about 1 h 5 min left").assertIsDisplayed()
+    }
+
+    @Test
+    fun syncing_waitsForAStalledConnection() {
+        show(syncing.copy(sync = (syncing.sync as ProducerState.Syncing).copy(estimate = TransferEstimate(0, null))))
+        composeRule.onNodeWithText("Waiting for the connection…").assertIsDisplayed()
+    }
+
+    @Test
     fun syncing_showsProgressAndCanStop() {
         show(syncing)
 
         composeRule.onNodeWithText("Sending to Pixel 2 XL").assertIsDisplayed()
         composeRule.onNodeWithText("12 of 40 · 145 MB of 830 MB").assertIsDisplayed()
+        composeRule.onNodeWithText("8.4 MB/s · about 2 min left").assertIsDisplayed()
         composeRule.onNodeWithText("Stop").performClick()
         events shouldBe listOf("stop")
     }

@@ -18,6 +18,8 @@ import io.github.danyk20.mediasync.sync.engine.PairingLink
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SpaceBudget
+import io.github.danyk20.mediasync.sync.engine.TransferEstimate
+import io.github.danyk20.mediasync.sync.engine.TransferEstimator
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboHost
@@ -52,6 +54,11 @@ data class ReceiverState(
     val port: Int? = null,
     /** Transfers in progress, by producer. */
     val transfers: Map<DeviceId, TransferProgress> = emptyMap(),
+    /**
+     * How fast each producer's transfer goes, once there's enough to go on. Without the time left: a receiving phone
+     * learns the total batch by batch.
+     */
+    val speeds: Map<DeviceId, TransferEstimate> = emptyMap(),
     /** The phone paired most recently in this run, for the pairing screen's success message. */
     val lastPaired: PairedPeer? = null,
     /** When a phone last connected or sent something; a receive window closes after a quiet spell. */
@@ -128,6 +135,14 @@ class ConsumerReceiver internal constructor(
     private val nextSession = AtomicLong()
     private val activeSessions = AtomicInteger()
 
+    /**
+     * What each producer's ended sessions of this sync brought: its speed counts all its connections, also once one
+     * of them is done before the others.
+     */
+    private val endedBytes = ConcurrentHashMap<DeviceId, Long>()
+    private val estimators = ConcurrentHashMap<DeviceId, TransferEstimator>()
+    private var speedsJob: Job? = null
+
     /** Turbo transfer, as the receiving phone (docs/PLAN.md §8.3). */
     val turbo = Turbo()
 
@@ -167,6 +182,7 @@ class ConsumerReceiver internal constructor(
             runCatching { discovery.advertise(server.port, serviceIdOf(identity.identity().id)) }.getOrNull()
         _state.update { it.copy(listening = true, port = server.port) }
         acceptJob = scope.launch(Dispatchers.IO) { acceptLoop(server) }
+        speedsJob = scope.launch { refreshSpeeds() }
         Diagnostics.log(Area.RECEIVE, "Listening on port ${server.port} for ${holders.joinToString()}")
         refreshInternet()
     }
@@ -201,12 +217,17 @@ class ConsumerReceiver internal constructor(
         turbo.stopReceive()
         if (server != null) Diagnostics.log(Area.RECEIVE, "Stopped listening")
         acceptJob?.cancel()
+        speedsJob?.cancel()
+        estimators.clear()
+        endedBytes.clear()
         server?.close()
         advertisement?.close()
         server = null
         advertisement = null
         stopListeningOverInternet()
-        _state.update { it.copy(listening = false, port = null, transfers = emptyMap(), overInternet = false) }
+        _state.update {
+            it.copy(listening = false, port = null, transfers = emptyMap(), speeds = emptyMap(), overInternet = false)
+        }
     }
 
     /**
@@ -296,7 +317,14 @@ class ConsumerReceiver internal constructor(
                 gate,
                 progress = { progress ->
                     sessions[id] = producer to progress
-                    _state.update { it.copy(transfers = transfers(), lastActivityMillis = System.currentTimeMillis()) }
+                    val transfers = transfers()
+                    _state.update {
+                        it.copy(
+                            transfers = transfers,
+                            speeds = speeds(transfers),
+                            lastActivityMillis = System.currentTimeMillis(),
+                        )
+                    }
                 },
                 space = space,
                 turbo = turbo.host,
@@ -318,13 +346,42 @@ class ConsumerReceiver internal constructor(
                 )
                 null // Dropped: kept partial files resume next time.
             }
-            sessions.remove(id)
+            sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesDone, Long::plus) }
+            // Its last session ended: the next sync of this producer starts afresh.
+            if (sessions.values.none { it.first == producer }) {
+                endedBytes.remove(producer)
+                estimators.remove(producer)
+            }
+            val transfers = transfers()
             _state.update { state ->
                 state.copy(
-                    transfers = transfers(),
+                    transfers = transfers,
+                    speeds = speeds(transfers),
                     lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
                     lastActivityMillis = System.currentTimeMillis(),
                     waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
+                )
+            }
+        }
+    }
+
+    /** Each producer's speed now, counting the sessions of this sync that ended already. */
+    private fun speeds(transfers: Map<DeviceId, TransferProgress>): Map<DeviceId, TransferEstimate> =
+        transfers.mapNotNull { (producer, progress) ->
+            val all = progress.copy(bytesDone = progress.bytesDone + (endedBytes[producer] ?: 0L))
+            estimators.getOrPut(producer) { TransferEstimator() }.update(all)?.let { producer to it }
+        }.toMap()
+
+    /** Keeps the speeds current every second, also while nothing comes: a stalled link slows down to nothing. */
+    private suspend fun refreshSpeeds() {
+        while (true) {
+            delay(SPEED_REFRESH_MILLIS)
+            if (estimators.isEmpty()) continue
+            _state.update { state ->
+                state.copy(
+                    speeds = state.transfers.keys.mapNotNull { producer ->
+                        estimators[producer]?.refresh()?.let { producer to it }
+                    }.toMap(),
                 )
             }
         }
@@ -488,6 +545,7 @@ class ConsumerReceiver internal constructor(
         private const val DIRECT_LINK_HOLDER = "turbo"
         private const val DIRECT_LINK_SWAP_HOLDER = "turbo-swap"
         private const val TURBO_RECEIVE_HOLDER = "turbo-receive"
+        private const val SPEED_REFRESH_MILLIS = 1_000L
 
         /** Time for the user to walk over to the sending phone and start Turbo there. */
         private const val TURBO_RECEIVE_IDLE_MILLIS = 10 * 60_000L

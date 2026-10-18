@@ -299,6 +299,7 @@ Grouped, each group with one plain-language choice:
 **Notifications**
 
 - One ongoing notification while transferring, with progress, speed and **Pause**.
+  - *Built (M6):* the progress card and the notification say how fast it goes and, on the sending phone, how long the rest takes: *12 of 40 · 8.4 MB/s · about 2 min left*. The speed covers the last 10 seconds, so it doesn't jump with every file, and shows after 5 seconds of transfer. It's refreshed every second, so a stalled link reads *Waiting for the connection…* instead of an old speed. Time left is rounded up (never *about 2 min* with 2:50 to go), in 5-minute steps from an hour on. The receiving phone shows the speed only: it learns the total batch by batch.
 - A quiet summary afterwards.
 - Actionable errors, e.g. *Google account needs sign-in again → Fix*.
 - Relay allowance warnings at 80 % and 95 %.

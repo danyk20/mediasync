@@ -29,6 +29,8 @@ import io.github.danyk20.mediasync.sync.engine.ProducerSession
 import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.sync.engine.SourceItem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TransferEstimate
+import io.github.danyk20.mediasync.sync.engine.TransferEstimator
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboSetup
@@ -49,9 +51,11 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -104,9 +108,16 @@ sealed interface ProducerState {
     /** Asking the receiving phone for a direct link, and joining it. */
     data object SettingUpTurbo : ProducerState
 
-    /** [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4). */
-    data class Syncing(val progress: TransferProgress?, val turbo: Boolean = false, val internet: Boolean = false) :
-        ProducerState
+    /**
+     * [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4).
+     * [estimate]: how fast it goes and how long the rest takes, once there's enough to go on.
+     */
+    data class Syncing(
+        val progress: TransferProgress?,
+        val turbo: Boolean = false,
+        val internet: Boolean = false,
+        val estimate: TransferEstimate? = null,
+    ) : ProducerState
 
     data class Failed(val reason: SyncFailure) : ProducerState
 }
@@ -212,6 +223,23 @@ class ProducerSync @Inject constructor(
         return _state.value
     }
 
+    /** The speed and time left of the sync running now: progress stops coming while a link stalls. */
+    private val estimator = TransferEstimator()
+
+    /** Keeps the estimate current every second, also while nothing comes. */
+    private suspend fun refreshEstimate() {
+        while (true) {
+            delay(ESTIMATE_REFRESH_MILLIS)
+            _state.update { state ->
+                if (state is ProducerState.Syncing && state.progress != null) {
+                    state.copy(estimate = estimator.refresh())
+                } else {
+                    state
+                }
+            }
+        }
+    }
+
     @Synchronized
     private fun launchSync(pauseWhen: () -> Boolean, turbo: Boolean): Job {
         job?.takeIf { syncing }?.let { return it }
@@ -220,11 +248,13 @@ class ProducerSync @Inject constructor(
         this.pauseWhen = pauseWhen
         _state.value = ProducerState.Connecting
         return scope.launch(Dispatchers.IO) {
+            val estimates = launch { refreshEstimate() }
             try {
                 val end = runSync(turbo)
                 syncing = false
                 _state.value = end
             } finally {
+                estimates.cancel()
                 syncing = false // Also when it failed unexpectedly: never block later syncs.
             }
         }.also { job = it }
@@ -473,7 +503,12 @@ class ProducerSync @Inject constructor(
                 },
                 connect = { another() },
                 progress = { progress ->
-                    _state.value = ProducerState.Syncing(progress, turbo = direct, internet = path == Path.INTERNET)
+                    _state.value = ProducerState.Syncing(
+                        progress,
+                        turbo = direct,
+                        internet = path == Path.INTERNET,
+                        estimate = estimator.update(progress),
+                    )
                     // This month's mobile data limit reached: stops after the current file.
                     if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
                 },
@@ -557,6 +592,7 @@ class ProducerSync @Inject constructor(
 
     private companion object {
         const val DISCOVERY_TIMEOUT_MILLIS = 5_000L
+        const val ESTIMATE_REFRESH_MILLIS = 1_000L
         const val LINK_TEST_MILLIS = 5_000L
 
         /** Joining a Wi-Fi Direct group usually takes a few seconds; some phones take longer. */

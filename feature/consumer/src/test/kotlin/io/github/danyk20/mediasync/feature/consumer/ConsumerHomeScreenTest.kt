@@ -40,7 +40,7 @@ class ConsumerHomeScreenTest {
 
     private val receiving = ConsumerHomeUiState(
         listening = true,
-        transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000),
+        transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000, bytesPerSecond = 8_400_000),
         producers = listOf(
             PairedPhone(
                 DeviceId.of(
@@ -71,6 +71,7 @@ class ConsumerHomeScreenTest {
 
         composeRule.onNodeWithText("Receiving from Anna's Pixel").assertIsDisplayed()
         composeRule.onNodeWithText("12 of 40 · 145 MB of 830 MB").assertIsDisplayed()
+        composeRule.onNodeWithText("8.4 MB/s").assertIsDisplayed() // The speed only: the total comes batch by batch.
         composeRule.onNodeWithText("Tom's Galaxy").assertIsDisplayed()
     }
 

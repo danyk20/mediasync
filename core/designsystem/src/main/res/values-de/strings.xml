@@ -30,4 +30,11 @@
     <string name="setup_battery_title">Synchronisierungen nachts laufen lassen</string>
     <string name="setup_battery_body">Android pausiert Apps im Hintergrund, um Akku zu sparen. Öffne in den Einstellungen von MediaSync die Akkueinstellungen und wähle Uneingeschränkt. MediaSync synchronisiert nur beim Laden.</string>
     <string name="setup_battery_open">Einstellungen öffnen</string>
+    <string name="transfer_speed">%1$s/s</string>
+    <string name="transfer_waiting">Warten auf die Verbindung…</string>
+    <string name="transfer_left_soon">weniger als eine Minute übrig</string>
+    <string name="transfer_left_minutes">noch etwa %1$d Min.</string>
+    <string name="transfer_left_hours">noch etwa %1$d Std. %2$d Min.</string>
+    <string name="transfer_left_whole_hours">noch etwa %1$d Std.</string>
+    <string name="transfer_speed_and_left">%1$s · %2$s</string>
 </resources>
