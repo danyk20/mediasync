@@ -295,8 +295,10 @@ class MediaStoreTest {
 
     @Test
     fun onlyWhatWasTakenWithinTheChosenDaysIsSentBothDaysIncluded() {
-        insertInto(TEST_FOLDER, jpeg(Color.CYAN), "today-range.jpg")
-        val today = LocalDate.now()
+        // Taken on a fixed day, with its time zone as a camera records it: without one, Android keeps no date taken
+        // for a photo whose file is much newer. Neither the test's clock nor its time zone decides what "today" is.
+        insertInto(TEST_FOLDER, jpeg(Color.CYAN, "2025:03:15 12:00:00", exifOffset = "+01:00"), "march-range.jpg")
+        val day = LocalDate.of(2025, 3, 15)
         fun sentWithin(range: SendRange) =
             MediaStoreSource(context, database.mediaFingerprintDao(), range = { range }) {
                 SourceSelection.of(setOf(TEST_FOLDER))
@@ -304,12 +306,12 @@ class MediaStoreTest {
                 .map { it.descriptor.displayName }
                 .filter { it.endsWith("-range.jpg") }
 
-        sentWithin(SendRange.Everything) shouldBe listOf("today-range.jpg")
-        sentWithin(SendRange(from = today)) shouldBe listOf("today-range.jpg")
-        sentWithin(SendRange(until = today)) shouldBe listOf("today-range.jpg")
-        sentWithin(SendRange(today, today)) shouldBe listOf("today-range.jpg")
-        sentWithin(SendRange(from = today.plusDays(1))) shouldBe emptyList()
-        sentWithin(SendRange(until = today.minusDays(1))) shouldBe emptyList()
+        sentWithin(SendRange.Everything) shouldBe listOf("march-range.jpg")
+        sentWithin(SendRange(from = day)) shouldBe listOf("march-range.jpg")
+        sentWithin(SendRange(until = day)) shouldBe listOf("march-range.jpg")
+        sentWithin(SendRange(day, day)) shouldBe listOf("march-range.jpg")
+        sentWithin(SendRange(from = day.plusDays(1))) shouldBe emptyList()
+        sentWithin(SendRange(until = day.minusDays(1))) shouldBe emptyList()
     }
 
     @Test
@@ -373,15 +375,22 @@ class MediaStoreTest {
 
     private fun insertIntoCamera(bytes: ByteArray, name: String): Uri = insertInto("DCIM/Camera/", bytes, name)
 
+    /**
+     * Adds a photo as a camera app does: pending until it's complete, when Android reads it at once. Written straight
+     * away, Android read it in the background, and a test could look before its dates were there (nightly, API 36).
+     */
     private fun insertInto(folder: String, bytes: ByteArray, name: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
         created += uri
         context.contentResolver.openOutputStream(uri)!!.use { it.write(bytes) }
+        val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+        context.contentResolver.update(uri, done, null, null) shouldBe 1
         return uri
     }
 
@@ -441,13 +450,19 @@ class MediaStoreTest {
     }
 
     /** A real JPEG; without [exifDate] it has no capture date, as WhatsApp images don't. */
-    private fun jpeg(color: Int, exifDate: String? = null, location: Boolean = false): ByteArray {
+    private fun jpeg(
+        color: Int,
+        exifDate: String? = null,
+        location: Boolean = false,
+        exifOffset: String? = null,
+    ): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
         val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
         if (exifDate == null && !location) return bytes
         val file = File.createTempFile("dated", ".jpg", context.cacheDir).apply { writeBytes(bytes) }
         ExifInterface(file).apply {
             exifDate?.let { setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, it) }
+            exifOffset?.let { setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, it) }
             if (location) setLatLong(47.3769, 8.5417)
             saveAttributes()
         }
