@@ -44,4 +44,14 @@
     <string name="transfer_left_hours">zbývá asi %1$d h %2$d min</string>
     <string name="transfer_left_whole_hours">zbývá asi %1$d h</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <string name="speed_chart_open">Rychlost v čase</string>
+    <string name="speed_chart_title">Rychlost přenosu</string>
+    <string name="speed_chart_now">Nyní</string>
+    <string name="speed_chart_average">Průměr</string>
+    <string name="speed_chart_peak">Špička</string>
+    <string name="speed_chart_hint">Tažením do stran zobrazíte dřívější údaje. Klepnutím na čáru zobrazíte rychlost v daný okamžik.</string>
+    <string name="speed_chart_waiting">Graf se zobrazí po několika sekundách přenosu.</string>
+    <string name="speed_chart_summary">Rychlost přenosu za %1$s: nyní %2$s, průměr %3$s, špička %4$s.</string>
+    <string name="speed_chart_minutes">%1$d min</string>
+    <string name="speed_chart_seconds">%1$d s</string>
 </resources>

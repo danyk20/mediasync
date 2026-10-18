@@ -154,7 +154,7 @@ class ConsumerHomeViewModelTest {
         )
 
         viewModel.uiState.first { it.transfer != null }.transfer shouldBe
-            IncomingTransfer("Anna's Pixel", 2, 5, 1_000, 9_000)
+            IncomingTransfer("Anna's Pixel", 2, 5, 1_000, 9_000, producerId = anna.id)
     }
 
     @Test

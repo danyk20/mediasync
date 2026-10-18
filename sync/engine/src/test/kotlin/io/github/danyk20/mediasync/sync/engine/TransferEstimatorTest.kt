@@ -53,6 +53,25 @@ class TransferEstimatorTest {
     }
 
     @Test
+    fun theSpeedIsRecordedOnceASecondForTheChartAndANewTransferStartsAnew() {
+        at(0.0, 0)
+        at(5.0, 10 * MB)
+        at(5.4, 11 * MB) // Within the same second: not recorded again.
+        at(6.0, 12 * MB)
+        time = 20_000 // Stalled: the refresh records the drop.
+        estimator.refresh()
+
+        estimator.history() shouldBe listOf(
+            SpeedSample(5_000, 2 * MB),
+            SpeedSample(6_000, 2 * MB),
+            SpeedSample(20_000, 0),
+        )
+
+        at(21.0, 1 * MB) // Another transfer.
+        estimator.history() shouldBe emptyList()
+    }
+
+    @Test
     fun theTimeLeftIsSaidAsPeopleSayIt() {
         fun left(seconds: Long) = TransferEstimate(1, seconds * 1_000).minutesLeft()
 

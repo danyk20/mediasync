@@ -42,4 +42,14 @@
     <string name="transfer_left_hours">cerca de %1$d h %2$d min restantes</string>
     <string name="transfer_left_whole_hours">cerca de %1$d h restantes</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <string name="speed_chart_open">Velocidade ao longo do tempo</string>
+    <string name="speed_chart_title">Velocidade da transferência</string>
+    <string name="speed_chart_now">Agora</string>
+    <string name="speed_chart_average">Média</string>
+    <string name="speed_chart_peak">Pico</string>
+    <string name="speed_chart_hint">Arraste para os lados para ver o passado. Toque na linha para ver a velocidade naquele momento.</string>
+    <string name="speed_chart_waiting">O gráfico começa depois de alguns segundos de transferência.</string>
+    <string name="speed_chart_summary">Velocidade da transferência em %1$s: agora %2$s, média %3$s, pico %4$s.</string>
+    <string name="speed_chart_minutes">%1$d min</string>
+    <string name="speed_chart_seconds">%1$d s</string>
 </resources>

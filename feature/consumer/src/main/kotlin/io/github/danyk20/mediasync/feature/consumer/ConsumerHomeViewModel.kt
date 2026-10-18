@@ -12,6 +12,7 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -44,6 +45,8 @@ data class IncomingTransfer(
     val bytesTotal: Long,
     /** How fast it comes, once there's enough to go on. */
     val bytesPerSecond: Long? = null,
+    /** The sending phone, whose speed over time the chart shows. */
+    val producerId: DeviceId? = null,
 )
 
 /** A sending phone paired with this one. */
@@ -109,6 +112,11 @@ class ConsumerHomeViewModel @Inject constructor(
     private val access = MutableStateFlow(checkAccess())
     private val relay = MutableStateFlow<RelayUsage?>(null)
 
+    /** The speed every second of each sending phone's sync now, or of its last one, for the chart. */
+    val speedHistory: StateFlow<Map<DeviceId, List<SpeedPoint>>> = receiver.speedHistory
+        .map { all -> all.mapValues { (_, samples) -> samples.map { SpeedPoint(it.atMillis, it.bytesPerSecond) } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyMap())
+
     init {
         // Receives while this screen is open; scheduled receive windows also run in the background.
         receiver.hold(HOLDER)
@@ -142,6 +150,7 @@ class ConsumerHomeViewModel @Inject constructor(
                 bytesDone = progress.bytesDone,
                 bytesTotal = progress.bytesTotal,
                 bytesPerSecond = state.speeds[id]?.bytesPerSecond,
+                producerId = id,
             )
         }
         ConsumerHomeUiState(

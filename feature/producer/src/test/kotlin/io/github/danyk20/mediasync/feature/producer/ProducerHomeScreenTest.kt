@@ -124,6 +124,15 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun syncing_theInfoNextToTheSpeedOpensItsChart() {
+        show(syncing)
+
+        composeRule.onNodeWithContentDescription("Speed over time").performClick()
+
+        events shouldBe listOf("speeds")
+    }
+
+    @Test
     fun syncing_waitsForAStalledConnection() {
         show(syncing.copy(sync = (syncing.sync as ProducerState.Syncing).copy(estimate = TransferEstimate(0, null))))
         composeRule.onNodeWithText("Waiting for the connection…").assertIsDisplayed()
@@ -584,6 +593,7 @@ class ProducerHomeScreenTest {
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },
                     onUnpair = { events += "unpair" },
+                    onShowSpeeds = { events += "speeds" },
                 )
             }
         }

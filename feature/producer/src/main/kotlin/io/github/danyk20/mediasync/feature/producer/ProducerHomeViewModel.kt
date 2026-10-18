@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.media.MediaPermissions
 import io.github.danyk20.mediasync.core.model.PhotoDetails
@@ -214,6 +215,11 @@ class ProducerHomeViewModel @Inject constructor(
             mobileDataSent = internet.mobileDataSent,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
+
+    /** The speed every second of this sync, or of the last one, for its chart. */
+    val speedHistory: StateFlow<List<SpeedPoint>> = sync.speedHistory
+        .map { samples -> samples.map { SpeedPoint(it.atMillis, it.bytesPerSecond) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     init {
         // Recount whenever a sync ends, the receiving phone, folders or day change, or photos are added,

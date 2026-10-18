@@ -5,10 +5,12 @@
 package io.github.danyk20.mediasync.feature.producer
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -65,8 +67,11 @@ import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedSheet
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
+import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.pastMoment
 import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
@@ -86,6 +91,7 @@ import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Instant
 import java.time.ZonedDateTime
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun ProducerHomeRoute(
@@ -115,6 +121,8 @@ fun ProducerHomeRoute(
         viewModel.onPermissionsChanged()
         onPauseOrDispose {}
     }
+    var showSpeeds by rememberSaveable { mutableStateOf(false) }
+    if (showSpeeds) SpeedHistorySheet(viewModel.speedHistory, onDismiss = { showSpeeds = false })
     ProducerHomeScreen(
         state = state,
         onPair = onPair,
@@ -122,20 +130,10 @@ fun ProducerHomeRoute(
         onSyncNow = viewModel::syncNow,
         onStop = viewModel::stop,
         onUnpair = viewModel::unpair,
+        onShowSpeeds = { showSpeeds = true },
         onGrantAccess = { requestPermissions.launch(MediaPermissions.required.toTypedArray()) },
-        onOpenSettings = {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.fromParts("package", context.packageName, null),
-                ),
-            )
-        },
-        onAllowNotifications = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        },
+        onOpenSettings = { context.openAppSettings() },
+        onAllowNotifications = { requestNotifications.askToNotify() },
         onDismiss = viewModel::dismiss,
         onChooseDetails = onChooseDetails,
         onChooseOrder = onChooseOrder,
@@ -153,6 +151,23 @@ fun ProducerHomeRoute(
         onOpenLocationSettings = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
         modifier = modifier,
     )
+}
+
+/** The chart of this sync's speed, followed while it's open. */
+@Composable
+private fun SpeedHistorySheet(history: StateFlow<List<SpeedPoint>>, onDismiss: () -> Unit) {
+    val speeds by history.collectAsStateWithLifecycle()
+    SpeedSheet(speeds, onDismiss = onDismiss)
+}
+
+/** MediaSync's page in the system settings: permissions, battery use. */
+private fun Context.openAppSettings() = startActivity(
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+)
+
+/** Asks to post notifications, where Android asks for that (13 on). */
+private fun ManagedActivityResultLauncher<String, Boolean>.askToNotify() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) launch(Manifest.permission.POST_NOTIFICATIONS)
 }
 
 /** Home screen of a phone that sends. */
@@ -178,6 +193,7 @@ fun ProducerHomeScreen(
     onStartTurbo: () -> Unit = {},
     onOpenLocationSettings: () -> Unit = {},
     onUnpair: () -> Unit = {},
+    onShowSpeeds: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -203,7 +219,7 @@ fun ProducerHomeScreen(
                 !state.canReadLibrary -> NeedsAccess(consumer, onGrantAccess, onOpenSettings)
 
                 else -> {
-                    Paired(consumer, state, onSyncNow, onStop, onUnpair)
+                    Paired(consumer, state, onSyncNow, onStop, onUnpair, onShowSpeeds)
                     Notices(state, consumer, onOpenSettings)
                     BackgroundSetupNotices(
                         askNotifications = state.askNotifications,
@@ -337,10 +353,11 @@ private fun Paired(
     onSyncNow: () -> Unit,
     onStop: () -> Unit,
     onUnpair: () -> Unit,
+    onShowSpeeds: () -> Unit,
 ) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync)
+            Sending(consumer, sync, onShowSpeeds)
             OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
@@ -765,7 +782,7 @@ private fun SyncNowButton(onSyncNow: () -> Unit) {
 }
 
 @Composable
-private fun Sending(consumer: String, sync: ProducerState.Syncing) {
+private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds: () -> Unit) {
     val progress = sync.progress
     val turbo = sync.turbo
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -801,11 +818,7 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing) {
             )
         }
         sync.estimate?.let { estimate ->
-            Text(
-                text = transferRate(estimate.bytesPerSecond, estimate.minutesLeft()),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            TransferRateRow(transferRate(estimate.bytesPerSecond, estimate.minutesLeft()), onShowSpeeds)
         }
     }
 }

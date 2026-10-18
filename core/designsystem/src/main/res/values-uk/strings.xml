@@ -44,4 +44,14 @@
     <string name="transfer_left_hours">залишилось близько %1$d год %2$d хв</string>
     <string name="transfer_left_whole_hours">залишилось близько %1$d год</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <string name="speed_chart_open">Швидкість у часі</string>
+    <string name="speed_chart_title">Швидкість передачі</string>
+    <string name="speed_chart_now">Зараз</string>
+    <string name="speed_chart_average">Середня</string>
+    <string name="speed_chart_peak">Пік</string>
+    <string name="speed_chart_hint">Проводьте вбік, щоб побачити попередні дані. Торкніться лінії, щоб побачити швидкість у цей момент.</string>
+    <string name="speed_chart_waiting">Графік з\'явиться через кілька секунд передачі.</string>
+    <string name="speed_chart_summary">Швидкість передачі за %1$s: зараз %2$s, середня %3$s, пік %4$s.</string>
+    <string name="speed_chart_minutes">%1$d хв</string>
+    <string name="speed_chart_seconds">%1$d с</string>
 </resources>

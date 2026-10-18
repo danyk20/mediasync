@@ -40,7 +40,15 @@ class ConsumerHomeScreenTest {
 
     private val receiving = ConsumerHomeUiState(
         listening = true,
-        transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000, bytesPerSecond = 8_400_000),
+        transfer = IncomingTransfer(
+            "Anna's Pixel",
+            12,
+            40,
+            145_000_000,
+            830_000_000,
+            bytesPerSecond = 8_400_000,
+            producerId = DeviceId.of(ByteArray(32) { 1 }),
+        ),
         producers = listOf(
             PairedPhone(
                 DeviceId.of(
@@ -63,6 +71,15 @@ class ConsumerHomeScreenTest {
         composeRule.onNodeWithText("Ready to receive").assertIsDisplayed()
         composeRule.onNodeWithText("Add sending phone").performClick()
         events shouldBe listOf("add")
+    }
+
+    @Test
+    fun receiving_theInfoNextToTheSpeedOpensThatPhonesChart() {
+        show(receiving)
+
+        composeRule.onNodeWithContentDescription("Speed over time").performClick()
+
+        events shouldBe listOf("speeds of 0101")
     }
 
     @Test
@@ -313,6 +330,7 @@ class ConsumerHomeScreenTest {
                     state = state,
                     onAddProducer = { events += "add" },
                     onRemoveProducer = { events += "remove ${it.name}" },
+                    onShowSpeeds = { events += "speeds of ${it.hex.take(4)}" },
                     onOpenBackup = { events += "backup" },
                     onChangeSchedule = { events += "schedule" },
                     onAllowNotifications = { events += "notifications" },

@@ -10,6 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,8 +60,11 @@ import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedSheet
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
+import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.component.transferRate
@@ -73,6 +78,7 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboPermissions
 import io.github.danyk20.mediasync.sync.android.level
 import java.text.NumberFormat
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun ConsumerHomeRoute(
@@ -104,19 +110,19 @@ fun ConsumerHomeRoute(
         viewModel.refresh()
         onPauseOrDispose {}
     }
+    // The chart of the sending phone shown, until dismissed.
+    var showSpeedsOf by rememberSaveable { mutableStateOf<String?>(null) }
+    showSpeedsOf?.let { SpeedHistorySheet(viewModel.speedHistory, it, onDismiss = { showSpeedsOf = null }) }
     ConsumerHomeScreen(
         state = state,
         onAddProducer = onAddProducer,
+        onShowSpeeds = { showSpeedsOf = it.hex },
         onChangeSchedule = onChangeSchedule,
         modifier = modifier,
         onSetUpInternet = onSetUpInternet,
         onOpenBackup = onOpenBackup,
         onRemoveProducer = { viewModel.removeProducer(it.id) },
-        onAllowNotifications = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        },
+        onAllowNotifications = { requestNotifications.askToNotify() },
         onOpenSettings = { context.openAppSettings() },
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
         onDismiss = viewModel::dismiss,
@@ -145,10 +151,26 @@ fun ConsumerHomeRoute(
     )
 }
 
+/** The chart of the sending phone [producer] (its id in hex), followed while it's open. */
+@Composable
+private fun SpeedHistorySheet(
+    history: StateFlow<Map<DeviceId, List<SpeedPoint>>>,
+    producer: String,
+    onDismiss: () -> Unit,
+) {
+    val speeds by history.collectAsStateWithLifecycle()
+    SpeedSheet(speeds.entries.firstOrNull { it.key.hex == producer }?.value.orEmpty(), onDismiss = onDismiss)
+}
+
 /** MediaSync's page in the system settings: permissions, battery use. */
 private fun Context.openAppSettings() = startActivity(
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
 )
+
+/** Asks to post notifications, where Android asks for that (13 on). */
+private fun ManagedActivityResultLauncher<String, Boolean>.askToNotify() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) launch(Manifest.permission.POST_NOTIFICATIONS)
+}
 
 /** Home screen of the phone that receives. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -161,6 +183,7 @@ fun ConsumerHomeScreen(
     onSetUpInternet: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onRemoveProducer: (PairedPhone) -> Unit = {},
+    onShowSpeeds: (DeviceId) -> Unit = {},
     onAllowNotifications: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
@@ -188,7 +211,7 @@ fun ConsumerHomeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Status(state)
+            Status(state, onShowSpeeds)
             if (state.turboReceiving && state.transfer == null) {
                 OutlinedButton(onClick = onStopTurboReceive, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.consumer_turbo_receive_stop))
@@ -284,10 +307,10 @@ private fun TurboReceiveRow(state: ConsumerHomeUiState, onStart: () -> Unit) {
 }
 
 @Composable
-private fun Status(state: ConsumerHomeUiState) {
+private fun Status(state: ConsumerHomeUiState, onShowSpeeds: (DeviceId) -> Unit) {
     val transfer = state.transfer
     when {
-        transfer != null -> Receiving(transfer, overTurbo = state.directLinkOpen)
+        transfer != null -> Receiving(transfer, overTurbo = state.directLinkOpen, onShowSpeeds = onShowSpeeds)
 
         state.turboReceiving -> StatusCard(
             title = stringResource(R.string.consumer_turbo_receive_waiting_title),
@@ -325,7 +348,7 @@ private fun Status(state: ConsumerHomeUiState) {
 
 /** Who is sending, and how far it got; [overTurbo] while a direct link is open. */
 @Composable
-private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean) {
+private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean, onShowSpeeds: (DeviceId) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusCard(
             title = stringResource(
@@ -350,10 +373,9 @@ private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean) {
         )
         // The speed only: this phone learns how much is coming batch by batch, so it can't tell the time left.
         transfer.bytesPerSecond?.let { speed ->
-            Text(
+            TransferRateRow(
                 text = transferRate(speed, minutesLeft = null),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                onShowSpeeds = { transfer.producerId?.let(onShowSpeeds) },
             )
         }
     }

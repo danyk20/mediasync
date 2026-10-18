@@ -37,4 +37,14 @@
     <string name="transfer_left_hours">noch etwa %1$d Std. %2$d Min.</string>
     <string name="transfer_left_whole_hours">noch etwa %1$d Std.</string>
     <string name="transfer_speed_and_left">%1$s · %2$s</string>
+    <string name="speed_chart_open">Geschwindigkeit im Verlauf</string>
+    <string name="speed_chart_title">Übertragungsgeschwindigkeit</string>
+    <string name="speed_chart_now">Jetzt</string>
+    <string name="speed_chart_average">Durchschnitt</string>
+    <string name="speed_chart_peak">Höchstwert</string>
+    <string name="speed_chart_hint">Wisch seitlich, um Früheres zu sehen. Tipp auf die Linie, um die Geschwindigkeit zu diesem Moment zu sehen.</string>
+    <string name="speed_chart_waiting">Das Diagramm startet nach ein paar Sekunden Übertragung.</string>
+    <string name="speed_chart_summary">Übertragungsgeschwindigkeit in den letzten %1$s: jetzt %2$s, Durchschnitt %3$s, Höchstwert %4$s.</string>
+    <string name="speed_chart_minutes">%1$d Min.</string>
+    <string name="speed_chart_seconds">%1$d s</string>
 </resources>
