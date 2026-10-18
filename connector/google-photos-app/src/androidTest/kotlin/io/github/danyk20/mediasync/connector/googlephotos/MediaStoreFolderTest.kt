@@ -80,7 +80,7 @@ class MediaStoreFolderTest {
 
         // Found either way, so never counted as removed, even before the gallery reports the trash.
         connector.removedFromPhone(listOf(receipt(trashed, 3))) shouldBe emptySet()
-        // Android reports the trash a while after the update: a moment on API 36, over 5 s once on API 34 (nightly).
+        // Android may report the trash a moment after the update.
         var file = folder.find(trashed.toString())
         val end = System.currentTimeMillis() + TRASH_TIMEOUT_MILLIS
         while ((file as? PhoneFile.Found)?.trashed != true && System.currentTimeMillis() < end) {
@@ -105,15 +105,23 @@ class MediaStoreFolderTest {
         change.await() shouldBe Unit
     }
 
+    /**
+     * Writes a photo as MediaSync's receiving phone does: pending until it's complete. Written straight away, Android
+     * still finished the file in the background, and a trash made in that moment was silently lost (7 in 40 on API 34,
+     * 2 in 40 on API 36; the nightly's and #45's failures).
+     */
     private fun insert(path: String, name: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             put(MediaStore.MediaColumns.RELATIVE_PATH, path)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
         created += uri
         context.contentResolver.openOutputStream(uri)!!.use { it.write(JPEG_START) }
+        val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+        context.contentResolver.update(uri, done, null, null) shouldBe 1
         return uri
     }
 
@@ -148,7 +156,7 @@ class MediaStoreFolderTest {
         val JPEG_START = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte())
         const val CHANGE_TIMEOUT_MILLIS = 10_000L
         const val OBSERVER_START_MILLIS = 500L
-        const val TRASH_TIMEOUT_MILLIS = 20_000L
+        const val TRASH_TIMEOUT_MILLIS = 5_000L
         const val DELETE_TIMEOUT_MILLIS = 3_000L
         const val POLL_MILLIS = 100L
     }
