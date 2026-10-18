@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/danyk20/mediasync/compare/v0.5.0...v0.6.0) (2026-10-18)
+
+
+### Features
+
+* an info icon opens a chart of the transfer speed over time ([#56](https://github.com/danyk20/mediasync/issues/56)) ([40dbda4](https://github.com/danyk20/mediasync/commit/40dbda4e477a1c2474adfe4ebfca3939758ca8f4))
+
 ## [0.5.0](https://github.com/danyk20/mediasync/compare/v0.4.0...v0.5.0) (2026-10-18)
 
 
