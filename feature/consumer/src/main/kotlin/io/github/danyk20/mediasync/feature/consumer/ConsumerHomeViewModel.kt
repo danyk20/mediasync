@@ -42,6 +42,8 @@ data class IncomingTransfer(
     val itemsTotal: Int,
     val bytesDone: Long,
     val bytesTotal: Long,
+    /** How fast it comes, once there's enough to go on. */
+    val bytesPerSecond: Long? = null,
 )
 
 /** A sending phone paired with this one. */
@@ -139,6 +141,7 @@ class ConsumerHomeViewModel @Inject constructor(
                 itemsTotal = progress.itemsTotal,
                 bytesDone = progress.bytesDone,
                 bytesTotal = progress.bytesTotal,
+                bytesPerSecond = state.speeds[id]?.bytesPerSecond,
             )
         }
         ConsumerHomeUiState(

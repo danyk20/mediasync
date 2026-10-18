@@ -37,4 +37,11 @@
     <string name="setup_battery_title">Дозвольте синхронізаціям працювати вночі</string>
     <string name="setup_battery_body">Android призупиняє застосунки у фоні, щоб заощаджувати заряд. У налаштуваннях MediaSync відкрийте налаштування батареї та виберіть «Без обмежень». MediaSync синхронізує лише під час заряджання.</string>
     <string name="setup_battery_open">Відкрити налаштування</string>
+    <string name="transfer_speed">%1$s/s</string>
+    <string name="transfer_waiting">Очікування з\'єднання…</string>
+    <string name="transfer_left_soon">залишилося менше хвилини</string>
+    <string name="transfer_left_minutes">залишилось близько %1$d хв</string>
+    <string name="transfer_left_hours">залишилось близько %1$d год %2$d хв</string>
+    <string name="transfer_left_whole_hours">залишилось близько %1$d год</string>
+    <string name="transfer_speed_and_left">%1$s · %2$s</string>
 </resources>

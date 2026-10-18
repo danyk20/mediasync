@@ -35,4 +35,11 @@
     <string name="setup_battery_title">Deixe as sincronizações rodarem à noite</string>
     <string name="setup_battery_body">O Android pausa apps em segundo plano para economizar bateria. Nas configurações do MediaSync, abra as configurações de bateria e escolha Sem restrições. O MediaSync só sincroniza enquanto o telefone está carregando.</string>
     <string name="setup_battery_open">Abrir configurações</string>
+    <string name="transfer_speed">%1$s/s</string>
+    <string name="transfer_waiting">Aguardando a conexão…</string>
+    <string name="transfer_left_soon">menos de um minuto restante</string>
+    <string name="transfer_left_minutes">cerca de %1$d min restantes</string>
+    <string name="transfer_left_hours">cerca de %1$d h %2$d min restantes</string>
+    <string name="transfer_left_whole_hours">cerca de %1$d h restantes</string>
+    <string name="transfer_speed_and_left">%1$s · %2$s</string>
 </resources>

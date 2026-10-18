@@ -11,6 +11,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.text.format.Formatter
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -30,6 +31,7 @@ import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Clock
 import java.time.Duration
@@ -293,12 +295,12 @@ class ReceiveNowWorker @AssistedInject constructor(
 private fun incoming(receiver: ConsumerReceiver, peers: PeerStore): Flow<Incoming?> = receiver.state.map { state ->
     state.transfers.entries.firstOrNull()?.let { (producer, progress) ->
         val known = withContext(Dispatchers.IO) { peers.observeAll().first() }
-        Incoming(known.firstOrNull { it.id == producer }?.name, progress)
+        Incoming(known.firstOrNull { it.id == producer }?.name, progress, state.speeds[producer])
     }
 }
 
 /** A transfer to this phone, as its notification shows it. */
-data class Incoming(val producerName: String?, val progress: TransferProgress)
+data class Incoming(val producerName: String?, val progress: TransferProgress, val speed: TransferEstimate? = null)
 
 /**
  * Whether a receive window that serves [due] and opened at [opened] can close at [now]: once no transfer is
@@ -352,7 +354,9 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
     /** Keeps the ongoing notification current until cancelled, then removes it. */
     suspend fun showSendingProgress(consumerName: String?, states: Flow<ProducerState>) =
         showProgress(SENDING_ID, states) { state ->
-            (state as? ProducerState.Syncing)?.progress?.let { sendingNotification(consumerName, it) }
+            (state as? ProducerState.Syncing)?.let { syncing ->
+                syncing.progress?.let { sendingNotification(consumerName, it, syncing.estimate) }
+            }
         }
 
     /** Keeps the ongoing notification current until cancelled, then removes it. */
@@ -380,11 +384,16 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
         }
     }
 
-    private fun sendingNotification(consumerName: String?, progress: TransferProgress?) = ongoing(
+    private fun sendingNotification(
+        consumerName: String?,
+        progress: TransferProgress?,
+        estimate: TransferEstimate? = null,
+    ) = ongoing(
         icon = android.R.drawable.stat_sys_upload,
         title = consumerName?.let { context.getString(R.string.sync_notification_sending_to, it) }
             ?: context.getString(R.string.sync_notification_sending),
         progress = progress,
+        rate = estimate?.let { rateText(it, withTimeLeft = true) },
     )
 
     private fun receivingNotification(incoming: Incoming?) = ongoing(
@@ -395,21 +404,52 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
             else -> context.getString(R.string.sync_notification_receiving_from, incoming.producerName)
         },
         progress = incoming?.progress,
+        // The speed only: a receiving phone learns how much is coming batch by batch.
+        rate = incoming?.speed?.let { rateText(it, withTimeLeft = false) },
     )
 
-    private fun ongoing(@DrawableRes icon: Int, title: String, progress: TransferProgress?): Notification =
-        builder(icon)
-            .setContentTitle(title)
-            .apply {
-                if (progress != null) {
-                    setContentText(
-                        context.getString(R.string.sync_notification_progress, progress.itemsDone, progress.itemsTotal),
-                    )
-                    setProgress(PROGRESS_MAX, progress.permille(), progress.bytesTotal == 0L)
-                }
+    private fun ongoing(
+        @DrawableRes icon: Int,
+        title: String,
+        progress: TransferProgress?,
+        rate: String? = null,
+    ): Notification = builder(icon)
+        .setContentTitle(title)
+        .apply {
+            if (progress != null) {
+                val count =
+                    context.getString(R.string.sync_notification_progress, progress.itemsDone, progress.itemsTotal)
+                setContentText(listOfNotNull(count, rate).joinToString(" · "))
+                setProgress(PROGRESS_MAX, progress.permille(), progress.bytesTotal == 0L)
             }
-            .setOngoing(true)
-            .build()
+        }
+        .setOngoing(true)
+        .build()
+
+    /** "8.4 MB/s · about 2 min left", as on the home screens; [withTimeLeft] only where the total is known. */
+    private fun rateText(estimate: TransferEstimate, withTimeLeft: Boolean): String {
+        if (estimate.bytesPerSecond <= 0) return context.getString(R.string.sync_notification_waiting)
+        val speed = context.getString(
+            R.string.sync_notification_speed,
+            Formatter.formatShortFileSize(context, estimate.bytesPerSecond),
+        )
+        val minutes = estimate.minutesLeft()?.takeIf { withTimeLeft } ?: return speed
+        val left = when {
+            minutes == 0 -> context.getString(R.string.sync_notification_left_soon)
+
+            minutes < MINUTES_PER_HOUR -> context.getString(R.string.sync_notification_left_minutes, minutes)
+
+            minutes % MINUTES_PER_HOUR == 0 ->
+                context.getString(R.string.sync_notification_left_whole_hours, minutes / MINUTES_PER_HOUR)
+
+            else -> context.getString(
+                R.string.sync_notification_left_hours,
+                minutes / MINUTES_PER_HOUR,
+                minutes % MINUTES_PER_HOUR,
+            )
+        }
+        return "$speed · $left"
+    }
 
     private fun builder(@DrawableRes icon: Int): NotificationCompat.Builder {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
@@ -451,6 +491,7 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
         const val RECEIVING_ID = 2
         const val SENT_ID = 3
         const val PROGRESS_MAX = 1000
+        const val MINUTES_PER_HOUR = 60
 
         /** Progress notifications change at most this often; Android drops faster updates anyway. */
         val PROGRESS_INTERVAL: Duration = Duration.ofSeconds(1)
