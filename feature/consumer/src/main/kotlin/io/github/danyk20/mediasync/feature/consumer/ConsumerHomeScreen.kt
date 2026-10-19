@@ -372,12 +372,10 @@ private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean, onShowSpee
             modifier = Modifier.fillMaxWidth(),
         )
         // The speed only: this phone learns how much is coming batch by batch, so it can't tell the time left.
-        transfer.bytesPerSecond?.let { speed ->
-            TransferRateRow(
-                text = transferRate(speed, minutesLeft = null),
-                onShowSpeeds = { transfer.producerId?.let(onShowSpeeds) },
-            )
-        }
+        TransferRateRow(
+            text = transferRate(transfer.bytesPerSecond, minutesLeft = null),
+            onShowSpeeds = { transfer.producerId?.let(onShowSpeeds) },
+        )
     }
 }
 

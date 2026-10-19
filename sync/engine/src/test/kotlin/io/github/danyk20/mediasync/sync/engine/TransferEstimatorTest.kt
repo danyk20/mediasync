@@ -48,8 +48,22 @@ class TransferEstimatorTest {
         at(0.0, 0)
         at(6.0, 60 * MB, bytesTotal = 60 * MB) shouldBe TransferEstimate(10 * MB, 0)
 
-        at(7.0, 1 * MB) shouldBe null // Fewer bytes than before: another transfer, warming up again.
+        estimator.reset()
+
         estimator.refresh() shouldBe null
+        at(7.0, 1 * MB) shouldBe null // Warming up again.
+        at(12.0, 11 * MB) shouldBe TransferEstimate(2 * MB, 44_500)
+    }
+
+    @Test
+    fun progressThatComesLateChangesNothing() {
+        at(0.0, 0)
+        at(6.0, 12 * MB) shouldBe TransferEstimate(2 * MB, 44_000)
+
+        // Another connection's thread reported a moment before, but came after: same transfer, no warming up again.
+        at(6.0, 11 * MB) shouldBe TransferEstimate(2 * MB, 44_000)
+        at(7.0, 14 * MB) shouldBe TransferEstimate(2 * MB, 43_000)
+        estimator.history() shouldBe listOf(SpeedSample(6_000, 2 * MB), SpeedSample(7_000, 2 * MB))
     }
 
     @Test
@@ -67,7 +81,7 @@ class TransferEstimatorTest {
             SpeedSample(20_000, 0),
         )
 
-        at(21.0, 1 * MB) // Another transfer.
+        estimator.reset() // Another transfer.
         estimator.history() shouldBe emptyList()
     }
 

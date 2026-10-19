@@ -133,6 +133,16 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun syncing_measuresTheSpeedFirstAndItsChartIsThereFromTheStart() {
+        show(syncing.copy(sync = (syncing.sync as ProducerState.Syncing).copy(estimate = null)))
+
+        composeRule.onNodeWithText("Measuring the speed…").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Speed over time").performClick()
+
+        events shouldBe listOf("speeds")
+    }
+
+    @Test
     fun syncing_waitsForAStalledConnection() {
         show(syncing.copy(sync = (syncing.sync as ProducerState.Syncing).copy(estimate = TransferEstimate(0, null))))
         composeRule.onNodeWithText("Waiting for the connection…").assertIsDisplayed()

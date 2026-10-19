@@ -817,8 +817,9 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds:
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        sync.estimate?.let { estimate ->
-            TransferRateRow(transferRate(estimate.bytesPerSecond, estimate.minutesLeft()), onShowSpeeds)
+        // From the first byte, so it doesn't come and go: measured at first, then the speed and time left.
+        if (progress != null) {
+            TransferRateRow(transferRate(sync.estimate?.bytesPerSecond, sync.estimate?.minutesLeft()), onShowSpeeds)
         }
     }
 }
