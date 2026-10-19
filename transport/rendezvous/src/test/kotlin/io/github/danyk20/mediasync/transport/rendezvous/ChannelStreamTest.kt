@@ -123,6 +123,48 @@ class ChannelStreamTest {
     }
 
     @Test
+    fun aReaderWaitingForAReplyKeepsWaitingWhileItsOwnDataIsTaken() {
+        // A big file over a slow upload: no reply comes until it's all there, but the queue keeps shrinking.
+        val channel = Loopback()
+        channel.other = ChannelStream(Loopback())
+        val sender = ChannelStream(channel, timeoutMillis = 300)
+        val reply = AtomicLong(-1)
+        channel.queued.set(4_000_000)
+        val reader = thread { reply.set(sender.source.readByte().toLong()) }
+
+        repeat(10) {
+            // 1 s, three times the timeout.
+            Thread.sleep(100)
+            val before = channel.queued.get()
+            channel.queued.set(before - 100_000)
+            sender.onBufferedAmountChange(previousAmount = before)
+        }
+        sender.onMessage(byteArrayOf(42))
+        reader.join(5_000)
+
+        reply.get() shouldBe 42
+    }
+
+    @Test
+    fun aQueueThatOnlyGrowsIsntProgress() {
+        val channel = Loopback()
+        channel.other = ChannelStream(Loopback())
+        val sender = ChannelStream(channel, timeoutMillis = 200)
+        channel.queued.set(1_000)
+
+        val failure = thread {
+            repeat(5) {
+                Thread.sleep(100)
+                val before = channel.queued.get()
+                channel.queued.set(before + 1_000) // Ours, queued: the other phone took nothing.
+                sender.onBufferedAmountChange(previousAmount = before)
+            }
+        }
+        shouldThrow<SocketTimeoutException> { sender.source.readByte() }
+        failure.join()
+    }
+
+    @Test
     fun aWholeSyncRunsOverIt() {
         val (producerSide, consumerSide) = pair()
         val producerId = deviceId(1)

@@ -190,7 +190,8 @@ class WebRtcLink(context: Context) : PeerLinks {
             val stream = ChannelStream(Channel(dataChannel)).also { stream = it }
             dataChannel.registerObserver(
                 object : DataChannel.Observer {
-                    override fun onBufferedAmountChange(previousAmount: Long) = stream.onBufferedAmountChange()
+                    override fun onBufferedAmountChange(previousAmount: Long) =
+                        stream.onBufferedAmountChange(previousAmount)
 
                     override fun onStateChange() {
                         when (dataChannel.state()) {

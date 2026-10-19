@@ -34,6 +34,9 @@ interface MessageChannel {
  * The byte streams the sync engine reads and writes, over a [MessageChannel], as over TCP: writes go out in messages of
  * at most [maxMessageBytes], waiting while [highWaterBytes] are queued; received messages are read in order.
  *
+ * It gives up after [timeoutMillis] in which nothing moved either way: nothing arrived, and nothing queued left. A
+ * reader that waits for a reply while its own side sends a big file over a slow link keeps waiting, as on TCP.
+ *
  * The channel's callbacks feed it: [onMessage], [onBufferedAmountChange] and [onClosed].
  */
 class ChannelStream(
@@ -48,13 +51,26 @@ class ChannelStream(
     private var closed = false
     private var failure: IOException? = null
 
+    /** When something last moved either way: a message arrived, or some of what was queued left. */
+    private var lastMoved = System.nanoTime()
+
     fun onMessage(message: ByteArray) = lock.withLock {
         incoming.write(message)
+        lastMoved = System.nanoTime()
         changed.signalAll()
     }
 
-    /** The channel sent some of what was queued: a waiting writer may go on. */
-    fun onBufferedAmountChange() = lock.withLock { changed.signalAll() }
+    /**
+     * The channel's queue changed from [previousAmount] (`null`: not known): when it shrank, the other phone took some
+     * of it, and a waiting writer may go on.
+     */
+    fun onBufferedAmountChange(previousAmount: Long? = null) = lock.withLock {
+        if (previousAmount == null || channel.bufferedAmount() < previousAmount) lastMoved = System.nanoTime()
+        changed.signalAll()
+    }
+
+    /** Nanoseconds left before giving up: [timeoutMillis] after something last moved. */
+    private fun timeLeft(): Long = lastMoved + TimeUnit.MILLISECONDS.toNanos(timeoutMillis) - System.nanoTime()
 
     /** The channel closed; with [error] when it failed. Reads end after what arrived before. */
     fun onClosed(error: IOException? = null) = lock.withLock {
@@ -74,10 +90,9 @@ class ChannelStream(
 
     private inner class Incoming : Source {
         override fun read(sink: Buffer, byteCount: Long): Long = lock.withLock {
-            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
             while (incoming.size == 0L) {
                 if (closed) failure?.let { throw it } ?: return -1
-                val left = deadline - System.nanoTime()
+                val left = timeLeft()
                 if (left <= 0) throw SocketTimeoutException("Nothing from the other phone for $timeoutMillis ms")
                 changed.awaitNanos(left)
             }
@@ -108,9 +123,8 @@ class ChannelStream(
 
         /** Waits while too much is queued; checks again now and then, in case a callback never comes. */
         private fun awaitRoom() = lock.withLock {
-            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
             while (!closed && channel.bufferedAmount() > highWaterBytes) {
-                val left = deadline - System.nanoTime()
+                val left = timeLeft()
                 if (left <= 0) throw SocketTimeoutException("The other phone took nothing for $timeoutMillis ms")
                 changed.awaitNanos(minOf(left, TimeUnit.MILLISECONDS.toNanos(RECHECK_MILLIS)))
             }

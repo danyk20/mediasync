@@ -372,7 +372,8 @@ class InternetPath(
         private val mailbox: Mailbox,
         private val client: RendezvousClient,
         private val pair: String,
-    ) : PeerConnection by connection {
+    ) : PeerConnection by connection,
+        RelayCounter {
         /** The Worker tells sessions apart by this: 16 random bytes. */
         private val session = base64Url(ByteArray(SESSION_BYTES).also(SecureRandom()::nextBytes))
         private val reporting = REPORTS.scheduleWithFixedDelay(
@@ -384,6 +385,11 @@ class InternetPath(
 
         @Volatile
         private var reported = 0L
+
+        // What the link underneath counts: the sending phone holds videos back on the relay by it (PLAN §17).
+        override fun relayedBytes(): Long = (connection as? RelayCounter)?.relayedBytes() ?: 0
+
+        override fun throughRelay(): Boolean = (connection as? RelayCounter)?.throughRelay() ?: false
 
         @Synchronized
         private fun report() {
