@@ -141,6 +141,12 @@ internal abstract class SettingsSourcesModule {
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */
 internal data class BackgroundPlan(val role: DeviceRole, val schedule: SyncSchedule)
 
+/** The worker of [role]'s background job. */
+private fun workerOf(role: DeviceRole): Class<out ListenableWorker> = when (role) {
+    DeviceRole.PRODUCER -> ScheduledSyncWorker::class.java
+    DeviceRole.CONSUMER -> ReceiveWindowWorker::class.java
+}
+
 /**
  * Remembers the latest due time each role has handled. A due time missed while the phone wasn't charging
  * therefore still runs at the next charge, even if the app is opened (and everything rescheduled) in between.
@@ -248,7 +254,10 @@ class SyncScheduler @Inject constructor(
         return if (next != null && Duration.between(now, next) <= leadOf(role)) next else schedule.previousDue(now)
     }
 
-    /** Called by a run that did its job: [due] won't run again, and the next run is queued behind this one. */
+    /**
+     * Called by a run that did its job: [due] won't run again, and the next run is queued behind this one. A run on
+     * the charger ([runWhilePluggedIn]) that was unplugged passes no [due]: it's still to do, at the next charge.
+     */
     suspend fun finished(role: DeviceRole, due: ZonedDateTime?) {
         due?.let { state.markHandled(role, it.toInstant().toEpochMilli()) }
         val plan = plans().first() ?: return
@@ -298,12 +307,8 @@ class SyncScheduler @Inject constructor(
     private suspend fun isRunning(role: DeviceRole) =
         workManager.getWorkInfosForUniqueWorkFlow(nameOf(role)).first().any { it.state == WorkInfo.State.RUNNING }
 
-    internal fun request(plan: BackgroundPlan, delay: Duration = delayOf(plan)): OneTimeWorkRequest {
-        val worker: Class<out ListenableWorker> = when (plan.role) {
-            DeviceRole.PRODUCER -> ScheduledSyncWorker::class.java
-            DeviceRole.CONSUMER -> ReceiveWindowWorker::class.java
-        }
-        return OneTimeWorkRequest.Builder(worker)
+    private fun request(plan: BackgroundPlan, delay: Duration = delayOf(plan)): OneTimeWorkRequest =
+        OneTimeWorkRequest.Builder(workerOf(plan.role))
             .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
             .setConstraints(constraintsOf(plan))
             // Unreachable consumer (its receive window may start late, see receiveWindowDone), or no Wi-Fi:
@@ -311,6 +316,25 @@ class SyncScheduler @Inject constructor(
             .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
             .addTag(TAG)
             .build()
+
+    /**
+     * Runs [role]'s background job again now, on the charger, without WorkManager's charging constraint
+     * (docs/PLAN.md §10.1). With the battery held below full, WorkManager stops a job it doesn't count as charging
+     * at once, and Android's job scheduler, which does count it, starts it again: many times a second.
+     */
+    fun runWhilePluggedIn(role: DeviceRole) {
+        val constraints = Constraints.Builder().setRequiresStorageNotLow(role == DeviceRole.CONSUMER).build()
+        val request = OneTimeWorkRequest.Builder(workerOf(role))
+            .setConstraints(constraints)
+            .setInputData(Data.Builder().putBoolean(PLUGGED_IN, true).build())
+            .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
+            .addTag(TAG)
+            .build()
+        workManager.enqueueUniqueWork(nameOf(role), ExistingWorkPolicy.REPLACE, request)
+        Diagnostics.log(
+            Area.SCHEDULE,
+            "Plugged in, battery held below full: the ${role.name.lowercase()} run goes ahead",
+        )
     }
 
     private fun delayOf(plan: BackgroundPlan): Duration {
@@ -354,6 +378,9 @@ class SyncScheduler @Inject constructor(
             if (role == DeviceRole.CONSUMER) Duration.ofMinutes(WINDOW_LEAD_MINUTES) else Duration.ZERO
 
         val RETRY_INTERVAL: Duration = Duration.ofMinutes(15)
+
+        /** Input: a run on the charger, without WorkManager's charging constraint ([runWhilePluggedIn]). */
+        const val PLUGGED_IN = "plugged-in"
         private val MISSED_AFTER: Duration = Duration.ofHours(1)
         private const val SYNC_NOW = "sync-now"
         private const val RECEIVE_NOW = "receive-now"

@@ -229,6 +229,15 @@ fun interface DeviceConditions {
 
     /** Below 30 % and not charging: Turbo transfer (docs/PLAN.md §8.3) warns that it uses more power. */
     fun lowForTurbo(): Boolean = false
+
+    /** On a charger, whether or not the battery is charging. */
+    fun pluggedIn(): Boolean = true
+
+    /**
+     * On a charger, but the battery held below full: Samsung's *Protect battery* stops at 85 %, adaptive charging
+     * waits. Android's job scheduler counts that as charging, and WorkManager doesn't (docs/PLAN.md §10.1).
+     */
+    fun chargingHeld(): Boolean = false
 }
 
 /** The *Photo details* a sending phone sends (docs/PLAN.md §6.3), as the user set them. */
