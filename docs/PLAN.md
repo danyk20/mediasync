@@ -875,6 +875,7 @@ There are two connectors, and the choice is made per consumer device.
 - **Capability:** `DELEGATED_TO_DEVICE_APP`. MediaSync doesn't upload anything. It stores files where the Google Photos app backs them up, which is free and unlimited in Storage saver on Pixel 2–5 (§1.5).
 - **One folder:**
   - All received files go into `DCIM/MediaSync/`. (`DCIM` because, on Android 10, it's the only top-level folder MediaStore accepts for both photos and videos.)
+  - *Built (M6, after a real-phone test):* **Simple file names**, on at first. The Google Photos app doesn't show files whose name has more than one dot, such as Samsung's `20251018_101530.LS.mp4`: they reached the phone, but never the gallery. With the setting on, a received file keeps only its last dot and the others become `_` (`20251018_101530_LS.mp4`). Files received before, or while it was off, get the simple name when the receiving phone's home screen opens or the setting is turned on. Only MediaSync's own files in `DCIM/MediaSync/` are renamed. The sending phone's names and the dedupe fingerprints don't change, so nothing is sent twice.
   - The Google Photos app treats every subfolder as a separate "device folder" that needs its own backup switch. A single folder means one switch covers every producer, now and later.
   - Producer and album are kept in MediaSync's database.
 - **Guided setup:** onboarding checks that Google Photos is installed, opens its backup settings, and asks for two things:

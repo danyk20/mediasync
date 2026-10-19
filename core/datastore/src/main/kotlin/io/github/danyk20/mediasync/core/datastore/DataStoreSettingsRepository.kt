@@ -129,6 +129,13 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[VideosOverRelayKey] = allowed }
     }
 
+    override val simpleFileNames: Flow<Boolean> =
+        dataStore.data.map { it[SimpleFileNamesKey] ?: true }.distinctUntilChanged()
+
+    override suspend fun setSimpleFileNames(on: Boolean) {
+        dataStore.edit { it[SimpleFileNamesKey] = on }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -154,6 +161,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val RendezvousUrlKey = stringPreferencesKey("rendezvous_url")
         val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
+        val SimpleFileNamesKey = booleanPreferencesKey("simple_file_names")
         val MobileDataCapKey = longPreferencesKey("mobile_data_cap_bytes")
 
         /** Stored instead of a preset name when the user picked folders by hand. */

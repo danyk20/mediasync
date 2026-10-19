@@ -40,6 +40,9 @@
     <string name="consumer_backup_row_off">Disattivato: le foto ricevute restano solo su questo telefono</string>
     <string name="consumer_backup_row_on">Sottoposti a backup dall\'app %1$s · %2$s passati oggi</string>
     <string name="consumer_backup_row_open">Apri</string>
+    <string name="consumer_names_row_title">Nomi file semplici</string>
+    <string name="consumer_names_row_on">Attiva: un nome conserva solo l\'ultimo punto, così Google Foto mostra il file. VID_1234.LS.mp4 viene salvato come VID_1234_LS.mp4</string>
+    <string name="consumer_names_row_off">Disattivata: i nomi restano invariati. Google Foto potrebbe non mostrare file come VID_1234.LS.mp4</string>
     <string name="consumer_internet_row_title">Sincronizzazione via Internet</string>
     <string name="consumer_internet_set_up">Configura</string>
     <string name="consumer_internet_row_relay">Relay questo mese: %1$s di %2$s liberi</string>

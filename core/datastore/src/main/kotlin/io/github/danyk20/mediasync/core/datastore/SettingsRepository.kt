@@ -68,6 +68,14 @@ interface SettingsRepository {
 
     suspend fun setVideosOverRelay(allowed: Boolean)
 
+    /**
+     * A receiving phone: a received file whose name has more than one dot keeps only the last, as the Google Photos
+     * app doesn't show the others (docs/PLAN.md §9.3.1); on at first.
+     */
+    val simpleFileNames: Flow<Boolean>
+
+    suspend fun setSimpleFileNames(on: Boolean)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

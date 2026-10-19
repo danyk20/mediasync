@@ -40,6 +40,9 @@
     <string name="consumer_backup_row_off">Désactivée : les photos reçues restent uniquement sur ce téléphone</string>
     <string name="consumer_backup_row_on">Sauvegardé par l\'appli %1$s · %2$s transmises aujourd\'hui</string>
     <string name="consumer_backup_row_open">Ouvrir</string>
+    <string name="consumer_names_row_title">Noms de fichiers simples</string>
+    <string name="consumer_names_row_on">Activée : un nom ne garde que son dernier point, pour que Google Photos affiche le fichier. VID_1234.LS.mp4 est enregistré sous VID_1234_LS.mp4</string>
+    <string name="consumer_names_row_off">Désactivée : les noms restent tels quels. Google Photos peut ne pas afficher les fichiers comme VID_1234.LS.mp4</string>
     <string name="consumer_internet_row_title">Synchronisation par Internet</string>
     <string name="consumer_internet_set_up">Configurer</string>
     <string name="consumer_internet_row_relay">Relais ce mois-ci : %1$s sur %2$s libres</string>

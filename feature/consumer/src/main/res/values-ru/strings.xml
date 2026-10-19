@@ -45,6 +45,9 @@
     <string name="consumer_backup_row_off">Выключено: полученные фото остаются только на этом телефоне</string>
     <string name="consumer_backup_row_on">Резервное копирование через %1$s · сегодня передано: %2$s</string>
     <string name="consumer_backup_row_open">Открыть</string>
+    <string name="consumer_names_row_title">Простые имена файлов</string>
+    <string name="consumer_names_row_on">Включено: в имени сохраняется только последняя точка, поэтому Google Фото показывает файл. VID_1234.LS.mp4 сохраняется как VID_1234_LS.mp4</string>
+    <string name="consumer_names_row_off">Выключено: имена остаются как есть. Google Фото может не показывать такие файлы, как VID_1234.LS.mp4</string>
     <string name="consumer_internet_row_title">Синхронизация через интернет</string>
     <string name="consumer_internet_set_up">Настроить</string>
     <string name="consumer_internet_row_relay">Ретрансляция в этом месяце: свободно %1$s из %2$s</string>

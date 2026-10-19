@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -122,6 +125,7 @@ fun ConsumerHomeRoute(
         onSetUpInternet = onSetUpInternet,
         onOpenBackup = onOpenBackup,
         onRemoveProducer = { viewModel.removeProducer(it.id) },
+        onSimpleFileNames = viewModel::setSimpleFileNames,
         onAllowNotifications = { requestNotifications.askToNotify() },
         onOpenSettings = { context.openAppSettings() },
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
@@ -183,6 +187,7 @@ fun ConsumerHomeScreen(
     onSetUpInternet: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     onRemoveProducer: (PairedPhone) -> Unit = {},
+    onSimpleFileNames: (Boolean) -> Unit = {},
     onShowSpeeds: (DeviceId) -> Unit = {},
     onAllowNotifications: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -233,6 +238,7 @@ fun ConsumerHomeScreen(
             ScheduleRow(state.schedule, onChangeSchedule)
             InternetRow(state.internetSync, state.relay, onSetUpInternet)
             state.backup?.let { BackupRow(it, onOpenBackup) }
+            FileNamesRow(state.simpleFileNames, onSimpleFileNames)
             TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers, onRemoveProducer)
             Text(
@@ -458,6 +464,23 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                 )
             },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** *Simple file names* (docs/PLAN.md §9.3.1): a received file's name keeps only its last dot. */
+@Composable
+private fun FileNamesRow(on: Boolean, onChange: (Boolean) -> Unit) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            // The whole row toggles, and reads out as one switch.
+            modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onChange),
+            headlineContent = { Text(stringResource(R.string.consumer_names_row_title)) },
+            supportingContent = {
+                Text(stringResource(if (on) R.string.consumer_names_row_on else R.string.consumer_names_row_off))
+            },
+            trailingContent = { Switch(checked = on, onCheckedChange = null) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }

@@ -40,7 +40,8 @@ import okio.source
  * Android 10.
  *
  * Files are written as MediaStore *pending* items: invisible to the gallery and to Google Photos until
- * they're complete and verified. An interrupted file stays pending, so the next session can resume it.
+ * they're complete and verified. An interrupted file stays pending, so the next session can resume it. Each is
+ * named as [ReceivedNames] says: with *Simple file names* on, a name keeps only its last dot.
  */
 @ExercisedOnDevice(coveredBy = "core:media MediaStoreTest")
 @Singleton
@@ -48,11 +49,13 @@ class MediaStoreSink internal constructor(
     context: Context,
     private val partials: PartialTransferDao,
     private val reserveBytes: Long,
+    /** The name a file sent under a given name is stored under. */
+    private val names: (String) -> String = { it },
 ) : MediaSink {
 
     @Inject
-    constructor(@ApplicationContext context: Context, partials: PartialTransferDao) :
-        this(context, partials, DEFAULT_RESERVE_BYTES)
+    constructor(@ApplicationContext context: Context, partials: PartialTransferDao, names: ReceivedNames) :
+        this(context, partials, DEFAULT_RESERVE_BYTES, names::of)
 
     private val resolver: ContentResolver = context.contentResolver
 
@@ -90,7 +93,7 @@ class MediaStoreSink internal constructor(
             MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         }
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, descriptor.displayName)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, names(descriptor.displayName))
             put(MediaStore.MediaColumns.MIME_TYPE, descriptor.mimeType)
             put(MediaStore.MediaColumns.RELATIVE_PATH, FOLDER)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
