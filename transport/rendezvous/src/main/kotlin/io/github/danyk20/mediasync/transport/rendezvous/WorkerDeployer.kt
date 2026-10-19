@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -82,8 +83,11 @@ class WorkerScript(
     }
 }
 
-/** Where a deployment went: the Worker's address, and whether its TURN relay could be set up. */
-data class Deployment(val accountId: String, val url: String, val relay: Boolean)
+/**
+ * Where a deployment went: the Worker's address, and whether its TURN relay could be set up. [relayNote] says why not
+ * when Cloudflare's answer wasn't what the app expects.
+ */
+data class Deployment(val accountId: String, val url: String, val relay: Boolean, val relayNote: String? = null)
 
 /** Cloudflare refused a step of the deployment; [code] is Cloudflare's error code, if it gave one. */
 class DeployException(val step: WorkerDeployer.Step, val code: Int?, message: String) :
@@ -112,7 +116,8 @@ class WorkerDeployer(
         // Kept from an earlier deployment: only what's missing is set.
         val kept = if (deployedTag == null) emptySet() else secretNames(account, name)
         onStep(Step.RELAY)
-        val relayKey = if (TURN_KEY_ID in kept) null else relayKey(account)
+        var relayNote: String? = null
+        val relayKey = if (TURN_KEY_ID in kept) null else relayKey(account) { relayNote = it }
         onStep(Step.UPLOAD)
         val secrets = buildMap {
             if (ACCOUNT_ID !in kept) put(ACCOUNT_ID, account)
@@ -139,8 +144,8 @@ class WorkerDeployer(
         return Deployment(
             account,
             "https://$name.$subdomain.workers.dev",
-            relay =
-                TURN_KEY_ID in kept || relayKey != null,
+            relay = TURN_KEY_ID in kept || relayKey != null,
+            relayNote = relayNote,
         )
     }
 
@@ -169,15 +174,30 @@ class WorkerDeployer(
         return script["migration_tag"]?.takeIf { it != JsonNull }?.jsonPrimitive?.content ?: NO_TAG
     }
 
-    /** A TURN key for the relay; `null` if the token may not make one: the Worker then connects directly only. */
-    private fun relayKey(account: String): Pair<String, String>? = try {
-        val key = call(Step.RELAY, "POST", "accounts/$account/calls/turn_keys", buildJsonObject { put("name", NAME) })
-            .jsonObject
-        key.getValue("uid").jsonPrimitive.content to key.getValue("key").jsonPrimitive.content
-    } catch (e: DeployException) {
-        if (e.code == null || e.code !in PERMISSION_ERRORS) throw e
-        null
+    /**
+     * A TURN key for the relay: its ID and secret. `null` if the token may not make one, or if Cloudflare's answer
+     * doesn't carry the key ([unexpected] then says what it did carry): the Worker then connects directly only.
+     */
+    private fun relayKey(account: String, unexpected: (String) -> Unit): Pair<String, String>? {
+        val made = try {
+            call(Step.RELAY, "POST", "accounts/$account/calls/turn_keys", buildJsonObject { put("name", NAME) })
+        } catch (e: DeployException) {
+            if (e.code == null || e.code !in PERMISSION_ERRORS) throw e
+            return null
+        }
+        val fields = made as? JsonObject
+        val id = fields?.text("uid")
+        val secret = fields?.text("key")
+        if (id != null && secret != null) return id to secret
+        // The field names only: the values may be secrets.
+        unexpected("TURN key answer without its key (fields: ${fields?.keys?.sorted()?.joinToString() ?: "none"})")
+        // A key without its secret is of no use: it isn't left behind in the user's account.
+        if (id != null) runCatching { call(Step.RELAY, "DELETE", "accounts/$account/calls/turn_keys/$id") }
+        return null
     }
+
+    /** The text of the field [name]; `null` if there's none, or it isn't text. */
+    private fun JsonObject.text(name: String): String? = (get(name) as? JsonPrimitive)?.takeIf { it.isString }?.content
 
     /** The names of the secrets the Worker deployed as [name] has. */
     private fun secretNames(account: String, name: String): Set<String> =

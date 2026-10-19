@@ -10,6 +10,7 @@ import io.github.danyk20.mediasync.transport.rendezvous.HttpRequest
 import io.github.danyk20.mediasync.transport.rendezvous.HttpResponse
 import io.github.danyk20.mediasync.transport.rendezvous.WorkerDeployer
 import io.github.danyk20.mediasync.transport.rendezvous.WorkerScript
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -173,6 +174,20 @@ class WorkerSetupTest {
         answer = { _, path -> if (path.endsWith("/turn_keys")) 403 to """[{"code":10000,"message":"No"}]""" else null }
 
         deploy() shouldBe SetupResult.Done("https://mediasync-rendezvous.anna.workers.dev", relay = false)
+    }
+
+    @Test
+    fun aRelayKeyAnswerWithoutTheKeyIsLoggedAndSetupCarriesOn() {
+        val logged = mutableListOf<String>()
+        Diagnostics.install { _, message -> logged += message }
+        answer =
+            { method, path -> if (method == "POST" && path.endsWith("/turn_keys")) 201 to """{"uid":"u"}""" else null }
+
+        val result = deploy()
+
+        result shouldBe SetupResult.Done("https://mediasync-rendezvous.anna.workers.dev", relay = false)
+        logged shouldContain "Internet: no relay: TURN key answer without its key (fields: uid)"
+        Diagnostics.install { _, _ -> }
     }
 
     @Test

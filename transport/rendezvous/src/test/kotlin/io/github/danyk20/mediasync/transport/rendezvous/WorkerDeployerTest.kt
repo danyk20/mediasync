@@ -131,6 +131,29 @@ class WorkerDeployerTest {
     }
 
     @Test
+    fun aRelayKeyAnswerWithoutTheKeyDeploysForDirectConnectionsAndRemovesTheKey() {
+        // As a phone saw it: Cloudflare made the key but its answer had no "key" (the app used to crash on it).
+        routes["POST accounts/acc1/calls/turn_keys"] =
+            201 to """{"uid":"turn-id","name":"mediasync-rendezvous","created":"2026-10-19T12:12:00Z","modified":"x"}"""
+        routes["DELETE accounts/acc1/calls/turn_keys/turn-id"] = 200 to "null"
+
+        val deployment = deployer().deploy(script)
+
+        deployment.relay shouldBe false
+        deployment.relayNote shouldBe "TURN key answer without its key (fields: created, modified, name, uid)"
+        bindings().map { it["name"]?.jsonPrimitive?.content } shouldNotContain "TURN_KEY_ID"
+        sent.map { "${it.method} ${it.url.path}" } shouldContain
+            "DELETE /client/v4/accounts/acc1/calls/turn_keys/turn-id"
+    }
+
+    @Test
+    fun aRelayKeyAnswerThatIsntAnObjectDeploysForDirectConnections() {
+        routes["POST accounts/acc1/calls/turn_keys"] = 201 to "[]"
+
+        deployer().deploy(script).relayNote shouldBe "TURN key answer without its key (fields: none)"
+    }
+
+    @Test
     fun aRedeploymentWithABetterTokenAddsTheRelay() {
         routes["GET accounts/acc1/workers/scripts"] = 200 to """[{"id":"mediasync-rendezvous","migration_tag":"v1"}]"""
         routes["GET accounts/acc1/workers/scripts/mediasync-rendezvous/secrets"] =

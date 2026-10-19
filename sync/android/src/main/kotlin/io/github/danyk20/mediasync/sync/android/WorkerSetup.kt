@@ -111,6 +111,7 @@ class WorkerSetup internal constructor(
             Diagnostics.log(Area.RECEIVE, "Internet: Cloudflare couldn't be reached", e)
             return SetupResult.Failed(SetupFailure.OFFLINE)
         }
+        deployment.relayNote?.let { Diagnostics.log(Area.RECEIVE, "Internet: no relay: $it") }
         onStep(SetupStep.STARTING)
         val live = withTimeoutOrNull(startTimeoutMillis) {
             while (!worker.isLive(deployment.url)) delay(pollMillis)
