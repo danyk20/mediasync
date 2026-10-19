@@ -10,6 +10,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * The diagnostic log in [directory]: one line per entry, written on a background thread so logging never slows
@@ -30,6 +31,11 @@ class FileDiagnosticLog(
     override fun log(area: Area, message: String) {
         val line = "${FORMAT.format(ZonedDateTime.now(clock))} ${area.label.padEnd(AREA_WIDTH)} ${message.oneLine()}\n"
         writer.execute { append(line) }
+    }
+
+    /** Waits, for a second at most, until what's been logged is written: before the app ends. */
+    fun flush() {
+        runCatching { writer.submit {}.get(FLUSH_SECONDS, TimeUnit.SECONDS) }
     }
 
     /** Everything kept, oldest first, once what's being written is written. */
@@ -61,6 +67,7 @@ class FileDiagnosticLog(
     private companion object {
         const val DEFAULT_MAX_BYTES = 512L * 1024
         const val AREA_WIDTH = 8
+        const val FLUSH_SECONDS = 1L
         val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS xx")
     }
 }

@@ -4,12 +4,15 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
+import io.github.danyk20.mediasync.transport.rendezvous.HttpRequest
 import io.github.danyk20.mediasync.transport.rendezvous.HttpResponse
 import io.github.danyk20.mediasync.transport.rendezvous.WorkerDeployer
 import io.github.danyk20.mediasync.transport.rendezvous.WorkerScript
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.mockk.mockk
 import io.mockk.verify
 import java.io.IOException
@@ -35,6 +38,10 @@ class WorkerSetupTest {
     private val settings = FakeSettingsRepository()
     private val receiver = mockk<ConsumerReceiver>(relaxed = true)
     private val tokens = mutableListOf<String>()
+    private val requests = mutableListOf<HttpRequest>()
+
+    /** What the network throws, if anything. */
+    private var failure: Throwable? = null
 
     /** Cloudflare's answer to a path, or `null` for its default. */
     private var answer: (method: String, path: String) -> Pair<Int, String>? = { _, _ -> null }
@@ -47,6 +54,12 @@ class WorkerSetupTest {
         deployer = { token ->
             tokens += token
             WorkerDeployer(token, { request ->
+                requests += request
+                failure?.let { throw it }
+                // As Android's HTTP stack does: a header value with a line break or other control character is refused.
+                request.headers.forEach { (name, value) ->
+                    require(value.all { it == '\t' || it in ' '..'~' }) { "Unexpected char in $name value" }
+                }
                 val path = request.url.path.removePrefix("/client/v4/")
                 if (path == "/v1/health") {
                     val status = if (unansweredHealthChecks-- > 0) 404 else 200
@@ -75,8 +88,11 @@ class WorkerSetupTest {
         else -> "{}"
     }
 
-    private fun deploy(setup: WorkerSetup = setup(), steps: MutableList<SetupStep> = mutableListOf()) =
-        runBlocking { setup.deploy("  token-123\n") { steps += it } }
+    private fun deploy(
+        setup: WorkerSetup = setup(),
+        steps: MutableList<SetupStep> = mutableListOf(),
+        token: String = "  token-123\n",
+    ) = runBlocking { setup.deploy(token) { steps += it } }
 
     @Test
     fun itDeploysWaitsForTheWorkerAndTurnsInternetSyncOn() {
@@ -90,6 +106,36 @@ class WorkerSetupTest {
         tokens shouldBe listOf("token-123") // As pasted, without the spaces around it.
         settings.rendezvousUrl.value shouldBe "https://mediasync-rendezvous.anna.workers.dev"
         verify { receiver.refreshInternet() }
+    }
+
+    @Test
+    fun aTokenPastedWithLineBreaksOrInvisibleCharactersInItStillWorks() {
+        // Copied from a web page: a line break, a zero-width space and a no-break space inside the token.
+        val result = deploy(token = "Bearer token-\n12\u200B3\u00A0\r\n")
+
+        result shouldBe SetupResult.Done("https://mediasync-rendezvous.anna.workers.dev", relay = true)
+        tokens shouldBe listOf("token-123")
+    }
+
+    @Test
+    fun aTokenThatCantBeOneIsInvalidWithoutAskingCloudflare() {
+        deploy(token = "tökén-123") shouldBe SetupResult.Failed(SetupFailure.INVALID_TOKEN)
+        deploy(token = " \n ") shouldBe SetupResult.Failed(SetupFailure.INVALID_TOKEN)
+        requests shouldBe emptyList()
+    }
+
+    @Test
+    fun anUnexpectedErrorIsAFailureNotACrash() {
+        val logged = mutableListOf<String>()
+        Diagnostics.install { _, message -> logged += message }
+        failure = IllegalStateException("Broken answer for Bearer token-123")
+
+        val result = deploy()
+
+        result shouldBe SetupResult.Failed(SetupFailure.REFUSED, "IllegalStateException")
+        logged.single() shouldContain "IllegalStateException"
+        logged.single() shouldNotContain "token-123" // The token never reaches the diagnostic log.
+        Diagnostics.install { _, _ -> }
     }
 
     @Test

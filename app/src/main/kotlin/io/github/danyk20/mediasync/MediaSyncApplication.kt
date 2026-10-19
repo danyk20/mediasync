@@ -52,6 +52,7 @@ class MediaSyncApplication :
     override fun onCreate() {
         super.onCreate()
         Diagnostics.install(diagnosticLog)
+        Diagnostics.logCrashes(diagnosticLog::flush)
         Diagnostics.log(Area.APP, "Started: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         // Keeps the background sync in step with the role and the schedule (docs/PLAN.md §10).
         scheduler.start()
