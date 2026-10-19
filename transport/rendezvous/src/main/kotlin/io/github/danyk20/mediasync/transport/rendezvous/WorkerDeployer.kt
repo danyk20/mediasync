@@ -187,7 +187,8 @@ class WorkerDeployer(
         }
         val fields = made as? JsonObject
         val id = fields?.text("uid")
-        val secret = fields?.text("key")
+        // Cloudflare's answer names it "secret" now; its API docs still say "key".
+        val secret = fields?.text("secret") ?: fields?.text("key")
         if (id != null && secret != null) return id to secret
         // The field names only: the values may be secrets.
         unexpected("TURN key answer without its key (fields: ${fields?.keys?.sorted()?.joinToString() ?: "none"})")

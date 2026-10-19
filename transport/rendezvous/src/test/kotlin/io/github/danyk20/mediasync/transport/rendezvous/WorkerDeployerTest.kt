@@ -131,6 +131,20 @@ class WorkerDeployerTest {
     }
 
     @Test
+    fun theRelayKeyIsReadFromTheSecretFieldCloudflareAnswersWith() {
+        // As a phone saw it on 2026-10-19 (fields: created, modified, name, secret, uid).
+        routes["POST accounts/acc1/calls/turn_keys"] = 201 to
+            """{"uid":"turn-id","secret":"turn-secret","name":"mediasync-rendezvous","created":"x","modified":"x"}"""
+
+        val deployment = deployer().deploy(script)
+
+        deployment shouldBe Deployment("acc1", "https://mediasync-rendezvous.anna.workers.dev", relay = true)
+        binding("TURN_KEY_ID").getValue("text").jsonPrimitive.content shouldBe "turn-id"
+        binding("TURN_KEY_API_TOKEN").getValue("text").jsonPrimitive.content shouldBe "turn-secret"
+        sent.none { it.method == "DELETE" } shouldBe true
+    }
+
+    @Test
     fun aRelayKeyAnswerWithoutTheKeyDeploysForDirectConnectionsAndRemovesTheKey() {
         // As a phone saw it: Cloudflare made the key but its answer had no "key" (the app used to crash on it).
         routes["POST accounts/acc1/calls/turn_keys"] =
