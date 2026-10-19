@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/danyk20/mediasync/compare/v0.8.0...v0.8.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* a TURN key answer without its key no longer stops internet sync setup ([#67](https://github.com/danyk20/mediasync/issues/67)) ([011fca0](https://github.com/danyk20/mediasync/commit/011fca0da21d44c301be871b47a831f9e407c788))
+* pasting a Cloudflare token with a line break no longer crashes the app ([#65](https://github.com/danyk20/mediasync/issues/65)) ([d4535af](https://github.com/danyk20/mediasync/commit/d4535afe46208e3009ea80a1ff016b0be291f81b))
+
 ## [0.8.0](https://github.com/danyk20/mediasync/compare/v0.7.0...v0.8.0) (2026-10-19)
 
 
