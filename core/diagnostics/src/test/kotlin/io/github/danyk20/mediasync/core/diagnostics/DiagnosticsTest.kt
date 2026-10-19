@@ -46,6 +46,36 @@ class DiagnosticsTest {
     }
 
     @Test
+    fun tokensNeverReachTheLog() {
+        val cleaned = Sanitizer.clean("Unexpected char 0x0a at 7 in header value: Bearer cfut_abc123-XYZ, retrying")
+
+        cleaned shouldNotContain "cfut_abc123"
+        cleaned shouldContain "Bearer <token>, retrying"
+    }
+
+    @Test
+    fun aCrashIsLoggedAndWrittenBeforeTheAppEnds() {
+        val log = FileDiagnosticLog(directory, clock)
+        Diagnostics.install(log)
+        val android = Thread.getDefaultUncaughtExceptionHandler()
+        val handed = mutableListOf<Throwable>()
+        Thread.setDefaultUncaughtExceptionHandler { _, error -> handed += error }
+        try {
+            Diagnostics.logCrashes(log::flush)
+
+            thread(name = "setup") { throw IllegalArgumentException("Unexpected char in Authorization value") }.join()
+
+            val entry = File(directory, "diagnostics.log").readText() // Already written: no waiting.
+            entry shouldContain
+                "app      Crashed on setup: IllegalArgumentException: Unexpected char in Authorization value at "
+            entry shouldContain "DiagnosticsTest"
+            handed.single().message shouldBe "Unexpected char in Authorization value" // Android still ends the app.
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(android)
+        }
+    }
+
+    @Test
     fun ordinaryMessagesStayAsTheyAre() {
         val message = "Sent 12 of 40 (3.2 MB) in 00:01:07, retry at 03:15, schedule daily@03:00, ratio 1.5"
 

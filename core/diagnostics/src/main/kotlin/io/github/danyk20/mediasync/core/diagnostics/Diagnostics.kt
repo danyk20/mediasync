@@ -47,13 +47,33 @@ object Diagnostics {
         .take(MAX_CAUSES)
         .joinToString(" ← ") { listOfNotNull(it.javaClass.simpleName, it.message).joinToString(": ") }
 
+    /**
+     * Logs a crash before Android ends the app: what was thrown and where, so a shared log says why the app closed.
+     * [flush] waits until the entry is written. Android's own handling (ending the app) follows as before.
+     */
+    fun logCrashes(flush: () -> Unit) {
+        val android = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                val where = error.stackTrace.take(CRASH_FRAMES).joinToString(" ← ")
+                log(Area.APP, "Crashed on ${thread.name}: ${describe(error)} at $where")
+                flush()
+            }
+            android?.uncaughtException(thread, error)
+        }
+    }
+
     private const val MAX_CAUSES = 3
+
+    /** Enough of the stack trace to find the place, with the release's R8 mapping. */
+    private const val CRASH_FRAMES = 4
 }
 
 /** Removes what could identify files or the network from a message. */
 object Sanitizer {
     private val replacements = listOf(
         Regex("""(content|file)://\S+""") to "<$1 uri>",
+        Regex("""(?i)\bbearer\s+[\w.~+/-]+=*""") to "Bearer <token>",
         Regex("""(?<![\w.])/(storage|sdcard|data|mnt|system|proc)/\S*""") to "<path>",
         Regex("""\b(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}\b""") to "$1.x",
         Regex("""\b(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b""") to "<ipv6>",
