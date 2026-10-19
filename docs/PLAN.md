@@ -986,6 +986,7 @@ How a scheduled sync runs:
 - **Only while charging, with catch-up.**
   - At the due time, a producer syncs if it is charging.
   - If it isn't, the sync stays due and runs the next time the phone is plugged in. A night away from the charger never skips a day's photos.
+  - *Fixed (M6, after a real-phone test):* "charging" means **on the charger**. Samsung's *Protect battery* (stops at 85 %) and adaptive charging keep a plugged-in battery from charging. Android's job scheduler counts that as charging and starts the job; WorkManager doesn't, and stopped it at once: on a Galaxy S22, about 20 starts and stops a second, for minutes (it flooded the diagnostic log). Now a run that starts with the battery held below full queues itself again without WorkManager's charging constraint and goes ahead on the charger. Unplugged during such a run, the sync pauses after the current file, or the receive window closes, and the due time waits for the next charge as before.
 - **Receive window on the consumer.**
   - The consumer opens a receive window a few minutes before the due time if it's charging, or as soon as it's plugged in afterwards.
   - The window stays open until every producer is done and an hour passes without activity. The default maximum is 4 h.

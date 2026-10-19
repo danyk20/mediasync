@@ -102,6 +102,16 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
         return !plugged && (batteryPercent() ?: PERCENT) < TURBO_WARNING_PERCENT
     }
 
+    override fun pluggedIn(): Boolean = battery()?.let { it.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0 } ?: true
+
+    override fun chargingHeld(): Boolean {
+        val battery = battery() ?: return false
+        // What WorkManager counts as charging: charging, or full.
+        val status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        return battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0 && !charging
+    }
+
     private fun battery(): Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 
     /** From the last battery broadcast: what the system shows, unlike a direct reading from the battery. */

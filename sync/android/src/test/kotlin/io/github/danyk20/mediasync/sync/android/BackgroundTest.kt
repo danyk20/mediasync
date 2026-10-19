@@ -9,6 +9,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -68,7 +69,15 @@ class BackgroundTest {
     private val state = ScheduleState(context)
     private val history = SyncHistory(context)
     private var pauseReason: PauseReason? = null
-    private val conditions = DeviceConditions { pauseReason }
+    private var pluggedIn = true
+    private var chargingHeld = false
+    private val conditions = object : DeviceConditions {
+        override fun pauseReason() = pauseReason
+
+        override fun pluggedIn() = pluggedIn
+
+        override fun chargingHeld() = chargingHeld
+    }
     private val consumer = deviceId(2)
 
     /** 20:00 in Zurich; tests move it. */
@@ -98,8 +107,12 @@ class BackgroundTest {
 
     private suspend fun SyncScheduler.applyCurrentPlan() = apply(plans().first())
 
-    private fun pending(role: DeviceRole) = workManager.getWorkInfosForUniqueWork(SyncScheduler.nameOf(role)).get()
-        .filter { it.state == WorkInfo.State.ENQUEUED }
+    private fun pending(role: DeviceRole) = runs(role).filter { it.state == WorkInfo.State.ENQUEUED }
+
+    /** Every run of [role]'s background job WorkManager knows; one without constraints may have started at once. */
+    private fun runs(role: DeviceRole) = workManager.getWorkInfosForUniqueWork(SyncScheduler.nameOf(role)).get()
+
+    private val onTheCharger = Data.Builder().putBoolean(SyncScheduler.PLUGGED_IN, true).build()
 
     private fun pairWithConsumer(schedule: SyncSchedule? = null) {
         peers.register(PairedPeer(consumer, "Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
@@ -276,6 +289,58 @@ class BackgroundTest {
     }
 
     @Test
+    fun onTheChargerWithTheBatteryHeldBelowFullARunGoesAheadWithoutWorkManagersChargingCheck() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        val sync = producerSync { ProducerState.Idle() }
+        chargingHeld = true // Samsung's Protect battery: plugged in, held at 85 %.
+
+        runSyncWorker(sync) shouldBe ListenableWorker.Result.success()
+
+        coVerify(exactly = 0) { sync.syncAndWait(any()) } // WorkManager would stop this run at once.
+        runs(DeviceRole.PRODUCER).single().constraints.requiresCharging() shouldBe false
+    }
+
+    @Test
+    fun aRunOnTheChargerThatIsUnpluggedWaitsForTheNextCharge() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        now = ZonedDateTime.parse("2026-10-15T03:02+02:00[Europe/Zurich]")
+        state.markHandled(DeviceRole.PRODUCER, millis("2026-10-14T03:00+02:00"))
+        chargingHeld = true
+        val sync = producerSync { pauseWhen ->
+            pauseWhen() shouldBe false
+            pluggedIn = false // Unplugged while sending.
+            pauseWhen() shouldBe true
+            ProducerState.Idle(SyncResult(sent = 3, cancelled = true))
+        }
+
+        runSyncWorker(sync, input = onTheCharger) shouldBe ListenableWorker.Result.success()
+
+        state.lastHandledDue(DeviceRole.PRODUCER) shouldBe millis("2026-10-14T03:00+02:00") // 03:00 isn't done.
+        val next = pending(DeviceRole.PRODUCER).single()
+        next.constraints.requiresCharging() shouldBe true
+        next.initialDelayMillis shouldBe 0 // Missed: at the next charge.
+    }
+
+    @Test
+    fun aReceiveWindowOnTheChargerClosesWhenUnplugged() = runTest {
+        settings.setRole(DeviceRole.CONSUMER)
+        now = ZonedDateTime.parse("2026-10-15T02:55+02:00[Europe/Zurich]")
+        state.markHandled(DeviceRole.CONSUMER, millis("2026-10-14T03:00+02:00"))
+        val receiver = mockk<ConsumerReceiver>(relaxed = true) {
+            every { state } returns MutableStateFlow(ReceiverState(listening = true))
+            every { hold(any()) } answers { pluggedIn = false } // Unplugged once listening.
+        }
+
+        runReceiveWindow(receiver, input = onTheCharger) shouldBe ListenableWorker.Result.success()
+
+        verify { receiver.release(any()) }
+        state.lastHandledDue(DeviceRole.CONSUMER) shouldBe millis("2026-10-14T03:00+02:00") // 03:00 isn't done.
+        pending(DeviceRole.CONSUMER).single().constraints.requiresCharging() shouldBe true
+    }
+
+    @Test
     fun aScheduledSyncThatDidntRunIsReportedUntilASyncGetsThrough() = runTest {
         val scheduler = scheduler()
         state.markHandled(DeviceRole.PRODUCER, millis("2026-10-14T03:00+02:00"))
@@ -417,9 +482,10 @@ class BackgroundTest {
     private suspend fun kotlinx.coroutines.test.TestScope.runSyncWorker(
         sync: ProducerSync,
         wifi: List<InetAddress> = listOf(InetAddress.getByName("192.168.1.30")),
+        input: Data = Data.EMPTY,
     ): ListenableWorker.Result {
         val scheduler = scheduler()
-        return runWorker<ScheduledSyncWorker> { appContext, parameters ->
+        return runWorker<ScheduledSyncWorker>(input) { appContext, parameters ->
             val network = AddressProvider { wifi }
             ScheduledSyncWorker(
                 appContext,
@@ -437,9 +503,10 @@ class BackgroundTest {
 
     private suspend fun kotlinx.coroutines.test.TestScope.runReceiveWindow(
         receiver: ConsumerReceiver,
+        input: Data = Data.EMPTY,
     ): ListenableWorker.Result {
         val scheduler = scheduler()
-        return runWorker<ReceiveWindowWorker> { appContext, parameters ->
+        return runWorker<ReceiveWindowWorker>(input) { appContext, parameters ->
             ReceiveWindowWorker(
                 appContext,
                 parameters,
@@ -457,9 +524,11 @@ class BackgroundTest {
     private val notifications = mockk<SyncNotifications>(relaxed = true)
 
     private suspend inline fun <reified W : CoroutineWorker> runWorker(
+        input: Data = Data.EMPTY,
         crossinline create: (Context, WorkerParameters) -> W,
     ): ListenableWorker.Result {
         val worker = TestListenableWorkerBuilder<W>(context)
+            .setInputData(input)
             .setWorkerFactory(
                 object : WorkerFactory() {
                     override fun createWorker(

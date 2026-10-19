@@ -69,13 +69,16 @@ class ScheduledSyncWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result = logged("Scheduled sync") {
-        val consumer = withContext(Dispatchers.IO) { peers.consumer() } ?: return@logged Result.success() // Unpaired.
-        val problem = sync(consumer) ?: return@logged Result.success()
+    override suspend fun doWork(): Result =
+        onTheCharger(DeviceRole.PRODUCER, conditions, scheduler) ?: logged("Scheduled sync") { scheduledSync() }
+
+    private suspend fun scheduledSync(): Result {
+        val consumer = withContext(Dispatchers.IO) { peers.consumer() } ?: return Result.success() // Unpaired.
+        val problem = sync(consumer) ?: return Result.success()
         // Tries again while charging; the home screen says why if the sync is late.
         Diagnostics.log(Area.WORK, "Scheduled sync waits: ${problem.name.lowercase()}")
         history.recordProblem(problem)
-        Result.retry()
+        return Result.retry()
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.sending(consumerName = null)
@@ -87,8 +90,18 @@ class ScheduledSyncWorker @AssistedInject constructor(
         conditions.pauseReason()?.let { return it.problem }
         val due = scheduler.servedDue(DeviceRole.PRODUCER, consumer.schedule ?: SyncSchedule.Default)
         var paused: PauseReason? = null
+        var unplugged = false
         val end = send(sync, notifications, consumer.name) {
-            sync.syncAndWait(pauseWhen = { conditions.pauseReason()?.also { paused = it } != null })
+            sync.syncAndWait(
+                pauseWhen = {
+                    conditions.pauseReason()?.also { paused = it } != null ||
+                        unpluggedFromCharger(conditions).also { unplugged = it }
+                },
+            )
+        }
+        if (unplugged) {
+            scheduler.finished(DeviceRole.PRODUCER, due = null) // The due time is still to do, at the next charge.
+            return null
         }
         val problem = paused?.problem ?: (end as? ProducerState.Failed)?.let { RETRIED[it.reason] }
         // Done, or nothing to retry until the user acts (e.g. pair again); the home screen says why.
@@ -140,6 +153,32 @@ class SyncNowWorker @AssistedInject constructor(
         const val TURBO = "turbo"
     }
 }
+
+/**
+ * On the charger with the battery held below full, WorkManager stops a scheduled run at once and Android starts it
+ * again, many times a second (docs/PLAN.md §10.1): it goes ahead instead as a run WorkManager doesn't stop. Such a
+ * run that finds the phone unplugged waits for a charge again. `null` to go ahead with this run.
+ */
+private suspend fun CoroutineWorker.onTheCharger(
+    role: DeviceRole,
+    conditions: DeviceConditions,
+    scheduler: SyncScheduler,
+): ListenableWorker.Result? {
+    val onTheCharger = inputData.getBoolean(SyncScheduler.PLUGGED_IN, false)
+    when {
+        !onTheCharger && conditions.chargingHeld() -> scheduler.runWhilePluggedIn(role)
+
+        onTheCharger && !conditions.pluggedIn() -> scheduler.finished(role, due = null)
+
+        // Waits for a charge again.
+        else -> return null
+    }
+    return ListenableWorker.Result.success()
+}
+
+/** A run on the charger, without WorkManager's charging constraint, whose phone was unplugged since. */
+private fun CoroutineWorker.unpluggedFromCharger(conditions: DeviceConditions): Boolean =
+    inputData.getBoolean(SyncScheduler.PLUGGED_IN, false) && !conditions.pluggedIn()
 
 /** Runs [work], noting in the diagnostic log when it starts, how it ends, and why Android stopped it. */
 private suspend fun CoroutineWorker.logged(
@@ -199,7 +238,8 @@ class ReceiveWindowWorker @AssistedInject constructor(
     private val clock: Clock,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result = logged("Receive window") { receive() }
+    override suspend fun doWork(): Result =
+        onTheCharger(DeviceRole.CONSUMER, conditions, scheduler) ?: logged("Receive window") { receive() }
 
     private suspend fun receive(): Result {
         conditions.pauseReason()?.let { reason ->
@@ -216,7 +256,7 @@ class ReceiveWindowWorker @AssistedInject constructor(
             val progress = launch { notifications.showReceivingProgress(incoming(receiver, peers)) }
             try {
                 while (!receiveWindowDone(due, opened, clock.millis(), receiver.state.value)) {
-                    if (conditions.pauseReason() != null) return@coroutineScope true
+                    if (conditions.pauseReason() != null || unpluggedFromCharger(conditions)) return@coroutineScope true
                     delay(CHECK_INTERVAL.toMillis())
                 }
                 false
@@ -225,13 +265,21 @@ class ReceiveWindowWorker @AssistedInject constructor(
                 receiver.release(HOLDER)
             }
         }
-        if (paused) {
-            Diagnostics.log(Area.WORK, "Receive window closes early: ${conditions.pauseReason()?.name?.lowercase()}")
-            return Result.retry()
-        }
+        if (paused) return closedEarly()
         Diagnostics.log(Area.WORK, "Receive window closes: everyone's done")
         scheduler.finished(DeviceRole.CONSUMER, due)
         return Result.success()
+    }
+
+    /** Closed before everyone was done: unplugged from the charger, it waits for a charge; paused, it opens later. */
+    private suspend fun closedEarly(): Result {
+        if (unpluggedFromCharger(conditions)) {
+            Diagnostics.log(Area.WORK, "Receive window closes: unplugged")
+            scheduler.finished(DeviceRole.CONSUMER, due = null)
+            return Result.success()
+        }
+        Diagnostics.log(Area.WORK, "Receive window closes early: ${conditions.pauseReason()?.name?.lowercase()}")
+        return Result.retry()
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifications.receiving()
