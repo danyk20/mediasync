@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/danyk20/mediasync/compare/v0.6.1...v0.7.0) (2026-10-19)
+
+
+### Features
+
+* received files get simple names, so Google Photos shows them ([#60](https://github.com/danyk20/mediasync/issues/60)) ([7a2dbb8](https://github.com/danyk20/mediasync/commit/7a2dbb81996b8d72a4fdee87d5793e3fcc425790))
+
+
+### Bug Fixes
+
+* on the charger with the battery held below full, background syncs run instead of looping ([#62](https://github.com/danyk20/mediasync/issues/62)) ([ce377e4](https://github.com/danyk20/mediasync/commit/ce377e418c7c6d2a4cbd9d48c34f161ac70aa164))
+
 ## [0.6.1](https://github.com/danyk20/mediasync/compare/v0.6.0...v0.6.1) (2026-10-19)
 
 
