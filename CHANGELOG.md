@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/danyk20/mediasync/compare/v0.6.0...v0.6.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* the speed shows steadily, also over Turbo and on the receiving phone ([#58](https://github.com/danyk20/mediasync/issues/58)) ([b8f3ba5](https://github.com/danyk20/mediasync/commit/b8f3ba5b4ed55d471cc55b2911a57d4954921e12))
+
 ## [0.6.0](https://github.com/danyk20/mediasync/compare/v0.5.0...v0.6.0) (2026-10-18)
 
 
