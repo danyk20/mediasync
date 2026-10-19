@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/danyk20/mediasync/compare/v0.7.0...v0.8.0) (2026-10-19)
+
+
+### Features
+
+* sign in with Cloudflare to set up internet sync ([#63](https://github.com/danyk20/mediasync/issues/63)) ([b11d23c](https://github.com/danyk20/mediasync/commit/b11d23c1709dfbf345917c50db2fe3ef8e94ac93))
+
 ## [0.7.0](https://github.com/danyk20/mediasync/compare/v0.6.1...v0.7.0) (2026-10-19)
 
 
