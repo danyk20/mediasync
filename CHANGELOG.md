@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/danyk20/mediasync/compare/v0.8.1...v0.8.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* internet sync sets up Cloudflare's relay again (the TURN key's secret is now called "secret") ([#68](https://github.com/danyk20/mediasync/issues/68)) ([da1faf8](https://github.com/danyk20/mediasync/commit/da1faf8cb06efe0351b7348d6e4aa808ce80d5d6))
+
 ## [0.8.1](https://github.com/danyk20/mediasync/compare/v0.8.0...v0.8.1) (2026-10-19)
 
 
