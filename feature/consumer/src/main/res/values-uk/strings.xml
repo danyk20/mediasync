@@ -45,6 +45,9 @@
     <string name="consumer_backup_row_off">Вимкнено: отримані фото залишаються лише на цьому телефоні</string>
     <string name="consumer_backup_row_on">Резервне копіювання через %1$s · сьогодні передано: %2$s</string>
     <string name="consumer_backup_row_open">Відкрити</string>
+    <string name="consumer_names_row_title">Прості імена файлів</string>
+    <string name="consumer_names_row_on">Увімкнено: у назві зберігається лише остання крапка, тому Google Фото показує файл. VID_1234.LS.mp4 зберігається як VID_1234_LS.mp4</string>
+    <string name="consumer_names_row_off">Вимкнено: імена залишаються без змін. Google Фото може не показувати файли на кшталт VID_1234.LS.mp4</string>
     <string name="consumer_internet_row_title">Синхронізація через інтернет</string>
     <string name="consumer_internet_set_up">Налаштувати</string>
     <string name="consumer_internet_row_relay">Ретрансляція цього місяця: вільно %1$s з %2$s</string>

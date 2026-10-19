@@ -37,6 +37,9 @@
     <string name="consumer_backup_row_off">Aus: Empfangene Fotos bleiben nur auf diesem Telefon</string>
     <string name="consumer_backup_row_on">Gesichert von der App %1$s · heute %2$s übergeben</string>
     <string name="consumer_backup_row_open">Öffnen</string>
+    <string name="consumer_names_row_title">Einfache Dateinamen</string>
+    <string name="consumer_names_row_on">An: Ein Name behält nur seinen letzten Punkt, damit Google Fotos die Datei anzeigt. VID_1234.LS.mp4 wird als VID_1234_LS.mp4 gespeichert</string>
+    <string name="consumer_names_row_off">Aus: Namen bleiben unverändert. Google Fotos zeigt Dateien wie VID_1234.LS.mp4 unter Umständen nicht an</string>
     <string name="consumer_internet_row_title">Internet-Synchronisierung</string>
     <string name="consumer_internet_set_up">Einrichten</string>
     <string name="consumer_internet_row_relay">Relay diesen Monat: %1$s von %2$s frei</string>

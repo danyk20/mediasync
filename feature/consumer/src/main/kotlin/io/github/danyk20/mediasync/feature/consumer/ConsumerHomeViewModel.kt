@@ -13,6 +13,9 @@ import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.media.ReceivedNames
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -79,6 +82,8 @@ data class ConsumerHomeUiState(
     val relay: RelayUsage? = null,
     /** Cloud backup (docs/PLAN.md §9.3.1); `null` in a build without any. */
     val backup: BackupLine? = null,
+    /** Received files whose name has more than one dot keep only the last, so Google Photos shows them. */
+    val simpleFileNames: Boolean = true,
 )
 
 /** Cloud backup, as the home screen's row shows it. */
@@ -107,6 +112,7 @@ class ConsumerHomeViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val setup: BackgroundSetup,
     backup: CloudBackup,
+    private val names: ReceivedNames,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -120,6 +126,8 @@ class ConsumerHomeViewModel @Inject constructor(
     init {
         // Receives while this screen is open; scheduled receive windows also run in the background.
         receiver.hold(HOLDER)
+        // Files received before *Simple file names*, or while it was off, get the simple name too.
+        simplifyStoredNames()
         // A sync that ran into a full storage: check the free space again.
         viewModelScope.launch { receiver.state.map { it.waitingForSpace }.distinctUntilChanged().collect { refresh() } }
         // The relay meter, while internet sync is on: read again now and then, as relayed transfers run.
@@ -139,8 +147,14 @@ class ConsumerHomeViewModel @Inject constructor(
         peers.observeAll(),
         received.observeCount(),
         combine(settings.syncSchedule, settings.rendezvousUrl, relay, ::Triple),
-        combine(access, settings.dismissedPrompts, backupLine(backup), ::Triple),
-    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed, backupLine) ->
+        combine(
+            access,
+            settings.dismissedPrompts,
+            combine(backupLine(backup), settings.simpleFileNames, ::Pair),
+            ::Triple,
+        ),
+    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed, files) ->
+        val (backupLine, simpleNames) = files
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
             IncomingTransfer(
@@ -172,6 +186,7 @@ class ConsumerHomeViewModel @Inject constructor(
             internetSync = worker != null,
             relay = relay?.takeIf { worker != null },
             backup = backupLine,
+            simpleFileNames = simpleNames,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ConsumerHomeUiState())
 
@@ -189,6 +204,21 @@ class ConsumerHomeViewModel @Inject constructor(
             peers.forget(id)
             turboKeys.renew()
             receiver.refreshInternet()
+        }
+    }
+
+    /** *Simple file names* on or off; turned on, what was received before gets the simple name too. */
+    fun setSimpleFileNames(on: Boolean) {
+        viewModelScope.launch {
+            settings.setSimpleFileNames(on)
+            if (on) simplifyStoredNames()
+        }
+    }
+
+    private fun simplifyStoredNames() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val renamed = names.simplifyStored()
+            if (renamed > 0) Diagnostics.log(Area.RECEIVE, "Simple file names: $renamed received files renamed")
         }
     }
 

@@ -18,6 +18,7 @@ import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.media.ReceivedNames
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -31,6 +32,8 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboKeyStore
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -87,7 +90,23 @@ class ConsumerHomeViewModelTest {
         every { deviceApps } returns listOf(FakeDeviceAppFactory())
     }
 
-    private fun viewModel() = ConsumerHomeViewModel(receiver, peers, turboKeys, received, settings, setup, backup)
+    private val names = mockk<ReceivedNames> { coEvery { simplifyStored() } returns 0 }
+
+    private fun viewModel() =
+        ConsumerHomeViewModel(receiver, peers, turboKeys, received, settings, setup, backup, names)
+
+    @Test
+    fun filesReceivedBeforeGetSimpleNamesAndAgainWhenTheyAreTurnedBackOn() = runTest {
+        val viewModel = viewModel()
+        coVerify(timeout = WAIT_MILLIS) { names.simplifyStored() } // What was received before this version.
+
+        viewModel.setSimpleFileNames(false)
+        viewModel.uiState.first { !it.simpleFileNames }
+        viewModel.setSimpleFileNames(true)
+
+        viewModel.uiState.first { it.simpleFileNames }
+        coVerify(timeout = WAIT_MILLIS, exactly = 2) { names.simplifyStored() }
+    }
 
     @Test
     fun removingASendingPhoneForgetsItAndStopsListeningForIt() {

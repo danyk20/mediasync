@@ -167,6 +167,16 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun simpleFileNamesAreOnAtFirstAndCanBeTurnedOff() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+        repository.simpleFileNames.first() shouldBe true
+
+        repository.setSimpleFileNames(false)
+
+        repository.simpleFileNames.first() shouldBe false
+    }
+
+    @Test
     fun internetSyncHasNoWorkerAndStaysOffMobileDataUntilSetUp() = runTest {
         val repository = DataStoreSettingsRepository(dataStore())
         repository.rendezvousUrl.first() shouldBe null

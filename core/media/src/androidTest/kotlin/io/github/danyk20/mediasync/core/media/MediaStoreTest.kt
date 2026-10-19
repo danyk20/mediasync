@@ -116,6 +116,34 @@ class MediaStoreTest {
     }
 
     @Test
+    fun aNameWithMoreThanOneDotKeepsOnlyTheLastSoGooglePhotosShowsIt() {
+        val names = ReceivedNames(context) { true }
+        val simple = MediaStoreSink(context, database.partialTransferDao(), reserveBytes = 0, names::of)
+        val photo = jpeg(Color.MAGENTA)
+
+        val location = simple.open(producer, descriptorOf(photo, "20251018_101530.LS.jpg"), 0).run {
+            write(photo, 0, photo.size)
+            commit()
+        }
+        val uri = Uri.parse(location).also { created += it }
+
+        displayName(uri) shouldBe "20251018_101530_LS.jpg"
+    }
+
+    @Test
+    fun filesReceivedBeforeGetTheSimpleNameAndOthersKeepTheirs() = runBlocking<Unit> {
+        val received = insertInto("${MediaStoreSink.FOLDER}/", jpeg(Color.CYAN), "20251018_101531.LS.jpg")
+        val camera = insertIntoCamera(jpeg(Color.YELLOW), "20251018_101532.LS.jpg")
+
+        ReceivedNames(context) { false }.simplifyStored() shouldBe 0
+        displayName(received) shouldBe "20251018_101531.LS.jpg"
+
+        (ReceivedNames(context) { true }.simplifyStored() >= 1) shouldBe true
+        displayName(received) shouldBe "20251018_101531_LS.jpg"
+        displayName(camera) shouldBe "20251018_101532.LS.jpg" // Not MediaSync's folder.
+    }
+
+    @Test
     fun aPhotoThatHasACaptureDateIsStoredByteForByte() {
         val photo = jpeg(Color.MAGENTA, exifDate = "2024:06:01 10:00:00")
         val descriptor = descriptorOf(photo, "has-date.jpg", capturedAt = 1_747_000_000_000)
@@ -412,6 +440,13 @@ class MediaStoreTest {
             .use {
                 it.moveToFirst()
                 it.getLong(0)
+            }
+
+    private fun displayName(uri: Uri): String =
+        context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)!!
+            .use {
+                it.moveToFirst()
+                it.getString(0)
             }
 
     private fun readBytes(uri: Uri) = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }

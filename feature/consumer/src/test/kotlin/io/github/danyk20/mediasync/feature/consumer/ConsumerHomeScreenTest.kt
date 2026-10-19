@@ -83,6 +83,17 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
+    fun simpleFileNamesAreOnAndTheRowTurnsThemOff() {
+        show(ConsumerHomeUiState(listening = true))
+
+        composeRule.onNodeWithText("Simple file names").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("VID_1234_LS.mp4", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Simple file names").performClick()
+
+        events shouldBe listOf("simple names false")
+    }
+
+    @Test
     fun receiving_measuresTheSpeedFirst() {
         show(receiving.copy(transfer = receiving.transfer?.copy(bytesPerSecond = null)))
 
@@ -339,6 +350,7 @@ class ConsumerHomeScreenTest {
                     onAddProducer = { events += "add" },
                     onRemoveProducer = { events += "remove ${it.name}" },
                     onShowSpeeds = { events += "speeds of ${it.hex.take(4)}" },
+                    onSimpleFileNames = { events += "simple names $it" },
                     onOpenBackup = { events += "backup" },
                     onChangeSchedule = { events += "schedule" },
                     onAllowNotifications = { events += "notifications" },

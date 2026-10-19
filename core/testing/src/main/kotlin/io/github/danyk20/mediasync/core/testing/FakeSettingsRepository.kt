@@ -101,6 +101,14 @@ class FakeSettingsRepository(
         videosOverRelayState.value = allowed
     }
 
+    private val simpleFileNamesState = MutableStateFlow(true)
+
+    override val simpleFileNames: StateFlow<Boolean> = simpleFileNamesState
+
+    override suspend fun setSimpleFileNames(on: Boolean) {
+        simpleFileNamesState.value = on
+    }
+
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())
 
     override val dismissedPrompts: StateFlow<Set<SetupPrompt>> = dismissedPromptsState
