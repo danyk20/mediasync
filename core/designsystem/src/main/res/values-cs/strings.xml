@@ -39,6 +39,7 @@
     <string name="setup_battery_open">Otevřít nastavení</string>
     <string name="transfer_speed">%1$s/s</string>
     <string name="transfer_waiting">Čekání na připojení…</string>
+    <string name="transfer_measuring">Měření rychlosti…</string>
     <string name="transfer_left_soon">zbývá méně než minuta</string>
     <string name="transfer_left_minutes">zbývá asi %1$d min</string>
     <string name="transfer_left_hours">zbývá asi %1$d h %2$d min</string>

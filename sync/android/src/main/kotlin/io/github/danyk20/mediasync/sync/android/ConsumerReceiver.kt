@@ -142,6 +142,15 @@ class ConsumerReceiver internal constructor(
      */
     private val endedBytes = ConcurrentHashMap<DeviceId, Long>()
     private val estimators = ConcurrentHashMap<DeviceId, TransferEstimator>()
+
+    /** When each producer's last session ended: one that comes back soon after is the same sync going on. */
+    private val quietSince = ConcurrentHashMap<DeviceId, Long>()
+
+    /**
+     * Held while a producer's sessions are added up: each session reports on its own thread, and a total from one
+     * moment must not come after a total from the next.
+     */
+    private val tally = Any()
     private var speedsJob: Job? = null
     private val _speedHistory = MutableStateFlow<Map<DeviceId, List<SpeedSample>>>(emptyMap())
 
@@ -223,8 +232,11 @@ class ConsumerReceiver internal constructor(
         if (server != null) Diagnostics.log(Area.RECEIVE, "Stopped listening")
         acceptJob?.cancel()
         speedsJob?.cancel()
-        estimators.clear()
-        endedBytes.clear()
+        synchronized(tally) {
+            estimators.clear()
+            endedBytes.clear()
+            quietSince.clear()
+        }
         server?.close()
         advertisement?.close()
         server = null
@@ -313,6 +325,7 @@ class ConsumerReceiver internal constructor(
     /** One session with [producer], from its first message to its end. */
     private fun receive(producer: DeviceId, connection: PeerConnection, started: Long) {
         val id = nextSession.incrementAndGet()
+        sessionStarts(producer)
         connection.use {
             val session = ConsumerSession(
                 device.local(),
@@ -321,14 +334,16 @@ class ConsumerReceiver internal constructor(
                 sink,
                 gate,
                 progress = { progress ->
-                    sessions[id] = producer to progress
-                    val transfers = transfers()
-                    _state.update {
-                        it.copy(
-                            transfers = transfers,
-                            speeds = speeds(transfers),
-                            lastActivityMillis = System.currentTimeMillis(),
-                        )
+                    synchronized(tally) {
+                        sessions[id] = producer to progress
+                        val transfers = transfers()
+                        _state.update {
+                            it.copy(
+                                transfers = transfers,
+                                speeds = speeds(transfers),
+                                lastActivityMillis = System.currentTimeMillis(),
+                            )
+                        }
                     }
                 },
                 space = space,
@@ -351,22 +366,33 @@ class ConsumerReceiver internal constructor(
                 )
                 null // Dropped: kept partial files resume next time.
             }
-            sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesDone, Long::plus) }
-            // Its last session ended: the next sync of this producer starts afresh.
-            if (sessions.values.none { it.first == producer }) {
-                endedBytes.remove(producer)
-                estimators.remove(producer)
+            synchronized(tally) {
+                // Its bytes stay in the producer's total: they move from its session to what ended.
+                sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesDone, Long::plus) }
+                if (sessions.values.none { it.first == producer }) quietSince[producer] = System.currentTimeMillis()
+                val transfers = transfers()
+                _state.update { state ->
+                    state.copy(
+                        transfers = transfers,
+                        speeds = speeds(transfers),
+                        lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
+                        lastActivityMillis = System.currentTimeMillis(),
+                        waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
+                    )
+                }
             }
-            val transfers = transfers()
-            _state.update { state ->
-                state.copy(
-                    transfers = transfers,
-                    speeds = speeds(transfers),
-                    lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
-                    lastActivityMillis = System.currentTimeMillis(),
-                    waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
-                )
-            }
+        }
+    }
+
+    /**
+     * A session from [producer] begins. Soon after its last one ended, it's the same sync going on: its connections
+     * may all end at once, as when it swaps Wi-Fi for Turbo. Later, it's another sync, and its speed starts afresh.
+     */
+    private fun sessionStarts(producer: DeviceId) = synchronized(tally) {
+        val quiet = quietSince.remove(producer) ?: return@synchronized
+        if (System.currentTimeMillis() - quiet > SAME_SYNC_GAP_MILLIS) {
+            endedBytes.remove(producer)
+            estimators[producer]?.reset()
         }
     }
 
@@ -381,15 +407,15 @@ class ConsumerReceiver internal constructor(
     private suspend fun refreshSpeeds() {
         while (true) {
             delay(SPEED_REFRESH_MILLIS)
-            if (estimators.isEmpty()) continue
+            val receiving = _state.value.transfers.keys
+            if (receiving.isEmpty()) continue
+            val speeds = receiving.mapNotNull { producer -> estimators[producer]?.refresh()?.let { producer to it } }
             // A producer whose sync ended keeps its last chart until its next sync.
-            _speedHistory.update { shown -> shown + estimators.mapValues { (_, estimator) -> estimator.history() } }
+            _speedHistory.update { shown ->
+                shown + receiving.mapNotNull { producer -> estimators[producer]?.let { producer to it.history() } }
+            }
             _state.update { state ->
-                state.copy(
-                    speeds = state.transfers.keys.mapNotNull { producer ->
-                        estimators[producer]?.refresh()?.let { producer to it }
-                    }.toMap(),
-                )
+                state.copy(speeds = speeds.filter { (producer, _) -> producer in state.transfers }.toMap())
             }
         }
     }
@@ -553,6 +579,9 @@ class ConsumerReceiver internal constructor(
         private const val DIRECT_LINK_SWAP_HOLDER = "turbo-swap"
         private const val TURBO_RECEIVE_HOLDER = "turbo-receive"
         private const val SPEED_REFRESH_MILLIS = 1_000L
+
+        /** A producer's sessions this close together are one sync: long enough for its swap to Turbo. */
+        private const val SAME_SYNC_GAP_MILLIS = 60_000L
 
         /** Time for the user to walk over to the sending phone and start Turbo there. */
         private const val TURBO_RECEIVE_IDLE_MILLIS = 10 * 60_000L

@@ -46,7 +46,8 @@ data class SpeedSample(val atMillis: Long, val bytesPerSecond: Long)
 /**
  * Estimates a transfer's speed from its progress over the last [windowMillis], so it doesn't jump with every file,
  * and only after [warmUpMillis], when there's enough to go on. Feed it every progress update, and [refresh] it now
- * and then: progress stops coming while a link stalls, and the speed should fall with it.
+ * and then: progress stops coming while a link stalls, and the speed should fall with it. [reset] it when another
+ * transfer starts.
  */
 class TransferEstimator(
     private val now: () -> Long = System::currentTimeMillis,
@@ -62,16 +63,32 @@ class TransferEstimator(
     @Synchronized
     fun history(): List<SpeedSample> = speeds.toList()
 
+    /** Another transfer starts: the speed warms up again, and its chart starts empty. */
+    @Synchronized
+    fun reset() {
+        samples.clear()
+        speeds.clear()
+        last = null
+    }
+
+    /**
+     * The estimate with [progress] in. Progress comes from several threads (parallel connections, and each one's
+     * confirmations), so it may come out of order: one with fewer bytes than already known is late, and changes
+     * nothing.
+     */
     @Synchronized
     fun update(progress: TransferProgress): TransferEstimate? {
-        val time = now()
-        // Fewer bytes than before: another transfer started.
-        if (samples.isEmpty() || progress.bytesDone < samples.last().second) {
-            samples.clear()
-            speeds.clear()
-            started = time
-        }
-        last = progress
+        val latest = last?.takeIf { progress.bytesDone < it.bytesDone } ?: progress
+        last = latest
+        return estimate(now(), latest)
+    }
+
+    /** The estimate now, from the last progress: lower the longer nothing has come. `null` before any progress. */
+    @Synchronized
+    fun refresh(): TransferEstimate? = last?.let { estimate(now(), it) }
+
+    private fun estimate(time: Long, progress: TransferProgress): TransferEstimate? {
+        if (samples.isEmpty()) started = time
         samples.addLast(time to progress.bytesDone)
         // Keeps one sample from before the window, so the speed covers all of it.
         while (samples.size > 2 && samples[1].first <= time - windowMillis) samples.removeFirst()
@@ -98,10 +115,6 @@ class TransferEstimator(
         speeds.addLast(SpeedSample(atMillis, bytesPerSecond))
         if (speeds.size > MAX_SAMPLES) speeds.removeFirst()
     }
-
-    /** The estimate now, from the last progress: lower the longer nothing has come. `null` before any progress. */
-    @Synchronized
-    fun refresh(): TransferEstimate? = last?.let(::update)
 
     private companion object {
         const val WINDOW_MILLIS = 10_000L

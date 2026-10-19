@@ -83,6 +83,14 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
+    fun receiving_measuresTheSpeedFirst() {
+        show(receiving.copy(transfer = receiving.transfer?.copy(bytesPerSecond = null)))
+
+        composeRule.onNodeWithText("Measuring the speed…").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Speed over time").assertIsDisplayed()
+    }
+
+    @Test
     fun receiving_showsWhoAndHowFar() {
         show(receiving)
 

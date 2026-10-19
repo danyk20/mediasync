@@ -45,6 +45,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import javax.net.SocketFactory
@@ -226,6 +227,12 @@ class ProducerSync @Inject constructor(
 
     /** The speed and time left of the sync running now: progress stops coming while a link stalls. */
     private val estimator = TransferEstimator()
+
+    /**
+     * The bytes this sync has moved, over every connection it used: Wi-Fi, then Turbo after a swap. Each one's
+     * progress starts at 0; for the speed, they're one transfer.
+     */
+    private val moved = AtomicLong()
     private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
 
     /** The speed every second of the sync running now, or of the last one, for its chart. */
@@ -252,6 +259,8 @@ class ProducerSync @Inject constructor(
         syncing = true
         cancelled = false
         this.pauseWhen = pauseWhen
+        estimator.reset()
+        moved.set(0)
         _state.value = ProducerState.Connecting
         return scope.launch(Dispatchers.IO) {
             val estimates = launch { refreshEstimate() }
@@ -481,13 +490,26 @@ class ProducerSync @Inject constructor(
             return { item -> item.descriptor.mimeType.startsWith("video/") }
         }
 
+        /** Shows [progress] over [path]; [before]: what this sync moved over the connections it used before. */
+        private fun show(progress: TransferProgress, path: Path, before: Long) {
+            moved.accumulateAndGet(before + progress.bytesDone, ::maxOf)
+            val all = progress.copy(bytesDone = before + progress.bytesDone, bytesTotal = before + progress.bytesTotal)
+            _state.value = ProducerState.Syncing(
+                progress,
+                turbo = path == Path.DIRECT,
+                internet = path == Path.INTERNET,
+                estimate = estimator.update(all),
+            )
+            // This month's mobile data limit reached: stops after the current file.
+            if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
+        }
+
         /** [another]: one more connection the way [connection] went, for parallel streams. */
         private fun send(
             connection: PeerConnection,
             path: Path,
             another: () -> PeerConnection? = { connectToFirst(listOf(connection.remoteAddress), consumer.id) },
         ): ProducerState.Idle = connection.use {
-            val direct = path == Path.DIRECT
             val over = when (path) {
                 Path.WIFI -> ""
                 Path.DIRECT -> " over Turbo"
@@ -495,6 +517,7 @@ class ProducerSync @Inject constructor(
             }
             // Over the internet, the phone's own order sends photos first: more of them arrive per minute.
             val order = order.resolved(overInternet = path == Path.INTERNET)
+            val before = moved.get() // Over the connections this sync used before this one.
             val result = ParallelSync(
                 session = { progress ->
                     ProducerSession(
@@ -508,16 +531,7 @@ class ProducerSync @Inject constructor(
                     )
                 },
                 connect = { another() },
-                progress = { progress ->
-                    _state.value = ProducerState.Syncing(
-                        progress,
-                        turbo = direct,
-                        internet = path == Path.INTERNET,
-                        estimate = estimator.update(progress),
-                    )
-                    // This month's mobile data limit reached: stops after the current file.
-                    if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
-                },
+                progress = { progress -> show(progress, path, before) },
                 // Over the internet, one connection carries it all.
                 mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
                 holdBack = relaySaver(it),
