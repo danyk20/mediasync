@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4](https://github.com/danyk20/mediasync/compare/v0.8.3...v0.8.4) (2026-10-19)
+
+
+### Bug Fixes
+
+* internet sync no longer drops files that take over a minute, and videos wait off the relay as set ([#75](https://github.com/danyk20/mediasync/issues/75)) ([d569590](https://github.com/danyk20/mediasync/commit/d56959019b2b86b2688fed92316cab6a76dbbd54))
+
 ## [0.8.3](https://github.com/danyk20/mediasync/compare/v0.8.2...v0.8.3) (2026-10-19)
 
 
