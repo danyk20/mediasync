@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/danyk20/mediasync/compare/v0.8.2...v0.8.3) (2026-10-19)
+
+
+### Bug Fixes
+
+* internet sync no longer crashes release builds when it starts a WebRTC connection ([#70](https://github.com/danyk20/mediasync/issues/70)) ([bbf4968](https://github.com/danyk20/mediasync/commit/bbf4968811099c5e6a1cf669f8e07b5e42c54385))
+
 ## [0.8.2](https://github.com/danyk20/mediasync/compare/v0.8.1...v0.8.2) (2026-10-19)
 
 
