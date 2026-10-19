@@ -303,7 +303,10 @@ class ConsumerReceiver internal constructor(
     }
 
     private fun serveOverInternet(connection: PeerConnection) {
-        Diagnostics.log(Area.RECEIVE, "Session from ${connection.peerId.short()} over the internet")
+        Diagnostics.log(
+            Area.RECEIVE,
+            "Session from ${connection.peerId.short()} over the internet, ${connection.internetRoute()}",
+        )
         counted(connection)
         relayUsage() // It may have gone through the relay: the meter, read, tells the user if it runs low.
     }

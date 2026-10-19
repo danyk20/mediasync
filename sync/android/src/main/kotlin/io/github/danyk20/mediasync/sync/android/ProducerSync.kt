@@ -474,7 +474,7 @@ class ProducerSync @Inject constructor(
                 Diagnostics.log(Area.SEND, "Internet: no connection to the receiving phone", e)
                 return null
             }
-            Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone")
+            Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone ${connection.internetRoute()}")
             _state.value = ProducerState.Syncing(progress = null, internet = true)
             return sockets.keepingAwake { send(connection, Path.INTERNET) }
         }

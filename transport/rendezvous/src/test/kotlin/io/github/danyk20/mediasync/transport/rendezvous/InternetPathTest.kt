@@ -96,6 +96,22 @@ class InternetPathTest {
     }
 
     @Test
+    fun theSendingPhoneKnowsWhetherItsConnectionGoesThroughTheRelay() {
+        // Videos wait for Wi-Fi on the relay unless allowed (PLAN §17): the sending phone must be able to tell.
+        listen()
+        worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
+        val connection = connect()
+        served.poll(WAIT, TimeUnit.MILLISECONDS)!!.close()
+
+        (connection as RelayCounter).throughRelay() shouldBe false
+        links.throughRelay = true
+        connection.throughRelay() shouldBe true
+        links.relayed.set(5_000)
+        connection.relayedBytes() shouldBe 5_000
+        connection.close()
+    }
+
+    @Test
     fun directConnectionsAreNotReported() {
         listen()
         worker.awaitOnline(pairId(consumer.deviceId, producer.deviceId))
@@ -173,6 +189,10 @@ class InternetPathTest {
         /** What went through the relay so far, as the producer's connection counts it. */
         val relayed = AtomicLong()
 
+        /** Whether the producer's connection goes through the relay now. */
+        @Volatile
+        var throughRelay = false
+
         override fun connect(
             peer: DeviceId,
             iceServers: List<IceServer>,
@@ -189,6 +209,8 @@ class InternetPathTest {
                     val end = pairs.getValue(session).producerEnd
                     return object : PeerConnection by end, RelayCounter {
                         override fun relayedBytes() = relayed.get()
+
+                        override fun throughRelay() = this@FakeLinks.throughRelay
                     }
                 }
             }
