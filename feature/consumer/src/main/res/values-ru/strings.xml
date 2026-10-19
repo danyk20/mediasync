@@ -88,6 +88,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare отказал: %1$s</string>
     <string name="consumer_cloudflare_try_again">Попробовать снова</string>
     <string name="consumer_cloudflare_ok">OK</string>
+    <string name="consumer_cloudflare_sign_in_intro">Войдите в Cloudflare и разрешите MediaSync настроить ваш собственный Worker в вашем аккаунте. Ещё нет аккаунта? Создайте бесплатный на странице входа. MediaSync использует вход один раз и не сохраняет его.</string>
+    <string name="consumer_cloudflare_sign_in">Войти через Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">Или использовать API-токен</string>
+    <string name="consumer_cloudflare_token_shown">Развёрнуто</string>
+    <string name="consumer_cloudflare_token_hidden">Свёрнуто</string>
+    <string name="consumer_cloudflare_progress_sign_in">Вход в Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">Вход отменён, поэтому ничего не настроено. Войдите снова, когда будете готовы.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">Этот вход начат не MediaSync, поэтому он проигнорирован. Войдите снова.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare не завершил вход: %1$s. Войдите снова или используйте API-токен.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Готово, но без ретрансляции: доступ к Calls не разрешён, поэтому телефоны, которые не могут соединиться напрямую, не будут синхронизироваться через интернет. Чтобы добавить её, войдите снова и разрешите Calls.</string>
     <string name="consumer_relay_title">Ретрансляция в этом месяце</string>
     <string name="consumer_relay_used">свободно %1$s из %2$s</string>
     <string name="consumer_relay_limit">Синхронизация через интернет перестаёт использовать ретрансляцию при %1$s, чтобы она оставалась бесплатной. Обнуляется %2$s.</string>

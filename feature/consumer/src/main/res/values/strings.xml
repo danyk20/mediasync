@@ -84,6 +84,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare refused: %1$s</string>
     <string name="consumer_cloudflare_try_again">Try again</string>
     <string name="consumer_cloudflare_ok">OK</string>
+    <string name="consumer_cloudflare_sign_in_intro">Sign in to Cloudflare and allow MediaSync to set up your own Worker in your account. No account yet? Create a free one on the sign-in page. MediaSync uses the sign-in once and doesn\'t keep it.</string>
+    <string name="consumer_cloudflare_sign_in">Sign in with Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">Or use an API token</string>
+    <string name="consumer_cloudflare_token_shown">Expanded</string>
+    <string name="consumer_cloudflare_token_hidden">Collapsed</string>
+    <string name="consumer_cloudflare_progress_sign_in">Signing in to Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">Signing in was cancelled, so nothing was set up. Sign in again when you\'re ready.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">This sign-in wasn\'t the one MediaSync started, so it was ignored. Sign in again.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare didn\'t finish the sign-in: %1$s. Sign in again, or use an API token.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Done, without the relay: Calls wasn\'t allowed, so phones that can\'t connect directly won\'t sync over the internet. To add it, sign in again and allow Calls.</string>
     <string name="consumer_relay_title">Relay this month</string>
     <string name="consumer_relay_used">%1$s of %2$s free</string>
     <string name="consumer_relay_limit">Internet sync stops using the relay at %1$s, so it stays free. Starts over on %2$s.</string>

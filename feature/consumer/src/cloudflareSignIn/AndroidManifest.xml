@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only in a build with MediaSync's Cloudflare OAuth client (feature/consumer/build.gradle.kts): the browser comes back
+  here after signing in with Cloudflare. An App Link, verified through the domain's /.well-known/assetlinks.json
+  (infra/rendezvous/README.md, "Sign in with Cloudflare").
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".CloudflareRedirectActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="${cloudflareRedirectHost}"
+                    android:path="${cloudflareRedirectPath}"
+                    android:scheme="https" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

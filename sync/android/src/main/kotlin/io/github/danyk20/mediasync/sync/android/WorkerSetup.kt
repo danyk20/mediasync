@@ -40,6 +40,15 @@ enum class SetupFailure {
 
     /** Cloudflare refused for another reason, given in the result's detail. */
     REFUSED,
+
+    /** Signing in with Cloudflare was cancelled, or not allowed. */
+    SIGN_IN_CANCELLED,
+
+    /** The browser came back with an answer that wasn't for this sign-in (another state): it was ignored. */
+    SIGN_IN_MISMATCH,
+
+    /** Cloudflare gave no token for the sign-in, for the reason in the result's detail. */
+    SIGN_IN_REFUSED,
 }
 
 sealed interface SetupResult {

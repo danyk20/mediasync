@@ -88,6 +88,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare відмовив: %1$s</string>
     <string name="consumer_cloudflare_try_again">Спробувати знову</string>
     <string name="consumer_cloudflare_ok">OK</string>
+    <string name="consumer_cloudflare_sign_in_intro">Увійдіть у Cloudflare і дозвольте MediaSync налаштувати ваш власний Worker у вашому обліковому записі. Ще немає облікового запису? Створіть безкоштовний на сторінці входу. MediaSync використовує вхід один раз і не зберігає його.</string>
+    <string name="consumer_cloudflare_sign_in">Увійти через Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">Або використати API-токен</string>
+    <string name="consumer_cloudflare_token_shown">Розгорнуто</string>
+    <string name="consumer_cloudflare_token_hidden">Згорнуто</string>
+    <string name="consumer_cloudflare_progress_sign_in">Вхід у Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">Вхід скасовано, тож нічого не налаштовано. Увійдіть знову, коли будете готові.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">Цей вхід розпочав не MediaSync, тож його проігноровано. Увійдіть знову.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare не завершив вхід: %1$s. Увійдіть знову або використайте API-токен.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Готово, але без ретрансляції: доступ до Calls не дозволено, тож телефони, які не можуть з’єднатися напряму, не синхронізуватимуться через інтернет. Щоб додати її, увійдіть знову і дозвольте Calls.</string>
     <string name="consumer_relay_title">Ретрансляція цього місяця</string>
     <string name="consumer_relay_used">вільно %1$s з %2$s</string>
     <string name="consumer_relay_limit">Синхронізація через інтернет перестає використовувати ретрансляцію при %1$s, щоб вона залишалася безкоштовною. Скидається %2$s.</string>

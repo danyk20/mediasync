@@ -88,6 +88,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare odmítl: %1$s</string>
     <string name="consumer_cloudflare_try_again">Zkusit znovu</string>
     <string name="consumer_cloudflare_ok">OK</string>
+    <string name="consumer_cloudflare_sign_in_intro">Přihlaste se do Cloudflare a povolte MediaSync nastavit ve vašem účtu vlastní Worker. Ještě nemáte účet? Na přihlašovací stránce si zdarma vytvoříte nový. MediaSync přihlášení použije jednou a neuchovává ho.</string>
+    <string name="consumer_cloudflare_sign_in">Přihlásit se přes Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">Nebo použít token API</string>
+    <string name="consumer_cloudflare_token_shown">Rozbaleno</string>
+    <string name="consumer_cloudflare_token_hidden">Sbaleno</string>
+    <string name="consumer_cloudflare_progress_sign_in">Přihlašuji se do Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">Přihlášení bylo zrušeno, takže se nic nenastavilo. Až budete připraveni, přihlaste se znovu.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">Toto přihlášení nespustila aplikace MediaSync, proto bylo ignorováno. Přihlaste se znovu.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare přihlášení nedokončil: %1$s. Přihlaste se znovu, nebo použijte token API.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Hotovo, bez relé: Calls nebylo povoleno, takže telefony, které se nemohou připojit přímo, se přes internet nesynchronizují. Chcete-li ho přidat, přihlaste se znovu a povolte Calls.</string>
     <string name="consumer_relay_title">Relé tento měsíc</string>
     <string name="consumer_relay_used">volných %1$s z %2$s</string>
     <string name="consumer_relay_limit">Synchronizace přes internet přestane relé používat při %1$s, aby zůstalo zdarma. Začne znovu %2$s.</string>

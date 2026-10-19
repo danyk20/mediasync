@@ -30,4 +30,7 @@ object MediaSyncIcons {
     @DrawableRes val Turbo: Int = R.drawable.ic_turbo
 
     @DrawableRes val MobileData: Int = R.drawable.ic_cellular
+
+    /** A section to open; turned upside down while it's open. */
+    @DrawableRes val Expand: Int = R.drawable.ic_expand_more
 }

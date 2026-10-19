@@ -85,6 +85,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare rechazó la operación: %1$s</string>
     <string name="consumer_cloudflare_try_again">Intentar de nuevo</string>
     <string name="consumer_cloudflare_ok">Aceptar</string>
+    <string name="consumer_cloudflare_sign_in_intro">Inicia sesión en Cloudflare y permite que MediaSync configure tu propio Worker en tu cuenta. ¿Aún no tienes cuenta? Crea una gratis en la página de inicio de sesión. MediaSync usa el inicio de sesión una vez y no lo guarda.</string>
+    <string name="consumer_cloudflare_sign_in">Iniciar sesión con Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">O usar un token de API</string>
+    <string name="consumer_cloudflare_token_shown">Desplegado</string>
+    <string name="consumer_cloudflare_token_hidden">Contraído</string>
+    <string name="consumer_cloudflare_progress_sign_in">Iniciando sesión en Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">Se canceló el inicio de sesión, así que no se configuró nada. Vuelve a iniciar sesión cuando estés listo.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">Este inicio de sesión no es el que inició MediaSync, así que se ignoró. Vuelve a iniciar sesión.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare no completó el inicio de sesión: %1$s. Vuelve a iniciar sesión o usa un token de API.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Listo, sin el relay: no se permitió Calls, así que los teléfonos que no pueden conectarse directamente no sincronizarán por internet. Para añadirlo, vuelve a iniciar sesión y permite Calls.</string>
     <string name="consumer_relay_title">Relay de este mes</string>
     <string name="consumer_relay_used">%1$s de %2$s libres</string>
     <string name="consumer_relay_limit">La sincronización por internet deja de usar el relay en %1$s, así se mantiene gratis. Se reinicia el %2$s.</string>
