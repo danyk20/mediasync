@@ -81,6 +81,68 @@ answers `POST /v1/relay/wake`, stores and logs nothing, and allows ten wake-ups 
 5. Set that address as `WAKE_RELAY_URL` in `[env.production.vars]`, run `npm run bundle:app`, and commit: the app's
    Worker carries it from then on, and households' Workers deployed (or redeployed) from it can be woken.
 
+### 5. Sign in with Cloudflare (once, in the developer's account)
+
+Without this, the receiving phone deploys a household's Worker with an API token the user creates on Cloudflare's
+token page and pastes. With MediaSync's own OAuth client, *Internet sync* offers **Sign in with Cloudflare** first and
+folds the token steps under *Or use an API token*. It's OAuth 2.0's authorization code flow with PKCE (S256), as a
+public client without a secret (`CloudflareOAuth` in `transport/rendezvous`). The access token goes to the same
+deployment as a pasted token, once, and is kept nowhere; no refresh token is asked for. A build without the two
+settings in step 5 hides the button and works as before.
+
+The app asks for these scopes (`CloudflareOAuth.SCOPES`, names from `GET /client/v4/oauth/scopes`):
+
+| Scope | For | On the client |
+|---|---|---|
+| `account-settings.read` | finding the user's account (`GET /accounts`) | required |
+| `workers-scripts.write` | uploading the Worker with its secrets, cron trigger and workers.dev address | required |
+| `calls.write` | the relay's TURN key (`POST /accounts/{id}/calls/turn_keys`) | optional: without it the Worker runs without the relay, and the app says how to add it |
+
+1. **A domain whose DNS you control.** A `github.io` address can't be verified. The examples use `mediasync.example`;
+   the redirect address is an https App Link on it, such as `https://mediasync.example/oauth/cloudflare`.
+2. **Register the client.** Dashboard → *Manage Account → OAuth clients → Create* (or
+   `POST /client/v4/accounts/{account_id}/oauth_clients` with a token that has *OAuth Clients Write*):
+   - name `MediaSync`, a logo, and the client URL `https://mediasync.example` (on the domain you verify);
+   - a mobile/public client: authorization code with PKCE, token endpoint auth method `none`, no refresh tokens;
+   - the scopes above, with `calls.write` optional;
+   - the redirect URI `https://mediasync.example/oauth/cloudflare`.
+
+   Note the client ID. The endpoints the app uses are `https://dash.cloudflare.com/oauth2/auth` and
+   `https://dash.cloudflare.com/oauth2/token` (developers.cloudflare.com, *Integrate your OAuth client*).
+3. **Verify the domain.** Add the DNS `TXT` record the dashboard shows. Its value is the whole text, including the
+   `cloudflare_oauth_client_publisher=` prefix. Cloudflare checks for up to two days; to check again, `PATCH` the client
+   with its unchanged `client_uri`.
+4. **App Links.** Serve `https://mediasync.example/.well-known/assetlinks.json` as `application/json`, without
+   redirects:
+
+   ```json
+   [{
+     "relation": ["delegate_permission/common.handle_all_urls"],
+     "target": {
+       "namespace": "android_app",
+       "package_name": "io.github.danyk20.mediasync",
+       "sha256_cert_fingerprints": [
+         "5F:3C:B3:5A:35:F9:4F:2D:B3:65:0E:F6:36:69:AE:E5:FA:B2:15:F8:36:ED:D2:4B:CE:20:DB:54:55:3E:FA:D2"
+       ]
+     }
+   }]
+   ```
+
+   That's the release certificate (CN=MediaSync). Play App Signing uses the same key (the upload was our own key), so
+   GitHub and Play builds share it. To test a debug build, add the debug key's fingerprint too
+   (`./gradlew :app:signingReport`). A short page at the redirect address that says to go back to MediaSync helps if
+   a browser shows it instead of opening the app. After installing, `adb shell pm get-app-links io.github.danyk20.mediasync`
+   should list the domain as `verified`.
+5. **Build with it.** Set `CLOUDFLARE_OAUTH_CLIENT_ID` and `CLOUDFLARE_OAUTH_REDIRECT_URI` as Gradle properties
+   (`~/.gradle/gradle.properties`, or `-P`) or environment variables. Release builds take them from the repository
+   variables of the same names (*Settings → Secrets and variables → Actions → Variables*). The build checks that the redirect is an https address without a query, and adds the App Link
+   (`feature/consumer/src/cloudflareSignIn/AndroidManifest.xml`) only then.
+6. **Try it while the client is private.** Until it's public, only members of the developer's Cloudflare account can
+   authorize it, which is enough for a test sign-in from a debug build.
+7. **Make it public** in the dashboard, or with `PATCH .../oauth_clients/{client_id}` and `{"visibility":"public"}`.
+   This needs the name, logo, client URL and scopes, and the verified domain. **It's permanent: a public client can't
+   be made private again, and the verified domain stays locked to it.** Do it only once a test sign-in has worked.
+
 ## Configuration
 
 Vars in `wrangler.toml`, repeated per environment:

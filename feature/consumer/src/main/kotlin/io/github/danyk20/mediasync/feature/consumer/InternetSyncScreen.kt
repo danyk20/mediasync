@@ -4,6 +4,8 @@
  */
 package io.github.danyk20.mediasync.feature.consumer
 
+import android.content.ActivityNotFoundException
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -42,8 +45,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,8 +59,11 @@ import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.RelayUsage
+import io.github.danyk20.mediasync.sync.android.SetupFailure
+import io.github.danyk20.mediasync.sync.android.SetupResult
 import io.github.danyk20.mediasync.sync.android.SetupStep
 import io.github.danyk20.mediasync.sync.android.WorkerSetup
+import io.github.danyk20.mediasync.transport.rendezvous.CloudflareOAuth
 import java.net.URI
 import java.net.URISyntaxException
 import java.text.NumberFormat
@@ -82,6 +92,8 @@ data class InternetSyncUiState(
     val relay: RelayUsage? = null,
     /** Setting it up with the user's Cloudflare account. */
     val setup: CloudflareSetup = CloudflareSetup.Unavailable,
+    /** This build can sign in with Cloudflare for it, instead of taking a token. */
+    val signIn: Boolean = false,
 )
 
 /**
@@ -93,18 +105,26 @@ class InternetSyncViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val receiver: ConsumerReceiver,
     private val workerSetup: WorkerSetup,
+    private val cloudflare: CloudflareSignIn,
+    /** Keeps a sign-in under way while the browser is open, even if Android ends the app meanwhile. */
+    private val saved: SavedStateHandle,
 ) : ViewModel() {
 
     private val relay = MutableStateFlow<RelayUsage?>(null)
     private val setup = MutableStateFlow(
-        if (workerSetup.available()) CloudflareSetup.Ready else CloudflareSetup.Unavailable,
+        when {
+            !workerSetup.available() -> CloudflareSetup.Unavailable
+            pending() != null -> CloudflareSetup.SigningIn
+            else -> CloudflareSetup.Ready
+        },
     )
+    private val canSignIn = workerSetup.available() && cloudflare.available
 
     /** `null` while loading. */
     val uiState: StateFlow<InternetSyncUiState?> =
         combine(settings.rendezvousUrl, receiver.state, relay, setup) { worker, state, relay, setup ->
             val on = worker != null
-            InternetSyncUiState(worker, reachable = on && state.overInternet, relay = relay?.takeIf { on }, setup)
+            InternetSyncUiState(worker, on && state.overInternet, relay?.takeIf { on }, setup, canSignIn)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
@@ -131,12 +151,65 @@ class InternetSyncViewModel @Inject constructor(
 
     /** Deploys the Worker into the user's Cloudflare account with [token], and turns internet sync on with it. */
     fun setUp(token: String) {
-        if (setup.value is CloudflareSetup.Running || setup.value == CloudflareSetup.Unavailable) return
+        if (busy()) return
+        deploy(token)
+    }
+
+    /**
+     * Starts signing in with Cloudflare: the address of its sign-in page, for the browser to open; `null` if this
+     * build can't, or something is under way. The answer comes in [returned].
+     */
+    fun signIn(): String? {
+        if (!canSignIn || busy()) return null
+        val pending = cloudflare.begin() ?: return null
+        cloudflare.take() // An earlier answer isn't this sign-in's.
+        saved[VERIFIER] = pending.verifier
+        saved[STATE] = pending.state
+        setup.value = CloudflareSetup.SigningIn
+        return cloudflare.authorizeUrl(pending)
+    }
+
+    /**
+     * Back on the screen: with a sign-in under way, the browser's answer is turned into a token to deploy with. Back
+     * without one, the sign-in was cancelled.
+     */
+    fun returned() {
+        val redirect = cloudflare.take()
+        val pending = pending() ?: return
+        saved.remove<String>(VERIFIER)
+        saved.remove<String>(STATE)
+        if (redirect == null) {
+            setup.value = CloudflareSetup.Finished(SetupResult.Failed(SetupFailure.SIGN_IN_CANCELLED))
+            return
+        }
+        setup.value = CloudflareSetup.SigningIn
+        viewModelScope.launch {
+            when (val result = cloudflare.token(redirect, pending)) {
+                is SignInResult.Token -> deploy(result.token, signedIn = true)
+
+                is SignInResult.Failed ->
+                    setup.value = CloudflareSetup.Finished(SetupResult.Failed(result.reason, result.detail))
+            }
+        }
+    }
+
+    private fun deploy(token: String, signedIn: Boolean = false) {
         setup.value = CloudflareSetup.Running(SetupStep.ACCOUNT)
         viewModelScope.launch {
             val result = workerSetup.deploy(token) { step -> setup.value = CloudflareSetup.Running(step) }
-            setup.value = CloudflareSetup.Finished(result)
+            setup.value = CloudflareSetup.Finished(result, signedIn)
         }
+    }
+
+    private fun busy() = when (setup.value) {
+        CloudflareSetup.Unavailable, CloudflareSetup.SigningIn, is CloudflareSetup.Running -> true
+        CloudflareSetup.Ready, is CloudflareSetup.Finished -> false
+    }
+
+    private fun pending(): CloudflareOAuth.Pending? {
+        val verifier = saved.get<String>(VERIFIER) ?: return null
+        val state = saved.get<String>(STATE) ?: return null
+        return CloudflareOAuth.Pending(verifier, state)
     }
 
     /** The outcome was read: back to the token steps. */
@@ -153,6 +226,8 @@ class InternetSyncViewModel @Inject constructor(
 
     private companion object {
         const val RELAY_REFRESH_MILLIS = 60_000L
+        const val VERIFIER = "cloudflare_sign_in_verifier"
+        const val STATE = "cloudflare_sign_in_state"
     }
 }
 
@@ -185,12 +260,24 @@ fun InternetSyncRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val links = LocalUriHandler.current
+    val context = LocalContext.current
+    // Back from the browser, or from anywhere else: a sign-in under way gets its answer.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.returned() }
     InternetSyncScreen(
         state = state,
         actions = InternetSyncActions(
             save = viewModel::save,
             turnOff = viewModel::turnOff,
             setUp = viewModel::setUp,
+            signIn = {
+                viewModel.signIn()?.let { url ->
+                    try {
+                        CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
+                    } catch (_: ActivityNotFoundException) {
+                        viewModel.returned() // No browser: nothing to sign in with.
+                    }
+                }
+            },
             openTokenPage = { links.openUri(WorkerSetup.TOKEN_URL) },
             dismissSetup = viewModel::dismissSetup,
         ),
@@ -261,14 +348,14 @@ private fun Setup(state: InternetSyncUiState, actions: InternetSyncActions) {
     when {
         state.worker != null -> {
             WorkerField(state, actions)
-            if (setup is CloudflareSetup.Finished) CloudflareSetupCard(setup, actions)
+            if (setup is CloudflareSetup.Finished) CloudflareSetupCard(setup, state.signIn, actions)
         }
 
         !deploying || ownWorker -> WorkerField(state, actions)
 
         else -> {
-            CloudflareSetupCard(setup, actions)
-            if (setup !is CloudflareSetup.Running) {
+            CloudflareSetupCard(setup, state.signIn, actions)
+            if (setup !is CloudflareSetup.Running && setup != CloudflareSetup.SigningIn) {
                 TextButton(onClick = { ownWorker = true }) {
                     Text(stringResource(R.string.consumer_internet_own_worker))
                 }

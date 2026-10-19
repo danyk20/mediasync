@@ -83,6 +83,16 @@
     <string name="consumer_cloudflare_refused">Cloudflare ha rifiutato: %1$s</string>
     <string name="consumer_cloudflare_try_again">Riprova</string>
     <string name="consumer_cloudflare_ok">OK</string>
+    <string name="consumer_cloudflare_sign_in_intro">Accedi a Cloudflare e consenti a MediaSync di configurare il tuo Worker nel tuo account. Non hai ancora un account? Creane uno gratis nella pagina di accesso. MediaSync usa l\'accesso una sola volta e non lo conserva.</string>
+    <string name="consumer_cloudflare_sign_in">Accedi con Cloudflare</string>
+    <string name="consumer_cloudflare_use_token">Oppure usa un token API</string>
+    <string name="consumer_cloudflare_token_shown">Espanso</string>
+    <string name="consumer_cloudflare_token_hidden">Compresso</string>
+    <string name="consumer_cloudflare_progress_sign_in">Accesso a Cloudflare…</string>
+    <string name="consumer_cloudflare_sign_in_cancelled">L\'accesso è stato annullato, quindi non è stato configurato nulla. Accedi di nuovo quando sei pronto.</string>
+    <string name="consumer_cloudflare_sign_in_mismatch">Questo accesso non è quello avviato da MediaSync, quindi è stato ignorato. Accedi di nuovo.</string>
+    <string name="consumer_cloudflare_sign_in_refused">Cloudflare non ha completato l\'accesso: %1$s. Accedi di nuovo o usa un token API.</string>
+    <string name="consumer_cloudflare_done_no_relay_sign_in">Fatto, senza il relay: Calls non è stato consentito, quindi i telefoni che non possono collegarsi direttamente non si sincronizzeranno via Internet. Per aggiungerlo, accedi di nuovo e consenti Calls.</string>
     <string name="consumer_relay_title">Relay questo mese</string>
     <string name="consumer_relay_used">%1$s di %2$s liberi</string>
     <string name="consumer_relay_limit">La sincronizzazione via Internet smette di usare il relay a %1$s, così resta gratuita. Ricomincia il %2$s.</string>

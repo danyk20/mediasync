@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,13 +25,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.sync.android.SetupFailure
 import io.github.danyk20.mediasync.sync.android.SetupResult
 import io.github.danyk20.mediasync.sync.android.SetupStep
@@ -42,9 +47,13 @@ sealed interface CloudflareSetup {
 
     data object Ready : CloudflareSetup
 
+    /** Signing in with Cloudflare: the browser is open, or its answer is being turned into a token. */
+    data object SigningIn : CloudflareSetup
+
     data class Running(val step: SetupStep) : CloudflareSetup
 
-    data class Finished(val result: SetupResult) : CloudflareSetup
+    /** [signedIn]: with a token from signing in, rather than a pasted one. */
+    data class Finished(val result: SetupResult, val signedIn: Boolean = false) : CloudflareSetup
 }
 
 /** What the user can do on the internet sync screen. */
@@ -52,13 +61,17 @@ class InternetSyncActions(
     val save: (String) -> Boolean = { true },
     val turnOff: () -> Unit = {},
     val setUp: (token: String) -> Unit = {},
+    val signIn: () -> Unit = {},
     val openTokenPage: () -> Unit = {},
     val dismissSetup: () -> Unit = {},
 )
 
-/** The three steps: an account, a token for MediaSync, and the token pasted here; then the deployment's progress. */
+/**
+ * Signing in with Cloudflare when the build can ([signIn]), with the three token steps folded below it; otherwise those
+ * steps (an account, a token for MediaSync, and the token pasted here). Then the deployment's progress.
+ */
 @Composable
-internal fun CloudflareSetupCard(setup: CloudflareSetup, actions: InternetSyncActions) {
+internal fun CloudflareSetupCard(setup: CloudflareSetup, signIn: Boolean, actions: InternetSyncActions) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -67,12 +80,38 @@ internal fun CloudflareSetupCard(setup: CloudflareSetup, actions: InternetSyncAc
                 modifier = Modifier.semantics { heading() },
             )
             when (setup) {
+                CloudflareSetup.SigningIn -> SigningIn()
                 is CloudflareSetup.Running -> Progress(setup.step)
-                is CloudflareSetup.Finished -> Outcome(setup.result, actions.dismissSetup)
-                else -> TokenSteps(actions)
+                is CloudflareSetup.Finished -> Outcome(setup, actions.dismissSetup)
+                else -> if (signIn) SignInSteps(actions) else TokenSteps(actions)
             }
         }
     }
+}
+
+@Composable
+private fun SignInSteps(actions: InternetSyncActions) {
+    var withToken by rememberSaveable { mutableStateOf(false) }
+    val shown = stringResource(R.string.consumer_cloudflare_token_shown)
+    val hidden = stringResource(R.string.consumer_cloudflare_token_hidden)
+    Text(stringResource(R.string.consumer_cloudflare_sign_in_intro), style = MaterialTheme.typography.bodyMedium)
+    Button(onClick = actions.signIn, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.consumer_cloudflare_sign_in))
+    }
+    TextButton(
+        onClick = { withToken = !withToken },
+        modifier = Modifier.semantics {
+            stateDescription = if (withToken) shown else hidden
+        },
+    ) {
+        Text(stringResource(R.string.consumer_cloudflare_use_token))
+        Icon(
+            painterResource(MediaSyncIcons.Expand),
+            contentDescription = null,
+            modifier = Modifier.padding(start = 8.dp).rotate(if (withToken) HALF_TURN else 0f),
+        )
+    }
+    if (withToken) TokenSteps(actions)
 }
 
 @Composable
@@ -97,6 +136,12 @@ private fun TokenSteps(actions: InternetSyncActions) {
 }
 
 @Composable
+private fun SigningIn() {
+    Text(stringResource(R.string.consumer_cloudflare_progress_sign_in), style = MaterialTheme.typography.bodyLarge)
+    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
 private fun Progress(step: SetupStep) {
     Text(
         stringResource(
@@ -118,21 +163,20 @@ private fun Progress(step: SetupStep) {
 }
 
 @Composable
-private fun Outcome(result: SetupResult, onDismiss: () -> Unit) {
+private fun Outcome(finished: CloudflareSetup.Finished, onDismiss: () -> Unit) {
+    val result = finished.result
     val failed = result is SetupResult.Failed && result.reason != SetupFailure.NOT_STARTED
     Text(
         text = when (result) {
             is SetupResult.Done -> stringResource(
-                if (result.relay) R.string.consumer_cloudflare_done else R.string.consumer_cloudflare_done_no_relay,
+                when {
+                    result.relay -> R.string.consumer_cloudflare_done
+                    finished.signedIn -> R.string.consumer_cloudflare_done_no_relay_sign_in
+                    else -> R.string.consumer_cloudflare_done_no_relay
+                },
             )
 
-            is SetupResult.Failed -> when (result.reason) {
-                SetupFailure.INVALID_TOKEN -> stringResource(R.string.consumer_cloudflare_invalid_token)
-                SetupFailure.NOT_ALLOWED -> stringResource(R.string.consumer_cloudflare_not_allowed)
-                SetupFailure.OFFLINE -> stringResource(R.string.consumer_cloudflare_offline)
-                SetupFailure.NOT_STARTED -> stringResource(R.string.consumer_cloudflare_not_started)
-                SetupFailure.REFUSED -> stringResource(R.string.consumer_cloudflare_refused, result.detail.orEmpty())
-            }
+            is SetupResult.Failed -> failureMessage(result)
         },
         style = MaterialTheme.typography.bodyMedium,
         color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
@@ -145,3 +189,25 @@ private fun Outcome(result: SetupResult, onDismiss: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun failureMessage(failure: SetupResult.Failed): String = when (failure.reason) {
+    SetupFailure.INVALID_TOKEN -> stringResource(R.string.consumer_cloudflare_invalid_token)
+
+    SetupFailure.NOT_ALLOWED -> stringResource(R.string.consumer_cloudflare_not_allowed)
+
+    SetupFailure.OFFLINE -> stringResource(R.string.consumer_cloudflare_offline)
+
+    SetupFailure.NOT_STARTED -> stringResource(R.string.consumer_cloudflare_not_started)
+
+    SetupFailure.REFUSED -> stringResource(R.string.consumer_cloudflare_refused, failure.detail.orEmpty())
+
+    SetupFailure.SIGN_IN_CANCELLED -> stringResource(R.string.consumer_cloudflare_sign_in_cancelled)
+
+    SetupFailure.SIGN_IN_MISMATCH -> stringResource(R.string.consumer_cloudflare_sign_in_mismatch)
+
+    SetupFailure.SIGN_IN_REFUSED ->
+        stringResource(R.string.consumer_cloudflare_sign_in_refused, failure.detail.orEmpty())
+}
+
+private const val HALF_TURN = 180f

@@ -77,6 +77,10 @@ jobs:
           MEDIASYNC_KEYSTORE_PASSWORD: ${{ secrets.MEDIASYNC_KEYSTORE_PASSWORD }}
           MEDIASYNC_KEY_ALIAS: ${{ secrets.MEDIASYNC_KEY_ALIAS }}
           MEDIASYNC_KEY_PASSWORD: ${{ secrets.MEDIASYNC_KEY_PASSWORD }}
+          # Sign in with Cloudflare (infra/rendezvous/README.md): without these repository variables, the app takes a
+          # pasted token only.
+          CLOUDFLARE_OAUTH_CLIENT_ID: ${{ vars.CLOUDFLARE_OAUTH_CLIENT_ID }}
+          CLOUDFLARE_OAUTH_REDIRECT_URI: ${{ vars.CLOUDFLARE_OAUTH_REDIRECT_URI }}
         # Two builds: with resource shrinking, the Android Gradle Plugin can't build the App Bundle while the
         # per-CPU APKs are on (https://issuetracker.google.com/402800800). v0.2.0's first build failed on it.
         run: |
