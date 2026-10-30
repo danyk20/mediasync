@@ -17,14 +17,16 @@ import androidx.room.RoomDatabase
         MediaFingerprintEntity::class,
         ConnectorAccountEntity::class,
         BackupReceiptEntity::class,
+        LeftOutItemEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // peers.schedule
         AutoMigration(from = 2, to = 3), // peers.turboKey
         AutoMigration(from = 3, to = 4), // connector_accounts, backup_receipts
         AutoMigration(from = 4, to = 5), // peers.pairSecret, peers.rendezvousUrl
+        AutoMigration(from = 5, to = 6), // left_out_items
     ],
 )
 abstract class MediaSyncDatabase : RoomDatabase() {
@@ -39,6 +41,8 @@ abstract class MediaSyncDatabase : RoomDatabase() {
     abstract fun mediaFingerprintDao(): MediaFingerprintDao
 
     abstract fun backupDao(): BackupDao
+
+    abstract fun leftOutItemDao(): LeftOutItemDao
 
     companion object {
         const val NAME = "mediasync.db"

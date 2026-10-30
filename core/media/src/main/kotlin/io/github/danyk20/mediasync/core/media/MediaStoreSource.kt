@@ -142,6 +142,9 @@ class MediaStoreSource internal constructor(
         if (item.shared) shared.remove(listOf(item.key.toUri().buildUpon().clearQuery().build().toString()))
     }
 
+    /** A shared item the user chose not to send leaves the queue, as if sent. */
+    override fun withdrawn(item: SourceItem) = confirmed(item)
+
     override fun open(item: SourceItem): Source =
         resolver.openInputStream(item.key.toUri())?.source() ?: throw FileNotFoundException(item.key)
 

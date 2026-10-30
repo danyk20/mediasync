@@ -26,6 +26,9 @@ interface MediaSource {
 
     /** The consumer has [item] now, sent or already there: a source lets go of what it kept only to send it. */
     fun confirmed(item: SourceItem) = Unit
+
+    /** The user chose not to send [item]: a source lets go of what it kept only to send it, as for [confirmed]. */
+    fun withdrawn(item: SourceItem) = Unit
 }
 
 /** Reads parts of one file; close it when done. */

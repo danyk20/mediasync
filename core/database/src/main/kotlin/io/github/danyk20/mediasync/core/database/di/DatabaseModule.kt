@@ -12,6 +12,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.danyk20.mediasync.core.database.BackupDao
+import io.github.danyk20.mediasync.core.database.LeftOutItemDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PartialTransferDao
@@ -46,4 +47,7 @@ internal object DatabaseModule {
 
     @Provides
     fun provideBackupDao(database: MediaSyncDatabase): BackupDao = database.backupDao()
+
+    @Provides
+    fun provideLeftOutItemDao(database: MediaSyncDatabase): LeftOutItemDao = database.leftOutItemDao()
 }

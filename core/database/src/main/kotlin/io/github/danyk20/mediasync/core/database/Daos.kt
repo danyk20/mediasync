@@ -98,6 +98,21 @@ interface MediaFingerprintDao {
     fun upsert(entry: MediaFingerprintEntity)
 }
 
+@Dao
+interface LeftOutItemDao {
+    @Query("SELECT fingerprint FROM left_out_items")
+    fun fingerprints(): List<String>
+
+    @Query("SELECT fingerprint FROM left_out_items")
+    fun observeFingerprints(): Flow<List<String>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(items: List<LeftOutItemEntity>)
+
+    @Query("DELETE FROM left_out_items WHERE fingerprint IN (:fingerprints)")
+    suspend fun delete(fingerprints: List<String>)
+}
+
 /** How many receipts an account has in one state. */
 data class StateCount(val state: String, val count: Int)
 

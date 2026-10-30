@@ -166,3 +166,27 @@ class RoomReceivedLedger @Inject constructor(private val dao: ReceivedItemDao) :
 
     fun observeCountFrom(producer: DeviceId): Flow<Int> = dao.observeCountFrom(producer.hex)
 }
+
+/** Producer side: the fingerprints of the photos and videos the user chose not to sync. */
+@Singleton
+class LeftOutStore @Inject constructor(private val dao: LeftOutItemDao) {
+    /** Blocking, for the sync engine's I/O threads. */
+    fun fingerprints(): Set<ByteString> = dao.fingerprints().toFingerprints()
+
+    fun observe(): Flow<Set<ByteString>> = dao.observeFingerprints().map { it.toFingerprints() }
+
+    suspend fun add(fingerprints: Collection<ByteString>) {
+        val now = System.currentTimeMillis()
+        dao.insert(fingerprints.map { LeftOutItemEntity(it.hex(), now) })
+    }
+
+    // In chunks: Android 10's SQLite takes at most 999 arguments.
+    suspend fun remove(fingerprints: Collection<ByteString>) =
+        fingerprints.map { it.hex() }.chunked(MAX_ARGUMENTS).forEach { dao.delete(it) }
+
+    private fun List<String>.toFingerprints(): Set<ByteString> = mapTo(HashSet()) { it.decodeHex() }
+
+    private companion object {
+        const val MAX_ARGUMENTS = 500
+    }
+}

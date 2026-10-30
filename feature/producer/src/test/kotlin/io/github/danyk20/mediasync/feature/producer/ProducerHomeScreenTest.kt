@@ -115,6 +115,31 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun pendingPhotos_canBeSeenToLeaveSomeOut() {
+        show(paired.copy(pendingCount = 214))
+
+        composeRule.onNodeWithText("See them").performClick()
+
+        events shouldBe listOf("waiting false")
+    }
+
+    @Test
+    fun leftOutPhotos_areCountedAndCanBeSeen() {
+        show(paired.copy(pendingCount = 0, leftOutCount = 3))
+
+        composeRule.onNodeWithText("3 photos and videos you chose not to sync").performScrollTo().performClick()
+
+        events shouldBe listOf("waiting true")
+    }
+
+    @Test
+    fun nothingLeftOut_hasNoRowForIt() {
+        show(paired.copy(pendingCount = 0))
+
+        composeRule.onNodeWithText("Left out").assertDoesNotExist()
+    }
+
+    @Test
     fun syncing_saysHowLongALongTransferTakesAndWhenItWaits() {
         fun rate(estimate: TransferEstimate) = syncing.copy(
             sync = (syncing.sync as ProducerState.Syncing).copy(estimate = estimate),
@@ -611,6 +636,7 @@ class ProducerHomeScreenTest {
                     onOpenLocationSettings = { events += "location" },
                     onUnpair = { events += "unpair" },
                     onShowSpeeds = { events += "speeds" },
+                    onSeeWaiting = { leftOut -> events += "waiting $leftOut" },
                 )
             }
         }

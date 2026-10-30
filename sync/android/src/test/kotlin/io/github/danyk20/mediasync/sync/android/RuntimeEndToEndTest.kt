@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.android
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import io.github.danyk20.mediasync.core.database.LeftOutStore
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -99,6 +100,7 @@ class RuntimeEndToEndTest {
     private val producerPeers = PeerStore(producerDb.peerDao())
     private val photos = List(4) { FakeMedia("photo$it", Random(it).nextBytes(300_000 + it)) }
     private val source = FakeMediaSource(photos)
+    private val leftOut = LeftOutItems(LeftOutStore(producerDb.leftOutItemDao()), source)
     private val producerLinks = FakeDirectLinks()
 
     /** The sending phone is away from the receiving phone's Wi-Fi; a direct link still reaches it. */
@@ -114,6 +116,7 @@ class RuntimeEndToEndTest {
         peers = producerPeers,
         ledger = RoomSentLedger(producerDb.sentItemDao()),
         source = source,
+        leftOut = leftOut,
         device = object : DeviceInfo {
             override fun local() = LocalDevice("Anna's Pixel", "test")
 
@@ -416,6 +419,30 @@ class RuntimeEndToEndTest {
         val stored = sink.stored.values.map { String(it, Charsets.ISO_8859_1) }
         stored.any { "Zurich" in it || "Pixel 8" in it } shouldBe false
         stored.size shouldBe photos.size + 1
+    }
+
+    @Test
+    fun whatTheUserLeavesOutIsntSentUntilBroughtBack() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        val waiting = producer.waitingItems()
+        val (left, rest) = waiting.partition { it.key == "photo0" }
+
+        leftOut.leaveOut(left)
+
+        producer.pendingCount() shouldBe Pending(toSend = 3, bytes = rest.sumOf { it.descriptor.size }, leftOut = 1)
+        producer.waitingItems() shouldBe waiting // Still shown, to bring back.
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult?.sent == 3 } }
+        sink.stored.size shouldBe 3
+        producer.pendingCount() shouldBe Pending(leftOut = 1)
+
+        leftOut.bringBack(left)
+
+        producer.pendingCount() shouldBe Pending(toSend = 1, bytes = left.single().descriptor.size)
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult?.sent == 1 } }
+        sink.stored.size shouldBe photos.size
     }
 
     @Test

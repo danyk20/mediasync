@@ -29,6 +29,7 @@ import io.github.danyk20.mediasync.feature.producer.PhotoDetailsRoute
 import io.github.danyk20.mediasync.feature.producer.ProducerHomeRoute
 import io.github.danyk20.mediasync.feature.producer.SendingOrderRoute
 import io.github.danyk20.mediasync.feature.producer.SourceFoldersRoute
+import io.github.danyk20.mediasync.feature.producer.WaitingRoute
 import io.github.danyk20.mediasync.navigation.Destination
 import io.github.danyk20.mediasync.navigation.startDestinationFor
 
@@ -83,7 +84,11 @@ private fun MediaSyncNavDisplay(
                     onChooseDetails = { backStack.add(Destination.ProducerPhotoDetails) },
                     onChooseOrder = { backStack.add(Destination.ProducerSendingOrder) },
                     onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
+                    onSeeWaiting = { leftOut -> backStack.add(Destination.ProducerWaiting(leftOut)) },
                 )
+            }
+            entry<Destination.ProducerWaiting> { destination ->
+                WaitingRoute(onDone = { backStack.removeLastOrNull() }, leftOutFirst = destination.leftOut)
             }
             entry<Destination.ProducerFolders> { SourceFoldersRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerPhotoDetails> { PhotoDetailsRoute(onDone = { backStack.removeLastOrNull() }) }

@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.LeftOutItems
 import io.github.danyk20.mediasync.sync.android.MobileDataUsage
 import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
@@ -98,8 +99,21 @@ class ProducerHomeViewModelTest {
         every { batteryRestricted() } answers { batteryRestricted }
     }
 
-    private fun viewModel() =
-        ProducerHomeViewModel(application, sync, scheduler, peers, library, settings, history, setup, clock, mobileData)
+    private val leftOut = mockk<LeftOutItems> { every { fingerprints } returns flowOf(emptySet()) }
+
+    private fun viewModel() = ProducerHomeViewModel(
+        application,
+        sync,
+        scheduler,
+        peers,
+        library,
+        settings,
+        history,
+        setup,
+        clock,
+        mobileData,
+        leftOut,
+    )
 
     @Test
     fun unpairingStopsASyncAndForgetsTheReceivingPhone() {

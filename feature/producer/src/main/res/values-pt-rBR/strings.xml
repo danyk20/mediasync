@@ -178,4 +178,46 @@
         <item quantity="other">%1$s itens</item>
     </plurals>
     <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+
+    <!-- The new photos and videos, to choose some not to sync. -->
+    <string name="producer_status_pending_see">Ver</string>
+    <string name="producer_left_out_row_title">Excluídos</string>
+    <plurals name="producer_left_out_row_summary">
+        <item quantity="one">%d foto ou vídeo que você escolheu não sincronizar</item>
+        <item quantity="many">%d fotos e vídeos que você escolheu não sincronizar</item>
+        <item quantity="other">%d fotos e vídeos que você escolheu não sincronizar</item>
+    </plurals>
+    <string name="producer_waiting_title">Fotos e vídeos novos</string>
+    <string name="producer_waiting_to_sync">Para sincronizar · %1$d</string>
+    <string name="producer_waiting_left_out">Excluídos · %1$d</string>
+    <string name="producer_waiting_to_sync_hint">A próxima sincronização envia estes. Toque e mantenha pressionados os que não devem ser sincronizados.</string>
+    <string name="producer_waiting_left_out_hint">Você escolheu não sincronizar estes: eles ficam só neste telefone. Toque e mantenha pressionados os que devem ser sincronizados mesmo assim.</string>
+    <string name="producer_waiting_to_sync_empty">Nada de novo para sincronizar.</string>
+    <string name="producer_waiting_left_out_empty">Nada foi excluído. As fotos e os vídeos que você escolher não sincronizar aparecem aqui.</string>
+    <string name="producer_waiting_today">Hoje</string>
+    <string name="producer_waiting_yesterday">Ontem</string>
+    <string name="producer_waiting_photo">Foto, %1$s</string>
+    <string name="producer_waiting_video">Vídeo, %1$s</string>
+    <string name="producer_waiting_open">Abrir</string>
+    <string name="producer_waiting_choose">Selecionar</string>
+    <plurals name="producer_waiting_chosen">
+        <item quantity="one">%d selecionado</item>
+        <item quantity="many">%d selecionados</item>
+        <item quantity="other">%d selecionados</item>
+    </plurals>
+    <string name="producer_waiting_clear_selection">Limpar seleção</string>
+    <string name="producer_waiting_leave_out">Não sincronizar</string>
+    <string name="producer_waiting_bring_back">Sincronizar</string>
+    <plurals name="producer_waiting_left_out_done">
+        <item quantity="one">%d não será sincronizado</item>
+        <item quantity="many">%d não serão sincronizados</item>
+        <item quantity="other">%d não serão sincronizados</item>
+    </plurals>
+    <plurals name="producer_waiting_synced_done">
+        <item quantity="one">%d será sincronizado</item>
+        <item quantity="many">%d serão sincronizados</item>
+        <item quantity="other">%d serão sincronizados</item>
+    </plurals>
+    <string name="producer_waiting_undo">Desfazer</string>
+    <string name="producer_waiting_no_viewer">Nenhum app neste telefone consegue abrir isso.</string>
 </resources>

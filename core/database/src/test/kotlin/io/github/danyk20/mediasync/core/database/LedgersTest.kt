@@ -107,4 +107,21 @@ class LedgersTest {
         peers.forget(producer)
         peers.isPaired(producer) shouldBe false
     }
+
+    @Test
+    fun leftOutItemsAreKeptByFingerprintUntilBroughtBack() = runTest {
+        val store = LeftOutStore(database.leftOutItemDao())
+        // More than SQLite takes in one statement on older phones.
+        val many = List(1_200) { "photo $it".encodeUtf8().sha256() }
+
+        store.add(many)
+        store.add(many.take(1)) // Left out again: nothing changes.
+
+        store.fingerprints() shouldBe many.toSet()
+        store.observe().first() shouldBe many.toSet()
+
+        store.remove(many.drop(1))
+
+        store.fingerprints() shouldBe setOf(many.first())
+    }
 }

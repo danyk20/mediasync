@@ -120,3 +120,10 @@ data class BackupReceiptEntity(
     val backedUpAtMillis: Long,
     val checkedAtMillis: Long?,
 )
+
+/**
+ * Producer side: a photo or video the user chose not to sync, by its fingerprint, until they bring it back. Since
+ * version 6.
+ */
+@Entity(tableName = "left_out_items")
+data class LeftOutItemEntity(@PrimaryKey val fingerprint: String, val leftOutAtMillis: Long)

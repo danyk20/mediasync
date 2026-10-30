@@ -477,6 +477,10 @@ The `meta` sidecar carries details that live *outside* the file, in the producer
   - *Automatic* (the default): newest first, so recent memories are safe sooner. Over the internet, photos before videos, so the item count rises quickly on a slow connection.
   - *Newest first*, *Oldest first*, *Photos first* and *Videos first* (the newest first within each). Under *Videos first*, a note says that a nearly full receiving phone then gets fewer items.
   - "Newest" means when it was taken, or the file's date without one (screenshots, saved images). A change applies from the next sync. With parallel connections, the order holds batch by batch, not file by file.
+- **Photos and videos not to sync** (each sending phone's choice; *Built (M6)*): the card that says how many new photos and videos wait has *See them*. It opens them as a gallery, by day, with a second list of those left out.
+  - Tapping one opens it in the phone's gallery. Touching and holding starts choosing (a day's heading chooses the whole day); *Don't sync* moves the chosen ones to *Left out*, and *Sync* moves them back. Each change is saved at once and can be undone from the message that confirms it.
+  - Left-out items are kept by fingerprint (`left_out_items`, schema v6), so a copy in another folder stays out too. An edited photo is another file and shows up as new. While anything is left out, the home screen has a *Left out* row that opens that list.
+  - The choice also applies to a sync already running, for what it hasn't offered yet. Photos shared to MediaSync are sent anyway, since the user asked for them then; leaving out a shared one takes it off the share queue.
 - With several producers connected at once, the consumer splits its stream budget fairly between them.
 
 ### 5.5 Failure handling

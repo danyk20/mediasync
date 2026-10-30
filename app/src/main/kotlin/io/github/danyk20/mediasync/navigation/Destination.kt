@@ -44,6 +44,10 @@ sealed interface Destination : NavKey {
     @Serializable
     data object ProducerSendingOrder : Destination
 
+    /** The photos and videos the next sync sends, to choose some not to sync; or, [leftOut], those left out. */
+    @Serializable
+    data class ProducerWaiting(val leftOut: Boolean = false) : Destination
+
     /** The consumer sets when its producers sync. */
     @Serializable
     data object ConsumerSchedule : Destination

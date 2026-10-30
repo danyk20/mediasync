@@ -26,6 +26,8 @@
         <item quantity="one">Tap Sync now to send it to %1$s.</item>
         <item quantity="other">Tap Sync now to send them to %1$s.</item>
     </plurals>
+    <!-- On the card above: shows the new photos and videos, to choose some not to sync. -->
+    <string name="producer_status_pending_see">See them</string>
     <string name="producer_status_connecting_title">Looking for %1$s…</string>
     <string name="producer_status_connecting_body">Both phones need to be on the same Wi-Fi, with MediaSync open.</string>
     <string name="producer_status_sending_title">Sending to %1$s</string>
@@ -90,6 +92,12 @@
     <string name="producer_details_remove_all_description">Location, camera, phone, captions, album and favorite are removed. The date, orientation and colours stay.</string>
     <string name="producer_details_remove_all_note">Motion Photos and Ultra HDR photos arrive as ordinary photos. RAW photos aren\'t sent: their details can\'t be removed.</string>
     <string name="producer_details_scope">Applies to photos and videos sent from now on. Those already sent keep their details.</string>
+    <!-- The home screen's row for what the user chose not to sync; it opens them. -->
+    <string name="producer_left_out_row_title">Left out</string>
+    <plurals name="producer_left_out_row_summary">
+        <item quantity="one">%d photo or video you chose not to sync</item>
+        <item quantity="other">%d photos and videos you chose not to sync</item>
+    </plurals>
     <string name="producer_order_row_title">Sending order</string>
     <string name="producer_order_title">Sending order</string>
     <string name="producer_order_intro">When a lot is waiting, this decides what arrives first, in case a sync stops before the end.</string>
@@ -180,4 +188,42 @@
     </plurals>
     <!-- "214 items · 1.2 GB · DCIM/Camera" -->
     <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+
+    <!-- The photos and videos the next sync sends, and those the user chose not to sync. -->
+    <string name="producer_waiting_title">New photos and videos</string>
+    <!-- Switches to the list of what the next sync sends; "To sync · 124". -->
+    <string name="producer_waiting_to_sync">To sync · %1$d</string>
+    <!-- Switches to the list of what the user chose not to sync; "Left out · 3". -->
+    <string name="producer_waiting_left_out">Left out · %1$d</string>
+    <string name="producer_waiting_to_sync_hint">The next sync sends these. Touch and hold the ones not to sync.</string>
+    <string name="producer_waiting_left_out_hint">You chose not to sync these: they stay on this phone only. Touch and hold the ones to sync after all.</string>
+    <string name="producer_waiting_to_sync_empty">Nothing new to sync.</string>
+    <string name="producer_waiting_left_out_empty">Nothing is left out. Photos and videos you choose not to sync show here.</string>
+    <string name="producer_waiting_today">Today</string>
+    <string name="producer_waiting_yesterday">Yesterday</string>
+    <!-- For screen readers: "Photo, Oct 28, 2026, 13:24". -->
+    <string name="producer_waiting_photo">Photo, %1$s</string>
+    <string name="producer_waiting_video">Video, %1$s</string>
+    <!-- For screen readers: what tapping and touching and holding a photo do. -->
+    <string name="producer_waiting_open">Open</string>
+    <string name="producer_waiting_choose">Select</string>
+    <plurals name="producer_waiting_chosen">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="producer_waiting_clear_selection">Clear selection</string>
+    <!-- Moves the selected photos and videos to the left-out list. -->
+    <string name="producer_waiting_leave_out">Don\'t sync</string>
+    <!-- Moves the selected photos and videos back to the list to sync. -->
+    <string name="producer_waiting_bring_back">Sync</string>
+    <plurals name="producer_waiting_left_out_done">
+        <item quantity="one">%d won\'t be synced</item>
+        <item quantity="other">%d won\'t be synced</item>
+    </plurals>
+    <plurals name="producer_waiting_synced_done">
+        <item quantity="one">%d will be synced</item>
+        <item quantity="other">%d will be synced</item>
+    </plurals>
+    <string name="producer_waiting_undo">Undo</string>
+    <string name="producer_waiting_no_viewer">No app on this phone can open it.</string>
 </resources>
