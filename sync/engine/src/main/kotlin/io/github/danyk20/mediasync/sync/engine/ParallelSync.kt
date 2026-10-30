@@ -59,7 +59,7 @@ class ParallelSync(
         var lastBytes = 0L
         var growing = true
         while (waitForProbe(streams)) {
-            val bytes = latest.values.sumOf { it.bytesDone }
+            val bytes = latest.values.sumOf { it.bytesMoved }
             val rate = (bytes - lastBytes).toDouble()
             lastBytes = bytes
             if (growing && mayGrow(streams, queue)) {
@@ -111,6 +111,7 @@ class ParallelSync(
                         bytesDone = all.sumOf { it.bytesDone },
                         bytesTotal = queue.totalBytes,
                         currentItem = part.currentItem,
+                        bytesSkipped = all.sumOf { it.bytesSkipped },
                     ),
                 )
             }

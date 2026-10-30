@@ -16,7 +16,7 @@
     <string name="sync_notification_progress">%1$d z %2$d</string>
     <string name="sync_notification_speed">%1$s/s</string>
     <string name="sync_notification_waiting">čakanie na pripojenie</string>
-    <string name="sync_notification_left_soon">zostáva menej ako minúta</string>
+    <string name="sync_notification_left_seconds">zostáva asi %1$d s</string>
     <string name="sync_notification_left_minutes">zostáva asi %1$d min</string>
     <string name="sync_notification_left_hours">zostáva asi %1$d h %2$d min</string>
     <string name="sync_notification_left_whole_hours">zostáva asi %1$d h</string>

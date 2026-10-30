@@ -8,22 +8,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import io.github.danyk20.mediasync.core.designsystem.R
 
+private const val SECONDS_PER_MINUTE = 60
 private const val MINUTES_PER_HOUR = 60
 
 /**
  * A transfer's speed, and the time left when it's known: "8.4 MB/s · about 2 min left". [bytesPerSecond] is `null`
- * while it's still measured, in a transfer's first seconds. [minutesLeft] is 0 under a minute, and `null` when not
- * known (a receiving phone learns the total only batch by batch). At 0 B/s the transfer waits for the connection.
+ * while it's still measured, in a transfer's first seconds. [secondsLeft] is as people say it (whole minutes, or tens
+ * of seconds in the last minute), and `null` when not known (a receiving phone learns the total only batch by batch).
+ * At 0 B/s the transfer waits for the connection.
  */
 @Composable
-fun transferRate(bytesPerSecond: Long?, minutesLeft: Int?): String {
+fun transferRate(bytesPerSecond: Long?, secondsLeft: Int?): String {
     if (bytesPerSecond == null) return stringResource(R.string.transfer_measuring)
     if (bytesPerSecond <= 0) return stringResource(R.string.transfer_waiting)
     val speed = stringResource(R.string.transfer_speed, formatBytes(bytesPerSecond))
+    if (secondsLeft == null) return speed
+    val minutesLeft = secondsLeft / SECONDS_PER_MINUTE
     val left = when {
-        minutesLeft == null -> return speed
-
-        minutesLeft == 0 -> stringResource(R.string.transfer_left_soon)
+        minutesLeft == 0 -> stringResource(R.string.transfer_left_seconds, secondsLeft)
 
         minutesLeft < MINUTES_PER_HOUR -> stringResource(R.string.transfer_left_minutes, minutesLeft)
 

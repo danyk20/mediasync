@@ -16,7 +16,7 @@
     <string name="sync_notification_progress">%1$d von %2$d</string>
     <string name="sync_notification_speed">%1$s/s</string>
     <string name="sync_notification_waiting">warte auf die Verbindung</string>
-    <string name="sync_notification_left_soon">weniger als eine Minute übrig</string>
+    <string name="sync_notification_left_seconds">noch etwa %1$d Sek.</string>
     <string name="sync_notification_left_minutes">noch etwa %1$d Min.</string>
     <string name="sync_notification_left_hours">noch etwa %1$d Std. %2$d Min.</string>
     <string name="sync_notification_left_whole_hours">noch etwa %1$d Std.</string>

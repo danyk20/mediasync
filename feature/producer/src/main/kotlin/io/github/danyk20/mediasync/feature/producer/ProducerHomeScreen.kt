@@ -819,7 +819,7 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds:
         }
         // From the first byte, so it doesn't come and go: measured at first, then the speed and time left.
         if (progress != null) {
-            TransferRateRow(transferRate(sync.estimate?.bytesPerSecond, sync.estimate?.minutesLeft()), onShowSpeeds)
+            TransferRateRow(transferRate(sync.estimate?.bytesPerSecond, sync.estimate?.secondsLeft()), onShowSpeeds)
         }
     }
 }

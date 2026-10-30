@@ -60,6 +60,18 @@ class SyncNotificationsTest {
     }
 
     @Test
+    fun theLastMinuteIsCountedInSeconds() {
+        val estimate = TransferEstimate(8_400_000, 32_000)
+
+        shown {
+            notifications.showSendingProgress(
+                "Pixel 2 XL",
+                MutableStateFlow(ProducerState.Syncing(progress, estimate = estimate)),
+            )
+        } shouldBe "12 of 40 · 8.4 MB/s · about 40 s left"
+    }
+
+    @Test
     fun aStalledTransferWaitsForTheConnection() {
         shown {
             notifications.showSendingProgress(
