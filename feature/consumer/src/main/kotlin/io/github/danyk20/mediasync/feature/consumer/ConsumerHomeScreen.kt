@@ -236,6 +236,7 @@ fun ConsumerHomeScreen(
                 onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
             )
             ScheduleRow(state.schedule, onChangeSchedule)
+            WakeUpNotice(state.wakeUpProblem, onSetUpInternet)
             InternetRow(state.internetSync, state.relay, onSetUpInternet)
             state.backup?.let { BackupRow(it, onOpenBackup) }
             FileNamesRow(state.simpleFileNames, onSimpleFileNames)
@@ -408,6 +409,23 @@ private fun StorageNotice(state: ConsumerHomeUiState, onOpenStorage: () -> Unit)
             onAction = onOpenStorage,
         )
     }
+}
+
+/**
+ * Sending phones can't wake this phone over the internet (docs/PLAN.md §10.4): they reach it only while MediaSync is
+ * open here. Setting up internet sync again deploys the Worker anew, which fixes what a Worker can.
+ */
+@Composable
+private fun WakeUpNotice(problem: String?, onSetUpInternet: () -> Unit) {
+    if (problem == null) return
+    NoticeCard(
+        title = stringResource(R.string.consumer_wake_ups_failing_title),
+        body = stringResource(R.string.consumer_wake_ups_failing_body, problem),
+        icon = MediaSyncIcons.Warning,
+        action = stringResource(R.string.consumer_internet_row_title),
+        onAction = onSetUpInternet,
+        warning = true,
+    )
 }
 
 /** When the sending phones sync, and the way to change it. */

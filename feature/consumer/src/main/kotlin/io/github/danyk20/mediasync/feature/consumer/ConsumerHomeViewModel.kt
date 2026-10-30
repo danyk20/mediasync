@@ -24,6 +24,8 @@ import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboKeyStore
+import io.github.danyk20.mediasync.sync.android.WakeUpCheck
+import io.github.danyk20.mediasync.sync.android.WakeUpStatus
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -80,6 +82,8 @@ data class ConsumerHomeUiState(
     val internetSync: Boolean = false,
     /** This month's relay usage (docs/PLAN.md §8.5), for the one-line meter; `null` until known. */
     val relay: RelayUsage? = null,
+    /** Why sending phones can't wake this phone over the internet (docs/PLAN.md §10.4), as last checked. */
+    val wakeUpProblem: String? = null,
     /** Cloud backup (docs/PLAN.md §9.3.1); `null` in a build without any. */
     val backup: BackupLine? = null,
     /** Received files whose name has more than one dot keep only the last, so Google Photos shows them. */
@@ -94,6 +98,9 @@ sealed interface BackupLine {
     /** [app] on this phone backs up what's received; [today] were handed to it since midnight. */
     data class On(val app: String, val today: Int) : BackupLine
 }
+
+/** Internet sync as set up: its Worker, the relay meter and whether wake-ups get through. */
+private data class Internet(val worker: String?, val relay: RelayUsage?, val wakeUps: WakeUpStatus?)
 
 /** What the phone allows MediaSync, and its free space. */
 private data class DeviceAccess(
@@ -113,6 +120,7 @@ class ConsumerHomeViewModel @Inject constructor(
     private val setup: BackgroundSetup,
     backup: CloudBackup,
     private val names: ReceivedNames,
+    wakeUps: WakeUpCheck,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -146,14 +154,15 @@ class ConsumerHomeViewModel @Inject constructor(
         receiver.state,
         peers.observeAll(),
         received.observeCount(),
-        combine(settings.syncSchedule, settings.rendezvousUrl, relay, ::Triple),
+        combine(settings.syncSchedule, combine(settings.rendezvousUrl, relay, wakeUps.status, ::Internet), ::Pair),
         combine(
             access,
             settings.dismissedPrompts,
             combine(backupLine(backup), settings.simpleFileNames, ::Pair),
             ::Triple,
         ),
-    ) { state, allPeers, count, (schedule, worker, relay), (access, dismissed, files) ->
+    ) { state, allPeers, count, (schedule, internet), (access, dismissed, files) ->
+        val (worker, relay, wakeUpStatus) = internet
         val (backupLine, simpleNames) = files
         val producers = allPeers.filter { it.role == DeviceRole.PRODUCER }
         val transfer = state.transfers.entries.firstOrNull()?.let { (id, progress) ->
@@ -185,6 +194,7 @@ class ConsumerHomeViewModel @Inject constructor(
             turboReceiving = state.turboReceiving,
             internetSync = worker != null,
             relay = relay?.takeIf { worker != null },
+            wakeUpProblem = wakeUpStatus?.problem?.takeIf { worker != null },
             backup = backupLine,
             simpleFileNames = simpleNames,
         )

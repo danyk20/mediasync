@@ -1,5 +1,8 @@
 {
   "compatibilityDate": "2026-10-01",
+  "compatibilityFlags": [
+    "global_fetch_strictly_public"
+  ],
   "migrationTag": "v1",
   "durableObjects": {
     "PAIRS": "PairMailbox",

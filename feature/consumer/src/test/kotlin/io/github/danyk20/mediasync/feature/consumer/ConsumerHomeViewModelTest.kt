@@ -30,6 +30,8 @@ import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboKeyStore
+import io.github.danyk20.mediasync.sync.android.WakeUpCheck
+import io.github.danyk20.mediasync.sync.android.WakeUpStatus
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -92,8 +94,11 @@ class ConsumerHomeViewModelTest {
 
     private val names = mockk<ReceivedNames> { coEvery { simplifyStored() } returns 0 }
 
+    private val wakeUpStatus = MutableStateFlow<WakeUpStatus?>(null)
+    private val wakeUps = mockk<WakeUpCheck> { every { status } returns wakeUpStatus }
+
     private fun viewModel() =
-        ConsumerHomeViewModel(receiver, peers, turboKeys, received, settings, setup, backup, names)
+        ConsumerHomeViewModel(receiver, peers, turboKeys, received, settings, setup, backup, names, wakeUps)
 
     @Test
     fun filesReceivedBeforeGetSimpleNamesAndAgainWhenTheyAreTurnedBackOn() = runTest {
@@ -146,6 +151,20 @@ class ConsumerHomeViewModelTest {
         withContext(Dispatchers.Default) {
             withTimeout(5_000) { viewModel.uiState.first { it.relay != null } }
         }.relay?.usedBytes shouldBe 812_000_000_000
+    }
+
+    @Test
+    fun wakeUpsThatDontGetThroughAreShownWhileInternetSyncIsOn() = runTest {
+        val viewModel = viewModel()
+        wakeUpStatus.value = WakeUpStatus(1, "wake_relay_failed: The wake relay answered HTTP 404")
+        viewModel.uiState.first { it.listening }.wakeUpProblem shouldBe null // Internet sync is off.
+
+        settings.setRendezvousUrl("https://mediasync.anna.workers.dev")
+
+        viewModel.uiState.first { it.internetSync }.wakeUpProblem shouldBe
+            "wake_relay_failed: The wake relay answered HTTP 404"
+        wakeUpStatus.value = WakeUpStatus(2)
+        viewModel.uiState.first { it.wakeUpProblem == null }
     }
 
     @Test

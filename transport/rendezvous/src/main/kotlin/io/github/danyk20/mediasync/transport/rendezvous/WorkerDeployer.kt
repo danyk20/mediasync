@@ -43,6 +43,11 @@ class WorkerScript(
     val crons: List<String>,
     /** The last Durable Object migration of the config. */
     val migrationTag: String,
+    /**
+     * Such as `global_fetch_strictly_public`, which lets the Worker reach the wake relay in the relay's own
+     * account.
+     */
+    val compatibilityFlags: List<String> = emptyList(),
 ) {
     /** A Workers Rate Limiting binding: [limit] requests per [periodSeconds] (10 or 60). */
     @Serializable
@@ -57,6 +62,7 @@ class WorkerScript(
     @Serializable
     private class Manifest(
         val compatibilityDate: String,
+        val compatibilityFlags: List<String> = emptyList(),
         val migrationTag: String,
         val durableObjects: Map<String, String>,
         val rateLimits: List<RateLimit>,
@@ -78,6 +84,7 @@ class WorkerScript(
                     it.rateLimits,
                     it.crons,
                     it.migrationTag,
+                    it.compatibilityFlags,
                 )
             }
     }
@@ -216,6 +223,9 @@ class WorkerDeployer(
         val metadata = buildJsonObject {
             put("main_module", MODULE)
             put("compatibility_date", script.compatibilityDate)
+            if (script.compatibilityFlags.isNotEmpty()) {
+                putJsonArray("compatibility_flags") { script.compatibilityFlags.forEach(::add) }
+            }
             putJsonObject("observability") { put("enabled", false) } // No request logs (PLAN §8.4).
             putJsonArray("bindings") { bindings(script, secrets).forEach(::add) }
             // A redeployment keeps the secrets set at the first.

@@ -131,6 +131,13 @@ class InternetPath(
         RendezvousClient(worker, signer, http).relayUsage(pairId(signer.deviceId, producer))
 
     /**
+     * As the consumer: checks wake-ups reach it (PLAN §10.4), through its Worker at [worker], as the pair with
+     * [producer].
+     */
+    fun wakeCheck(worker: URI, producer: DeviceId) =
+        RendezvousClient(worker, signer, http).wakeCheck(pairId(signer.deviceId, producer))
+
+    /**
      * As the consumer: registers each pair in [pairs] (producer → pair secret) at its Worker at [worker], and answers
      * those producers' offers through its mailbox. Each connection goes to [serve], on a thread of its own, until the
      * returned handle is closed. A mailbox that drops is opened again. Doesn't block. [pushToken], this phone's FCM

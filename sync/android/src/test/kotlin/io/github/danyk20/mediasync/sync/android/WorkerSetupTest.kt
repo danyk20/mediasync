@@ -14,6 +14,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import io.mockk.mockk
 import io.mockk.verify
 import java.io.IOException
@@ -50,6 +51,10 @@ class WorkerSetupTest {
     /** Health checks until the Worker answers. */
     private var unansweredHealthChecks = 0
 
+    /** What checking wake-ups through the new Worker finds. */
+    private var wakeUps: WakeUpStatus? = null
+    private val wakeUpChecks = mutableListOf<String>()
+
     private fun setup(bundle: WorkerScript? = script) = WorkerSetup(
         bundle = { bundle },
         deployer = { token ->
@@ -79,6 +84,10 @@ class WorkerSetupTest {
         receiver = receiver,
         startTimeoutMillis = 2_000,
         pollMillis = 10,
+        checkWakeUps = { worker ->
+            wakeUpChecks += worker
+            wakeUps
+        },
     )
 
     private fun defaultResult(method: String, path: String) = when {
@@ -107,6 +116,24 @@ class WorkerSetupTest {
         tokens shouldBe listOf("token-123") // As pasted, without the spaces around it.
         settings.rendezvousUrl.value shouldBe "https://mediasync-rendezvous.anna.workers.dev"
         verify { receiver.refreshInternet() }
+    }
+
+    @Test
+    fun itChecksThatSendingPhonesCanWakeThisPhoneThroughTheNewWorker() {
+        wakeUps = WakeUpStatus(1, "wake_relay_failed: The wake relay answered HTTP 404 (Cloudflare error 1042)")
+
+        val result = deploy()
+
+        result shouldBe SetupResult.Done("https://mediasync-rendezvous.anna.workers.dev", relay = true, wakeUps)
+        wakeUpChecks shouldBe listOf("https://mediasync-rendezvous.anna.workers.dev")
+    }
+
+    @Test
+    fun aWorkerThatDoesntStartIsntCheckedForWakeUps() {
+        unansweredHealthChecks = Int.MAX_VALUE
+
+        deploy() shouldBe SetupResult.Failed(SetupFailure.NOT_STARTED)
+        wakeUpChecks shouldBe emptyList()
     }
 
     @Test
@@ -222,10 +249,13 @@ class WorkerSetupTest {
             )
         }
 
-        WorkerSetup(context, settings, receiver).available() shouldBe true
+        WorkerSetup(context, settings, receiver, mockk(relaxed = true)).available() shouldBe true
         carried.durableObjects shouldBe mapOf("PAIRS" to "PairMailbox", "METER" to "UsageMeter")
         carried.migrationTag shouldBe "v1"
         carried.crons shouldBe listOf("*/15 * * * *")
+        // Its wake-ups go through the developer's relay, which it must be able to reach even in the relay's account.
+        carried.vars["WAKE_RELAY_URL"] shouldStartWith "https://"
+        carried.compatibilityFlags shouldContain "global_fetch_strictly_public"
         carried.module.decodeToString() shouldContain "PairMailbox"
     }
 

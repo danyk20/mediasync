@@ -86,6 +86,7 @@ data class ReceiverState(
  * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule.
  */
 @Singleton
+@Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
 class ConsumerReceiver internal constructor(
     private val identity: IdentityProvider,
     private val peers: PeerStore,
@@ -97,6 +98,8 @@ class ConsumerReceiver internal constructor(
     private val preferredPort: Int,
     /** A direct link closes after this long without a session over it (or anywhere). */
     private val directLinkIdleMillis: Long = DIRECT_LINK_IDLE_MILLIS,
+    /** Listening over the internet through this Worker, started or again: wake-ups may be checked. */
+    private val onInternet: (worker: String) -> Unit = {},
 ) {
     @Inject
     constructor(
@@ -107,7 +110,8 @@ class ConsumerReceiver internal constructor(
         device: DeviceInfo,
         network: Connectivity,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(identity, peers, ledger, sink, device, network, scope, PREFERRED_PORT)
+        wakeUps: WakeUpCheck,
+    ) : this(identity, peers, ledger, sink, device, network, scope, PREFERRED_PORT, onInternet = wakeUps::checkIfDue)
 
     private val addresses = network.addresses
     private val discovery = network.discovery
@@ -218,7 +222,10 @@ class ConsumerReceiver internal constructor(
         overInternet?.second?.close()
         overInternet = wanted?.let { it to internet.listen(it.worker, it.pairs, ::serveOverInternet) }
         _state.update { it.copy(overInternet = wanted != null) }
-        if (wanted != null) Diagnostics.log(Area.RECEIVE, "Internet: listening for ${pairs.size} sending phones")
+        if (wanted != null) {
+            Diagnostics.log(Area.RECEIVE, "Internet: listening for ${pairs.size} sending phones")
+            onInternet(wanted.worker)
+        }
     }
 
     private fun stopListeningOverInternet() = synchronized(internetLock) {

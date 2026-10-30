@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.feature.consumer
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -169,6 +170,23 @@ class ConsumerHomeScreenTest {
     fun screenshot_storageFull_light() {
         show(ConsumerHomeUiState(listening = true, storageFull = true, waitingForSpace = 40, askBattery = true))
         composeRule.onRoot().captureScreenshot("consumer_home_storage_full_light")
+    }
+
+    @Test
+    fun wakeUpsThatDontGetThrough_sayWhyAndLeadToInternetSync() {
+        show(ConsumerHomeUiState(listening = true, internetSync = true, wakeUpProblem = PROBLEM))
+
+        composeRule.onNodeWithText("Sending phones can't wake this phone").assertIsDisplayed()
+        composeRule.onNodeWithText(PROBLEM, substring = true).assertIsDisplayed()
+        // The notice's button comes before the row of the same name.
+        composeRule.onAllNodes(hasText("Internet sync") and hasClickAction())[0].performClick()
+        events shouldBe listOf("internet")
+    }
+
+    @Test
+    fun screenshot_wakeUpsFailing_light() {
+        show(ConsumerHomeUiState(listening = true, internetSync = true, wakeUpProblem = PROBLEM))
+        composeRule.onRoot().captureScreenshot("consumer_home_wake_ups_failing_light")
     }
 
     @Test
@@ -362,8 +380,13 @@ class ConsumerHomeScreenTest {
                     onDismissTurbo = { events += "dismiss turbo" },
                     onStartTurboReceive = { events += "turbo receive" },
                     onStopTurboReceive = { events += "stop turbo receive" },
+                    onSetUpInternet = { events += "internet" },
                 )
             }
         }
+    }
+
+    private companion object {
+        const val PROBLEM = "wake_relay_failed: The wake relay answered HTTP 404 (Cloudflare error 1042)"
     }
 }

@@ -152,6 +152,7 @@ private fun Progress(step: SetupStep) {
                 SetupStep.SCHEDULE -> R.string.consumer_cloudflare_progress_schedule
                 SetupStep.ADDRESS -> R.string.consumer_cloudflare_progress_address
                 SetupStep.STARTING -> R.string.consumer_cloudflare_progress_starting
+                SetupStep.CHECKING -> R.string.consumer_cloudflare_progress_checking
             },
         ),
         style = MaterialTheme.typography.bodyLarge,
@@ -181,6 +182,14 @@ private fun Outcome(finished: CloudflareSetup.Finished, onDismiss: () -> Unit) {
         style = MaterialTheme.typography.bodyMedium,
         color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
     )
+    // Set up, but a sending phone couldn't wake this one: it'd only reach it while MediaSync is open here.
+    ((result as? SetupResult.Done)?.wakeUps?.problem)?.let { problem ->
+        Text(
+            text = stringResource(R.string.consumer_cloudflare_wake_ups_failing, problem),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
     Row {
         TextButton(onClick = onDismiss) {
             Text(

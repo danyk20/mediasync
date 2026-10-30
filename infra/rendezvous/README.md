@@ -81,6 +81,11 @@ answers `POST /v1/relay/wake`, stores and logs nothing, and allows ten wake-ups 
 5. Set that address as `WAKE_RELAY_URL` in `[env.production.vars]`, run `npm run bundle:app`, and commit: the app's
    Worker carries it from then on, and households' Workers deployed (or redeployed) from it can be woken.
 
+The deployment checks the relay reaches FCM (`scripts/check-wake-relay.sh`), and so does CI every night. A household's
+Worker reaches the relay with `fetch()`, which Cloudflare refuses between Workers on the same zone (error 1042), as a
+household Worker in the relay's own account is: the `global_fetch_strictly_public` compatibility flag in
+`wrangler.toml` lets it through, and `npm run bundle:app` refuses to bundle a relay-using Worker without it.
+
 ### 5. Sign in with Cloudflare (once, in the developer's account)
 
 Without this, the receiving phone deploys a household's Worker with an API token the user creates on Cloudflare's

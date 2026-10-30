@@ -143,4 +143,10 @@
     <string name="consumer_turbo_receive_waiting_body">No telefone que envia, toque em Iniciar Turbo. Mantenha os dois telefones juntos.</string>
     <string name="consumer_turbo_receive_stop">Parar recepção Turbo</string>
     <string name="consumer_turbo_receiving_title">Recebendo de %1$s pelo Turbo</string>
+
+    <!-- Whether sending phones can wake this phone over the internet. -->
+    <string name="consumer_cloudflare_progress_checking">Verificando se os telefones que enviam conseguem acordar este telefone…</string>
+    <string name="consumer_cloudflare_wake_ups_failing">Mas os telefones que enviam não conseguem acordar este telefone: pela internet, eles só o alcançam enquanto o MediaSync estiver aberto aqui. Motivo: %1$s</string>
+    <string name="consumer_wake_ups_failing_title">Os telefones que enviam não conseguem acordar este telefone</string>
+    <string name="consumer_wake_ups_failing_body">Pela internet, eles só o alcançam enquanto o MediaSync estiver aberto aqui. Configurar a sincronização pela internet de novo pode resolver. Motivo: %1$s</string>
 </resources>

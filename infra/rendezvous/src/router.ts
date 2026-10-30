@@ -7,7 +7,7 @@ import { authenticate } from "./auth.ts";
 import type { RequestContext } from "./context.ts";
 import { deletePair, getPair, openSignaling, registerPair } from "./handlers/pairs.ts";
 import { getRelayUsage, iceServers, reportRelayUsage, updateRelaySettings } from "./handlers/relay.ts";
-import { relayedWake, wake } from "./handlers/wake.ts";
+import { relayedWake, wake, wakeCheck } from "./handlers/wake.ts";
 import { ApiError, errorResponse, json, readBody } from "./http.ts";
 import { isPairId } from "./identity.ts";
 import { clientKey, enforceLimit } from "./rate-limit.ts";
@@ -34,6 +34,7 @@ const ROUTES: Route[] = [
     { pattern: new RegExp(`^/v1/pairs/${PAIR}/signal$`), methods: { GET: openSignaling } },
     { pattern: new RegExp(`^/v1/pairs/${PAIR}/ice-servers$`), methods: { POST: iceServers } },
     { pattern: new RegExp(`^/v1/pairs/${PAIR}/wake$`), methods: { POST: wake } },
+    { pattern: new RegExp(`^/v1/pairs/${PAIR}/wake-check$`), methods: { POST: wakeCheck } },
     { pattern: new RegExp(`^/v1/pairs/${PAIR}/relay-usage$`), methods: { GET: getRelayUsage, POST: reportRelayUsage } },
     { pattern: /^\/v1\/relay\/settings$/, methods: { PUT: updateRelaySettings } },
 ];

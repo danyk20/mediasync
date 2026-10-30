@@ -14,6 +14,11 @@
 name = "mediasync-rendezvous-dev"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
+# A household's Worker hands wake-ups to the developer's wake relay (PLAN §10.4) with fetch(). Without this flag,
+# Cloudflare refuses a fetch to another Worker on the same zone (error 1042), and a household Worker deployed in the
+# relay's own account (its workers.dev subdomain is one zone) could never wake its phone. With it, the fetch goes out
+# through Cloudflare's front door like any request from the internet. scripts/app-bundle.mjs checks it's set.
+compatibility_flags = ["global_fetch_strictly_public"]
 
 # No request logs beyond Cloudflare's defaults (PLAN §8.4): Workers Logs stays off.
 # `wrangler tail` shows live logs on demand; the Worker itself never logs IP addresses.

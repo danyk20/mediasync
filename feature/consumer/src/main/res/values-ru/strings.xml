@@ -148,4 +148,10 @@
     <string name="consumer_turbo_receive_waiting_body">На отправляющем телефоне нажмите «Запустить Turbo». Держите два телефона близко друг к другу.</string>
     <string name="consumer_turbo_receive_stop">Остановить приём Turbo</string>
     <string name="consumer_turbo_receiving_title">Получение от %1$s через Turbo</string>
+
+    <!-- Whether sending phones can wake this phone over the internet. -->
+    <string name="consumer_cloudflare_progress_checking">Проверяю, могут ли отправляющие телефоны разбудить этот телефон…</string>
+    <string name="consumer_cloudflare_wake_ups_failing">Но отправляющие телефоны не могут разбудить этот телефон, поэтому через интернет они достучатся до него, только пока здесь открыт MediaSync. Причина: %1$s</string>
+    <string name="consumer_wake_ups_failing_title">Отправляющие телефоны не могут разбудить этот телефон</string>
+    <string name="consumer_wake_ups_failing_body">Через интернет они достучатся до него, только пока здесь открыт MediaSync. Помочь может повторная настройка синхронизации через интернет. Причина: %1$s</string>
 </resources>
