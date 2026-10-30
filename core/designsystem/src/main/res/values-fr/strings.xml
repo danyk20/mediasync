@@ -35,7 +35,7 @@
     <string name="transfer_speed">%1$s/s</string>
     <string name="transfer_waiting">En attente de la connexion…</string>
     <string name="transfer_measuring">Mesure de la vitesse…</string>
-    <string name="transfer_left_soon">moins d\'une minute restante</string>
+    <string name="transfer_left_seconds">il reste environ %1$d s</string>
     <string name="transfer_left_minutes">il reste environ %1$d min</string>
     <string name="transfer_left_hours">il reste environ %1$d h %2$d min</string>
     <string name="transfer_left_whole_hours">il reste environ %1$d h</string>

@@ -40,7 +40,7 @@
     <string name="transfer_speed">%1$s/s</string>
     <string name="transfer_waiting">Очікування з\'єднання…</string>
     <string name="transfer_measuring">Вимірювання швидкості…</string>
-    <string name="transfer_left_soon">залишилося менше хвилини</string>
+    <string name="transfer_left_seconds">залишилось близько %1$d с</string>
     <string name="transfer_left_minutes">залишилось близько %1$d хв</string>
     <string name="transfer_left_hours">залишилось близько %1$d год %2$d хв</string>
     <string name="transfer_left_whole_hours">залишилось близько %1$d год</string>

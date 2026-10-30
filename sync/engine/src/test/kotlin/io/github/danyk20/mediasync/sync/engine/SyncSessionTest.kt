@@ -25,6 +25,7 @@ import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import okio.ByteString
@@ -381,6 +382,60 @@ class SyncSessionTest {
         )
 
         updates.last() shouldBe TransferProgress(2, 2, 2L * MIB + 500, 2L * MIB + 500, updates.last().currentItem)
+    }
+
+    /** Syncs, and returns the last progress each side reported: the one with the most bytes done. */
+    private fun syncWithProgress(producer: Producer, consumer: Consumer): Pair<TransferProgress, TransferProgress?> {
+        val sent = CopyOnWriteArrayList<TransferProgress>()
+        val received = CopyOnWriteArrayList<TransferProgress>()
+        val connection = ConnectionPair(producerId, consumerId)
+        runBothSides(
+            producer = {
+                ProducerSession(local, producer.source, producer.ledger, progress = { sent += it })
+                    .sync(connection.producerEnd)
+            },
+            consumer = {
+                ConsumerSession(
+                    local,
+                    consumer.registry,
+                    consumer.ledger,
+                    consumer.sink,
+                    FakePairingGate(TOKEN),
+                    progress = { received += it },
+                ).serve(connection.consumerEnd)
+            },
+        )
+        return sent.maxBy { it.bytesDone } to received.maxByOrNull { it.bytesDone }
+    }
+
+    @Test
+    fun `the part of a resumed file the consumer kept is done, but didn't move`() {
+        val big = media("video", 5 * MIB)
+        val producer = Producer(listOf(big))
+        val consumer = Consumer()
+        sync(producer, consumer, Faults(cutAfter = 3L * MIB))
+        val kept = consumer.sink.partialSize(producerId, big.descriptor.fingerprint)
+
+        val (sent, received) = syncWithProgress(producer, consumer)
+
+        sent.bytesDone shouldBe 5L * MIB
+        sent.bytesSkipped shouldBe kept
+        received!!.bytesSkipped shouldBe kept
+        received.bytesMoved shouldBe 5L * MIB - kept
+    }
+
+    @Test
+    fun `files that aren't sent after all are done, but didn't move`() {
+        val had = listOf(media("a", 1000), media("b", 2000))
+        val consumer = Consumer(FakeMediaSink(availableBytes = 10_000))
+        sync(Producer(had), consumer)
+        // Reinstalled: the producer offers again what the consumer has, and one more that doesn't fit.
+        val reinstalled = Producer(had + media("c", 500) + media("large", 50_000))
+
+        val (sent, _) = syncWithProgress(reinstalled, consumer)
+
+        sent.bytesDone shouldBe sent.bytesTotal // Nothing is left: the time left can reach 0.
+        sent.bytesMoved shouldBe 500
     }
 
     @Test

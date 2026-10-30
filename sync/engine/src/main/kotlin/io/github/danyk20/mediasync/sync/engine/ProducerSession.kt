@@ -148,6 +148,7 @@ class ProducerSession(
         private var nextOfferId = 0
         private var itemsDone = 0
         private var bytesDone = 0L
+        private var bytesSkipped = 0L
         private var sent = 0
         private var alreadyOnConsumer = 0
         private var failed = 0
@@ -199,6 +200,9 @@ class ProducerSession(
             if (offered.isEmpty()) return
             channel.send(Offer(offered.map { (id, prepared) -> prepared.descriptor.toOfferItem(id) }))
             val response = awaitResponse()
+            // Deferred: offered again next time, so not part of this sync's time left.
+            val answered = (response.want.map { it.offerId } + response.have.map { it.offerId }).toSet()
+            offered.filterKeys { it !in answered }.values.forEach { skip(it.item) }
 
             for (have in response.have) {
                 val prepared =
@@ -206,6 +210,7 @@ class ProducerSession(
                 ledger.markSent(consumer, prepared.descriptor.fingerprint, have.contentId)
                 source.confirmed(prepared.item)
                 count { alreadyOnConsumer++ }
+                skip(prepared.item)
                 completeItem(prepared.item)
             }
             for (want in response.want) {
@@ -217,6 +222,7 @@ class ProducerSession(
                     offered[want.offerId] ?: throw ProtocolException("WANT for unknown offer ${want.offerId}")
                 if (!sendFile(want.offerId, prepared, want.resumeOffset)) {
                     count { failed++ }
+                    skip(prepared.item)
                     completeItem(prepared.item)
                 }
             }
@@ -229,6 +235,7 @@ class ProducerSession(
             val redaction = plan(item)
             if (redaction == null || redaction is Redaction.Withheld) {
                 count { if (redaction == null) failed++ else withheld++ } // Unreadable now: offered again next time.
+                skip(item)
                 completeItem(item)
                 return null
             }
@@ -302,7 +309,10 @@ class ProducerSession(
                 digest.update(buffer, 0, n)
                 remaining -= n
             }
-            count { bytesDone += offset }
+            count {
+                bytesDone += offset
+                bytesSkipped += offset
+            }
         }
 
         /** The replies' thread: confirmations update the session; offer responses go to the sending thread. */
@@ -359,6 +369,12 @@ class ProducerSession(
 
         private inline fun count(update: () -> Unit) = lock.withLock { update() }
 
+        /** [item] isn't sent in this sync after all: its bytes are done, without moving. */
+        private fun skip(item: SourceItem) = count {
+            bytesDone += item.descriptor.size
+            bytesSkipped += item.descriptor.size
+        }
+
         private fun completeItem(item: SourceItem) {
             count { itemsDone++ }
             report(item)
@@ -366,7 +382,14 @@ class ProducerSession(
 
         private fun report(item: SourceItem) {
             val snapshot = lock.withLock {
-                TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, item.descriptor.displayName)
+                TransferProgress(
+                    itemsDone,
+                    itemsTotal,
+                    bytesDone,
+                    bytesTotal,
+                    item.descriptor.displayName,
+                    bytesSkipped,
+                )
             }
             progress.onProgress(snapshot)
         }

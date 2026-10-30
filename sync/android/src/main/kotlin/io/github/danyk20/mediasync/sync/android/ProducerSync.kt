@@ -229,10 +229,12 @@ class ProducerSync @Inject constructor(
     private val estimator = TransferEstimator()
 
     /**
-     * The bytes this sync has moved, over every connection it used: Wi-Fi, then Turbo after a swap. Each one's
-     * progress starts at 0; for the speed, they're one transfer.
+     * The bytes this sync has done, over every connection it used: Wi-Fi, then Turbo after a swap, and of them the
+     * skipped ones ([TransferProgress.bytesSkipped]). Each one's progress starts at 0; for the speed, they're one
+     * transfer.
      */
-    private val moved = AtomicLong()
+    private val done = AtomicLong()
+    private val skipped = AtomicLong()
     private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
 
     /** The speed every second of the sync running now, or of the last one, for its chart. */
@@ -260,7 +262,8 @@ class ProducerSync @Inject constructor(
         cancelled = false
         this.pauseWhen = pauseWhen
         estimator.reset()
-        moved.set(0)
+        done.set(0)
+        skipped.set(0)
         _state.value = ProducerState.Connecting
         return scope.launch(Dispatchers.IO) {
             val estimates = launch { refreshEstimate() }
@@ -490,10 +493,18 @@ class ProducerSync @Inject constructor(
             return { item -> item.descriptor.mimeType.startsWith("video/") }
         }
 
-        /** Shows [progress] over [path]; [before]: what this sync moved over the connections it used before. */
-        private fun show(progress: TransferProgress, path: Path, before: Long) {
-            moved.accumulateAndGet(before + progress.bytesDone, ::maxOf)
-            val all = progress.copy(bytesDone = before + progress.bytesDone, bytesTotal = before + progress.bytesTotal)
+        /**
+         * Shows [progress] over [path]; [before] and [skippedBefore]: what this sync did over the connections it used
+         * before.
+         */
+        private fun show(progress: TransferProgress, path: Path, before: Long, skippedBefore: Long) {
+            done.accumulateAndGet(before + progress.bytesDone, ::maxOf)
+            skipped.accumulateAndGet(skippedBefore + progress.bytesSkipped, ::maxOf)
+            val all = progress.copy(
+                bytesDone = before + progress.bytesDone,
+                bytesTotal = before + progress.bytesTotal,
+                bytesSkipped = skippedBefore + progress.bytesSkipped,
+            )
             _state.value = ProducerState.Syncing(
                 progress,
                 turbo = path == Path.DIRECT,
@@ -501,7 +512,7 @@ class ProducerSync @Inject constructor(
                 estimate = estimator.update(all),
             )
             // This month's mobile data limit reached: stops after the current file.
-            if (progress.bytesDone >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
+            if (progress.bytesMoved >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
         }
 
         /** [another]: one more connection the way [connection] went, for parallel streams. */
@@ -517,7 +528,9 @@ class ProducerSync @Inject constructor(
             }
             // Over the internet, the phone's own order sends photos first: more of them arrive per minute.
             val order = order.resolved(overInternet = path == Path.INTERNET)
-            val before = moved.get() // Over the connections this sync used before this one.
+            // Over the connections this sync used before this one.
+            val before = done.get()
+            val skippedBefore = skipped.get()
             val result = ParallelSync(
                 session = { progress ->
                     ProducerSession(
@@ -531,7 +544,7 @@ class ProducerSync @Inject constructor(
                     )
                 },
                 connect = { another() },
-                progress = { progress -> show(progress, path, before) },
+                progress = { progress -> show(progress, path, before, skippedBefore) },
                 // Over the internet, one connection carries it all.
                 mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
                 holdBack = relaySaver(it),

@@ -137,8 +137,8 @@ class ConsumerReceiver internal constructor(
     private val activeSessions = AtomicInteger()
 
     /**
-     * What each producer's ended sessions of this sync brought: its speed counts all its connections, also once one
-     * of them is done before the others.
+     * The bytes each producer's ended sessions of this sync brought over the link: its speed counts all its
+     * connections, also once one of them is done before the others.
      */
     private val endedBytes = ConcurrentHashMap<DeviceId, Long>()
     private val estimators = ConcurrentHashMap<DeviceId, TransferEstimator>()
@@ -371,7 +371,7 @@ class ConsumerReceiver internal constructor(
             }
             synchronized(tally) {
                 // Its bytes stay in the producer's total: they move from its session to what ended.
-                sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesDone, Long::plus) }
+                sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesMoved, Long::plus) }
                 if (sessions.values.none { it.first == producer }) quietSince[producer] = System.currentTimeMillis()
                 val transfers = transfers()
                 _state.update { state ->
@@ -433,6 +433,7 @@ class ConsumerReceiver internal constructor(
                     bytesDone = a.bytesDone + b.bytesDone,
                     bytesTotal = a.bytesTotal + b.bytesTotal,
                     currentItem = b.currentItem ?: a.currentItem,
+                    bytesSkipped = a.bytesSkipped + b.bytesSkipped,
                 )
             }
         }

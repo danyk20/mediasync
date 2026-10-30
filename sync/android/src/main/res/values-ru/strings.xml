@@ -16,7 +16,7 @@
     <string name="sync_notification_progress">%1$d из %2$d</string>
     <string name="sync_notification_speed">%1$s/s</string>
     <string name="sync_notification_waiting">ожидание подключения</string>
-    <string name="sync_notification_left_soon">осталось меньше минуты</string>
+    <string name="sync_notification_left_seconds">осталось около %1$d с</string>
     <string name="sync_notification_left_minutes">осталось около %1$d мин</string>
     <string name="sync_notification_left_hours">осталось около %1$d ч %2$d мин</string>
     <string name="sync_notification_left_whole_hours">осталось около %1$d ч</string>

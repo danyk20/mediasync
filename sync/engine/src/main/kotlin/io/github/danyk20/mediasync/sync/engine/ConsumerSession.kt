@@ -198,6 +198,7 @@ class ConsumerSession(
         private var itemsDone = 0
         private var bytesTotal = 0L
         private var bytesDone = 0L
+        private var bytesSkipped = 0L // The kept start of resumed files: done, but not received now.
         private var received = 0
         private var alreadyHad = 0
         private var failed = 0
@@ -304,6 +305,7 @@ class ConsumerSession(
 
             init {
                 bytesDone += offset
+                bytesSkipped += offset
             }
 
             /** Takes the [byteCount] bytes just read into [buffer]. */
@@ -316,7 +318,14 @@ class ConsumerSession(
                     if (writable) writable = writeOrFail(byteCount)
                 }
                 progress.onProgress(
-                    TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, descriptor.displayName),
+                    TransferProgress(
+                        itemsDone,
+                        itemsTotal,
+                        bytesDone,
+                        bytesTotal,
+                        descriptor.displayName,
+                        bytesSkipped,
+                    ),
                 )
             }
 

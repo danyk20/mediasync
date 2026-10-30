@@ -481,9 +481,10 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
             R.string.sync_notification_speed,
             Formatter.formatShortFileSize(context, estimate.bytesPerSecond),
         )
-        val minutes = estimate.minutesLeft()?.takeIf { withTimeLeft } ?: return speed
+        val seconds = estimate.secondsLeft()?.takeIf { withTimeLeft } ?: return speed
+        val minutes = seconds / SECONDS_PER_MINUTE
         val left = when {
-            minutes == 0 -> context.getString(R.string.sync_notification_left_soon)
+            minutes == 0 -> context.getString(R.string.sync_notification_left_seconds, seconds)
 
             minutes < MINUTES_PER_HOUR -> context.getString(R.string.sync_notification_left_minutes, minutes)
 
@@ -539,6 +540,7 @@ class SyncNotifications @Inject constructor(@ApplicationContext private val cont
         const val RECEIVING_ID = 2
         const val SENT_ID = 3
         const val PROGRESS_MAX = 1000
+        const val SECONDS_PER_MINUTE = 60
         const val MINUTES_PER_HOUR = 60
 
         /** Progress notifications change at most this often; Android drops faster updates anyway. */

@@ -124,6 +124,13 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun syncing_countsTheLastMinuteInSeconds() {
+        val estimate = TransferEstimate(8_400_000, 32_000)
+        show(syncing.copy(sync = (syncing.sync as ProducerState.Syncing).copy(estimate = estimate)))
+        composeRule.onNodeWithText("8.4 MB/s · about 40 s left").assertIsDisplayed()
+    }
+
+    @Test
     fun syncing_theInfoNextToTheSpeedOpensItsChart() {
         show(syncing)
 
