@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.5](https://github.com/danyk20/mediasync/compare/v0.8.4...v0.8.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* the time left counts down steadily instead of jumping with the speed ([#77](https://github.com/danyk20/mediasync/issues/77)) ([ba27284](https://github.com/danyk20/mediasync/commit/ba27284de5d013f565c1f3f6f55f755636f402e2))
+
 ## [0.8.4](https://github.com/danyk20/mediasync/compare/v0.8.3...v0.8.4) (2026-10-19)
 
 
