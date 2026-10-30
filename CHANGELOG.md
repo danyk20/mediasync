@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/danyk20/mediasync/compare/v0.9.1...v0.9.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* **deps:** raise Guava in the build tools to 33.7.2 ([#84](https://github.com/danyk20/mediasync/issues/84)) ([ce65bee](https://github.com/danyk20/mediasync/commit/ce65bee289c45384b8bd96506309e20aff09a48c))
+
 ## [0.9.1](https://github.com/danyk20/mediasync/compare/v0.9.0...v0.9.1) (2026-10-30)
 
 
