@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/danyk20/mediasync/compare/v0.9.0...v0.9.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* wake-ups reach a receiving phone whose Worker shares the wake relay's account ([#81](https://github.com/danyk20/mediasync/issues/81)) ([c2397c1](https://github.com/danyk20/mediasync/commit/c2397c14833c8352fef3515867cabbad7b7643b6))
+
 ## [0.9.0](https://github.com/danyk20/mediasync/compare/v0.8.5...v0.9.0) (2026-10-30)
 
 
