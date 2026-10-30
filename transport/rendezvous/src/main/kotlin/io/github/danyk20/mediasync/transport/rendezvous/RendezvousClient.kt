@@ -65,6 +65,14 @@ class RendezvousClient(
         call("POST", "/v1/pairs/$pairId/wake", body, JsonObject.serializer())
     }
 
+    /**
+     * As the consumer: has the Worker send this phone a wake-up check the way a producer's wake-up goes (PLAN §10.4).
+     * Returns once FCM took it; a [RendezvousException] says why it couldn't, e.g. `wake_relay_failed`.
+     */
+    fun wakeCheck(pairId: String) {
+        call("POST", "/v1/pairs/$pairId/wake-check", JsonObject(emptyMap()), JsonObject.serializer())
+    }
+
     /** During a relayed session: the cumulative bytes of [session] (16 random bytes, base64url) so far. */
     fun reportRelayUsage(pairId: String, session: String, relayedBytes: Long): RelayMeter {
         val body = buildJsonObject {

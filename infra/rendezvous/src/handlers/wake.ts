@@ -48,7 +48,10 @@ function sender(env: Env): Sender {
     throw new ApiError(503, "push_not_configured", "This rendezvous has no FCM service account or wake relay");
 }
 
-/** Hands the wake-up to the wake relay at [relayUrl] (`POST /v1/relay/wake`). */
+/**
+ * Hands the wake-up to the wake relay at [relayUrl] (`POST /v1/relay/wake`). FCM's own answer comes back as an
+ * outcome; when the relay itself can't be used, `wake_relay_failed` says why, so the sending phone's log does too.
+ */
 async function relayWake(
     relayUrl: string,
     token: string,
@@ -62,13 +65,34 @@ async function relayWake(
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ token, data, collapseKey }),
         });
-    } catch {
-        return "failed";
+    } catch (error) {
+        const reason = error instanceof Error ? error.message : "unknown error";
+        throw new ApiError(502, "wake_relay_failed", `The wake relay couldn't be reached: ${reason}`);
     }
     if (response.ok) return "sent";
     if (response.status === 410) return "unregistered";
-    return "failed";
+    const answer = await relayAnswer(response);
+    if (answer === "push_failed") return "failed"; // The relay works; FCM didn't take the message.
+    throw new ApiError(502, "wake_relay_failed", `The wake relay answered HTTP ${response.status} (${answer})`);
 }
+
+/**
+ * What a failing relay said: its error code, or Cloudflare's own, such as `error code: 1042` for a fetch to a Worker on
+ * the same zone that Cloudflare refused.
+ */
+async function relayAnswer(response: Response): Promise<string> {
+    const text = (await response.text()).slice(0, MAX_ANSWER_LENGTH);
+    try {
+        const code = (JSON.parse(text) as { error?: { code?: unknown } }).error?.code;
+        if (typeof code === "string") return code;
+    } catch {
+        // Not the relay's JSON: an error page of Cloudflare's.
+    }
+    const cloudflare = /error code:?\s*(\d+)/i.exec(text);
+    return cloudflare ? `Cloudflare error ${cloudflare[1]}` : "no explanation";
+}
+
+const MAX_ANSWER_LENGTH = 2048;
 
 /**
  * `POST /v1/pairs/{pairId}/wake`: the producer asks the Worker to wake the consumer (PLAN §10.4).
@@ -87,7 +111,27 @@ export async function wake(context: RequestContext): Promise<Response> {
     const data: Record<string, string> = { type: "wake", v: "1", pair: context.pairId };
     if (payload !== undefined) data.payload = payload;
 
-    const outcome = await send(token, data, `wake-${pairTag(context.pairId)}`);
+    return delivered(pair, token, await send(token, data, `wake-${pairTag(context.pairId)}`));
+}
+
+/**
+ * `POST /v1/pairs/{pairId}/wake-check`: the consumer checks that wake-ups reach it, as a producer's would: the same
+ * way out (FCM, or the wake relay) to its own token. It receives `{"type": "wake-check", "v": "1", "pair": "<pair ID>"}`,
+ * which wakes nothing. Answers like a wake-up.
+ */
+export async function wakeCheck(context: RequestContext): Promise<Response> {
+    const send = sender(context.env);
+    const pair = pairStub(context.env, context.pairId);
+    const { token } = unwrap(await pair.claimWakeCheck(caller(context), context.now));
+    const data = { type: "wake-check", v: "1", pair: context.pairId };
+    return delivered(pair, token, await send(token, data, `check-${pairTag(context.pairId)}`));
+}
+
+async function delivered(
+    pair: ReturnType<typeof pairStub>,
+    token: string,
+    outcome: WakeOutcome,
+): Promise<Response> {
     switch (outcome) {
         case "sent":
             return json({ sent: true });

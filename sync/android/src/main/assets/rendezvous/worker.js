@@ -672,6 +672,7 @@ var MAX_QUEUED_MESSAGES = 64;
 var MAX_QUEUED_BYTES = 256 * 1024;
 var MAX_MESSAGES_PER_MINUTE = 120;
 var WAKE_MIN_INTERVAL_MILLIS = 20 * 1e3;
+var WAKE_CHECK_MIN_INTERVAL_MILLIS = 60 * 1e3;
 var CLOSE_REPLACED = 4001;
 var CLOSE_UNPAIRED = 4003;
 var CLOSE_POLICY = 1008;
@@ -752,6 +753,27 @@ var PairMailbox = class extends DurableObject2 {
       return fail(429, "wake_throttled", "A wake-up was sent moments ago", { "retry-after": `${retryAfter}` });
     }
     record.lastWakeAt = now;
+    await this.ctx.storage.put(PAIR_KEY, record);
+    return ok({ token: record.fcmToken });
+  }
+  /**
+   * Claims a wake-up check for the consumer: returns its own FCM token, or why there's none to check. One a minute:
+   * the phone checks once a day, and when it's set up.
+   */
+  async claimWakeCheck(caller2, now = Date.now()) {
+    this.ensureSchema();
+    const record = await this.record();
+    const checked = this.check(record, caller2, "consumer", now);
+    if (!checked.ok) return checked;
+    if (!record?.fcmToken) {
+      return fail(409, "no_push_token", "The consumer hasn't registered for wake-ups");
+    }
+    const sinceLast = now - (record.lastWakeCheckAt ?? 0);
+    if (sinceLast < WAKE_CHECK_MIN_INTERVAL_MILLIS) {
+      const retryAfter = Math.ceil((WAKE_CHECK_MIN_INTERVAL_MILLIS - sinceLast) / 1e3);
+      return fail(429, "wake_throttled", "A wake-up check was sent moments ago", { "retry-after": `${retryAfter}` });
+    }
+    record.lastWakeCheckAt = now;
     await this.ctx.storage.put(PAIR_KEY, record);
     return ok({ token: record.fcmToken });
   }
@@ -1291,14 +1313,29 @@ async function relayWake(relayUrl, token, data, collapseKey) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token, data, collapseKey })
     });
-  } catch {
-    return "failed";
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown error";
+    throw new ApiError(502, "wake_relay_failed", `The wake relay couldn't be reached: ${reason}`);
   }
   if (response.ok) return "sent";
   if (response.status === 410) return "unregistered";
-  return "failed";
+  const answer = await relayAnswer(response);
+  if (answer === "push_failed") return "failed";
+  throw new ApiError(502, "wake_relay_failed", `The wake relay answered HTTP ${response.status} (${answer})`);
 }
 __name(relayWake, "relayWake");
+async function relayAnswer(response) {
+  const text = (await response.text()).slice(0, MAX_ANSWER_LENGTH);
+  try {
+    const code = JSON.parse(text).error?.code;
+    if (typeof code === "string") return code;
+  } catch {
+  }
+  const cloudflare = /error code:?\s*(\d+)/i.exec(text);
+  return cloudflare ? `Cloudflare error ${cloudflare[1]}` : "no explanation";
+}
+__name(relayAnswer, "relayAnswer");
+var MAX_ANSWER_LENGTH = 2048;
 async function wake(context) {
   const body = parseJsonObject(context.body);
   const payload = optionalString(body, "payload", MAX_PAYLOAD_LENGTH);
@@ -1308,7 +1345,18 @@ async function wake(context) {
   const { token } = unwrap(await pair.claimWake(caller(context), context.now));
   const data = { type: "wake", v: "1", pair: context.pairId };
   if (payload !== void 0) data.payload = payload;
-  const outcome = await send(token, data, `wake-${pairTag(context.pairId)}`);
+  return delivered(pair, token, await send(token, data, `wake-${pairTag(context.pairId)}`));
+}
+__name(wake, "wake");
+async function wakeCheck(context) {
+  const send = sender(context.env);
+  const pair = pairStub(context.env, context.pairId);
+  const { token } = unwrap(await pair.claimWakeCheck(caller(context), context.now));
+  const data = { type: "wake-check", v: "1", pair: context.pairId };
+  return delivered(pair, token, await send(token, data, `check-${pairTag(context.pairId)}`));
+}
+__name(wakeCheck, "wakeCheck");
+async function delivered(pair, token, outcome) {
   switch (outcome) {
     case "sent":
       return json({ sent: true });
@@ -1319,7 +1367,7 @@ async function wake(context) {
       throw new ApiError(502, "push_failed", "FCM didn't accept the wake-up; try again later");
   }
 }
-__name(wake, "wake");
+__name(delivered, "delivered");
 var MAX_TOKEN_LENGTH = 4096;
 var MAX_DATA_ENTRIES = 8;
 var MAX_DATA_LENGTH = 3072;
@@ -1367,6 +1415,7 @@ var ROUTES = [
   { pattern: new RegExp(`^/v1/pairs/${PAIR}/signal$`), methods: { GET: openSignaling } },
   { pattern: new RegExp(`^/v1/pairs/${PAIR}/ice-servers$`), methods: { POST: iceServers } },
   { pattern: new RegExp(`^/v1/pairs/${PAIR}/wake$`), methods: { POST: wake } },
+  { pattern: new RegExp(`^/v1/pairs/${PAIR}/wake-check$`), methods: { POST: wakeCheck } },
   { pattern: new RegExp(`^/v1/pairs/${PAIR}/relay-usage$`), methods: { GET: getRelayUsage, POST: reportRelayUsage } },
   { pattern: /^\/v1\/relay\/settings$/, methods: { PUT: updateRelaySettings } }
 ];

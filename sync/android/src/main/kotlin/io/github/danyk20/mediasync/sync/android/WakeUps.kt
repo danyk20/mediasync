@@ -96,10 +96,18 @@ class WakeUpService : FirebaseMessagingService() {
     @Inject
     lateinit var tokens: PushTokens
 
+    @Inject
+    lateinit var wakeUps: WakeUpCheck
+
     override fun onMessageReceived(message: RemoteMessage) {
-        if (message.data["type"] != "wake") return
-        Diagnostics.log(Area.RECEIVE, "Internet: woken by a sending phone")
-        scheduler.receiveNow()
+        when (message.data["type"]) {
+            "wake" -> {
+                Diagnostics.log(Area.RECEIVE, "Internet: woken by a sending phone")
+                scheduler.receiveNow()
+            }
+
+            "wake-check" -> wakeUps.arrived() // Wakes nothing: it only shows the way works.
+        }
     }
 
     /** A new token, or a renewed one: the Worker must know it, and listening again registers it there. */

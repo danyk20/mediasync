@@ -90,6 +90,8 @@ class AndroidInternetLinks @Inject internal constructor(
             )
         }.also(alerts::check) // Whenever the meter is read: the user hears when it runs low.
 
+    override fun wakeCheck(worker: String, producer: DeviceId) = receiving.wakeCheck(URI(worker), producer)
+
     private fun path(area: Area) = InternetPath(signer, links, log = { message, error ->
         val entry = "Internet: $message"
         if (error == null) Diagnostics.log(area, entry) else Diagnostics.log(area, entry, error)

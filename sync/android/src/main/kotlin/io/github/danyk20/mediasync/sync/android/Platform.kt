@@ -122,6 +122,14 @@ interface InternetLinks {
      */
     fun relayUsage(worker: String, producer: DeviceId): RelayUsage
 
+    /**
+     * As a receiving phone: has its Worker at [worker] send it a wake-up check, as the pair with [producer], the way a
+     * sending phone's wake-up goes (docs/PLAN.md §10.4). Blocks until FCM took it.
+     *
+     * @throws IOException if it couldn't; a `RendezvousException` carries the Worker's reason.
+     */
+    fun wakeCheck(worker: String, producer: DeviceId): Unit = throw IOException("No internet sync")
+
     /** Without internet sync. */
     object None : InternetLinks {
         override fun allowed() = false

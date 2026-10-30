@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestContext } from "../src/context.ts";
 import { base64UrlDecode, utf8 } from "../src/encoding.ts";
 import { clearAccessTokenCache, FCM_SCOPE } from "../src/fcm.ts";
-import { relayedWake, wake } from "../src/handlers/wake.ts";
+import { relayedWake, wake, wakeCheck } from "../src/handlers/wake.ts";
 import { pairTag } from "../src/identity.ts";
 import type { PairRecord } from "../src/pair-mailbox.ts";
 import type { Pair } from "./support/worker.ts";
@@ -228,6 +228,76 @@ describe("POST /v1/pairs/{pairId}/wake", () => {
     });
 });
 
+describe("POST /v1/pairs/{pairId}/wake-check", () => {
+    async function checkRequest(pair: Pair) {
+        return send(await pair.consumer.request("POST", `/v1/pairs/${pair.pairId}/wake-check`));
+    }
+
+    it("sends the consumer a check the way a wake-up would go, which wakes nothing", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        const { requests } = fakeGoogle({ tokenRequests: 0, fcmStatus: [] });
+
+        const response = await checkRequest(pair);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ sent: true });
+        const message = (requests.find((r) => r.url === FCM_URL)!.json() as { message: Record<string, unknown> }).message;
+        expect(message).toMatchObject({
+            token: "fcm-token-1",
+            data: { type: "wake-check", v: "1", pair: pair.pairId },
+            android: { priority: "HIGH", collapse_key: `check-${pairTag(pair.pairId)}` },
+        });
+        // A producer's wake-up isn't held back by it.
+        expect((await record(pair.pairId))?.lastWakeAt).toBeUndefined();
+    });
+
+    it("is for the consumer only, once a minute", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        fakeGoogle({ tokenRequests: 0, fcmStatus: [] });
+
+        const producer = await send(await pair.producer.request("POST", `/v1/pairs/${pair.pairId}/wake-check`));
+        expect(producer.status).toBe(403);
+        expect((await checkRequest(pair)).status).toBe(200);
+        const again = await checkRequest(pair);
+        expect(again.status).toBe(429);
+        expect(await errorCode(again)).toBe("wake_throttled");
+    });
+
+    it("says when FCM no longer knows the token, and forgets it", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        fakeGoogle({ tokenRequests: 0, fcmStatus: [404], fcmBody: JSON.stringify({ error: { status: "UNREGISTERED" } }) });
+
+        const response = await checkRequest(pair);
+
+        expect(response.status).toBe(410);
+        expect(await errorCode(response)).toBe("push_token_unregistered");
+        expect((await record(pair.pairId))?.fcmToken).toBeUndefined();
+    });
+
+    it("needs a token to check", async () => {
+        const pair = await registeredPair();
+        const response = await checkRequest(pair);
+        expect(response.status).toBe(409);
+        expect(await errorCode(response)).toBe("no_push_token");
+    });
+});
+
+/** The consumer's wake-up check, handled by a Worker with [overrides] to its bindings. */
+async function wakeCheckWith(pair: Pair, overrides: Partial<Env>) {
+    const request = await pair.consumer.request("POST", `/v1/pairs/${pair.pairId}/wake-check`);
+    const context: RequestContext = {
+        request,
+        env: { ...env, ...overrides },
+        ctx: {} as ExecutionContext,
+        url: new URL(request.url),
+        body: new Uint8Array(),
+        device: { id: pair.consumer.id, nonce: request.headers.get("x-mediasync-nonce")!, timestamp: 0 },
+        pairId: pair.pairId,
+        now: Date.now(),
+    };
+    return wakeCheck(context);
+}
+
 /** The producer's wake request, handled by a Worker with [overrides] to its bindings. */
 async function wakeWith(pair: Pair, overrides: Partial<Env>) {
     const request = await pair.producer.request("POST", `/v1/pairs/${pair.pairId}/wake`);
@@ -285,6 +355,51 @@ describe("a household's Worker, without an FCM service account", () => {
             code: "push_token_unregistered",
         });
         expect((await record(pair.pairId))?.fcmToken).toBeUndefined();
+    });
+
+    it("says why the relay couldn't be used, such as Cloudflare refusing a Worker on the same zone", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        mockFetch(() => new Response("error code: 1042", { status: 404 }));
+
+        await expect(wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay })).rejects.toMatchObject({
+            status: 502,
+            code: "wake_relay_failed",
+            message: "The wake relay answered HTTP 404 (Cloudflare error 1042)",
+        });
+        expect((await record(pair.pairId))?.fcmToken).toBe("fcm-token-1"); // Not the token's fault.
+    });
+
+    it("says when the relay can't be reached at all", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        mockFetch(() => {
+            throw new TypeError("Network connection lost.");
+        });
+
+        await expect(wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay })).rejects.toMatchObject({
+            status: 502,
+            code: "wake_relay_failed",
+            message: "The wake relay couldn't be reached: Network connection lost.",
+        });
+    });
+
+    it("passes on what the relay says, when it's FCM that failed", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        mockFetch(() => jsonResponse({ error: { code: "push_failed", message: "FCM didn't accept" } }, 502));
+
+        await expect(wakeWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay })).rejects.toMatchObject({
+            status: 502,
+            code: "push_failed",
+        });
+    });
+
+    it("checks wake-ups through the relay too", async () => {
+        const pair = await registeredPair("fcm-token-1");
+        const { requests } = mockFetch(() => jsonResponse({ sent: true }));
+
+        const response = await wakeCheckWith(pair, { FCM_SERVICE_ACCOUNT: "", WAKE_RELAY_URL: relay });
+
+        expect(await response.json()).toEqual({ sent: true });
+        expect(requests[0]!.json()).toMatchObject({ token: "fcm-token-1", data: { type: "wake-check" } });
     });
 
     it("says wake-ups aren't set up without a relay either", async () => {

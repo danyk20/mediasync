@@ -30,6 +30,7 @@ class WorkerDeployerTest {
         rateLimits = listOf(WorkerScript.RateLimit("IP_LIMITER", "1001", limit = 120, periodSeconds = 60)),
         crons = listOf("*/15 * * * *"),
         migrationTag = "v1",
+        compatibilityFlags = listOf("global_fetch_strictly_public"),
     )
     private val sent = mutableListOf<HttpRequest>()
 
@@ -83,6 +84,8 @@ class WorkerDeployerTest {
         val metadata = metadata()
         metadata.getValue("main_module").jsonPrimitive.content shouldBe "worker.js"
         metadata.getValue("compatibility_date").jsonPrimitive.content shouldBe "2026-10-01"
+        // Without it, a Worker in the wake relay's own account can't reach the relay (Cloudflare error 1042).
+        metadata.getValue("compatibility_flags").toString() shouldBe """["global_fetch_strictly_public"]"""
         metadata.getValue("observability").toString() shouldBe """{"enabled":false}"""
         metadata.getValue("migrations").toString() shouldBe
             """{"new_tag":"v1","steps":[{"new_sqlite_classes":["PairMailbox","UsageMeter"]}]}"""
@@ -223,7 +226,7 @@ class WorkerDeployerTest {
     @Test
     fun theBundleStepsManifestDescribesTheScript() {
         val manifest = """
-            {"compatibilityDate":"2026-10-01","migrationTag":"v1",
+            {"compatibilityDate":"2026-10-01","compatibilityFlags":["global_fetch_strictly_public"],"migrationTag":"v1",
              "durableObjects":{"PAIRS":"PairMailbox","METER":"UsageMeter"},
              "rateLimits":[{"name":"IP_LIMITER","namespaceId":"1001","limit":120,"period":60}],
              "vars":{"RELAY_BUDGET_GB":"950"},"crons":["*/15 * * * *"],"comment":"from wrangler.toml"}
@@ -240,6 +243,13 @@ class WorkerDeployerTest {
         ) shouldBe
             listOf(script.compatibilityDate, script.migrationTag, script.durableObjects, script.rateLimits, script.vars)
         parsed.crons shouldBe script.crons
+        parsed.compatibilityFlags shouldBe script.compatibilityFlags
+        // An older bundle step wrote none.
+        WorkerScript.of(
+            script.module,
+            manifest.replace(""""compatibilityFlags":["global_fetch_strictly_public"],""", ""),
+        )
+            .compatibilityFlags shouldBe emptyList()
     }
 
     @Test

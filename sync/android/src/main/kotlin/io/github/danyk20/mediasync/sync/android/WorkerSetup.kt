@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Where setting up internet sync is (docs/PLAN.md §8.4), as the screen shows it. */
-enum class SetupStep { ACCOUNT, RELAY, UPLOAD, SCHEDULE, ADDRESS, STARTING }
+enum class SetupStep { ACCOUNT, RELAY, UPLOAD, SCHEDULE, ADDRESS, STARTING, CHECKING }
 
 /** Why setting up internet sync didn't work. */
 enum class SetupFailure {
@@ -53,8 +53,11 @@ enum class SetupFailure {
 }
 
 sealed interface SetupResult {
-    /** Internet sync is on, through the Worker at [url]; [relay]: with Cloudflare's relay. */
-    data class Done(val url: String, val relay: Boolean) : SetupResult
+    /**
+     * Internet sync is on, through the Worker at [url]; [relay]: with Cloudflare's relay. [wakeUps]: whether sending
+     * phones can wake this phone through it; `null` if that couldn't be told yet.
+     */
+    data class Done(val url: String, val relay: Boolean, val wakeUps: WakeUpStatus? = null) : SetupResult
 
     data class Failed(val reason: SetupFailure, val detail: String? = null) : SetupResult
 }
@@ -72,13 +75,25 @@ class WorkerSetup internal constructor(
     private val receiver: ConsumerReceiver,
     private val startTimeoutMillis: Long = START_TIMEOUT_MILLIS,
     private val pollMillis: Long = POLL_MILLIS,
+    /** Checks that sending phones can wake this phone through the new Worker at the given address. */
+    private val checkWakeUps: suspend (String) -> WakeUpStatus? = { null },
 ) {
     @Inject
     constructor(
         @ApplicationContext context: Context,
         settings: SettingsRepository,
         receiver: ConsumerReceiver,
-    ) : this({ bundleIn(context) }, { token -> WorkerDeployer(token) }, settings, receiver)
+        wakeUps: WakeUpCheck,
+    ) : this(
+        { bundleIn(context) },
+        { token -> WorkerDeployer(token) },
+        settings,
+        receiver,
+        checkWakeUps = { worker ->
+            wakeUps.forget()
+            wakeUps.check(worker)
+        },
+    )
 
     private val script by lazy(bundle)
 
@@ -126,7 +141,9 @@ class WorkerSetup internal constructor(
         return if (live == null) {
             SetupResult.Failed(SetupFailure.NOT_STARTED)
         } else {
-            SetupResult.Done(deployment.url, deployment.relay)
+            // A wake-up that can't get through shows now, not when a sending phone waits for this one in vain.
+            onStep(SetupStep.CHECKING)
+            SetupResult.Done(deployment.url, deployment.relay, checkWakeUps(deployment.url))
         }
     }
 

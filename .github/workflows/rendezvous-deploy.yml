@@ -81,3 +81,8 @@ jobs:
             exit 1
           fi
           printf '%s' "$FCM_SERVICE_ACCOUNT" | npx wrangler secret put FCM_SERVICE_ACCOUNT --env wake-relay
+      # Deployed and given its secret: it must reach FCM now, or every household's wake-ups fail (PLAN §10.4).
+      - if: steps.credentials.outputs.ready == 'true' && env.TARGET == 'wake-relay'
+        name: Check the wake relay reaches FCM
+        working-directory: infra/rendezvous
+        run: scripts/check-wake-relay.sh

@@ -45,6 +45,7 @@ data class Fact(val label: String, val value: String)
  * names no files, places or people.
  */
 @Singleton
+@Suppress("LongParameterList") // Injected collaborators, one each.
 class DiagnosticsReport @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
@@ -55,6 +56,7 @@ class DiagnosticsReport @Inject constructor(
     private val workManager: WorkManager,
     private val log: FileDiagnosticLog,
     private val clock: Clock,
+    private val wakeUps: WakeUpCheck,
 ) {
     private val setup = BackgroundSetup(context)
 
@@ -102,12 +104,20 @@ class DiagnosticsReport @Inject constructor(
             )
         }
 
-        DeviceRole.CONSUMER -> listOf(
+        DeviceRole.CONSUMER -> listOfNotNull(
             Fact("Receives from", peers.observeAll().first().count { it.role == DeviceRole.PRODUCER }.toString()),
             Fact("Schedule", settings.syncSchedule.first().encode()),
+            settings.rendezvousUrl.first()?.let { Fact("Wake-ups", wakeUps()) },
         )
 
         null -> emptyList()
+    }
+
+    /** Whether sending phones can wake this phone over the internet, as last checked (docs/PLAN.md §10.4). */
+    private fun wakeUps(): String {
+        val status = wakeUps.status.value ?: return "not checked yet"
+        val found = if (status.working) "work" else "don't work: ${status.problem}"
+        return "$found (checked ${at(status.checkedAtMillis)})"
     }
 
     /** What this phone can link up directly with (docs/PLAN.md §8.3). */

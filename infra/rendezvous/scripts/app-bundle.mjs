@@ -22,6 +22,7 @@ const config = unstable_readConfig({ config: "wrangler.toml", env: ENV });
 const migrations = config.migrations ?? [];
 const manifest = {
     compatibilityDate: config.compatibility_date,
+    compatibilityFlags: config.compatibility_flags ?? [],
     migrationTag: migrations.at(-1)?.tag,
     durableObjects: Object.fromEntries(config.durable_objects.bindings.map((it) => [it.name, it.class_name])),
     rateLimits: (config.ratelimits ?? []).map((it) => ({
@@ -34,6 +35,11 @@ const manifest = {
     crons: config.triggers?.crons ?? [],
 };
 if (!manifest.migrationTag) throw new Error("wrangler.toml has no Durable Object migration");
+// A household's Worker deployed in the wake relay's own account couldn't fetch it without this (error 1042): its
+// phone would never be woken, and only a failed wake-up would tell.
+if (manifest.vars.WAKE_RELAY_URL && !manifest.compatibilityFlags.includes("global_fetch_strictly_public")) {
+    throw new Error("A Worker that uses the wake relay needs the global_fetch_strictly_public compatibility flag");
+}
 
 const bundleDir = mkdtempSync(join(tmpdir(), "mediasync-worker-"));
 try {

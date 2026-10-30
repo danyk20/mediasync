@@ -75,6 +75,9 @@
     <string name="consumer_cloudflare_progress_schedule">Scheduling the relay meter…</string>
     <string name="consumer_cloudflare_progress_address">Giving it an address…</string>
     <string name="consumer_cloudflare_progress_starting">Starting up. A new address can take a few minutes…</string>
+    <string name="consumer_cloudflare_progress_checking">Checking that sending phones can wake this phone…</string>
+    <!-- After "Done: internet sync is on…" when the check of wake-ups failed; %1$s: why, technical. -->
+    <string name="consumer_cloudflare_wake_ups_failing">But sending phones can\'t wake this phone, so over the internet they reach it only while MediaSync is open here. Why: %1$s</string>
     <string name="consumer_cloudflare_done">Done: internet sync is on, through your own Worker.</string>
     <string name="consumer_cloudflare_done_no_relay">Done, without the relay: the token may not set it up, so phones that can\'t connect directly won\'t sync over the internet. To add it, create a token that may also edit Realtime, and set up again.</string>
     <string name="consumer_cloudflare_invalid_token">Cloudflare doesn\'t accept this token. Copy it again, all of it.</string>
@@ -142,4 +145,8 @@
     <string name="consumer_turbo_receive_waiting_body">On the sending phone, tap Start Turbo. Keep the two phones close together.</string>
     <string name="consumer_turbo_receive_stop">Stop Turbo receive</string>
     <string name="consumer_turbo_receiving_title">Receiving from %1$s over Turbo</string>
+
+    <!-- A sending phone's wake-up wouldn't reach this phone (checked once a day). %1$s: why, technical. -->
+    <string name="consumer_wake_ups_failing_title">Sending phones can\'t wake this phone</string>
+    <string name="consumer_wake_ups_failing_body">Over the internet, they reach it only while MediaSync is open here. Setting up internet sync again may fix it. Why: %1$s</string>
 </resources>

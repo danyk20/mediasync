@@ -12,6 +12,18 @@ env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false
 
 jobs:
+  # Every household's wake-ups go through the developer's wake relay (PLAN §10.4): a revoked service account or an FCM
+  # change would leave phones asleep without a word, so it's checked every night.
+  wake-relay:
+    name: Wake relay reaches FCM
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the wake relay
+        working-directory: infra/rendezvous
+        run: scripts/check-wake-relay.sh
+
   # One job per API level, each on its own runner: four emulator types booting on one runner exhausted it
   # (nightly #1: "The runner has received a shutdown signal").
   device-matrix:

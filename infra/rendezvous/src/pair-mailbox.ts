@@ -31,6 +31,7 @@ export interface PairRecord {
     createdAt: number;
     fcmToken?: string;
     lastWakeAt?: number;
+    lastWakeCheckAt?: number;
 }
 
 export interface Membership {
@@ -60,6 +61,8 @@ export const MAX_QUEUED_BYTES = 256 * 1024;
 export const MAX_MESSAGES_PER_MINUTE = 120;
 /** At most one wake-up per pair in this interval: one is enough to open the consumer's receive window. */
 export const WAKE_MIN_INTERVAL_MILLIS = 20 * 1000;
+/** At most one wake-up check per pair in this interval. */
+export const WAKE_CHECK_MIN_INTERVAL_MILLIS = 60 * 1000;
 
 /** WebSocket close codes (4000–4999 are for applications). */
 export const CLOSE_REPLACED = 4001;
@@ -167,6 +170,28 @@ export class PairMailbox extends DurableObject<Env> {
             return fail(429, "wake_throttled", "A wake-up was sent moments ago", { "retry-after": `${retryAfter}` });
         }
         record.lastWakeAt = now;
+        await this.ctx.storage.put(PAIR_KEY, record);
+        return ok({ token: record.fcmToken });
+    }
+
+    /**
+     * Claims a wake-up check for the consumer: returns its own FCM token, or why there's none to check. One a minute:
+     * the phone checks once a day, and when it's set up.
+     */
+    async claimWakeCheck(caller: Caller, now: number = Date.now()): Promise<Result<{ token: string }>> {
+        this.ensureSchema();
+        const record = await this.record();
+        const checked = this.check(record, caller, "consumer", now);
+        if (!checked.ok) return checked;
+        if (!record?.fcmToken) {
+            return fail(409, "no_push_token", "The consumer hasn't registered for wake-ups");
+        }
+        const sinceLast = now - (record.lastWakeCheckAt ?? 0);
+        if (sinceLast < WAKE_CHECK_MIN_INTERVAL_MILLIS) {
+            const retryAfter = Math.ceil((WAKE_CHECK_MIN_INTERVAL_MILLIS - sinceLast) / 1000);
+            return fail(429, "wake_throttled", "A wake-up check was sent moments ago", { "retry-after": `${retryAfter}` });
+        }
+        record.lastWakeCheckAt = now;
         await this.ctx.storage.put(PAIR_KEY, record);
         return ok({ token: record.fcmToken });
     }

@@ -148,4 +148,10 @@
     <string name="consumer_turbo_receive_waiting_body">Na odesílajícím telefonu klepněte na Spustit Turbo. Držte oba telefony blízko u sebe.</string>
     <string name="consumer_turbo_receive_stop">Zastavit příjem Turbo</string>
     <string name="consumer_turbo_receiving_title">Přijímá od %1$s přes Turbo</string>
+
+    <!-- Whether sending phones can wake this phone over the internet. -->
+    <string name="consumer_cloudflare_progress_checking">Ověřuji, že odesílající telefony dokážou tento telefon probudit…</string>
+    <string name="consumer_cloudflare_wake_ups_failing">Odesílající telefony ale tento telefon nedokážou probudit, takže přes internet ho zastihnou jen tehdy, když je tu otevřený MediaSync. Důvod: %1$s</string>
+    <string name="consumer_wake_ups_failing_title">Odesílající telefony nedokážou tento telefon probudit</string>
+    <string name="consumer_wake_ups_failing_body">Přes internet ho zastihnou jen tehdy, když je tu otevřený MediaSync. Pomoci může nové nastavení synchronizace přes internet. Důvod: %1$s</string>
 </resources>

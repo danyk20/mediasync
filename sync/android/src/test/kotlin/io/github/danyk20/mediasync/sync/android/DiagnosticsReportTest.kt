@@ -29,6 +29,8 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import io.mockk.every
+import io.mockk.mockk
 import java.io.File
 import java.net.InetAddress
 import java.nio.file.Files
@@ -36,6 +38,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -82,7 +85,11 @@ class DiagnosticsReportTest {
         workManager,
         log,
         clock,
+        wakeUps,
     )
+
+    private val wakeUpStatus = MutableStateFlow<WakeUpStatus?>(null)
+    private val wakeUps = mockk<WakeUpCheck> { every { status } returns wakeUpStatus }
 
     @Test
     fun aSendingPhoneSaysHowItsSetUpWithoutNamingAnyone() = runBlocking<Unit> {
@@ -119,6 +126,21 @@ class DiagnosticsReportTest {
 
         facts["Receives from"] shouldBe "2"
         facts["Schedule"] shouldBe "charging"
+        facts.containsKey("Wake-ups") shouldBe false // Without internet sync, there are none to check.
+    }
+
+    @Test
+    fun aReceivingPhoneWithInternetSyncSaysWhetherWakeUpsGetThrough() = runBlocking<Unit> {
+        settings.setRole(DeviceRole.CONSUMER)
+        settings.setRendezvousUrl("https://mediasync-rendezvous.anna.workers.dev")
+        fun wakeUps() = runBlocking { report().facts().associate { it.label to it.value }["Wake-ups"] }
+
+        wakeUps() shouldBe "not checked yet"
+        wakeUpStatus.value = WakeUpStatus(clock.millis(), "wake_relay_failed: The wake relay answered HTTP 404")
+        wakeUps() shouldBe
+            "don't work: wake_relay_failed: The wake relay answered HTTP 404 (checked 2026-10-14 09:30 +02:00)"
+        wakeUpStatus.value = WakeUpStatus(clock.millis())
+        wakeUps() shouldBe "work (checked 2026-10-14 09:30 +02:00)"
     }
 
     @Test
