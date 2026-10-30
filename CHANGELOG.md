@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/danyk20/mediasync/compare/v0.8.5...v0.9.0) (2026-10-30)
+
+
+### Features
+
+* see the new photos and videos before they sync, and leave some out ([#79](https://github.com/danyk20/mediasync/issues/79)) ([34f4967](https://github.com/danyk20/mediasync/commit/34f4967c08fe51d18831a5b89510b442f588e02d))
+
 ## [0.8.5](https://github.com/danyk20/mediasync/compare/v0.8.4...v0.8.5) (2026-10-30)
 
 
