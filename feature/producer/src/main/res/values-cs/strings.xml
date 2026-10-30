@@ -185,4 +185,50 @@
         <item quantity="other">%1$s položky</item>
     </plurals>
     <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+
+    <!-- The new photos and videos, to choose some not to sync. -->
+    <string name="producer_status_pending_see">Zobrazit</string>
+    <string name="producer_left_out_row_title">Vynechané</string>
+    <plurals name="producer_left_out_row_summary">
+        <item quantity="one">%d fotka nebo video, které nechcete synchronizovat</item>
+        <item quantity="few">%d fotky nebo videa, které nechcete synchronizovat</item>
+        <item quantity="many">%d fotek a videí, které nechcete synchronizovat</item>
+        <item quantity="other">%d fotek a videí, které nechcete synchronizovat</item>
+    </plurals>
+    <string name="producer_waiting_title">Nové fotky a videa</string>
+    <string name="producer_waiting_to_sync">K synchronizaci · %1$d</string>
+    <string name="producer_waiting_left_out">Vynechané · %1$d</string>
+    <string name="producer_waiting_to_sync_hint">Tyto pošle příští synchronizace. Podržte ty, které se synchronizovat nemají.</string>
+    <string name="producer_waiting_left_out_hint">Tyto jste se rozhodli nesynchronizovat: zůstanou jen v tomto telefonu. Podržte ty, které se přece jen synchronizovat mají.</string>
+    <string name="producer_waiting_to_sync_empty">Nic nového k synchronizaci.</string>
+    <string name="producer_waiting_left_out_empty">Nic není vynechané. Zde se zobrazí fotky a videa, které se rozhodnete nesynchronizovat.</string>
+    <string name="producer_waiting_today">Dnes</string>
+    <string name="producer_waiting_yesterday">Včera</string>
+    <string name="producer_waiting_photo">Fotka, %1$s</string>
+    <string name="producer_waiting_video">Video, %1$s</string>
+    <string name="producer_waiting_open">Otevřít</string>
+    <string name="producer_waiting_choose">Vybrat</string>
+    <plurals name="producer_waiting_chosen">
+        <item quantity="one">Vybráno: %d</item>
+        <item quantity="few">Vybráno: %d</item>
+        <item quantity="many">Vybráno: %d</item>
+        <item quantity="other">Vybráno: %d</item>
+    </plurals>
+    <string name="producer_waiting_clear_selection">Zrušit výběr</string>
+    <string name="producer_waiting_leave_out">Nesynchronizovat</string>
+    <string name="producer_waiting_bring_back">Synchronizovat</string>
+    <plurals name="producer_waiting_left_out_done">
+        <item quantity="one">%d položka se nebude synchronizovat</item>
+        <item quantity="few">%d položky se nebudou synchronizovat</item>
+        <item quantity="many">%d položek se nebude synchronizovat</item>
+        <item quantity="other">%d položek se nebude synchronizovat</item>
+    </plurals>
+    <plurals name="producer_waiting_synced_done">
+        <item quantity="one">%d položka se bude synchronizovat</item>
+        <item quantity="few">%d položky se budou synchronizovat</item>
+        <item quantity="many">%d položek se bude synchronizovat</item>
+        <item quantity="other">%d položek se bude synchronizovat</item>
+    </plurals>
+    <string name="producer_waiting_undo">Zpět</string>
+    <string name="producer_waiting_no_viewer">Žádná aplikace v tomto telefonu to neumí otevřít.</string>
 </resources>

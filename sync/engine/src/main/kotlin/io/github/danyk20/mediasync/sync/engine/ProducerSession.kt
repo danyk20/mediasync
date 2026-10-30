@@ -90,6 +90,11 @@ class ProducerSession(
      * consumer still verifies and stores the previous ones, so there's no round trip per file.
      */
     private val window: Int = WINDOW,
+    /**
+     * Of the given items, those the user chose not to send. Asked when listing, and again before each offer, so what
+     * the user leaves out while a sync runs isn't sent either.
+     */
+    private val leftOut: (List<SourceItem>) -> List<SourceItem> = { emptyList() },
 ) {
 
     fun sync(connection: PeerConnection): SyncResult = sync(connection, WorkQueue(pendingFor(connection.peerId)))
@@ -113,11 +118,15 @@ class ProducerSession(
         return run.send(queue)
     }
 
-    /** Items the consumer hasn't confirmed, without duplicates: those the user shared first, then in [order]. */
+    /**
+     * Items the consumer hasn't confirmed and the user didn't leave out, without duplicates: those the user shared
+     * first, then in [order].
+     */
     internal fun pendingFor(consumer: DeviceId): List<SourceItem> {
         val confirmed = ledger.sentFingerprints(consumer)
-        return source.items()
-            .filter { it.descriptor.fingerprint !in confirmed }
+        val waiting = source.items().filter { it.descriptor.fingerprint !in confirmed }
+        val left = leftOut(waiting).toSet()
+        return waiting.filter { it !in left }
             .sortedWith(compareByDescending<SourceItem> { it.shared }.then(order.comparator()))
             .distinctBy { it.descriptor.fingerprint }
     }
@@ -196,7 +205,13 @@ class ProducerSession(
         }
 
         private fun offerBatch(batch: List<SourceItem>) {
-            val offered = batch.mapNotNull(::prepare).associateBy { nextOfferId++ }
+            // Left out since the sync started: done, without being sent.
+            val left = leftOut(batch).toSet()
+            left.forEach {
+                skip(it)
+                completeItem(it)
+            }
+            val offered = batch.filter { it !in left }.mapNotNull(::prepare).associateBy { nextOfferId++ }
             if (offered.isEmpty()) return
             channel.send(Offer(offered.map { (id, prepared) -> prepared.descriptor.toOfferItem(id) }))
             val response = awaitResponse()

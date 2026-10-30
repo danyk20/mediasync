@@ -439,6 +439,46 @@ class SyncSessionTest {
     }
 
     @Test
+    fun `what the user left out isn't offered`() {
+        val producer = Producer(listOf(media("a", 1000), media("b", 2000), media("c", 500)))
+
+        val pending = ProducerSession(local, producer.source, producer.ledger, leftOut = { items ->
+            items.filter { it.key == "b" }
+        }).pendingFor(consumerId)
+
+        pending.map { it.key } shouldContainExactlyInAnyOrder listOf("a", "c")
+    }
+
+    @Test
+    fun `what the user leaves out while a sync runs isn't sent, and is done`() {
+        val producer = Producer(listOf(media("a", 1000), media("b", 2000), media("c", 500)))
+        val consumer = Consumer()
+        val sent = CopyOnWriteArrayList<TransferProgress>()
+        val asked = AtomicInteger()
+        // Nothing is left out when the sync lists what to send; "b" is by the time it's offered.
+        val leftOut = { items: List<SourceItem> ->
+            if (asked.getAndIncrement() == 0) emptyList() else items.filter { it.key == "b" }
+        }
+        val connection = ConnectionPair(producerId, consumerId)
+
+        val (result, _) = runBothSides(
+            producer = {
+                ProducerSession(local, producer.source, producer.ledger, progress = { sent += it }, leftOut = leftOut)
+                    .sync(connection.producerEnd)
+            },
+            consumer = {
+                ConsumerSession(local, consumer.registry, consumer.ledger, consumer.sink, FakePairingGate(TOKEN))
+                    .serve(connection.consumerEnd)
+            },
+        )
+
+        result.getOrThrow().sent shouldBe 2
+        consumer.ledger.items.map { it.descriptor.displayName } shouldContainExactlyInAnyOrder listOf("a.jpg", "c.jpg")
+        val last = sent.maxWith(compareBy({ it.bytesDone }, { it.itemsDone }))
+        last shouldBe TransferProgress(3, 3, 3500, 3500, last.currentItem, bytesSkipped = 2000)
+    }
+
+    @Test
     fun `the last progress comes before the session ends, never after`() {
         val producer = Producer(List(3) { media("item$it", 500) })
         val consumer = Consumer()

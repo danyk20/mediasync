@@ -125,10 +125,10 @@ sealed interface ProducerState {
 }
 
 /**
- * What the consumer doesn't have yet: [toSend], and [withheld] by the *Photo details* setting, whose details can't
- * be removed (RAW photos under *Remove all*, formats MediaSync can't read).
+ * What the consumer doesn't have yet: [toSend], [withheld] by the *Photo details* setting, whose details can't be
+ * removed (RAW photos under *Remove all*, formats MediaSync can't read), and [leftOut] by the user.
  */
-data class Pending(val toSend: Int = 0, val withheld: Int = 0, val bytes: Long = 0)
+data class Pending(val toSend: Int = 0, val withheld: Int = 0, val bytes: Long = 0, val leftOut: Int = 0)
 
 /** The outcome of scanning a pairing QR code. */
 sealed interface PairingResult {
@@ -141,11 +141,13 @@ sealed interface PairingResult {
 
 /** The sending side: pairs with the consumer and sends new photos and videos to it (docs/PLAN.md §5). */
 @Singleton
+@Suppress("LongParameterList") // Injected collaborators, one each.
 class ProducerSync @Inject constructor(
     private val identity: IdentityProvider,
     private val peers: PeerStore,
     private val ledger: SentLedger,
     private val source: MediaSource,
+    private val leftOut: LeftOutItems,
     private val device: DeviceInfo,
     network: Connectivity,
     private val history: SyncHistory,
@@ -314,14 +316,32 @@ class ProducerSync @Inject constructor(
             }
         }
 
-    /** Photos and videos the consumer doesn't have yet: those that will be sent, and those withheld. */
+    /** Photos and videos the consumer doesn't have yet: those that will be sent, those withheld and those left out. */
     suspend fun pendingCount(): Pending = withContext(Dispatchers.IO) {
-        val consumer = peers.consumer() ?: return@withContext Pending()
-        val sent = ledger.sentFingerprints(consumer.id)
+        val waiting = waiting() ?: return@withContext Pending()
+        val left = leftOut.of(waiting).toSet()
         val details = device.photoDetails()
-        val waiting = source.items().filter { it.descriptor.fingerprint !in sent }
-        val (held, toSend) = waiting.partition { isWithheld(it.descriptor.mimeType, details) }
-        Pending(toSend = toSend.size, withheld = held.size, bytes = toSend.sumOf { it.descriptor.size })
+        val (held, toSend) = waiting.filter { it !in left }.partition { isWithheld(it.descriptor.mimeType, details) }
+        Pending(toSend.size, held.size, toSend.sumOf { it.descriptor.size }, left.size)
+    }
+
+    /**
+     * Photos and videos the consumer doesn't have yet and the *Photo details* setting doesn't withhold: those that
+     * will be sent, and those the user left out ([LeftOutItems]). Shared items first, as they're sent.
+     */
+    suspend fun waitingItems(): List<SourceItem> = withContext(Dispatchers.IO) {
+        val details = device.photoDetails()
+        waiting().orEmpty().filterNot { isWithheld(it.descriptor.mimeType, details) }
+    }
+
+    /** What the consumer doesn't have yet, once each (as shared, if it was); `null` while not paired. */
+    private fun waiting(): List<SourceItem>? {
+        val consumer = peers.consumer() ?: return null
+        val sent = ledger.sentFingerprints(consumer.id)
+        return source.items()
+            .filter { it.descriptor.fingerprint !in sent }
+            .sortedByDescending { it.shared }
+            .distinctBy { it.descriptor.fingerprint }
     }
 
     private suspend fun runSync(turbo: Boolean): ProducerState {
@@ -541,6 +561,7 @@ class ProducerSync @Inject constructor(
                         { !cancelled && !pauseWhen() },
                         details,
                         order,
+                        leftOut = { items -> leftOut.of(items) },
                     )
                 },
                 connect = { another() },

@@ -10,4 +10,7 @@ dependencies {
     implementation(projects.sync.android)
     implementation(projects.core.media)
     implementation(projects.core.datastore)
+
+    testImplementation(libs.androidx.room.runtime)
+    testImplementation(testFixtures(projects.sync.engine))
 }

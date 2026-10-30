@@ -163,4 +163,33 @@ class MigrationTest {
     private companion object {
         const val NAME = "migration-test.db"
     }
+
+    @Test
+    fun version5PairingsSurviveAndNothingIsLeftOutYet() = runTest {
+        helper.createDatabase(NAME, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO peers (deviceId, name, role, pairedAtMillis) " +
+                    "VALUES ('${consumer.hex}', 'Pixel 2 XL', 'CONSUMER', 1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(NAME, 6, true).close()
+
+        val database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MediaSyncDatabase::class.java,
+            NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            PeerStore(database.peerDao()).consumer()?.name shouldBe "Pixel 2 XL"
+            val leftOut = LeftOutStore(database.leftOutItemDao())
+            leftOut.fingerprints().shouldBeEmpty()
+
+            leftOut.add(listOf(fingerprint))
+
+            leftOut.fingerprints() shouldBe setOf(fingerprint)
+        } finally {
+            database.close()
+        }
+    }
 }

@@ -101,6 +101,7 @@ fun ProducerHomeRoute(
     onChooseDetails: () -> Unit = {},
     onChooseOrder: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onSeeWaiting: (leftOut: Boolean) -> Unit = {},
     viewModel: ProducerHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -149,6 +150,7 @@ fun ProducerHomeRoute(
             }
         },
         onOpenLocationSettings = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
+        onSeeWaiting = onSeeWaiting,
         modifier = modifier,
     )
 }
@@ -194,6 +196,7 @@ fun ProducerHomeScreen(
     onOpenLocationSettings: () -> Unit = {},
     onUnpair: () -> Unit = {},
     onShowSpeeds: () -> Unit = {},
+    onSeeWaiting: (leftOut: Boolean) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -219,7 +222,13 @@ fun ProducerHomeScreen(
                 !state.canReadLibrary -> NeedsAccess(consumer, onGrantAccess, onOpenSettings)
 
                 else -> {
-                    Paired(consumer, state, onSyncNow, onStop, onUnpair, onShowSpeeds)
+                    Paired(
+                        consumer,
+                        state,
+                        PairedActions(onSyncNow, onStop, onUnpair, onShowSpeeds) {
+                            onSeeWaiting(false)
+                        },
+                    )
                     Notices(state, consumer, onOpenSettings)
                     BackgroundSetupNotices(
                         askNotifications = state.askNotifications,
@@ -232,7 +241,7 @@ fun ProducerHomeScreen(
                     WithheldNotice(state, onChooseDetails)
                     HeldBackNotice(state)
                     TurboCard(state, consumer, onStartTurbo, onOpenSettings, onOpenLocationSettings)
-                    WhatIsSent(state, onChooseFolders, onChooseDetails, onChooseOrder)
+                    WhatIsSent(state, onChooseFolders, onChooseDetails, onChooseOrder) { onSeeWaiting(true) }
                     InternetCard(
                         state,
                         consumer,
@@ -253,6 +262,7 @@ private fun WhatIsSent(
     onChooseFolders: () -> Unit,
     onChooseDetails: () -> Unit,
     onChooseOrder: () -> Unit,
+    onSeeLeftOut: () -> Unit,
 ) {
     SettingRow(
         title = stringResource(R.string.producer_sources_title),
@@ -272,6 +282,19 @@ private fun WhatIsSent(
         icon = MediaSyncIcons.Order,
         onClick = onChooseOrder,
     )
+    if (state.leftOutCount > 0) {
+        SettingRow(
+            title = stringResource(R.string.producer_left_out_row_title),
+            summary = pluralStringResource(
+                R.plurals.producer_left_out_row_summary,
+                state.leftOutCount,
+                state.leftOutCount,
+            ),
+            icon = MediaSyncIcons.LeftOut,
+            onClick = onSeeLeftOut,
+            action = stringResource(R.string.producer_status_pending_see),
+        )
+    }
 }
 
 /** The receiving phone this one sends to, and *Unpair*, to send to another one. */
@@ -346,19 +369,21 @@ private fun NeedsAccess(consumer: String, onGrantAccess: () -> Unit, onOpenSetti
     }
 }
 
+/** What can be done from the status at the top of a paired phone's home screen. */
+private data class PairedActions(
+    val onSyncNow: () -> Unit,
+    val onStop: () -> Unit,
+    val onUnpair: () -> Unit,
+    val onShowSpeeds: () -> Unit,
+    val onSeeWaiting: () -> Unit,
+)
+
 @Composable
-private fun Paired(
-    consumer: String,
-    state: ProducerHomeUiState,
-    onSyncNow: () -> Unit,
-    onStop: () -> Unit,
-    onUnpair: () -> Unit,
-    onShowSpeeds: () -> Unit,
-) {
+private fun Paired(consumer: String, state: ProducerHomeUiState, actions: PairedActions) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync, onShowSpeeds)
-            OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
+            Sending(consumer, sync, actions.onShowSpeeds)
+            OutlinedButton(onClick = actions.onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
         }
@@ -383,13 +408,13 @@ private fun Paired(
             )
             // Unpaired on the other phone: unpair here too, then pair again.
             if (sync.reason == SyncFailure.NOT_ALLOWED) {
-                AskingToUnpair(consumer, onUnpair) { ask ->
+                AskingToUnpair(consumer, actions.onUnpair) { ask ->
                     Button(onClick = ask, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.producer_unpair))
                     }
                 }
             } else {
-                SyncNowButton(onSyncNow)
+                SyncNowButton(actions.onSyncNow)
             }
         }
 
@@ -401,8 +426,8 @@ private fun Paired(
                     icon = MediaSyncIcons.Info,
                 )
             } else {
-                IdleStatus(consumer, state.pendingCount, state.lastSyncMillis, state.now)
-                SyncNowButton(onSyncNow)
+                IdleStatus(consumer, state.pendingCount, state.lastSyncMillis, state.now, actions.onSeeWaiting)
+                SyncNowButton(actions.onSyncNow)
             }
         }
     }
@@ -493,7 +518,13 @@ private fun NextSync(state: ProducerHomeUiState) {
 
 /** A setting of what is sent (folders, details), and the way to change it. */
 @Composable
-private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, onClick: () -> Unit) {
+private fun SettingRow(
+    title: String,
+    summary: String,
+    @DrawableRes icon: Int,
+    onClick: () -> Unit,
+    action: String = stringResource(R.string.producer_sources_change),
+) {
     // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
@@ -503,7 +534,7 @@ private fun SettingRow(title: String, summary: String, @DrawableRes icon: Int, o
             leadingContent = { Icon(painterResource(icon), contentDescription = null) },
             trailingContent = {
                 Text(
-                    text = stringResource(R.string.producer_sources_change),
+                    text = action,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -825,7 +856,13 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds:
 }
 
 @Composable
-private fun IdleStatus(consumer: String, pending: Int?, lastSyncMillis: Long?, now: ZonedDateTime?) {
+private fun IdleStatus(
+    consumer: String,
+    pending: Int?,
+    lastSyncMillis: Long?,
+    now: ZonedDateTime?,
+    onSeeWaiting: () -> Unit,
+) {
     val lastSync = if (lastSyncMillis != null && now != null) {
         val at = Instant.ofEpochMilli(lastSyncMillis).atZone(now.zone)
         stringResource(R.string.producer_last_sync, pastMoment(at, now))
@@ -850,6 +887,8 @@ private fun IdleStatus(consumer: String, pending: Int?, lastSyncMillis: Long?, n
             title = pluralStringResource(R.plurals.producer_status_pending_title, pending, pending),
             body = pluralStringResource(R.plurals.producer_status_pending_body, pending, consumer),
             icon = MediaSyncIcons.Send,
+            actionLabel = stringResource(R.string.producer_status_pending_see),
+            onAction = onSeeWaiting,
         )
     }
 }

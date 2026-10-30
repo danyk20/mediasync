@@ -33,4 +33,18 @@ object MediaSyncIcons {
 
     /** A section to open; turned upside down while it's open. */
     @DrawableRes val Expand: Int = R.drawable.ic_expand_more
+
+    @DrawableRes val Close: Int = R.drawable.ic_close
+
+    /** A chosen photo or video, while choosing. */
+    @DrawableRes val Selected: Int = R.drawable.ic_check_circle
+
+    /** One not chosen, while choosing. */
+    @DrawableRes val NotSelected: Int = R.drawable.ic_radio_unchecked
+
+    /** Marks a video among photos. */
+    @DrawableRes val Video: Int = R.drawable.ic_play
+
+    /** What the user chose not to sync. */
+    @DrawableRes val LeftOut: Int = R.drawable.ic_block
 }

@@ -185,4 +185,50 @@
         <item quantity="other">%1$s елемента</item>
     </plurals>
     <string name="producer_folders_details">%1$s · %2$s · %3$s</string>
+
+    <!-- The new photos and videos, to choose some not to sync. -->
+    <string name="producer_status_pending_see">Переглянути</string>
+    <string name="producer_left_out_row_title">Виключені</string>
+    <plurals name="producer_left_out_row_summary">
+        <item quantity="one">%d фото або відео, яке ви вирішили не синхронізувати</item>
+        <item quantity="few">%d фото або відео, які ви вирішили не синхронізувати</item>
+        <item quantity="many">%d фото та відео, які ви вирішили не синхронізувати</item>
+        <item quantity="other">%d фото та відео, які ви вирішили не синхронізувати</item>
+    </plurals>
+    <string name="producer_waiting_title">Нові фото та відео</string>
+    <string name="producer_waiting_to_sync">До синхронізації · %1$d</string>
+    <string name="producer_waiting_left_out">Виключені · %1$d</string>
+    <string name="producer_waiting_to_sync_hint">Їх надішле наступна синхронізація. Натисніть і утримуйте ті, які не треба синхронізувати.</string>
+    <string name="producer_waiting_left_out_hint">Ви вирішили не синхронізувати їх: вони залишаться лише на цьому телефоні. Натисніть і утримуйте ті, які все ж треба синхронізувати.</string>
+    <string name="producer_waiting_to_sync_empty">Немає нічого нового для синхронізації.</string>
+    <string name="producer_waiting_left_out_empty">Нічого не виключено. Тут з’являться фото та відео, які ви вирішите не синхронізувати.</string>
+    <string name="producer_waiting_today">Сьогодні</string>
+    <string name="producer_waiting_yesterday">Учора</string>
+    <string name="producer_waiting_photo">Фото, %1$s</string>
+    <string name="producer_waiting_video">Відео, %1$s</string>
+    <string name="producer_waiting_open">Відкрити</string>
+    <string name="producer_waiting_choose">Вибрати</string>
+    <plurals name="producer_waiting_chosen">
+        <item quantity="one">Вибрано: %d</item>
+        <item quantity="few">Вибрано: %d</item>
+        <item quantity="many">Вибрано: %d</item>
+        <item quantity="other">Вибрано: %d</item>
+    </plurals>
+    <string name="producer_waiting_clear_selection">Зняти виділення</string>
+    <string name="producer_waiting_leave_out">Не синхронізувати</string>
+    <string name="producer_waiting_bring_back">Синхронізувати</string>
+    <plurals name="producer_waiting_left_out_done">
+        <item quantity="one">%d елемент не буде синхронізовано</item>
+        <item quantity="few">%d елементи не буде синхронізовано</item>
+        <item quantity="many">%d елементів не буде синхронізовано</item>
+        <item quantity="other">%d елементів не буде синхронізовано</item>
+    </plurals>
+    <plurals name="producer_waiting_synced_done">
+        <item quantity="one">%d елемент буде синхронізовано</item>
+        <item quantity="few">%d елементи буде синхронізовано</item>
+        <item quantity="many">%d елементів буде синхронізовано</item>
+        <item quantity="other">%d елементів буде синхронізовано</item>
+    </plurals>
+    <string name="producer_waiting_undo">Скасувати</string>
+    <string name="producer_waiting_no_viewer">На цьому телефоні немає застосунку, який може це відкрити.</string>
 </resources>

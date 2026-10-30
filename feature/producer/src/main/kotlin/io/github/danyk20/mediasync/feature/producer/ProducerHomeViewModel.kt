@@ -21,6 +21,7 @@ import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.sync.android.BackgroundSetup
+import io.github.danyk20.mediasync.sync.android.LeftOutItems
 import io.github.danyk20.mediasync.sync.android.MobileDataUsage
 import io.github.danyk20.mediasync.sync.android.Pending
 import io.github.danyk20.mediasync.sync.android.ProducerState
@@ -42,6 +43,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -57,6 +59,8 @@ data class ProducerHomeUiState(
     val pendingCount: Int? = null,
     /** Their size. */
     val pendingBytes: Long = 0,
+    /** Photos and videos not yet sent that the user chose not to sync. */
+    val leftOutCount: Int = 0,
     /** Whether Turbo transfer (docs/PLAN.md §8.3) can be used, as far as this phone goes. */
     val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
     /** Battery below 30 % and not charging: Turbo uses more power. */
@@ -151,6 +155,7 @@ class ProducerHomeViewModel @Inject constructor(
     private val setup: BackgroundSetup,
     private val clock: Clock,
     mobileDataUsage: MobileDataUsage,
+    leftOut: LeftOutItems,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -189,6 +194,7 @@ class ProducerHomeViewModel @Inject constructor(
             sync = state,
             pendingCount = count?.toSend,
             pendingBytes = count?.bytes ?: 0,
+            leftOutCount = count?.leftOut ?: 0,
             turbo = access.turbo,
             turboBatteryLow = access.turboBatteryLow,
             turboDeclined = extras.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
@@ -222,8 +228,8 @@ class ProducerHomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     init {
-        // Recount whenever a sync ends, the receiving phone, folders or day change, or photos are added,
-        // edited or deleted. A newer reason cancels a count still running.
+        // Recount whenever a sync ends, the receiving phone, folders or day change, photos are added, edited or
+        // deleted, or left out. A newer reason cancels a count still running.
         @OptIn(FlowPreview::class)
         val reasons = merge(
             uiState.distinctUntilChangedBy {
@@ -238,6 +244,7 @@ class ProducerHomeViewModel @Inject constructor(
             }
                 .map { },
             library.changes().debounce(LIBRARY_SETTLE_MILLIS),
+            leftOut.fingerprints.drop(1).map { },
         )
         viewModelScope.launch { reasons.collectLatest { countPending() } }
     }
