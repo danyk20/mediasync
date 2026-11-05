@@ -5,6 +5,7 @@
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.variant.DeviceTestBuilder
 import com.android.build.api.variant.LibraryAndroidComponentsExtension
+import io.github.danyk20.mediasync.buildlogic.alignLifecycle
 import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
 import io.github.danyk20.mediasync.buildlogic.configureJava
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
@@ -54,6 +55,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
         }
 
         configureKotlin()
+        alignLifecycle()
         configureCodeQuality(koverSourceVariant = "debug")
     }
 }
