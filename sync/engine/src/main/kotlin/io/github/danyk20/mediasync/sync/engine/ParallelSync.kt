@@ -141,6 +141,7 @@ class ParallelSync(
                 consumerTurboKey = a.consumerTurboKey ?: b.consumerTurboKey,
                 consumerPairSecret = a.consumerPairSecret ?: b.consumerPairSecret,
                 consumerRendezvousUrl = a.consumerRendezvousUrl ?: b.consumerRendezvousUrl,
+                consumerWifiAddresses = a.consumerWifiAddresses ?: b.consumerWifiAddresses,
             )
         }
     }

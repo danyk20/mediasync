@@ -185,11 +185,15 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
     /** Binds to the local network that has a direct route to [address], else to any local network. */
     override fun factoryFor(address: InetSocketAddress): SocketFactory {
         val networks = localNetworks()
-        val direct = networks.firstOrNull { (_, links) ->
-            links.routes.any { !it.isDefaultRoute && it.matches(address.address) }
-        }
+        val direct = networks.firstOrNull { (_, links) -> links.reaches(address.address) }
         return (direct ?: networks.firstOrNull())?.first?.socketFactory ?: SocketFactory.getDefault()
     }
+
+    override fun isOnLocalNetwork(address: InetAddress): Boolean =
+        localNetworks().any { (_, links) -> links.reaches(address) }
+
+    /** A route other than the default one: [address] is on this network itself. */
+    private fun LinkProperties.reaches(address: InetAddress) = routes.any { !it.isDefaultRoute && it.matches(address) }
 
     // A snapshot is all pairing and syncing need; a NetworkCallback would have to be registered in advance.
     @Suppress("DEPRECATION")

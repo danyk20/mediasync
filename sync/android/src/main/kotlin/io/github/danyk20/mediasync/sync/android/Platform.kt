@@ -60,6 +60,9 @@ fun interface AddressProvider {
 fun interface LanSockets {
     fun factoryFor(address: InetSocketAddress): SocketFactory
 
+    /** Whether [address] is on one of the Wi-Fi or Ethernet networks this phone is on, not behind a router. */
+    fun isOnLocalNetwork(address: InetAddress): Boolean = true
+
     /** Runs [session] with the Wi-Fi radio kept out of power saving (docs/PLAN.md §7), as a sending phone. */
     fun <T> keepingAwake(session: () -> T): T = session()
 
@@ -298,7 +301,18 @@ fun serviceIdOf(device: DeviceId): String =
     "mediasync-nsd-v1:${device.hex}".encodeUtf8().sha256().hex().take(SERVICE_ID_LENGTH)
 
 /**
- * The addresses worth putting in a pairing QR code: each one makes the code denser and harder to scan.
+ * Where a sending phone looks for its receiving phone first, before asking mDNS (docs/PLAN.md §8.2): where the
+ * receiving phone said it listens on its Wi-Fi ([told]), if that's on a network this phone is on ([isLocal]); then
+ * where it was last reached ([lastAddress]), wherever that is, as it worked before.
+ */
+internal fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (InetAddress) -> Boolean): List<String> {
+    val nearby = told.filter { address -> parseAddress(address)?.address?.let(isLocal) == true }
+    return (nearby + listOfNotNull(lastAddress)).distinct()
+}
+
+/**
+ * The addresses worth putting in a pairing QR code: each one makes the code denser and harder to scan. A receiving
+ * phone also tells these to its sending phones in every session (`Hello.wifiAddresses`).
  * Home networks route IPv4 reliably, so IPv6 is only used without it, and then only addresses that last:
  * private (ULA) ones first, then global ones, never deprecated site-local (`fec0::`) or link-local ones.
  */

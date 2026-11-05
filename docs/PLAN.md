@@ -695,6 +695,7 @@ interface SecureSession : Closeable {
 
 - The consumer advertises the NSD/mDNS service `_mediasync._tcp`. The TXT record holds only a rotating, keyed hash of the device ID, so device names are not broadcast.
 - The producer also tries the **last known IP:port** directly, because mDNS is unreliable on some routers.
+- *Fixed (M6, after a real-phone test):* on one home Wi-Fi, mDNS never found the receiving phone, and its last known IP was from another network, so Turbo fell back to *Turbo receive*. Now the consumer tells paired producers where it listens on its Wi-Fi in every session (`Hello.wifiAddresses`, also over the internet or a direct link), and in the pairing code as before. The producer tries those first when one is on a network it's on, then the last known IP, then mDNS. Diagnostics shows both.
 - *Client isolation* (guest networks) is detected, and the app suggests Turbo transfer instead.
 
 ### 8.3 Turbo transfer (Wi-Fi Direct), manual and optional
@@ -723,6 +724,7 @@ interface SecureSession : Closeable {
     - The consumer keeps a random 32-byte Turbo key (outside backups) and tells it to paired producers in every session (`Hello.turboKey`, only once the producer is paired). Phones paired earlier learn it at their next sync: no new pairing.
     - *Turbo receive* opens a group whose name (`DIRECT-xy-MediaSync-abcdef`) and passphrase are an HMAC of the key and the 15-minute epoch, so the name changes on its own and isn't a lasting trace of the phone.
     - A producer that can't reach the consumer over Wi-Fi derives the same for the current and the previous epoch, joins, and sends. If it hasn't learned the key yet, it says one sync on the same Wi-Fi is needed first.
+    - *Fixed (M6, after a real-phone test):* the user may start *Turbo receive* after Turbo on the producer. Android joins a group only if it's up when asked (on the test phones, a group that was up was joined in 3 to 4 seconds; one that came up during the try never was), so the producer looks for 2 minutes: it tries each name for 20 seconds, asks again after a short pause, and looks for the previous epoch's name only while a link started then may still be new to it. Its home screen says to tap *Turbo receive* on the other phone, and has a **Stop** button.
     - The group stays until the user taps **Stop**, or 10 minutes without a session over it.
     - Removing a sending phone gives the receiving phone a new key, so the removed phone can't find the link any more. The phones still paired learn it in their next session over Wi-Fi or the internet. *Built (M6).*
 - **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.

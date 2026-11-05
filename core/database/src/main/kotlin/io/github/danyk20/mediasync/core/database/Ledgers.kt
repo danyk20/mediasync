@@ -38,6 +38,8 @@ data class Peer(
     val pairSecret: ByteString? = null,
     /** Producer side: the consumer's rendezvous Worker for internet sync; `null` until it says. */
     val rendezvousUrl: String? = null,
+    /** Producer side: where the consumer last said it listens on its Wi-Fi (`192.168.1.20:47420`). */
+    val wifiAddresses: List<String> = emptyList(),
 ) {
     /** Never the key: this may end up in logs. */
     override fun toString() = "Peer($id, $name, $role, paired at $pairedAtMillis, last at $lastAddress)"
@@ -46,7 +48,8 @@ data class Peer(
 /**
  * What a producer learns about its consumer in a session: where it was reached ([address], on the local network only),
  * its [schedule], its *Turbo receive* [turboKey] (docs/PLAN.md §8.3), their [pairSecret] and its [rendezvousUrl] for
- * internet sync (ADR 0009). A `null` (not said, or an older consumer) changes nothing.
+ * internet sync (ADR 0009), and where it said it listens on its Wi-Fi ([wifiAddresses], docs/PLAN.md §8.2). A `null`
+ * (not said, or an older consumer) changes nothing.
  */
 data class ConsumerFacts(
     val address: String? = null,
@@ -54,9 +57,11 @@ data class ConsumerFacts(
     val turboKey: ByteString? = null,
     val pairSecret: ByteString? = null,
     val rendezvousUrl: String? = null,
+    val wifiAddresses: List<String>? = null,
 ) {
     /** Never the keys: this may end up in logs. */
-    override fun toString() = "ConsumerFacts(address=$address, schedule=$schedule, rendezvousUrl=$rendezvousUrl)"
+    override fun toString() = "ConsumerFacts(address=$address, schedule=$schedule, rendezvousUrl=$rendezvousUrl, " +
+        "wifiAddresses=$wifiAddresses)"
 }
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
@@ -94,8 +99,10 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         facts.address?.let { dao.recordAddress(id.hex, it, System.currentTimeMillis()) }
         facts.schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
         with(facts) {
-            if (turboKey != null || pairSecret != null || rendezvousUrl != null) {
-                dao.recordFacts(id.hex, turboKey?.hex(), pairSecret?.hex(), rendezvousUrl)
+            val wifi = wifiAddresses?.takeIf { it.isNotEmpty() }?.joinToString(" ")
+            val told = listOf(turboKey, pairSecret, rendezvousUrl, wifi)
+            if (told.any { it != null }) {
+                dao.recordFacts(id.hex, turboKey?.hex(), pairSecret?.hex(), rendezvousUrl, wifi)
             }
         }
     }
@@ -123,6 +130,7 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
         turboKey?.decodeHex(),
         pairSecret?.decodeHex(),
         rendezvousUrl,
+        wifiAddresses?.split(' ')?.filter { it.isNotEmpty() }.orEmpty(),
     )
 }
 

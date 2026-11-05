@@ -30,6 +30,11 @@ data class PeerEntity(
     val pairSecret: String? = null,
     /** Producer side: the consumer's rendezvous Worker for internet sync, as it last said. Since version 5. */
     val rendezvousUrl: String? = null,
+    /**
+     * Producer side: where the consumer last said it listens on its Wi-Fi, space-separated (`192.168.1.20:47420`);
+     * tried when this phone is on that Wi-Fi. Since version 7.
+     */
+    val wifiAddresses: String? = null,
 )
 
 /** Producer side: what a consumer has confirmed (docs/PLAN.md §5.6). */
