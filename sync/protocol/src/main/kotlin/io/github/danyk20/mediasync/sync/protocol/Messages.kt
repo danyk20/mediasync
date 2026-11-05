@@ -49,6 +49,12 @@ data class Hello(
      * over the internet (PLAN §8.4); empty when it has none.
      */
     @ProtoNumber(9) val rendezvousUrl: String = "",
+    /**
+     * Consumer only, and only to a paired producer: where it listens on its Wi-Fi now (`192.168.1.20:47420`), in every
+     * session, also over the internet or a direct link. The producer tries these when it's on that Wi-Fi, so it finds
+     * the consumer also where mDNS doesn't get through (docs/PLAN.md §8.2). Empty when it's on no Wi-Fi.
+     */
+    @ProtoNumber(10) val wifiAddresses: List<String> = emptyList(),
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */

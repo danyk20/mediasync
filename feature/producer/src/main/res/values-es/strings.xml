@@ -120,6 +120,8 @@
     <string name="producer_turbo_declined">Turbo necesita permiso para conectarse a dispositivos cercanos (ubicación, antes de Android 13). Permítelo en los ajustes de MediaSync.</string>
     <string name="producer_turbo_setting_up_title">Configurando Turbo con %1$s…</string>
     <string name="producer_turbo_setting_up_body">Uniendo los dos teléfonos directamente. Tarda unos segundos.</string>
+    <string name="producer_turbo_looking_title">Buscando %1$s cerca…</string>
+    <string name="producer_turbo_looking_body">%1$s no está en esta Wi-Fi. En %1$s, abre MediaSync y toca Recepción Turbo. Mantén los dos teléfonos juntos.</string>
     <string name="producer_turbo_sending_title">Enviando a %1$s por Turbo</string>
     <string name="producer_internet_sending_title">Enviando a %1$s por internet</string>
     <string name="producer_mobile_data_cap_title">Límite mensual de datos móviles</string>

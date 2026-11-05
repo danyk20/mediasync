@@ -108,6 +108,8 @@
     <string name="producer_turbo_declined">Turbo braucht die Erlaubnis, sich mit Geräten in der Nähe zu verbinden (Standort, vor Android 13). Erlaube es in den Einstellungen von MediaSync.</string>
     <string name="producer_turbo_setting_up_title">Turbo mit %1$s wird eingerichtet…</string>
     <string name="producer_turbo_setting_up_body">Die beiden Telefone werden direkt verbunden. Das dauert einige Sekunden.</string>
+    <string name="producer_turbo_looking_title">Suche %1$s in der Nähe…</string>
+    <string name="producer_turbo_looking_body">%1$s ist nicht in diesem WLAN. Öffne auf %1$s MediaSync und tippe auf Turbo-Empfang. Halte die beiden Telefone nah beieinander.</string>
     <string name="producer_turbo_sending_title">Sende an %1$s über Turbo</string>
     <string name="producer_internet_sending_title">Sende an %1$s über das Internet</string>
     <string name="producer_mobile_data_cap_title">Monatliches Limit für mobile Daten</string>

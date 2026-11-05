@@ -62,6 +62,11 @@ data class SyncResult(
     val consumerRendezvousUrl: String? = null,
     /** Held back for this connection, such as videos over the relay (PLAN §17, relay saver); sent another time. */
     val heldBack: Int = 0,
+    /**
+     * Where the consumer said it listens on its Wi-Fi now (`192.168.1.20:47420`, docs/PLAN.md §8.2); `null` if it
+     * said none (on no Wi-Fi, or an older version).
+     */
+    val consumerWifiAddresses: List<String>? = null,
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "SyncResult(sent=$sent, alreadyOnConsumer=$alreadyOnConsumer, failed=$failed, " +
@@ -115,6 +120,7 @@ class ProducerSession(
         run.consumerTurboKey = hello.turboKey.takeIf { it.size == TURBO_KEY_BYTES }
         run.consumerPairSecret = hello.pairSecret.takeIf { it.size == PAIR_SECRET_BYTES }
         run.consumerRendezvousUrl = hello.rendezvousUrl.takeIf { it.startsWith("https://") }
+        run.consumerWifiAddresses = wifiAddressesOf(hello)
         return run.send(queue)
     }
 
@@ -169,6 +175,7 @@ class ProducerSession(
         var consumerTurboKey: ByteString? = null
         var consumerPairSecret: ByteString? = null
         var consumerRendezvousUrl: String? = null
+        var consumerWifiAddresses: List<String>? = null
 
         fun send(queue: WorkQueue): SyncResult {
             replies.start()
@@ -200,6 +207,7 @@ class ProducerSession(
                     consumerTurboKey,
                     consumerPairSecret,
                     consumerRendezvousUrl,
+                    consumerWifiAddresses = consumerWifiAddresses,
                 )
             }
         }
@@ -471,6 +479,20 @@ internal fun SendingOrder.comparator(): Comparator<SourceItem> {
         else -> newestFirst
     }
 }
+
+/**
+ * The consumer's Wi-Fi addresses as it told them, a few and short ones only: the producer later connects to them, and
+ * parses them as literal addresses then. `null` if it told none.
+ */
+internal fun wifiAddressesOf(hello: Hello): List<String>? =
+    hello.wifiAddresses.filter { it.isNotBlank() && it.length <= MAX_ADDRESS_LENGTH }
+        .distinct()
+        .take(MAX_WIFI_ADDRESSES)
+        .takeIf { it.isNotEmpty() }
+
+/** `[` + 39 characters of IPv6 + `]:65535`. */
+private const val MAX_ADDRESS_LENGTH = 47
+private const val MAX_WIFI_ADDRESSES = 4
 
 /** When it was taken, or else when its file last changed (screenshots, saved images). */
 private fun SourceItem.takenAtMillis(): Long =

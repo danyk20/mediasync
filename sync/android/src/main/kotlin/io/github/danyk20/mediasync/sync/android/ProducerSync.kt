@@ -53,13 +53,17 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import okio.ByteString
 
 /** Why a pairing or sync attempt didn't work. */
 enum class SyncFailure {
@@ -111,6 +115,12 @@ sealed interface ProducerState {
     data object SettingUpTurbo : ProducerState
 
     /**
+     * Looking for the receiving phone's *Turbo receive* link (docs/PLAN.md §8.3): it isn't on this Wi-Fi, and its user
+     * may start Turbo receive there only now. Ends when it's found, after a while, or when the user stops it.
+     */
+    data object LookingForTurboReceive : ProducerState
+
+    /**
      * [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4).
      * [estimate]: how fast it goes and how long the rest takes, once there's enough to go on.
      */
@@ -139,10 +149,22 @@ sealed interface PairingResult {
     data class Failed(val reason: SyncFailure) : PairingResult
 }
 
+/**
+ * How a sending phone looks for the receiving phone's *Turbo receive* link (docs/PLAN.md §8.3): for [searchMillis] in
+ * all, joining each name it may have for up to [joinMillis], with [pauseMillis] between rounds. Its user may start
+ * Turbo receive only after Turbo here, and Android joins a link only if it's up when asked: so this phone asks again.
+ */
+internal data class TurboReceiveSearch(
+    val searchMillis: Long = 120_000,
+    /** A link that's up is joined in a few seconds (3 to 4 on the test phones, docs/PLAN.md §8.3). */
+    val joinMillis: Long = 20_000,
+    val pauseMillis: Long = 2_000,
+)
+
 /** The sending side: pairs with the consumer and sends new photos and videos to it (docs/PLAN.md §5). */
 @Singleton
-@Suppress("LongParameterList") // Injected collaborators, one each.
-class ProducerSync @Inject constructor(
+@Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
+class ProducerSync internal constructor(
     private val identity: IdentityProvider,
     private val peers: PeerStore,
     private val ledger: SentLedger,
@@ -152,8 +174,35 @@ class ProducerSync @Inject constructor(
     network: Connectivity,
     private val history: SyncHistory,
     private val conditions: DeviceConditions,
-    @ApplicationScope private val scope: CoroutineScope,
+    private val scope: CoroutineScope,
+    private val turboSearch: TurboReceiveSearch,
 ) {
+    @Inject
+    constructor(
+        identity: IdentityProvider,
+        peers: PeerStore,
+        ledger: SentLedger,
+        source: MediaSource,
+        leftOut: LeftOutItems,
+        device: DeviceInfo,
+        network: Connectivity,
+        history: SyncHistory,
+        conditions: DeviceConditions,
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(
+        identity,
+        peers,
+        ledger,
+        source,
+        leftOut,
+        device,
+        network,
+        history,
+        conditions,
+        scope,
+        TurboReceiveSearch(),
+    )
+
     private val discovery = network.discovery
     private val sockets = network.sockets
     private val directLinks = network.directLinks
@@ -188,7 +237,11 @@ class ProducerSync @Inject constructor(
                 } else {
                     peers.register(consumer, it.remoteAddress)
                     peers.keepOnlyConsumer(consumer.id)
-                    peers.recordConsumer(consumer.id, ConsumerFacts(schedule = outcome.consumerSchedule))
+                    // Where the code says it listens on its Wi-Fi: as good as what it tells in a session.
+                    peers.recordConsumer(
+                        consumer.id,
+                        ConsumerFacts(schedule = outcome.consumerSchedule, wifiAddresses = link.addresses),
+                    )
                     PairingResult.Paired(consumer.name)
                 }
             }
@@ -426,40 +479,80 @@ class ProducerSync @Inject constructor(
 
         /**
          * Not on a network with the consumer: joins its *Turbo receive* link (docs/PLAN.md §8.3), whose name and
-         * passphrase come from the consumer's Turbo key and the time it was started, in this epoch or the last.
+         * passphrase come from the consumer's Turbo key and the time it was started. Its user may start it only now,
+         * after Turbo here: this phone keeps looking for a while, unless the user stops it.
          */
         suspend fun overTurboReceive(): ProducerState {
             val key = consumer.turboKey ?: return ProducerState.Failed(SyncFailure.TURBO_NOT_SET_UP).also {
                 Diagnostics.log(Area.SEND, "Turbo: no key from the receiving phone yet; one sync over Wi-Fi tells it")
             }
-            _state.value = ProducerState.SettingUpTurbo
-            val port = consumer.lastAddress?.let(::parseAddress)?.port ?: ConsumerReceiver.PREFERRED_PORT
-            val epoch = DirectLink.epochAt(System.currentTimeMillis())
-            for (started in listOf(epoch, epoch - 1)) {
-                val (name, passphrase) = DirectLink.derived(key, started)
-                val outcome = try {
-                    overDirectLink(DirectLink(name, passphrase, host = "", port = port))
-                } finally {
-                    directLinks.leave()
+            _state.value = ProducerState.LookingForTurboReceive
+            val port = (consumer.wifiAddresses + listOfNotNull(consumer.lastAddress))
+                .firstNotNullOfOrNull { parseAddress(it)?.port } ?: ConsumerReceiver.PREFERRED_PORT
+            val search = since(0, turboSearch.searchMillis)
+            Diagnostics.log(Area.SEND, "Turbo: looking for a Turbo receive link of the receiving phone for $search")
+            val outcome = searchTurboReceive(key, port)
+            return when {
+                cancelled -> ProducerState.Idle().also {
+                    Diagnostics.log(Area.SEND, "Turbo: stopped looking for the receiving phone's Turbo receive link")
                 }
+
+                outcome == null -> ProducerState.Failed(SyncFailure.TURBO_UNREACHABLE).also {
+                    Diagnostics.log(Area.SEND, "Turbo: no Turbo receive link of the receiving phone nearby")
+                }
+
                 // Over a link of its own, nothing to go on over: what's left goes next time.
-                if (outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED) {
-                    return ProducerState.Failed(SyncFailure.CONNECTION_LOST)
-                }
-                if (outcome != null) return outcome
+                outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED ->
+                    ProducerState.Failed(SyncFailure.CONNECTION_LOST)
+
+                else -> outcome
             }
-            Diagnostics.log(Area.SEND, "Turbo: no Turbo receive link of the receiving phone nearby")
-            return ProducerState.Failed(SyncFailure.TURBO_UNREACHABLE)
+        }
+
+        /**
+         * Joins the link of [key] the consumer started in this epoch or the last, as soon as there is one, and sends
+         * over it. `null` if none came up in time, or the user stopped looking.
+         */
+        private suspend fun searchTurboReceive(key: ByteString, port: Int): ProducerState? {
+            val until = System.currentTimeMillis() + turboSearch.searchMillis
+            var looked: Long? = null
+            while (!cancelled) {
+                val now = System.currentTimeMillis()
+                for (started in DirectLink.epochsToLookFor(now, looked)) {
+                    if (cancelled) break
+                    val (name, passphrase) = DirectLink.derived(key, started)
+                    overTurboReceiveLink(DirectLink(name, passphrase, host = "", port = port))?.let { return it }
+                }
+                looked = DirectLink.epochAt(now)
+                val left = until - System.currentTimeMillis()
+                if (left <= 0) break
+                untilStopped { delay(minOf(turboSearch.pauseMillis, left)) }
+            }
+            return null
+        }
+
+        /** Joins [link], unless the user stops first, and sends over it; `null` if it wasn't joined. */
+        private suspend fun overTurboReceiveLink(link: DirectLink): ProducerState? = try {
+            untilStopped { join(link, turboSearch.joinMillis) }?.let { joined -> overJoinedLink(link, joined) }
+        } finally {
+            directLinks.leave()
         }
 
         /** How it ended over [link]; `null` if it couldn't be joined. A link dropping goes on over Wi-Fi. */
         private suspend fun overDirectLink(link: DirectLink): ProducerState? {
             val timeout = if (link.kind == LinkKind.WIFI_AWARE) AWARE_JOIN_TIMEOUT_MILLIS else JOIN_TIMEOUT_MILLIS
-            val joined = directLinks.join(link, timeout)
-            if (joined == null) {
-                Diagnostics.log(Area.SEND, "Turbo: couldn't join $link within ${since(0, timeout)}")
-                return null
+            return join(link, timeout)?.let { joined -> overJoinedLink(link, joined) }
+        }
+
+        private suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? =
+            directLinks.join(link, timeoutMillis).also { joined ->
+                if (joined == null) {
+                    Diagnostics.log(Area.SEND, "Turbo: couldn't join $link within ${since(0, timeoutMillis)}")
+                }
             }
+
+        /** How it ended over [link], [joined] already; `null` if the consumer didn't answer on it. */
+        private fun overJoinedLink(link: DirectLink, joined: JoinedLink): ProducerState? {
             // Where the phone that opened the link is on it: it said so, but the link knows best.
             val direct = connectOver(joined, link.port, consumer.id) ?: return null
             Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host.hostAddress}")
@@ -587,6 +680,7 @@ class ProducerSync @Inject constructor(
                     turboKey = result.consumerTurboKey,
                     pairSecret = result.consumerPairSecret,
                     rendezvousUrl = result.consumerRendezvousUrl,
+                    wifiAddresses = result.consumerWifiAddresses,
                 ),
             )
             if (!result.cancelled) history.recordSync(System.currentTimeMillis(), result.deferred)
@@ -601,11 +695,15 @@ class ProducerSync @Inject constructor(
         else -> SyncFailure.CONNECTION_LOST
     }
 
-    /** The last known address first (fast), then whatever the network advertises (moved to a new IP). */
+    /**
+     * Where the consumer said it listens on this phone's Wi-Fi, and where it was last reached, first (fast); then
+     * whatever the network advertises (docs/PLAN.md §8.2): mDNS doesn't get through on every Wi-Fi.
+     */
     private suspend fun connect(consumer: Peer): PeerConnection? {
-        consumer.lastAddress?.let { address ->
-            connectToFirst(listOf(address), consumer.id)?.let { return it }
-            Diagnostics.log(Area.SEND, "Not at its last address $address; looking for it on the network")
+        val known = addressesToTry(consumer.lastAddress, consumer.wifiAddresses, sockets::isOnLocalNetwork)
+        if (known.isNotEmpty()) {
+            connectToFirst(known, consumer.id)?.let { return it }
+            Diagnostics.log(Area.SEND, "Not at ${known.joinToString(" or ")}; looking for it on the network")
         }
         val found = discovery.find(serviceIdOf(consumer.id), DISCOVERY_TIMEOUT_MILLIS)
         if (found == null) {
@@ -623,6 +721,22 @@ class ProducerSync @Inject constructor(
                     "Found at $found"
                 },
             )
+        }
+    }
+
+    /** [block]'s outcome; or `null` at once when the user stops the sync ([cancel]), which cancels [block]. */
+    private suspend fun <T> untilStopped(block: suspend () -> T): T? = coroutineScope {
+        val work = async { block() }
+        val stop = launch { while (!cancelled) delay(STOP_POLL_MILLIS) }
+        select {
+            work.onAwait { outcome ->
+                stop.cancel()
+                outcome
+            }
+            stop.onJoin {
+                work.cancel()
+                null
+            }
         }
     }
 
@@ -646,6 +760,9 @@ class ProducerSync @Inject constructor(
 
     private companion object {
         const val DISCOVERY_TIMEOUT_MILLIS = 5_000L
+
+        /** How soon what waits for a link stops once the user stops the sync. */
+        const val STOP_POLL_MILLIS = 200L
         const val ESTIMATE_REFRESH_MILLIS = 1_000L
         const val LINK_TEST_MILLIS = 5_000L
 

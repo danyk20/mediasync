@@ -20,6 +20,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
@@ -97,6 +98,7 @@ class DiagnosticsReport @Inject constructor(
             val record = history.record.value
             listOf(
                 Fact("Sends to", consumer?.id?.short() ?: "not paired"),
+                Fact("Finds it at", whereToFind(consumer)),
                 Fact("Schedule", (consumer?.schedule?.encode() ?: "daily@03:00") + " (the receiving phone's)"),
                 Fact("Photo details", settings.photoDetails.first().name.lowercase()),
                 Fact("Last sync", record.lastSyncMillis?.let { at(it) } ?: "never"),
@@ -111,6 +113,16 @@ class DiagnosticsReport @Inject constructor(
         )
 
         null -> emptyList()
+    }
+
+    /**
+     * Where a sending phone looks for its receiving phone before asking the network (docs/PLAN.md §8.2): where it last
+     * reached it, and where the receiving phone said it is on its Wi-Fi; without the addresses' last part.
+     */
+    private fun whereToFind(consumer: Peer?): String {
+        val last = consumer?.lastAddress?.let { "${Sanitizer.clean(it)} (last reached)" }
+        val told = consumer?.wifiAddresses.orEmpty().map { "${Sanitizer.clean(it)} (its Wi-Fi)" }
+        return (listOfNotNull(last) + told).joinToString().ifEmpty { "nowhere yet" }
     }
 
     /** Whether sending phones can wake this phone over the internet, as last checked (docs/PLAN.md §10.4). */

@@ -400,6 +400,17 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, actions: Paired
             icon = MediaSyncIcons.Turbo,
         )
 
+        ProducerState.LookingForTurboReceive -> {
+            StatusCard(
+                title = stringResource(R.string.producer_turbo_looking_title, consumer),
+                body = stringResource(R.string.producer_turbo_looking_body, consumer),
+                icon = MediaSyncIcons.Turbo,
+            )
+            OutlinedButton(onClick = actions.onStop, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.producer_stop))
+            }
+        }
+
         is ProducerState.Failed -> {
             StatusCard(
                 title = stringResource(R.string.producer_status_failed_title),
