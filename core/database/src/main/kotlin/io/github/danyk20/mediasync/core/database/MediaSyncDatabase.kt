@@ -19,7 +19,7 @@ import androidx.room.RoomDatabase
         BackupReceiptEntity::class,
         LeftOutItemEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2), // peers.schedule
@@ -27,6 +27,7 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 3, to = 4), // connector_accounts, backup_receipts
         AutoMigration(from = 4, to = 5), // peers.pairSecret, peers.rendezvousUrl
         AutoMigration(from = 5, to = 6), // left_out_items
+        AutoMigration(from = 6, to = 7), // peers.wifiAddresses
     ],
 )
 abstract class MediaSyncDatabase : RoomDatabase() {

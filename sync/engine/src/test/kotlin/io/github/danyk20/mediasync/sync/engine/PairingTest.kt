@@ -35,6 +35,7 @@ class PairingTest {
     private val received = FakeReceivedLedger()
     private val sink = FakeMediaSink()
     private var consumerSchedule: SyncSchedule? = null
+    private var consumerWifi: List<String> = emptyList()
 
     private fun pair(
         gate: FakePairingGate,
@@ -62,8 +63,13 @@ class PairingTest {
         return producer.getOrThrow() to consumer.getOrThrow()
     }
 
-    private fun consumerSession(gate: PairingGate) =
-        ConsumerSession(LocalDevice("Pixel 2 XL", "1.0", consumerSchedule), registry, received, sink, gate)
+    private fun consumerSession(gate: PairingGate) = ConsumerSession(
+        LocalDevice("Pixel 2 XL", "1.0", consumerSchedule, wifiAddresses = consumerWifi),
+        registry,
+        received,
+        sink,
+        gate,
+    )
 
     @Test
     fun `the producer learns the consumer's schedule when pairing and in every sync`() {
@@ -74,6 +80,20 @@ class PairingTest {
         // Changed on the consumer since: the next session brings the new one.
         consumerSchedule = SyncSchedule.WhileCharging
         sync(FakeMediaSource(), FakeSentLedger()).first.consumerSchedule shouldBe SyncSchedule.WhileCharging
+    }
+
+    @Test
+    fun `in every sync the producer learns where the consumer is on its Wi-Fi now`() {
+        consumerWifi = listOf("192.168.1.20:47420")
+        pair(FakePairingGate(token))
+
+        sync(FakeMediaSource(), FakeSentLedger()).first.consumerWifiAddresses shouldBe listOf("192.168.1.20:47420")
+
+        // Moved to another Wi-Fi since: the next session brings the new address; on none, nothing.
+        consumerWifi = listOf("10.128.0.57:47420")
+        sync(FakeMediaSource(), FakeSentLedger()).first.consumerWifiAddresses shouldBe listOf("10.128.0.57:47420")
+        consumerWifi = emptyList()
+        sync(FakeMediaSource(), FakeSentLedger()).first.consumerWifiAddresses shouldBe null
     }
 
     @Test

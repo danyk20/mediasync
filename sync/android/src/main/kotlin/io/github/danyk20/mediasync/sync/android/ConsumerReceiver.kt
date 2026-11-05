@@ -83,7 +83,8 @@ data class ReceiverState(
  * has one, and stores what they send (docs/PLAN.md §5, §8.2, §8.4).
  *
  * It listens while something needs it ([hold]): an open screen, or a scheduled receive window running in the
- * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule.
+ * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule, and
+ * where it listens on its Wi-Fi.
  */
 @Singleton
 @Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
@@ -259,14 +260,23 @@ class ConsumerReceiver internal constructor(
      * address (not on Wi-Fi).
      */
     fun openPairing(): PairingLink? {
-        val port = _state.value.port ?: return null
-        val local = pairingAddresses(addresses.localAddresses()).map { formatAddress(it, port) }
+        val local = wifiAddresses()
         if (local.isEmpty()) return null
         _state.update { it.copy(lastPaired = null) }
         return PairingLink(identity.identity().id, window.open(), local, device.local().name.take(MAX_NAME))
     }
 
     fun closePairing() = window.close()
+
+    /**
+     * Where this phone listens on its Wi-Fi now (`192.168.1.20:47420`): in pairing codes, and told to paired phones in
+     * every session, so they find it also where mDNS doesn't get through (docs/PLAN.md §8.2). Empty while it isn't
+     * listening, or on no Wi-Fi.
+     */
+    private fun wifiAddresses(): List<String> {
+        val port = _state.value.port ?: return emptyList()
+        return pairingAddresses(addresses.localAddresses()).map { formatAddress(it, port) }
+    }
 
     /** How much more this phone can receive; 0 when its storage is full (docs/PLAN.md §2.2). */
     fun freeBytes(): Long = sink.availableBytes()
@@ -338,7 +348,7 @@ class ConsumerReceiver internal constructor(
         sessionStarts(producer)
         connection.use {
             val session = ConsumerSession(
-                device.local(),
+                device.local().copy(wifiAddresses = wifiAddresses()),
                 peers,
                 ledger,
                 sink,

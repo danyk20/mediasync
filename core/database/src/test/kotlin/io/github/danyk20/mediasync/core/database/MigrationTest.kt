@@ -160,6 +160,35 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun version6PairingsSurviveAndHaveNoWifiAddressesYet() = runTest {
+        helper.createDatabase(NAME, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO peers (deviceId, name, role, pairedAtMillis, lastAddress) " +
+                    "VALUES ('${consumer.hex}', 'Pixel 2 XL', 'CONSUMER', 1, '192.168.43.20:47420')",
+            )
+        }
+
+        helper.runMigrationsAndValidate(NAME, 7, true).close()
+
+        val database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MediaSyncDatabase::class.java,
+            NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val peers = PeerStore(database.peerDao())
+            peers.consumer()?.lastAddress shouldBe "192.168.43.20:47420"
+            peers.consumer()?.wifiAddresses shouldBe emptyList()
+
+            peers.recordConsumer(consumer, ConsumerFacts(wifiAddresses = listOf("10.128.0.57:47420")))
+
+            peers.consumer()?.wifiAddresses shouldBe listOf("10.128.0.57:47420")
+        } finally {
+            database.close()
+        }
+    }
+
     private companion object {
         const val NAME = "migration-test.db"
     }

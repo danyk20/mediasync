@@ -81,6 +81,17 @@ data class DirectLink(
         /** The *Turbo receive* epoch at [millis]: a consumer's network keeps its name this long. */
         fun epochAt(millis: Long): Long = millis / EPOCH_MILLIS
 
+        /**
+         * A producer waiting for the consumer's *Turbo receive* link: the epochs whose names to look for at [now],
+         * having last looked in [lastLooked] (`null` the first time). The current epoch's, as a link started now has
+         * that name; and the previous one's, unless already looked for since it ended: a link started then keeps its
+         * name.
+         */
+        fun epochsToLookFor(now: Long, lastLooked: Long?): List<Long> {
+            val current = epochAt(now)
+            return if (lastLooked == current) listOf(current) else listOf(current, current - 1)
+        }
+
         /** In MediaSync's network names, so it only ever removes its own. */
         const val NAME_MARKER = "-MediaSync"
 
