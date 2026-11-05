@@ -125,6 +125,8 @@
     <string name="producer_turbo_declined">Turbo потребує дозволу на підключення до пристроїв поблизу (геолокація, до Android 13). Дозвольте його в налаштуваннях MediaSync.</string>
     <string name="producer_turbo_setting_up_title">Налаштування Turbo з %1$s…</string>
     <string name="producer_turbo_setting_up_body">Напряму з’єднуємо два телефони. Це займе кілька секунд.</string>
+    <string name="producer_turbo_looking_title">Пошук %1$s поблизу…</string>
+    <string name="producer_turbo_looking_body">%1$s не в цій мережі Wi-Fi. На %1$s відкрийте MediaSync і натисніть «Прийом Turbo». Тримайте два телефони близько один до одного.</string>
     <string name="producer_turbo_sending_title">Надсилання на %1$s через Turbo</string>
     <string name="producer_internet_sending_title">Надсилання на %1$s через інтернет</string>
     <string name="producer_mobile_data_cap_title">Місячний ліміт мобільного інтернету</string>

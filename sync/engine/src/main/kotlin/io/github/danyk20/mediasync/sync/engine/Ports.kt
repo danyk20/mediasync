@@ -117,6 +117,8 @@ fun interface PairingGate {
  * @property turboKey consumer only: what its *Turbo receive* links derive from, told to paired producers only
  *   (docs/PLAN.md §8.3).
  * @property rendezvousUrl consumer only: its rendezvous Worker for internet sync (PLAN §8.4), told to paired producers.
+ * @property wifiAddresses consumer only: where it listens on its Wi-Fi now (`192.168.1.20:47420`), told to paired
+ *   producers, which try them where mDNS doesn't get through (docs/PLAN.md §8.2).
  */
 data class LocalDevice(
     val name: String,
@@ -124,6 +126,7 @@ data class LocalDevice(
     val schedule: SyncSchedule? = null,
     val turboKey: ByteString? = null,
     val rendezvousUrl: String? = null,
+    val wifiAddresses: List<String> = emptyList(),
 ) {
     /** Never the key: this ends up in logs. */
     override fun toString() = "LocalDevice($name, $appVersion, $schedule)"

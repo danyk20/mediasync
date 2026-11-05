@@ -42,6 +42,12 @@ class MessageCodecTest {
                 }.toByteString(),
             ),
             Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, pairSecret = ByteArray(32) { 7 }.toByteString()),
+            Hello(
+                PROTOCOL_VERSION,
+                "Pixel 2 XL",
+                WireRole.CONSUMER,
+                wifiAddresses = listOf("192.168.1.20:47420", "[fd00::20]:47420"),
+            ),
             PairRequest(token = "0123456789abcdef".encodeUtf8()),
             PairResult(accepted = false, reason = PairResult.Reason.DECLINED),
             Offer(listOf(offerItem(1), offerItem(2).copy(capturedAtMillis = null, album = null))),
