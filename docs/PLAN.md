@@ -999,8 +999,9 @@ How a scheduled sync runs:
   - Android 14+ batches background jobs, so a window or a producer's sync may start up to ~31 minutes after its time (seen on API 36: `max_cpu_only_job_batch_delay_ms`). Producers that arrive too early retry every 15 minutes; the hour of quiet leaves each at least two tries while the window is open.
 - **Staggered starts.** Producers spread their start over a few random minutes so they don't all connect at once. The consumer still shares bandwidth fairly (§5.4).
 - **Retries.**
-  - If a due producer can't reach the consumer, it retries every 15 minutes while charging. From M5 it also asks the Worker to wake the consumer (§10.4).
+  - If a due producer can't reach the consumer, it retries while charging: after 15 minutes, then 15 more each time (30, 45, 60…). From M5 it also asks the Worker to wake the consumer (§10.4).
   - Each attempt is a short job. The foreground service starts only once a transfer actually begins.
+  - *Fixed (M6, after a real-phone test):* Android starts the app for each try, and the app then plans its background work again. A try without Wi-Fi ends at once, so that planning found nothing running and replaced the waiting retry: the wait started over at 15 minutes, and another try ran right away (a Galaxy S22 tried every 15 to 30 minutes all night). A run waiting to try again now stays, unless the schedule changed meanwhile. Each run carries its plan as a tag for that.
 - **Timing accuracy.**
   - Scheduling uses WorkManager: one-time work delayed to the next due time, with `requiresCharging`, re-enqueued after each run.
   - Doze doesn't apply while a phone is charging, and app-standby limits are relaxed. Job batching can still start the sync up to ~31 minutes after 03:00 on Android 14+ (see the receive window above).

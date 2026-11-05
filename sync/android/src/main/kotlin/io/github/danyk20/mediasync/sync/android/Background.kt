@@ -178,7 +178,8 @@ class ScheduleState @Inject constructor(@ApplicationContext context: Context) {
  * - *Whenever charging*: a sending phone syncs when it's charging and has new photos; a receiving phone
  *   listens while it's charging. *Manual*: nothing runs in the background.
  *
- * A finished run queues the next one behind itself, so changing the schedule never cancels a transfer.
+ * A finished run queues the next one behind itself, so changing the schedule never cancels a transfer. A run waiting
+ * to try again keeps its wait when Android starts the app for it, unless the schedule changed meanwhile.
  */
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -291,9 +292,18 @@ class SyncScheduler @Inject constructor(
             Diagnostics.log(Area.SCHEDULE, "Nothing runs in the background: ${plan.role.name.lowercase()}, manual")
             return
         }
-        // A run in progress queues the next one itself when it ends, with the schedule as it is then.
-        if (isRunning(plan.role)) {
-            Diagnostics.log(Area.SCHEDULE, "A ${plan.role.name.lowercase()} run is in progress; it queues the next")
+        val stays = when {
+            // It queues the next run itself when it ends, with the schedule as it is then.
+            isRunning(plan.role) -> "is in progress; it queues the next"
+
+            // Android starts the app for each try, and a try without Wi-Fi ends at once. Replaced then, the run would
+            // start over at the first wait, and run once more right away.
+            retryWaiting(plan) -> "waits to try again; it stays"
+
+            else -> null
+        }
+        if (stays != null) {
+            Diagnostics.log(Area.SCHEDULE, "A ${plan.role.name.lowercase()} run $stays")
             return
         }
         val delay = delayOf(plan)
@@ -307,6 +317,12 @@ class SyncScheduler @Inject constructor(
     private suspend fun isRunning(role: DeviceRole) =
         workManager.getWorkInfosForUniqueWorkFlow(nameOf(role)).first().any { it.state == WorkInfo.State.RUNNING }
 
+    /** [plan]'s run tried, and waits to try again (WorkManager's growing wait). */
+    private suspend fun retryWaiting(plan: BackgroundPlan) =
+        workManager.getWorkInfosForUniqueWorkFlow(nameOf(plan.role)).first().any { run ->
+            run.state == WorkInfo.State.ENQUEUED && run.runAttemptCount > 0 && planTagOf(plan) in run.tags
+        }
+
     private fun request(plan: BackgroundPlan, delay: Duration = delayOf(plan)): OneTimeWorkRequest =
         OneTimeWorkRequest.Builder(workerOf(plan.role))
             .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
@@ -315,6 +331,7 @@ class SyncScheduler @Inject constructor(
             // try again while charging (docs/PLAN.md §10.1).
             .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
             .addTag(TAG)
+            .addTag(planTagOf(plan))
             .build()
 
     /**
@@ -322,13 +339,15 @@ class SyncScheduler @Inject constructor(
      * (docs/PLAN.md §10.1). With the battery held below full, WorkManager stops a job it doesn't count as charging
      * at once, and Android's job scheduler, which does count it, starts it again: many times a second.
      */
-    fun runWhilePluggedIn(role: DeviceRole) {
+    suspend fun runWhilePluggedIn(role: DeviceRole) {
         val constraints = Constraints.Builder().setRequiresStorageNotLow(role == DeviceRole.CONSUMER).build()
+        val plan = plans().first()?.takeIf { it.role == role }
         val request = OneTimeWorkRequest.Builder(workerOf(role))
             .setConstraints(constraints)
             .setInputData(Data.Builder().putBoolean(PLUGGED_IN, true).build())
             .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
             .addTag(TAG)
+            .apply { plan?.let { addTag(planTagOf(it)) } }
             .build()
         workManager.enqueueUniqueWork(nameOf(role), ExistingWorkPolicy.REPLACE, request)
         Diagnostics.log(
@@ -372,6 +391,9 @@ class SyncScheduler @Inject constructor(
             DeviceRole.PRODUCER -> "scheduled-sync"
             DeviceRole.CONSUMER -> "receive-window"
         }
+
+        /** Which plan a run was queued for: a run waiting to try again stays only while that's still the plan. */
+        internal fun planTagOf(plan: BackgroundPlan) = "mediasync-plan:${plan.role.name}:${plan.schedule.encode()}"
 
         /** How long before a due time a receive window opens. */
         fun leadOf(role: DeviceRole): Duration =
