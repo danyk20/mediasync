@@ -33,7 +33,7 @@ serialization = "1.11.0"
 okhttp = "5.5.0"
 webrtc = "150.7871.01"
 # Firebase Cloud Messaging, for waking the receiving phone over the internet (docs/PLAN.md §10.4).
-firebaseBom = "34.19.0"
+firebaseBom = "35.1.0"
 googleServices = "4.5.0"
 zxing = "3.5.4"
 
