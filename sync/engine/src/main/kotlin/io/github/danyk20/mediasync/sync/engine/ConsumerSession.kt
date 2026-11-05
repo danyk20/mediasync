@@ -94,6 +94,7 @@ class ConsumerSession(
                 local.turboKey?.takeIf { paired } ?: ByteString.EMPTY, // Only for phones paired already.
                 (if (paired) registry.pairSecret(connection.peerId) else null) ?: ByteString.EMPTY,
                 local.rendezvousUrl?.takeIf { paired }.orEmpty(),
+                local.wifiAddresses.takeIf { paired }.orEmpty(),
             ),
         )
         if (hello.protocolVersion != PROTOCOL_VERSION || hello.role != WireRole.PRODUCER) {

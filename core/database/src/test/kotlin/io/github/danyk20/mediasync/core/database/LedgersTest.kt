@@ -109,6 +109,26 @@ class LedgersTest {
     }
 
     @Test
+    fun theConsumersWifiAddressesAreKeptUntilItTellsNewOnes() = runTest {
+        val peers = PeerStore(database.peerDao())
+        peers.register(PairedPeer(consumer, "Pixel 2 XL", DeviceRole.CONSUMER), address = "192.168.43.20:47420")
+        peers.consumer()?.wifiAddresses shouldBe emptyList()
+
+        peers.recordConsumer(consumer, ConsumerFacts(wifiAddresses = listOf("10.128.0.57:47420", "[fd00::57]:47420")))
+
+        peers.consumer()?.wifiAddresses shouldBe listOf("10.128.0.57:47420", "[fd00::57]:47420")
+        peers.consumer()?.lastAddress shouldBe "192.168.43.20:47420" // Where it was reached stays apart.
+
+        // On no Wi-Fi, or an older version: what it said last stays.
+        peers.recordConsumer(consumer, ConsumerFacts(wifiAddresses = null))
+        peers.recordConsumer(consumer, ConsumerFacts(wifiAddresses = emptyList()))
+        peers.consumer()?.wifiAddresses shouldBe listOf("10.128.0.57:47420", "[fd00::57]:47420")
+
+        peers.recordConsumer(consumer, ConsumerFacts(wifiAddresses = listOf("192.168.1.57:47420")))
+        peers.consumer()?.wifiAddresses shouldBe listOf("192.168.1.57:47420")
+    }
+
+    @Test
     fun leftOutItemsAreKeptByFingerprintUntilBroughtBack() = runTest {
         val store = LeftOutStore(database.leftOutItemDao())
         // More than SQLite takes in one statement on older phones.

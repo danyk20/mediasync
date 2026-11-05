@@ -577,6 +577,16 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun turbo_awayFromTheWifiWaitsForTurboReceiveUntilStopped() {
+        show(paired.copy(sync = ProducerState.LookingForTurboReceive))
+
+        composeRule.onNodeWithText("Looking for Pixel 2 XL nearby…").assertIsDisplayed()
+        composeRule.onNodeWithText("open MediaSync and tap Turbo receive", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Stop").performClick()
+        events shouldBe listOf("stop")
+    }
+
+    @Test
     fun turbo_awayFromTheWifiNeedsOneSyncOnItFirst() {
         show(paired.copy(sync = ProducerState.Failed(SyncFailure.TURBO_NOT_SET_UP)))
         composeRule.onNodeWithText("sync once on the same Wi-Fi first", substring = true).assertIsDisplayed()

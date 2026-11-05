@@ -125,6 +125,8 @@
     <string name="producer_turbo_declined">Turbo potřebuje povolení připojovat se k okolním zařízením (poloha, před Androidem 13). Povolte to v nastavení MediaSync.</string>
     <string name="producer_turbo_setting_up_title">Nastavuji Turbo s %1$s…</string>
     <string name="producer_turbo_setting_up_body">Přímo propojujeme oba telefony. Trvá to několik sekund.</string>
+    <string name="producer_turbo_looking_title">Hledám %1$s poblíž…</string>
+    <string name="producer_turbo_looking_body">%1$s není na této Wi-Fi. Na %1$s otevřete MediaSync a klepněte na Příjem Turbo. Držte oba telefony blízko u sebe.</string>
     <string name="producer_turbo_sending_title">Odesílám na %1$s přes Turbo</string>
     <string name="producer_internet_sending_title">Odesílám na %1$s přes internet</string>
     <string name="producer_mobile_data_cap_title">Měsíční limit mobilních dat</string>
