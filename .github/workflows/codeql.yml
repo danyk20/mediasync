@@ -3,9 +3,18 @@ name: CodeQL
 on:
   push:
     branches: [main]
+  # Not for a pull request that changes only docs: nothing CodeQL reads.
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   schedule:
     - cron: "41 4 * * 1"
+
+# A newer push to a pull request makes its running analysis pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -45,9 +54,13 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+      # Compiles everything the app is built from (Kotlin, Java, KSP and Hilt: the same compile tasks as
+      # :app:assembleDebug) without dexing or packaging it, which CodeQL doesn't read.
       - if: matrix.build-mode == 'manual'
         name: Build (CodeQL observes the compiler)
-        run: ./gradlew :app:assembleDebug --no-build-cache --no-configuration-cache --rerun-tasks
+        run: >
+          ./gradlew :app:compileDebugJavaWithJavac :app:hiltJavaCompileDebug
+          --no-build-cache --no-configuration-cache --rerun-tasks
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:${{ matrix.language }}
