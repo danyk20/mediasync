@@ -256,9 +256,9 @@ jobs:
             exit 1
           fi
 
-  # One job per API level, side by side on their own runners. Branch protection requires the summary's name.
+  # Two jobs per API level, side by side on their own runners. Branch protection requires the summary's name.
   instrumented-tests:
-    name: Instrumented tests (API ${{ matrix.api }})
+    name: Instrumented tests (API ${{ matrix.api }}, part ${{ matrix.part }} of 2)
     needs: changes
     # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
     if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
@@ -266,8 +266,12 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      # Each module's device tests boot an emulator of their own, one after another: most of a job. Split over two
+      # jobs, three modules each, an API level takes about half as long. Part 2 takes every module part 1 doesn't, so
+      # a module that gains device tests runs without a change here.
       matrix:
         api: [29, 36]
+        part: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -295,11 +299,21 @@ jobs:
           done' > memory.log 2>&1 &
       # One Gradle call: it creates the emulator and boots it once for its snapshot (about a minute) while it compiles
       # the app and the test APKs, then runs each module's tests.
-      - name: Run on API ${{ matrix.api }}
+      # Part 2 also sets the app's emulator up: the other modules' setups wait for it (build-logic), so it's set up once.
+      - name: Run on API ${{ matrix.api }}, part ${{ matrix.part }}
         id: device-tests
-        run: >
-          ./gradlew api${{ matrix.api }}DebugAndroidTest
-          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+        env:
+          API: ${{ matrix.api }}
+          PART: ${{ matrix.part }}
+        run: |
+          first=(:app :sync:android :core:crypto)
+          if [ "$PART" = 1 ]; then
+            tasks=("${first[@]/%/:api${API}DebugAndroidTest}")
+          else
+            tasks=(":app:api${API}Setup" "api${API}DebugAndroidTest")
+            for module in "${first[@]}"; do tasks+=(-x "${module}:api${API}DebugAndroidTest"); done
+          fi
+          ./gradlew "${tasks[@]}" -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       # How many tests ran in each module, from Gradle's results: a module whose tests didn't run shows up missing.
       - name: Device tests per module
         if: ${{ !cancelled() }}
@@ -313,7 +327,7 @@ jobs:
               row[0] += int(suite.get("tests", 0))
               row[1] += int(suite.get("skipped", 0))
               row[2] += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
-          print("### Device tests on API ${{ matrix.api }}\n\n| Module | Tests | Skipped | Failed |\n|---|---|---|---|")
+          print("### Device tests on API ${{ matrix.api }}, part ${{ matrix.part }}\n\n| Module | Tests | Skipped | Failed |\n|---|---|---|---|")
           for module, (tests, skipped, failed) in sorted(rows.items()):
               print(f"| `{module}` | {tests} | {skipped} | {failed} |")
           totals = [sum(row[i] for row in rows.values()) for i in range(3)]
@@ -330,7 +344,7 @@ jobs:
         if: always() && steps.device-tests.outcome != 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: instrumented-test-reports-api${{ matrix.api }}
+          name: instrumented-test-reports-api${{ matrix.api }}-part${{ matrix.part }}
           path: |
             **/build/reports/androidTests/
             **/build/outputs/androidTest-results/
