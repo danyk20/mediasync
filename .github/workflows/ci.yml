@@ -154,11 +154,20 @@ jobs:
           path: benchmark-history
           key: benchmark-${{ github.run_id }}
           restore-keys: benchmark-
-      # Shared CI machines vary a lot: only a halving fails the check.
+      # GitHub's runners don't all have the same CPU, and on the same code runs measured either 218–265 MB/s or
+      # 535–604 MB/s (one 128 MB video over TLS): a slow runner after a fast one failed the check. Each CPU model keeps
+      # its own history, so a run is compared with one on the same kind of machine.
+      - name: Runner CPU
+        id: cpu
+        run: |
+          model=$(lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -n 1)
+          echo "Runner CPU: ${model:-unknown}"
+          echo "model=${model:-unknown}" >> "$GITHUB_OUTPUT"
+      # Shared CI machines still vary: only a halving fails the check.
       - name: Compare with earlier results
         uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
-          name: Sync throughput
+          name: Sync throughput on ${{ steps.cpu.outputs.model }}
           tool: customBiggerIsBetter
           output-file-path: transport/lan/build/benchmark/results.json
           external-data-json-path: benchmark-history/data.json
