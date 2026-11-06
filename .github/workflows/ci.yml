@@ -291,6 +291,25 @@ jobs:
         run: >
           ./gradlew api${{ matrix.api }}DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+      # How many tests ran in each module, from Gradle's results: a module whose tests didn't run shows up missing.
+      - name: Device tests per module
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          rows = {}
+          for path in glob.glob("**/build/outputs/androidTest-results/managedDevice/**/TEST-*.xml", recursive=True):
+              suite = ET.parse(path).getroot()
+              row = rows.setdefault(path.split("/build/")[0], [0, 0, 0])
+              row[0] += int(suite.get("tests", 0))
+              row[1] += int(suite.get("skipped", 0))
+              row[2] += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+          print("### Device tests on API ${{ matrix.api }}\n\n| Module | Tests | Skipped | Failed |\n|---|---|---|---|")
+          for module, (tests, skipped, failed) in sorted(rows.items()):
+              print(f"| `{module}` | {tests} | {skipped} | {failed} |")
+          totals = [sum(row[i] for row in rows.values()) for i in range(3)]
+          print(f"| **Total** | **{totals[0]}** | {totals[1]} | {totals[2]} |")
+          EOF
       # always(): when the runner is stopped from outside, failure() steps are skipped.
       - name: Show why the tests stopped
         if: always() && steps.device-tests.outcome != 'success'
