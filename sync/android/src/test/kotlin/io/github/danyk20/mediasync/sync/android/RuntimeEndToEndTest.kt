@@ -766,6 +766,8 @@ class RuntimeEndToEndTest {
 
         val sending = async { producer.syncAndWait(turbo = true) }
         withTimeout(TIMEOUT) { producer.state.first { it == ProducerState.LookingForTurboReceive } }
+        // Stopped while it searches: once it has tried a link, not in the moment before its search begins.
+        withTimeout(TIMEOUT) { while (producerLinks.joinTries.get() == 0) delay(POLL) }
         val stopped = System.currentTimeMillis()
         producer.cancel()
 
@@ -813,6 +815,11 @@ private class FakeDirectLinks : DirectLinks {
     /** Which links this phone can join: any, or only those another phone opened. */
     var joinable: (DirectLink) -> Boolean = { true }
     var joined: DirectLink? = null
+
+    /** How often this phone tried to join a link. */
+    val joinTries = java.util.concurrent.atomic.AtomicInteger()
+
+    @Volatile
     var left = false
     val opened = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
     val kinds = java.util.concurrent.CopyOnWriteArrayList<LinkKind>()
@@ -837,6 +844,7 @@ private class FakeDirectLinks : DirectLinks {
     }
 
     override suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? {
+        joinTries.incrementAndGet()
         val joins = joinable(link)
         if (joins) joined = link
         return if (joins) JoinedLink(InetAddress.getByName("127.0.0.1")) else null
