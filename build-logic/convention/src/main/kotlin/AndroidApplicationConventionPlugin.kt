@@ -4,6 +4,7 @@
  */
 import app.cash.licensee.LicenseeExtension
 import com.android.build.api.dsl.ApplicationExtension
+import io.github.danyk20.mediasync.buildlogic.alignLifecycle
 import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
 import io.github.danyk20.mediasync.buildlogic.configureJava
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
@@ -61,6 +62,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
         }
 
         configureKotlin()
+        alignLifecycle()
         configureCodeQuality(koverSourceVariant = "debug")
     }
 }

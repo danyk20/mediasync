@@ -40,6 +40,15 @@ internal fun Lint.configureLint() {
     )
 }
 
+/**
+ * Every Android module gets at least the catalog's Lifecycle, also where a library brings an older one along (Compose
+ * brought 2.9.4 into core:designsystem). Lint loads each library's own checks, and older Lifecycle checks call lint
+ * APIs that Android Gradle Plugin 9.5 no longer has: lint then fails the build (`ObsoleteLintCustomCheck`).
+ */
+internal fun Project.alignLifecycle() {
+    dependencies.constraints.add("implementation", libs.library("androidx-lifecycle-runtime"))
+}
+
 internal fun UnitTestOptions.configureUnitTests() {
     // Needed by Robolectric and Compose UI tests running on the JVM.
     isIncludeAndroidResources = true
@@ -94,6 +103,9 @@ internal fun TestOptions.configureManagedDevices() {
                 apiLevel = spec.apiLevel
                 systemImageSource = "aosp"
                 testedAbi = hostAbi
+                // AGP still chose API 29's 32-bit x86 image, which the emulator Android Gradle Plugin 9.5 runs no
+                // longer starts ("Unable to start Android emulator for dev29_default_x86_Pixel_2").
+                require64Bit = true
             }
         }
         groups.create("ci") {

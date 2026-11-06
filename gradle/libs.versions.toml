@@ -1,6 +1,6 @@
 [versions]
 # Build
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 ksp = "2.3.12"
 
@@ -14,7 +14,7 @@ activityCompose = "1.13.0"
 browser = "1.10.0"
 composeBom = "2026.09.00"
 coreKtx = "1.19.1"
-datastore = "1.2.1"
+datastore = "1.3.0"
 hiltLifecycleViewmodelCompose = "1.4.0"
 lifecycle = "2.11.0"
 navigation3 = "1.2.0"
@@ -68,6 +68,7 @@ androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx"
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-hilt-lifecycle-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "hiltLifecycleViewmodelCompose" }
+androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }
