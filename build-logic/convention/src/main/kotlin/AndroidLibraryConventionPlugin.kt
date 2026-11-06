@@ -46,6 +46,12 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 variant.deviceTests[DeviceTestBuilder.ANDROID_TEST_TYPE]?.enable = hasDeviceTests
             }
         }
+        // CI runs the device tests in one Gradle call, so the emulator is set up while the code compiles. The app's
+        // setup goes first, and each module's then finds the emulator ready: two setting it up at once can fail.
+        val deviceSetup = Regex("api\\d+Setup")
+        tasks.configureEach {
+            if (deviceSetup.matches(name)) mustRunAfter(":app:$name")
+        }
 
         dependencies {
             "testImplementation"(libs.library("junit4"))

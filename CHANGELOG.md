@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/danyk20/mediasync/compare/v0.9.2...v0.9.3) (2026-11-06)
+
+
+### Bug Fixes
+
+* a sync waiting to try again keeps its wait when Android restarts the app ([#93](https://github.com/danyk20/mediasync/issues/93)) ([ab98048](https://github.com/danyk20/mediasync/commit/ab98048760d0cdfe062235cb1bebdbb72ed321db))
+
 ## [0.9.2](https://github.com/danyk20/mediasync/compare/v0.9.1...v0.9.2) (2026-11-05)
 
 

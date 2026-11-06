@@ -154,11 +154,20 @@ jobs:
           path: benchmark-history
           key: benchmark-${{ github.run_id }}
           restore-keys: benchmark-
-      # Shared CI machines vary a lot: only a halving fails the check.
+      # GitHub's runners don't all have the same CPU, and on the same code runs measured either 218–265 MB/s or
+      # 535–604 MB/s (one 128 MB video over TLS): a slow runner after a fast one failed the check. Each CPU model keeps
+      # its own history, so a run is compared with one on the same kind of machine.
+      - name: Runner CPU
+        id: cpu
+        run: |
+          model=$(lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -n 1)
+          echo "Runner CPU: ${model:-unknown}"
+          echo "model=${model:-unknown}" >> "$GITHUB_OUTPUT"
+      # Shared CI machines still vary: only a halving fails the check.
       - name: Compare with earlier results
         uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
-          name: Sync throughput
+          name: Sync throughput on ${{ steps.cpu.outputs.model }}
           tool: customBiggerIsBetter
           output-file-path: transport/lan/build/benchmark/results.json
           external-data-json-path: benchmark-history/data.json
@@ -272,7 +281,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       # Downloaded each time: caching an image (1–2 GB) would push the Gradle caches out of the repository's 10 GB.
-      - name: Install the emulator image
+      - name: Download the emulator and its system image
         run: scripts/install-emulator-image.sh ${{ matrix.api }}
       # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
       # alive: each test task boots its own, and they keep running for a while after it ends. Two API 36 emulators
@@ -284,11 +293,32 @@ jobs:
             echo "$(date -u +%T) $(free -m | awk "/^Mem:/ {print \"used=\" \$3 \"MB available=\" \$7 \"MB\"}") disk_free=$(df -m / | awk "NR==2 {print \$4}")MB emulators=$(pgrep -c qemu-system || true)"
             sleep 10
           done' > memory.log 2>&1 &
+      # One Gradle call: it creates the emulator and boots it once for its snapshot (about a minute) while it compiles
+      # the app and the test APKs, then runs each module's tests.
       - name: Run on API ${{ matrix.api }}
         id: device-tests
         run: >
           ./gradlew api${{ matrix.api }}DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+      # How many tests ran in each module, from Gradle's results: a module whose tests didn't run shows up missing.
+      - name: Device tests per module
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          rows = {}
+          for path in glob.glob("**/build/outputs/androidTest-results/managedDevice/**/TEST-*.xml", recursive=True):
+              suite = ET.parse(path).getroot()
+              row = rows.setdefault(path.split("/build/")[0], [0, 0, 0])
+              row[0] += int(suite.get("tests", 0))
+              row[1] += int(suite.get("skipped", 0))
+              row[2] += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+          print("### Device tests on API ${{ matrix.api }}\n\n| Module | Tests | Skipped | Failed |\n|---|---|---|---|")
+          for module, (tests, skipped, failed) in sorted(rows.items()):
+              print(f"| `{module}` | {tests} | {skipped} | {failed} |")
+          totals = [sum(row[i] for row in rows.values()) for i in range(3)]
+          print(f"| **Total** | **{totals[0]}** | {totals[1]} | {totals[2]} |")
+          EOF
       # always(): when the runner is stopped from outside, failure() steps are skipped.
       - name: Show why the tests stopped
         if: always() && steps.device-tests.outcome != 'success'
