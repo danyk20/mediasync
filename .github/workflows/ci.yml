@@ -267,8 +267,8 @@ jobs:
     strategy:
       fail-fast: false
       # Each module's device tests boot an emulator of their own, one after another: most of a job. Split over two
-      # jobs, three modules each, an API level takes about half as long. Part 2 takes every module part 1 doesn't, so
-      # a module that gains device tests runs without a change here.
+      # jobs, an API level takes about half as long: part 1 the two slowest modules (app, sync:android), part 2 every
+      # other module, so a module that gains device tests runs without a change here.
       matrix:
         api: [29, 36]
         part: [1, 2]
@@ -306,7 +306,7 @@ jobs:
           API: ${{ matrix.api }}
           PART: ${{ matrix.part }}
         run: |
-          first=(:app :sync:android :core:crypto)
+          first=(:app :sync:android)
           if [ "$PART" = 1 ]; then
             tasks=("${first[@]/%/:api${API}DebugAndroidTest}")
           else
