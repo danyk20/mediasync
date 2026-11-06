@@ -266,10 +266,6 @@ jobs:
     if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Two Gradle calls here (emulator setup, then the tests): the second reuses the first's daemon instead of starting
-    # Gradle again. setup-gradle stops it at the end of the job.
-    env:
-      GRADLE_OPTS: -Dorg.gradle.daemon=true
     strategy:
       fail-fast: false
       matrix:
@@ -289,7 +285,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       # Downloaded each time: caching an image (1–2 GB) would push the Gradle caches out of the repository's 10 GB.
-      - name: Install the emulator image
+      - name: Download the emulator and its system image
         run: scripts/install-emulator-image.sh ${{ matrix.api }}
       # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
       # alive: each test task boots its own, and they keep running for a while after it ends. Two API 36 emulators
@@ -301,6 +297,8 @@ jobs:
             echo "$(date -u +%T) $(free -m | awk "/^Mem:/ {print \"used=\" \$3 \"MB available=\" \$7 \"MB\"}") disk_free=$(df -m / | awk "NR==2 {print \$4}")MB emulators=$(pgrep -c qemu-system || true)"
             sleep 10
           done' > memory.log 2>&1 &
+      # One Gradle call: it creates the emulator and boots it once for its snapshot (about a minute) while it compiles
+      # the app and the test APKs, then runs each module's tests.
       - name: Run on API ${{ matrix.api }}
         id: device-tests
         run: >
