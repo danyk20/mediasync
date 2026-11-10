@@ -9,6 +9,11 @@ updates:
     commit-message:
       prefix: "build(deps)"
     groups:
+      # A week's minor and patch updates arrive as one PR. An update goes to the first group it matches, so
+      # only major updates reach the groups below.
+      libraries:
+        patterns: ["*"]
+        update-types: [minor, patch]
       # Kotlin, KSP and the Compose compiler must move together.
       kotlin:
         patterns:
