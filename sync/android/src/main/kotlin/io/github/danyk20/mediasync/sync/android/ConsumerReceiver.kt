@@ -304,7 +304,14 @@ class ConsumerReceiver internal constructor(
                 if (scope.isActive && this.server === server) Diagnostics.log(Area.RECEIVE, "Stopped accepting", e)
                 break // Closed by stop().
             }
-            scope.launch(Dispatchers.IO) { serve(pending) }
+            if (this.server === server) {
+                scope.launch(Dispatchers.IO) { serve(pending) }
+            } else {
+                // On Linux, closing the socket doesn't end an accept already waiting: it can still take one more
+                // connection. A stopped receiver turns that one away, as if it had been refused; the next accept
+                // then ends the loop.
+                pending.close()
+            }
         }
     }
 
