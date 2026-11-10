@@ -9,8 +9,8 @@ updates:
     commit-message:
       prefix: "build(deps)"
     groups:
-      # A week's minor and patch updates arrive as one PR. An update goes to the first group it matches, so
-      # only major updates reach the groups below.
+      # A week's minor and patch updates arrive as one PR. The groups below take only major updates, which
+      # come in a PR of their own.
       libraries:
         patterns: ["*"]
         update-types: [minor, patch]
@@ -19,10 +19,12 @@ updates:
         patterns:
           - "org.jetbrains.kotlin*"
           - "com.google.devtools.ksp*"
+        update-types: [major]
       androidx:
         patterns:
           - "androidx.*"
           - "com.android.*"
+        update-types: [major]
       testing:
         patterns:
           - "org.junit*"
@@ -31,12 +33,14 @@ updates:
           - "org.robolectric*"
           - "io.github.takahirom.roborazzi*"
           - "app.cash.turbine*"
+        update-types: [major]
       code-quality:
         patterns:
           - "com.diffplug.spotless*"
           - "io.gitlab.arturbosch.detekt*"
           - "org.jetbrains.kotlinx.kover*"
           - "app.cash.licensee*"
+        update-types: [major]
 
   # The rendezvous Worker (infra/rendezvous). Wrangler, the Vitest plugin, the Workers types and Vitest
   # move together: the plugin pins Wrangler and Miniflare, and the types follow the runtime.
