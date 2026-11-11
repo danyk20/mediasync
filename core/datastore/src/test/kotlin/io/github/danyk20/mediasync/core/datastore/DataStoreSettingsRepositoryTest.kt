@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
@@ -197,6 +198,22 @@ class DataStoreSettingsRepositoryTest {
 
         repository.setRendezvousUrl(null)
         repository.rendezvousUrl.first() shouldBe null
+    }
+
+    @Test
+    fun theDiagnosticLogKeepsOneMegabyteUntilTheUserChoosesWithinTheLimits() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+        repository.diagnosticsLogBytes.first() shouldBe LogSize.DEFAULT_BYTES
+
+        repository.setDiagnosticsLogBytes(20 * LogSize.MEGABYTE)
+        repository.diagnosticsLogBytes.first() shouldBe 20 * LogSize.MEGABYTE
+
+        repository.setDiagnosticsLogBytes(1)
+        repository.diagnosticsLogBytes.first() shouldBe LogSize.MIN_BYTES
+
+        dataStore.edit { it[DataStoreSettingsRepository.DiagnosticsLogBytesKey] = Long.MAX_VALUE }
+        repository.diagnosticsLogBytes.first() shouldBe LogSize.MAX_BYTES
     }
 
     @Test

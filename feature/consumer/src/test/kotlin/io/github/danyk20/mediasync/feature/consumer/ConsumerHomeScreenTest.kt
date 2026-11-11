@@ -158,12 +158,14 @@ class ConsumerHomeScreenTest {
     }
 
     @Test
-    fun diagnostics_areInTheMenu() {
+    fun settingsAndDiagnostics_areInTheMenu() {
         show(ConsumerHomeUiState(listening = true))
 
         composeRule.onNodeWithContentDescription("More options").performClick()
         composeRule.onNodeWithText("Diagnostics").performClick()
-        events shouldBe listOf("diagnostics")
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Settings").performClick()
+        events shouldBe listOf("diagnostics", "mediasync settings")
     }
 
     @Test
@@ -375,6 +377,7 @@ class ConsumerHomeScreenTest {
                     onOpenSettings = { events += "settings" },
                     onOpenStorage = { events += "storage" },
                     onDismiss = { events += "dismiss $it" },
+                    onOpenMediaSyncSettings = { events += "mediasync settings" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onAllowTurbo = { events += "allow turbo" },
                     onDismissTurbo = { events += "dismiss turbo" },

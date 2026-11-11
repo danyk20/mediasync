@@ -16,6 +16,7 @@ import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.feature.quickaccess.QuickAccess
 import io.github.danyk20.mediasync.feature.share.ShareTarget
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.DiagnosticLogLimit
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import javax.inject.Inject
 
@@ -37,6 +38,9 @@ class MediaSyncApplication :
     lateinit var diagnosticLog: FileDiagnosticLog
 
     @Inject
+    lateinit var diagnosticLogLimit: DiagnosticLogLimit
+
+    @Inject
     lateinit var cloudBackup: CloudBackup
 
     @Inject
@@ -53,6 +57,8 @@ class MediaSyncApplication :
         super.onCreate()
         Diagnostics.install(diagnosticLog)
         Diagnostics.logCrashes(diagnosticLog::flush)
+        // Keeps the log to the size chosen in Settings (docs/PLAN.md §11).
+        diagnosticLogLimit.start()
         Diagnostics.log(Area.APP, "Started: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         // Keeps the background sync in step with the role and the schedule (docs/PLAN.md §10).
         scheduler.start()

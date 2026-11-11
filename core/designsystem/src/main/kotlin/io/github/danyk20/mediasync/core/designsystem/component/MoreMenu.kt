@@ -20,26 +20,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import io.github.danyk20.mediasync.core.designsystem.R
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 
-/**
- * The ⋮ menu of a home screen's top bar: what's used rarely, such as *Diagnostics*, and *Reset MediaSync*, which asks
- * first. [onReset] defaults to clearing the app's data, as Android's *Clear storage* would.
- */
+/** The ⋮ menu of a home screen's top bar: what's used rarely, *Settings* and *Diagnostics*. */
 @Composable
-fun MoreMenu(onOpenDiagnostics: () -> Unit, onReset: (() -> Unit)? = null) {
+fun MoreMenu(onOpenSettings: () -> Unit, onOpenDiagnostics: () -> Unit) {
     var open by remember { mutableStateOf(false) }
-    var confirmReset by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     Box {
         IconButton(onClick = { open = true }) {
             Icon(painterResource(MediaSyncIcons.More), contentDescription = stringResource(R.string.more_options))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.menu_settings)) },
+                onClick = {
+                    open = false
+                    onOpenSettings()
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.menu_diagnostics)) },
                 onClick = {
@@ -47,23 +48,7 @@ fun MoreMenu(onOpenDiagnostics: () -> Unit, onReset: (() -> Unit)? = null) {
                     onOpenDiagnostics()
                 },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.menu_reset)) },
-                onClick = {
-                    open = false
-                    confirmReset = true
-                },
-            )
         }
-    }
-    if (confirmReset) {
-        ResetDialog(
-            onReset = {
-                confirmReset = false
-                (onReset ?: { context.resetMediaSync() })()
-            },
-            onCancel = { confirmReset = false },
-        )
     }
 }
 

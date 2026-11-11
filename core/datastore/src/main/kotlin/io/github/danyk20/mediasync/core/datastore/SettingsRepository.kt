@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.core.datastore
 
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
@@ -75,6 +76,15 @@ interface SettingsRepository {
     val simpleFileNames: Flow<Boolean>
 
     suspend fun setSimpleFileNames(on: Boolean)
+
+    /**
+     * How much of the diagnostic log is kept (docs/PLAN.md §11), in bytes: [LogSize.DEFAULT_BYTES] until the user
+     * chooses, always within [LogSize.MIN_BYTES] and [LogSize.MAX_BYTES].
+     */
+    val diagnosticsLogBytes: Flow<Long>
+
+    /** Stores [bytes], brought within what [LogSize] allows. */
+    suspend fun setDiagnosticsLogBytes(bytes: Long)
 
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>

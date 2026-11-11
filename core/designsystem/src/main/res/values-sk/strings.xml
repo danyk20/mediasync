@@ -24,8 +24,9 @@
 
     <string name="notice_not_now">Teraz nie</string>
     <string name="more_options">Ďalšie možnosti</string>
+    <string name="menu_settings">Nastavenia</string>
     <string name="menu_diagnostics">Diagnostika</string>
-    <string name="menu_reset">Obnoviť MediaSync</string>
+    <string name="reset_mediasync">Obnoviť MediaSync</string>
     <string name="reset_title">Obnoviť MediaSync?</string>
     <string name="reset_body">Tento telefón zabudne svoju rolu, spárované telefóny, nastavenia a históriu a MediaSync začne od začiatku, ako keby bol práve nainštalovaný. Fotky a videá zostanú, kde sú. Worker v Cloudflare, ktorý ste nastavili, zostane vo vašom účte Cloudflare.</string>
     <string name="reset_confirm">Obnoviť</string>

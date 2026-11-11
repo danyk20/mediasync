@@ -22,6 +22,7 @@ import io.github.danyk20.mediasync.feature.consumer.ConsumerHomeRoute
 import io.github.danyk20.mediasync.feature.consumer.InternetSyncRoute
 import io.github.danyk20.mediasync.feature.consumer.SyncScheduleRoute
 import io.github.danyk20.mediasync.feature.diagnostics.DiagnosticsRoute
+import io.github.danyk20.mediasync.feature.diagnostics.SettingsRoute
 import io.github.danyk20.mediasync.feature.onboarding.RoleChoiceRoute
 import io.github.danyk20.mediasync.feature.pairing.ConsumerPairingRoute
 import io.github.danyk20.mediasync.feature.pairing.ProducerPairingRoute
@@ -83,6 +84,7 @@ private fun MediaSyncNavDisplay(
                     onChooseFolders = { backStack.add(Destination.ProducerFolders) },
                     onChooseDetails = { backStack.add(Destination.ProducerPhotoDetails) },
                     onChooseOrder = { backStack.add(Destination.ProducerSendingOrder) },
+                    onOpenMediaSyncSettings = { backStack.add(Destination.Settings) },
                     onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                     onSeeWaiting = { leftOut -> backStack.add(Destination.ProducerWaiting(leftOut)) },
                 )
@@ -93,6 +95,7 @@ private fun MediaSyncNavDisplay(
             entry<Destination.ProducerFolders> { SourceFoldersRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerPhotoDetails> { PhotoDetailsRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerSendingOrder> { SendingOrderRoute(onDone = { backStack.removeLastOrNull() }) }
+            entry<Destination.Settings> { SettingsRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.Diagnostics> { DiagnosticsRoute(onDone = { backStack.removeLastOrNull() }) }
             entry<Destination.ProducerPairing> { destination ->
                 ProducerPairingRoute(onDone = { backStack.removeLastOrNull() }, openedLink = destination.openedLink)
@@ -103,6 +106,7 @@ private fun MediaSyncNavDisplay(
                     onChangeSchedule = { backStack.add(Destination.ConsumerSchedule) },
                     onSetUpInternet = { backStack.add(Destination.ConsumerInternet) },
                     onOpenBackup = { backStack.add(Destination.ConsumerBackup) },
+                    onOpenMediaSyncSettings = { backStack.add(Destination.Settings) },
                     onOpenDiagnostics = { backStack.add(Destination.Diagnostics) },
                 )
             }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
+import io.github.danyk20.mediasync.core.designsystem.component.ResetDialog
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.kotest.matchers.shouldBe
 import org.junit.Rule
@@ -20,7 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The home screens' ⋮ menu: *Diagnostics*, and *Reset MediaSync*, which asks first. */
+/** The home screens' ⋮ menu: *Settings* and *Diagnostics*; and the question before *Reset MediaSync*. */
 @RunWith(RobolectricTestRunner::class)
 class MoreMenuTest {
 
@@ -30,24 +31,20 @@ class MoreMenuTest {
     private val events = mutableListOf<String>()
 
     @Test
-    fun resettingAsksFirstAndSaysPhotosStay() {
-        show()
+    fun settingsOpensFromTheMenu() {
+        showMenu()
 
         composeRule.onNodeWithContentDescription("More options").performClick()
-        composeRule.onNodeWithText("Reset MediaSync").performClick()
-        composeRule.onNodeWithText("Photos and videos stay where they are", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Cancel").performClick()
-        events shouldBe emptyList()
+        composeRule.onNodeWithText("Diagnostics").assertIsDisplayed()
+        composeRule.onNodeWithText("Reset MediaSync").assertDoesNotExist() // It's in Settings now.
+        composeRule.onNodeWithText("Settings").performClick()
 
-        composeRule.onNodeWithContentDescription("More options").performClick()
-        composeRule.onNodeWithText("Reset MediaSync").performClick()
-        composeRule.onNode(hasText("Reset") and hasAnyAncestor(isDialog())).performClick()
-        events shouldBe listOf("reset")
+        events shouldBe listOf("settings")
     }
 
     @Test
     fun diagnosticsOpensFromTheMenu() {
-        show()
+        showMenu()
 
         composeRule.onNodeWithContentDescription("More options").performClick()
         composeRule.onNodeWithText("Diagnostics").performClick()
@@ -55,10 +52,25 @@ class MoreMenuTest {
         events shouldBe listOf("diagnostics")
     }
 
-    private fun show() {
+    @Test
+    fun resettingSaysPhotosStayAndCanBeCancelled() {
         composeRule.setContent {
             MediaSyncTheme(dynamicColor = false) {
-                MoreMenu(onOpenDiagnostics = { events += "diagnostics" }, onReset = { events += "reset" })
+                ResetDialog(onReset = { events += "reset" }, onCancel = { events += "cancel" })
+            }
+        }
+
+        composeRule.onNodeWithText("Photos and videos stay where they are", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNode(hasText("Reset") and hasAnyAncestor(isDialog())).performClick()
+
+        events shouldBe listOf("cancel", "reset")
+    }
+
+    private fun showMenu() {
+        composeRule.setContent {
+            MediaSyncTheme(dynamicColor = false) {
+                MoreMenu(onOpenSettings = { events += "settings" }, onOpenDiagnostics = { events += "diagnostics" })
             }
         }
     }
