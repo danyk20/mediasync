@@ -5,10 +5,13 @@
 package io.github.danyk20.mediasync.feature.diagnostics
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ApplicationProvider
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -20,7 +23,12 @@ import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.DiagnosticsReport
 import io.github.danyk20.mediasync.sync.android.Fact
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.android.TestFiles
 import io.github.danyk20.mediasync.sync.engine.LinkSpeed
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
+import io.github.danyk20.mediasync.sync.engine.TestFileOutcome
+import io.github.danyk20.mediasync.sync.engine.TestFilePath
+import io.github.danyk20.mediasync.sync.engine.TestFileStatus
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -73,13 +81,15 @@ class DiagnosticsTest {
     private val sync =
         mockk<ProducerSync> { coEvery { linkTest(any(), any()) } answers { speeds[firstArg<Int>() / 4] } }
 
-    private fun viewModel() = DiagnosticsViewModel(report, sync, settings, peers)
+    private val testFiles = TestFiles(ApplicationProvider.getApplicationContext())
+
+    private fun viewModel() = DiagnosticsViewModel(report, sync, settings, peers, testFiles)
 
     @Test
     fun itShowsTheReportAndRecentEventsAndClears() = runTest {
         val viewModel = viewModel()
-        viewModel.uiState.first { it.facts.isNotEmpty() && it.linkTest != null } shouldBe
-            DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL"))
+        viewModel.uiState.first { it.facts.isNotEmpty() && it.linkTest != null && it.testFile != null } shouldBe
+            DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL"), TestFileUi("Pixel 2 XL"))
 
         entries = emptyList()
         viewModel.clear()
@@ -116,7 +126,79 @@ class DiagnosticsTest {
     fun onlySendingPhonesHaveALinkTest() = runTest {
         settings.setRole(DeviceRole.CONSUMER)
 
-        viewModel().uiState.first { it.facts.isNotEmpty() }.linkTest shouldBe null
+        val state = viewModel().uiState.first { it.facts.isNotEmpty() }
+        state.linkTest shouldBe null
+        state.testFile shouldBe null // Nothing checked here yet.
+    }
+
+    @Test
+    fun aSendingPhoneAddsATestFileOfTheSizeTypedAndCanRemoveIt() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.testFile != null }.testFile?.size shouldBe "25"
+
+        viewModel.onTestFileSizeChange("20000")
+        viewModel.uiState.value.testFile?.canAdd shouldBe false
+        viewModel.addTestFile()
+        testFiles.waiting() shouldBe null
+        viewModel.onTestFileSizeChange("0,5")
+        viewModel.addTestFile()
+
+        testFiles.waiting()?.size shouldBe MB / 2
+        viewModel.uiState.first { it.testFile?.waitingBytes != null }.testFile?.waitingBytes shouldBe MB / 2
+        viewModel.removeTestFile()
+        viewModel.uiState.first { it.testFile?.waitingBytes == null }
+        testFiles.waiting() shouldBe null
+    }
+
+    @Test
+    fun aReceivingPhoneShowsTheLastTestFileItChecked() = runTest {
+        settings.setRole(DeviceRole.CONSUMER)
+        testFiles.checked(DeviceId.of(ByteArray(32)), outcome)
+
+        val test = viewModel().uiState.first { it.testFile != null }.testFile
+        test shouldBe TestFileUi(consumerName = null, last = outcome)
+    }
+
+    @Test
+    fun aTestFileIsAddedFromItsSection() {
+        show(DiagnosticsUiState(facts, recent, testFile = TestFileUi("Pixel 2 XL")))
+
+        composeRule.onNodeWithText("Add test file").performScrollTo().performClick()
+        events shouldBe listOf("add test file")
+        composeRule.onNodeWithText("From 0.1 MB to 10 GB", substring = true).assertExists()
+    }
+
+    @Test
+    fun aWrongSizeSaysWhatFitsAndCantBeAdded() {
+        show(DiagnosticsUiState(facts, recent, testFile = TestFileUi("Pixel 2 XL", size = "0", sizeInvalid = true)))
+
+        composeRule.onNodeWithText("Type a size from 0.1 to 10240 MB, such as 25 or 500.").assertExists()
+        composeRule.onNodeWithText("Add test file").assertIsNotEnabled()
+    }
+
+    @Test
+    fun screenshot_testFile_light() {
+        val waiting = TestFileUi(
+            "Pixel 2 XL",
+            waitingBytes = 25 * MB,
+            problem = TestFileHeld.RECEIVER_OUTDATED,
+            last = outcome,
+        )
+        show(DiagnosticsUiState(facts, recent, testFile = waiting))
+        composeRule.onNodeWithText("Arrived exactly as sent.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("25 MB in 2.0 s: 12.5 MB/s over Turbo").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Remove test file").performScrollTo().performClick()
+        events shouldBe listOf("remove test file")
+        composeRule.onRoot().captureScreenshot("diagnostics_test_file_light")
+    }
+
+    @Test
+    fun screenshot_testFileReceived_dark() {
+        val mismatched = outcome.copy(status = TestFileStatus.MISMATCHED, path = TestFilePath.RELAY)
+        show(DiagnosticsUiState(facts, recent, testFile = TestFileUi(last = mismatched)), darkTheme = true)
+        composeRule.onNodeWithText("Didn't arrive exactly as sent.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add test file").assertDoesNotExist()
+        composeRule.onRoot().captureScreenshot("diagnostics_test_file_received_dark")
     }
 
     @Test
@@ -153,6 +235,8 @@ class DiagnosticsTest {
     @Test
     fun screenshot_dark() = screenshot(darkTheme = true, "diagnostics_dark")
 
+    private val outcome = TestFileOutcome(TestFileStatus.MATCHED, 25 * MB, 25 * MB, 2_000_000, TestFilePath.TURBO)
+
     private companion object {
         const val MB = 1024L * 1024
     }
@@ -172,6 +256,11 @@ class DiagnosticsTest {
                     onSave = { events += "save" },
                     onClear = { events += "clear" },
                     onDone = { events += "done" },
+                    testFileActions = TestFileActions(
+                        onSizeChange = { events += "size $it" },
+                        onAdd = { events += "add test file" },
+                        onRemove = { events += "remove test file" },
+                    ),
                 )
             }
         }

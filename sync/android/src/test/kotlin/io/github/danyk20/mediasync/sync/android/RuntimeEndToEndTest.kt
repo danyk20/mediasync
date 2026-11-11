@@ -23,12 +23,15 @@ import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
+import io.github.danyk20.mediasync.sync.engine.TestFilePath
+import io.github.danyk20.mediasync.sync.engine.TestFileStatus
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMedia
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSink
 import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
+import io.github.danyk20.mediasync.sync.engine.testing.FakeTestFileStore
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.testIdentity
 import io.kotest.matchers.doubles.shouldBeGreaterThan
@@ -97,6 +100,9 @@ class RuntimeEndToEndTest {
 
     /** What the receiving phone showed for its links: before Android 13, MediaSync on screen. */
     private val screenCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+    /** Where the receiving phone checks test files (docs/PLAN.md §7, *Test file*). */
+    private val consumerTestFiles = FakeTestFileStore()
     private val receiver: ConsumerReceiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
@@ -118,6 +124,7 @@ class RuntimeEndToEndTest {
 
             override val needsPermission = false
         },
+        testFiles = consumerTestFiles,
     )
 
     // The sending phone.
@@ -136,6 +143,7 @@ class RuntimeEndToEndTest {
     private var photoDetails = PhotoDetails.KEEP_ALL
     private var videosOverRelay = false
     private var sendingOrder = SendingOrder.Default
+    private val producerTestFiles = TestFiles(ApplicationProvider.getApplicationContext())
     private val producer = ProducerSync(
         identity = { producerIdentity },
         peers = producerPeers,
@@ -158,6 +166,7 @@ class RuntimeEndToEndTest {
         conditions = { null },
         scope = scope,
         turboSearch = TurboReceiveSearch(searchMillis = 3_000, joinMillis = 500, pauseMillis = 50),
+        testFiles = producerTestFiles,
     )
 
     @After
@@ -578,6 +587,47 @@ class RuntimeEndToEndTest {
         // The consumer tells it explicitly, so the user knows to pair again.
         (failed as ProducerState.Failed).reason shouldBe SyncFailure.NOT_ALLOWED
         sink.stored.size shouldBe 0
+    }
+
+    @Test
+    fun aTestFileGoesFirstIsCheckedAndDeletedAndNeverBecomesAPhoto() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        producerTestFiles.add(3L * 1024 * 1024)
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait() }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe photos.size
+        val checked = producerTestFiles.state.value
+        checked.waiting shouldBe null
+        checked.last?.status shouldBe TestFileStatus.MATCHED
+        checked.last?.path shouldBe TestFilePath.WIFI
+        consumerTestFiles.checked.single().second shouldBe checked.last
+        consumerTestFiles.leftovers() shouldBe 0
+        // Only the photos are in the gallery and the ledger.
+        sink.stored.size shouldBe photos.size
+        received.observeCount().first() shouldBe photos.size
+    }
+
+    @Test
+    fun throughTheRelayOnMobileDataTheTestFileGoesAndCountsAsMobileData() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        producer.syncNow()
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Idle && it.lastResult != null } }
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        offWifi = true
+        internet.throughRelay = true
+        internet.mobileDataLeft = Long.MAX_VALUE // On mobile data, without a limit.
+        val size = 1024L * 1024
+        producerTestFiles.add(size)
+
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+
+        producerTestFiles.state.value.last?.path shouldBe TestFilePath.RELAY
+        producerTestFiles.state.value.waiting shouldBe null
+        internet.mobileDataCounted.get() shouldBe size
     }
 
     @Test

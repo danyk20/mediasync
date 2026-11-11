@@ -19,6 +19,7 @@ import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.ServeResult
 import io.github.danyk20.mediasync.sync.engine.SpaceBudget
 import io.github.danyk20.mediasync.sync.engine.SpeedSample
+import io.github.danyk20.mediasync.sync.engine.TestFileStore
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferEstimator
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -103,6 +104,8 @@ class ConsumerReceiver internal constructor(
     private val onInternet: (worker: String) -> Unit = {},
     /** Shows MediaSync while a direct link opens and stays open, where Android only allows one then. */
     private val linkScreen: LinkScreen = LinkScreen.None,
+    /** Where test files are checked (docs/PLAN.md §7, *Test file*); `null`: this phone doesn't take them. */
+    private val testFiles: TestFileStore? = null,
 ) {
     @Inject
     constructor(
@@ -115,6 +118,7 @@ class ConsumerReceiver internal constructor(
         @ApplicationScope scope: CoroutineScope,
         wakeUps: WakeUpCheck,
         linkScreen: LinkScreen,
+        testFiles: TestFiles,
     ) : this(
         identity,
         peers,
@@ -126,6 +130,7 @@ class ConsumerReceiver internal constructor(
         PREFERRED_PORT,
         onInternet = wakeUps::checkIfDue,
         linkScreen = linkScreen,
+        testFiles = testFiles,
     )
 
     private val addresses = network.addresses
@@ -214,7 +219,10 @@ class ConsumerReceiver internal constructor(
         advertisement =
             runCatching { discovery.advertise(server.port, serviceIdOf(identity.identity().id)) }.getOrNull()
         _state.update { it.copy(listening = true, port = server.port) }
-        acceptJob = scope.launch(Dispatchers.IO) { acceptLoop(server) }
+        acceptJob = scope.launch(Dispatchers.IO) {
+            testFiles?.cleanLeftovers()
+            acceptLoop(server)
+        }
         speedsJob = scope.launch { refreshSpeeds() }
         Diagnostics.log(Area.RECEIVE, "Listening on port ${server.port} for ${holders.joinToString()}")
         refreshInternet()
@@ -376,21 +384,10 @@ class ConsumerReceiver internal constructor(
                 ledger,
                 sink,
                 gate,
-                progress = { progress ->
-                    synchronized(tally) {
-                        sessions[id] = producer to progress
-                        val transfers = transfers()
-                        _state.update {
-                            it.copy(
-                                transfers = transfers,
-                                speeds = speeds(transfers),
-                                lastActivityMillis = System.currentTimeMillis(),
-                            )
-                        }
-                    }
-                },
+                progress = { progress -> showProgress(id, producer, progress) },
                 space = space,
                 turbo = turbo.host,
+                testFiles = testFiles,
             )
             val result = try {
                 session.serve(it).also { result ->
@@ -427,6 +424,19 @@ class ConsumerReceiver internal constructor(
                 lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
                 lastActivityMillis = System.currentTimeMillis(),
                 waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
+            )
+        }
+    }
+
+    /** Session [id] from [producer] got this far. */
+    private fun showProgress(id: Long, producer: DeviceId, progress: TransferProgress) = synchronized(tally) {
+        sessions[id] = producer to progress
+        val transfers = transfers()
+        _state.update {
+            it.copy(
+                transfers = transfers,
+                speeds = speeds(transfers),
+                lastActivityMillis = System.currentTimeMillis(),
             )
         }
     }
@@ -478,6 +488,7 @@ class ConsumerReceiver internal constructor(
                     bytesTotal = a.bytesTotal + b.bytesTotal,
                     currentItem = b.currentItem ?: a.currentItem,
                     bytesSkipped = a.bytesSkipped + b.bytesSkipped,
+                    testFile = a.testFile || b.testFile,
                 )
             }
         }

@@ -27,6 +27,7 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import okio.BufferedSource
@@ -81,6 +82,7 @@ data class SyncResult(
  * The session is blocking: run it on an I/O thread. Closing the connection aborts it; everything
  * already confirmed stays recorded, and a partly sent file resumes next time.
  */
+@Suppress("LongParameterList") // What a sync is set up with: the user's choices and the timings tests shorten.
 class ProducerSession(
     private val local: LocalDevice,
     private val source: MediaSource,
@@ -100,9 +102,18 @@ class ProducerSession(
      * the user leaves out while a sync runs isn't sent either.
      */
     private val leftOut: (List<SourceItem>) -> List<SourceItem> = { emptyList() },
+    /**
+     * Where the test file waiting (docs/PLAN.md §7, *Test file*) comes from and how it goes; it's sent first, before
+     * any photo or video. `null`: none is sent.
+     */
+    private val testFiles: TestFileRoute? = null,
 ) {
 
-    fun sync(connection: PeerConnection): SyncResult = sync(connection, WorkQueue(pendingFor(connection.peerId)))
+    fun sync(connection: PeerConnection): SyncResult =
+        sync(connection, WorkQueue(pendingFor(connection.peerId), waitingTestFile()))
+
+    /** The test file waiting to be sent first, if any. */
+    internal fun waitingTestFile(): TestFile? = testFiles?.queue?.waiting()
 
     /** Sends items from [queue], which other sessions on other connections may share (docs/PLAN.md §7). */
     fun sync(connection: PeerConnection, queue: WorkQueue): SyncResult {
@@ -121,6 +132,7 @@ class ProducerSession(
         run.consumerPairSecret = hello.pairSecret.takeIf { it.size == PAIR_SECRET_BYTES }
         run.consumerRendezvousUrl = hello.rendezvousUrl.takeIf { it.startsWith("https://") }
         run.consumerWifiAddresses = wifiAddressesOf(hello)
+        run.consumerTakesTestFiles = hello.testFiles
         return run.send(queue)
     }
 
@@ -176,10 +188,13 @@ class ProducerSession(
         var consumerPairSecret: ByteString? = null
         var consumerRendezvousUrl: String? = null
         var consumerWifiAddresses: List<String>? = null
+        var consumerTakesTestFiles = false
 
         fun send(queue: WorkQueue): SyncResult {
-            replies.start()
             try {
+                // First, alone on the connection: the consumer's replies are read as they come.
+                testFiles?.let { route -> queue.takeTestFile()?.let { sendTestFile(it, route, queue) } }
+                replies.start()
                 while (!cancelled) {
                     if (!shouldContinue()) cancelled = true
                     val batch = if (cancelled) emptyList() else queue.take(OFFER_BATCH_SIZE, OFFER_BATCH_BYTES)
@@ -250,6 +265,40 @@ class ProducerSession(
                 }
             }
             count { deferred += offered.size - response.want.size - response.have.size }
+        }
+
+        /**
+         * The test file (docs/PLAN.md §7, *Test file*), to a consumer that takes test files; one that doesn't (an older
+         * version) would see unknown messages. Whatever happens, it's done with when this returns.
+         */
+        private fun sendTestFile(file: TestFile, route: TestFileRoute, queue: WorkQueue) {
+            var moved = 0L
+            try {
+                val sent = when {
+                    !consumerTakesTestFiles -> TestFileSent.Held(TestFileHeld.RECEIVER_OUTDATED)
+
+                    !shouldContinue() -> TestFileSent.Held(TestFileHeld.STOPPED)
+
+                    else -> TestFileSender(channel, route.path, shouldContinue) { n ->
+                        moved += n
+                        count {
+                            bytesSent += n
+                            bytesDone += n
+                        }
+                        report(currentItem = null, testFile = true)
+                    }.send(file, buffer)
+                }
+                when (sent) {
+                    is TestFileSent.Checked -> route.queue.checked(file, sent.outcome)
+
+                    is TestFileSent.Held -> {
+                        skip(file.size - moved)
+                        route.queue.held(file, sent.reason)
+                    }
+                }
+            } finally {
+                queue.testFileDone()
+            }
         }
 
         /** How [item] is sent under the chosen details; `null` if it isn't, now. */
@@ -393,9 +442,11 @@ class ProducerSession(
         private inline fun count(update: () -> Unit) = lock.withLock { update() }
 
         /** [item] isn't sent in this sync after all: its bytes are done, without moving. */
-        private fun skip(item: SourceItem) = count {
-            bytesDone += item.descriptor.size
-            bytesSkipped += item.descriptor.size
+        private fun skip(item: SourceItem) = skip(item.descriptor.size)
+
+        private fun skip(bytes: Long) = count {
+            bytesDone += bytes
+            bytesSkipped += bytes
         }
 
         private fun completeItem(item: SourceItem) {
@@ -403,16 +454,11 @@ class ProducerSession(
             report(item)
         }
 
-        private fun report(item: SourceItem) {
+        private fun report(item: SourceItem) = report(item.descriptor.displayName)
+
+        private fun report(currentItem: String?, testFile: Boolean = false) {
             val snapshot = lock.withLock {
-                TransferProgress(
-                    itemsDone,
-                    itemsTotal,
-                    bytesDone,
-                    bytesTotal,
-                    item.descriptor.displayName,
-                    bytesSkipped,
-                )
+                TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, currentItem, bytesSkipped, testFile)
             }
             progress.onProgress(snapshot)
         }
@@ -449,12 +495,27 @@ internal fun OfferItem.toDescriptor() = MediaDescriptor(
 
 /**
  * The items one sync sends, shared by its connections: each takes the next batch when it's ready for more, so no
- * item goes twice and a faster connection simply takes more.
+ * item goes twice and a faster connection simply takes more. A [testFile] goes first, over one of them, and its bytes
+ * count in [totalBytes] (docs/PLAN.md §7, *Test file*).
  */
-class WorkQueue(items: List<SourceItem>) {
+class WorkQueue(items: List<SourceItem>, testFile: TestFile? = null) {
     private val queue = ConcurrentLinkedQueue(items)
+    private val testFile = AtomicReference(testFile)
     val total: Int = items.size
-    val totalBytes: Long = items.sumOf { it.descriptor.size }
+    val totalBytes: Long = items.sumOf { it.descriptor.size } + (testFile?.size ?: 0)
+
+    /** Until the test file was sent, or wasn't after all: no other connection joins in the meantime. */
+    @Volatile
+    var sendingTestFile: Boolean = testFile != null
+        private set
+
+    /** The test file, to the first connection that asks; `null` to the others, and if there's none. */
+    fun takeTestFile(): TestFile? = testFile.getAndSet(null)
+
+    /** The connection that took the test file is done with it. */
+    fun testFileDone() {
+        sendingTestFile = false
+    }
 
     /** Up to [maxItems], ending once they reach [maxBytes]; always at least one while there is one. */
     fun take(maxItems: Int, maxBytes: Long = Long.MAX_VALUE): List<SourceItem> = buildList {

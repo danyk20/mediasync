@@ -28,6 +28,7 @@ import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboProblem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
@@ -610,6 +611,42 @@ class ProducerHomeScreenTest {
     )
 
     @Test
+    fun aTestFileWaitingIsShownAndCanBeRemoved() {
+        show(paired.copy(pendingCount = 0, testFileBytes = 25L * 1024 * 1024))
+
+        composeRule.onNodeWithText("Test file waiting").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("A 25 MB test file goes to Pixel 2 XL first", substring = true).assertExists()
+        composeRule.onNodeWithText("Remove").performScrollTo().performClick()
+        events shouldBe listOf("remove test file")
+    }
+
+    @Test
+    fun aTestFileTheReceivingPhoneCantTakeSaysWhy() {
+        show(paired.copy(testFileBytes = 1024L * 1024, testFileProblem = TestFileHeld.RECEIVER_OUTDATED))
+
+        composeRule.onNodeWithText("needs a newer version of MediaSync", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun whileTheTestFileIsSentTheProgressSaysSo() {
+        show(
+            paired.copy(
+                testFileBytes = 25L * 1024 * 1024,
+                sync = ProducerState.Syncing(TransferProgress(0, 40, 5_000_000, 855_000_000, null, testFile = true)),
+            ),
+        )
+
+        composeRule.onNodeWithText("Test file first", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Test file waiting").assertDoesNotExist()
+    }
+
+    @Test
+    fun screenshot_testFile_light() = screenshot(
+        paired.copy(pendingCount = 214, testFileBytes = 25L * 1024 * 1024),
+        "producer_home_test_file_light",
+    )
+
+    @Test
     fun screenshot_turboNotUsed_light() = screenshot(
         paired.copy(sync = ProducerState.Idle(turboProblem = TurboProblem.NO_LINK)),
         "producer_home_turbo_not_used_light",
@@ -650,6 +687,7 @@ class ProducerHomeScreenTest {
                     onUnpair = { events += "unpair" },
                     onShowSpeeds = { events += "speeds" },
                     onSeeWaiting = { leftOut -> events += "waiting $leftOut" },
+                    onRemoveTestFile = { events += "remove test file" },
                 )
             }
         }

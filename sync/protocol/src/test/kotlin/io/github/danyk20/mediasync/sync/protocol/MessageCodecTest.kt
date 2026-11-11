@@ -71,6 +71,12 @@ class MessageCodecTest {
                 TurboReady.Kind.WIFI_AWARE,
             ),
             TurboReady(TurboReady.Status.NOT_ALLOWED),
+            Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, testFiles = true),
+            TestFileBegin(size = 26_214_400, path = TestFileBegin.Path.RELAY),
+            TestFileReady(TestFileReady.Status.NO_SPACE),
+            TestFileEnd(sha256 = sha),
+            TestFileEnd(cancelled = true),
+            TestFileResult(TestFileResult.Status.MATCHED, bytes = 26_214_400, micros = 812_345),
         )
 
         messages.forEach { message ->

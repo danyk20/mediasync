@@ -35,4 +35,25 @@
     <string name="settings_log_size_save">Salvar</string>
     <string name="settings_reset_title">Começar de novo</string>
     <string name="settings_reset_intro">Este telefone esquece a função dele, os telefones pareados, as configurações e o histórico. As fotos e os vídeos continuam.</string>
+    <string name="diagnostics_test_file">Arquivo de teste</string>
+    <string name="diagnostics_test_file_intro">Envia para %1$s um arquivo do tamanho que você escolher, primeiro na próxima sincronização, para testar a velocidade e a conexão. %1$s só confere se ele chegou exatamente como foi enviado e depois o apaga: ele nunca aparece na galeria e nunca entra em backup.</string>
+    <string name="diagnostics_test_file_received">Um celular que envia pode mandar um arquivo de teste para testar a velocidade e a conexão. Este celular só confere se ele chegou exatamente como foi enviado e depois o apaga.</string>
+    <string name="diagnostics_test_file_size">Tamanho (MB)</string>
+    <string name="diagnostics_test_file_size_hint">De 0,1 MB a 10 GB (10240 MB). 25 MB se você não mudar.</string>
+    <string name="diagnostics_test_file_size_invalid">Digite um tamanho de 0,1 a 10240 MB, como 25 ou 500.</string>
+    <string name="diagnostics_test_file_add">Adicionar arquivo de teste</string>
+    <string name="diagnostics_test_file_waiting">Um arquivo de teste de %1$s espera para ser enviado primeiro na próxima sincronização.</string>
+    <string name="diagnostics_test_file_remove">Remover arquivo de teste</string>
+    <string name="diagnostics_test_file_outdated">%1$s precisa de uma versão mais nova do MediaSync para receber um arquivo de teste. Atualize o MediaSync lá; até lá, ele espera.</string>
+    <string name="diagnostics_test_file_no_space">%1$s não tem espaço para ele agora. Ele espera até ter.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s não conseguiu salvá-lo. Ele será tentado de novo na próxima sincronização.</string>
+    <string name="diagnostics_test_file_last">Último arquivo de teste</string>
+    <string name="diagnostics_test_file_matched">Chegou exatamente como foi enviado.</string>
+    <string name="diagnostics_test_file_mismatched">Não chegou exatamente como foi enviado.</string>
+    <string name="diagnostics_test_file_not_stored">O celular que recebe não conseguiu salvá-lo.</string>
+    <string name="diagnostics_test_file_result">%1$s em %2$s s: %3$s MB/s por %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">Wi-Fi</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">internet</string>
+    <string name="diagnostics_test_file_over_relay">internet, pelo relay</string>
 </resources>

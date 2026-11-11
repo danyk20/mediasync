@@ -36,4 +36,25 @@
     <string name="settings_log_size_save">Save</string>
     <string name="settings_reset_title">Start over</string>
     <string name="settings_reset_intro">This phone forgets its role, paired phones, settings and history. Photos and videos stay.</string>
+    <string name="diagnostics_test_file">Test file</string>
+    <string name="diagnostics_test_file_intro">Sends a file of the size you choose to %1$s, first in the next sync, to test the speed and the connection. %1$s only checks that it arrived exactly as sent, then deletes it: it never shows in the gallery and is never backed up.</string>
+    <string name="diagnostics_test_file_received">A sending phone can send a test file to test the speed and the connection. This phone only checks that it arrived exactly as sent, then deletes it.</string>
+    <string name="diagnostics_test_file_size">Size (MB)</string>
+    <string name="diagnostics_test_file_size_hint">From 0.1 MB to 10 GB (10240 MB). 25 MB unless you change it.</string>
+    <string name="diagnostics_test_file_size_invalid">Type a size from 0.1 to 10240 MB, such as 25 or 500.</string>
+    <string name="diagnostics_test_file_add">Add test file</string>
+    <string name="diagnostics_test_file_waiting">A %1$s test file waits to be sent first in the next sync.</string>
+    <string name="diagnostics_test_file_remove">Remove test file</string>
+    <string name="diagnostics_test_file_outdated">%1$s needs a newer version of MediaSync to take a test file. Update MediaSync there; until then, it waits.</string>
+    <string name="diagnostics_test_file_no_space">%1$s doesn\'t have room for it now. It waits until there is.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s couldn\'t write it. It\'s tried again in the next sync.</string>
+    <string name="diagnostics_test_file_last">Last test file</string>
+    <string name="diagnostics_test_file_matched">Arrived exactly as sent.</string>
+    <string name="diagnostics_test_file_mismatched">Didn\'t arrive exactly as sent.</string>
+    <string name="diagnostics_test_file_not_stored">The receiving phone couldn\'t write it.</string>
+    <string name="diagnostics_test_file_result">%1$s in %2$s s: %3$s MB/s over %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">Wi-Fi</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">the internet</string>
+    <string name="diagnostics_test_file_over_relay">the internet, through the relay</string>
 </resources>

@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.sync.engine.testing
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.IncomingFile
+import io.github.danyk20.mediasync.sync.engine.IncomingTestFile
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta
 import io.github.danyk20.mediasync.sync.engine.MediaSink
@@ -22,6 +23,11 @@ import io.github.danyk20.mediasync.sync.engine.ReceivedItem
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.sync.engine.SourceItem
+import io.github.danyk20.mediasync.sync.engine.TestFile
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
+import io.github.danyk20.mediasync.sync.engine.TestFileOutcome
+import io.github.danyk20.mediasync.sync.engine.TestFileQueue
+import io.github.danyk20.mediasync.sync.engine.TestFileStore
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
@@ -193,4 +199,64 @@ class FakeMediaSink(
     }
 
     fun storedContents(): Set<ByteString> = stored.values.map { it.toByteString() }.toSet()
+}
+
+/** Test files (docs/PLAN.md §7, *Test file*) a receiving phone checks, in memory. */
+class FakeTestFileStore(
+    /** When set, writing fails after this many bytes, like a full or broken disk. */
+    var failWritesAfter: Long? = null,
+    var failOpen: Boolean = false,
+) : TestFileStore {
+    /** Every test file opened, by the order it was opened in, with what was written to it until it was deleted. */
+    val files: MutableList<Buffer> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** Of [files], those deleted. */
+    val deleted: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    val checked: MutableList<Pair<DeviceId, TestFileOutcome>> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** Test files opened and not deleted: there should never be any once a session ended. */
+    fun leftovers(): Int = files.size - deleted.size
+
+    override fun open(): IncomingTestFile {
+        if (failOpen) throw IOException("No room for a test file")
+        val buffer = Buffer()
+        val index = synchronized(files) {
+            files += buffer
+            files.size - 1
+        }
+        return object : IncomingTestFile {
+            override fun write(bytes: ByteArray, offset: Int, byteCount: Int) {
+                val limit = failWritesAfter
+                if (limit != null && buffer.size + byteCount > limit) throw IOException("Disk full")
+                buffer.write(bytes, offset, byteCount)
+            }
+
+            override fun delete() {
+                deleted += index
+            }
+
+            override fun close() = Unit
+        }
+    }
+
+    override fun checked(producer: DeviceId, outcome: TestFileOutcome) {
+        checked += producer to outcome
+    }
+}
+
+/** The test file waiting on a sending phone, and what became of it. */
+class FakeTestFileQueue(@Volatile var file: TestFile? = null) : TestFileQueue {
+    val checked: MutableList<TestFileOutcome> = java.util.Collections.synchronizedList(mutableListOf())
+    val held: MutableList<TestFileHeld> = java.util.Collections.synchronizedList(mutableListOf())
+
+    override fun waiting(): TestFile? = file
+
+    override fun checked(file: TestFile, outcome: TestFileOutcome) {
+        checked += outcome
+        if (this.file == file) this.file = null
+    }
+
+    override fun held(file: TestFile, reason: TestFileHeld) {
+        held += reason
+    }
 }

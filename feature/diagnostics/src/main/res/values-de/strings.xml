@@ -35,4 +35,25 @@
     <string name="settings_log_size_save">Speichern</string>
     <string name="settings_reset_title">Neu beginnen</string>
     <string name="settings_reset_intro">Dieses Telefon vergisst seine Rolle, gekoppelte Telefone, Einstellungen und Verlauf. Fotos und Videos bleiben.</string>
+    <string name="diagnostics_test_file">Testdatei</string>
+    <string name="diagnostics_test_file_intro">Sendet eine Datei in der gewählten Größe an %1$s, als Erstes bei der nächsten Synchronisierung, um Geschwindigkeit und Verbindung zu testen. %1$s prüft nur, ob sie genau so angekommen ist, wie sie gesendet wurde, und löscht sie dann: Sie erscheint nie in der Galerie und wird nie gesichert.</string>
+    <string name="diagnostics_test_file_received">Ein sendendes Telefon kann eine Testdatei senden, um Geschwindigkeit und Verbindung zu testen. Dieses Telefon prüft nur, ob sie genau so angekommen ist, wie sie gesendet wurde, und löscht sie dann.</string>
+    <string name="diagnostics_test_file_size">Größe (MB)</string>
+    <string name="diagnostics_test_file_size_hint">Von 0,1 MB bis 10 GB (10240 MB). 25 MB, solange du sie nicht änderst.</string>
+    <string name="diagnostics_test_file_size_invalid">Gib eine Größe von 0,1 bis 10240 MB ein, zum Beispiel 25 oder 500.</string>
+    <string name="diagnostics_test_file_add">Testdatei hinzufügen</string>
+    <string name="diagnostics_test_file_waiting">Eine Testdatei mit %1$s wartet darauf, bei der nächsten Synchronisierung als Erstes gesendet zu werden.</string>
+    <string name="diagnostics_test_file_remove">Testdatei entfernen</string>
+    <string name="diagnostics_test_file_outdated">%1$s braucht eine neuere MediaSync-Version, um eine Testdatei anzunehmen. Aktualisiere MediaSync dort; bis dahin wartet sie.</string>
+    <string name="diagnostics_test_file_no_space">%1$s hat gerade keinen Platz dafür. Sie wartet, bis genug frei ist.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s konnte sie nicht speichern. Bei der nächsten Synchronisierung wird es erneut versucht.</string>
+    <string name="diagnostics_test_file_last">Letzte Testdatei</string>
+    <string name="diagnostics_test_file_matched">Genau so angekommen, wie sie gesendet wurde.</string>
+    <string name="diagnostics_test_file_mismatched">Nicht genau so angekommen, wie sie gesendet wurde.</string>
+    <string name="diagnostics_test_file_not_stored">Das empfangende Telefon konnte sie nicht speichern.</string>
+    <string name="diagnostics_test_file_result">%1$s in %2$s s: %3$s MB/s über %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">WLAN</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">das Internet</string>
+    <string name="diagnostics_test_file_over_relay">das Internet, über das Relay</string>
 </resources>

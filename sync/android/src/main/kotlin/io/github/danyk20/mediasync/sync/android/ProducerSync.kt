@@ -30,6 +30,12 @@ import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.sync.engine.SourceItem
 import io.github.danyk20.mediasync.sync.engine.SpeedSample
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TestFile
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
+import io.github.danyk20.mediasync.sync.engine.TestFileOutcome
+import io.github.danyk20.mediasync.sync.engine.TestFilePath
+import io.github.danyk20.mediasync.sync.engine.TestFileQueue
+import io.github.danyk20.mediasync.sync.engine.TestFileRoute
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferEstimator
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
@@ -176,6 +182,8 @@ class ProducerSync internal constructor(
     private val conditions: DeviceConditions,
     private val scope: CoroutineScope,
     private val turboSearch: TurboReceiveSearch,
+    /** The test file waiting to be sent first (docs/PLAN.md §7, *Test file*). */
+    private val testFiles: TestFileQueue = NoTestFile,
 ) {
     @Inject
     constructor(
@@ -189,6 +197,7 @@ class ProducerSync internal constructor(
         history: SyncHistory,
         conditions: DeviceConditions,
         @ApplicationScope scope: CoroutineScope,
+        testFiles: TestFiles,
     ) : this(
         identity,
         peers,
@@ -201,6 +210,7 @@ class ProducerSync internal constructor(
         conditions,
         scope,
         TurboReceiveSearch(),
+        testFiles,
     )
 
     private val discovery = network.discovery
@@ -663,8 +673,7 @@ class ProducerSync internal constructor(
          * Through the relay, videos wait for Wi-Fi or a direct connection unless the user lets them go (docs/PLAN.md
          * §17, relay saver): they'd use most of the free allowance.
          */
-        private fun relaySaver(connection: PeerConnection): (SourceItem) -> Boolean {
-            val relayed = (connection as? RelayCounter)?.throughRelay() == true
+        private fun relaySaver(relayed: Boolean): (SourceItem) -> Boolean {
             if (!relayed || device.videosOverRelay()) return { false }
             Diagnostics.log(Area.SEND, "Internet: through the relay; videos wait for Wi-Fi or a direct connection")
             return { item -> item.descriptor.mimeType.startsWith("video/") }
@@ -708,6 +717,8 @@ class ProducerSync internal constructor(
             // Over the connections this sync used before this one.
             val before = done.get()
             val skippedBefore = skipped.get()
+            val relayed = (it as? RelayCounter)?.throughRelay() == true
+            val testFile = TestFileRoute(path.forTestFile(relayed), testFiles)
             val result = ParallelSync(
                 session = { progress ->
                     ProducerSession(
@@ -719,13 +730,14 @@ class ProducerSync internal constructor(
                         details,
                         order,
                         leftOut = { items -> leftOut.of(items) },
+                        testFiles = testFile,
                     )
                 },
                 connect = { another() },
                 progress = { progress -> show(progress, path, before, skippedBefore) },
                 // Over the internet, one connection carries it all.
                 mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
-                holdBack = relaySaver(it),
+                holdBack = relaySaver(relayed),
             ).sync(it)
             mobileDataLeft?.let { left ->
                 internet.countMobileData(result.bytesSent)
@@ -854,3 +866,19 @@ private fun TurboUnavailable.toProblem() = when (this) {
 
 /** How a sync reaches the consumer (docs/PLAN.md §8). */
 private enum class Path { WIFI, DIRECT, INTERNET }
+
+/** As both phones' *Diagnostics* name it, for a test file: [relayed], through the relay. */
+private fun Path.forTestFile(relayed: Boolean) = when (this) {
+    Path.WIFI -> TestFilePath.WIFI
+    Path.DIRECT -> TestFilePath.TURBO
+    Path.INTERNET -> if (relayed) TestFilePath.RELAY else TestFilePath.INTERNET
+}
+
+/** Where no test file is ever sent. */
+private object NoTestFile : TestFileQueue {
+    override fun waiting(): TestFile? = null
+
+    override fun checked(file: TestFile, outcome: TestFileOutcome) = Unit
+
+    override fun held(file: TestFile, reason: TestFileHeld) = Unit
+}

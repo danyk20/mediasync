@@ -41,6 +41,10 @@ value class FrameType(val code: Int) {
         val LINK_TEST_RESULT = FrameType(0x0E)
         val TURBO_REQUEST = FrameType(0x0F)
         val TURBO_READY = FrameType(0x10)
+        val TEST_FILE_BEGIN = FrameType(0x11)
+        val TEST_FILE_READY = FrameType(0x12)
+        val TEST_FILE_END = FrameType(0x13)
+        val TEST_FILE_RESULT = FrameType(0x14)
     }
 }
 

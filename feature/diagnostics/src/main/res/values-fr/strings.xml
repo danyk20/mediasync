@@ -35,4 +35,25 @@
     <string name="settings_log_size_save">Enregistrer</string>
     <string name="settings_reset_title">Repartir de zéro</string>
     <string name="settings_reset_intro">Ce téléphone oublie son rôle, ses téléphones associés, ses réglages et son historique. Les photos et vidéos restent.</string>
+    <string name="diagnostics_test_file">Fichier de test</string>
+    <string name="diagnostics_test_file_intro">Envoie à %1$s un fichier de la taille que vous choisissez, en premier lors de la prochaine synchronisation, pour tester la vitesse et la connexion. %1$s vérifie seulement qu\'il est arrivé exactement tel qu\'envoyé, puis le supprime : il n\'apparaît jamais dans la galerie et n\'est jamais sauvegardé.</string>
+    <string name="diagnostics_test_file_received">Un téléphone qui envoie peut envoyer un fichier de test pour tester la vitesse et la connexion. Ce téléphone vérifie seulement qu\'il est arrivé exactement tel qu\'envoyé, puis le supprime.</string>
+    <string name="diagnostics_test_file_size">Taille (Mo)</string>
+    <string name="diagnostics_test_file_size_hint">De 0,1 Mo à 10 Go (10240 Mo). 25 Mo sauf si vous la changez.</string>
+    <string name="diagnostics_test_file_size_invalid">Saisissez une taille de 0,1 à 10240 Mo, par exemple 25 ou 500.</string>
+    <string name="diagnostics_test_file_add">Ajouter un fichier de test</string>
+    <string name="diagnostics_test_file_waiting">Un fichier de test de %1$s attend d\'être envoyé en premier lors de la prochaine synchronisation.</string>
+    <string name="diagnostics_test_file_remove">Retirer le fichier de test</string>
+    <string name="diagnostics_test_file_outdated">%1$s a besoin d\'une version plus récente de MediaSync pour accepter un fichier de test. Mettez MediaSync à jour sur ce téléphone ; d\'ici là, il attend.</string>
+    <string name="diagnostics_test_file_no_space">%1$s n\'a pas la place pour lui en ce moment. Il attend qu\'il y en ait.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s n\'a pas pu l\'enregistrer. Nouvel essai lors de la prochaine synchronisation.</string>
+    <string name="diagnostics_test_file_last">Dernier fichier de test</string>
+    <string name="diagnostics_test_file_matched">Arrivé exactement tel qu\'envoyé.</string>
+    <string name="diagnostics_test_file_mismatched">N\'est pas arrivé exactement tel qu\'envoyé.</string>
+    <string name="diagnostics_test_file_not_stored">Le téléphone qui reçoit n\'a pas pu l\'enregistrer.</string>
+    <string name="diagnostics_test_file_result">%1$s en %2$s s : %3$s Mo/s via %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">le Wi-Fi</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">Internet</string>
+    <string name="diagnostics_test_file_over_relay">Internet, par le relais</string>
 </resources>

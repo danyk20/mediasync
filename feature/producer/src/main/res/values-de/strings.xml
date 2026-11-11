@@ -203,4 +203,11 @@
     </plurals>
     <string name="producer_waiting_undo">Rückgängig</string>
     <string name="producer_waiting_no_viewer">Keine App auf diesem Telefon kann es öffnen.</string>
+    <string name="producer_test_file_title">Testdatei wartet</string>
+    <string name="producer_test_file_body">Eine Testdatei mit %1$s geht bei der nächsten Synchronisierung als Erstes an %2$s, um Geschwindigkeit und Verbindung zu testen. Dort wird sie nach der Prüfung gelöscht.</string>
+    <string name="producer_test_file_outdated">%1$s braucht eine neuere MediaSync-Version, um sie anzunehmen. Aktualisiere MediaSync dort.</string>
+    <string name="producer_test_file_no_space">%1$s hat gerade keinen Platz dafür.</string>
+    <string name="producer_test_file_not_writable">%1$s konnte sie letztes Mal nicht speichern.</string>
+    <string name="producer_test_file_remove">Entfernen</string>
+    <string name="producer_status_sending_test_file">Zuerst die Testdatei · %1$s von %2$s</string>
 </resources>

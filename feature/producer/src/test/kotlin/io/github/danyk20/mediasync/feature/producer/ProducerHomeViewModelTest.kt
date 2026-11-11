@@ -33,8 +33,10 @@ import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
+import io.github.danyk20.mediasync.sync.android.TestFiles
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.every
@@ -100,6 +102,7 @@ class ProducerHomeViewModelTest {
     }
 
     private val leftOut = mockk<LeftOutItems> { every { fingerprints } returns flowOf(emptySet()) }
+    private val testFiles = TestFiles(application)
 
     private fun viewModel() = ProducerHomeViewModel(
         application,
@@ -113,7 +116,24 @@ class ProducerHomeViewModelTest {
         clock,
         mobileData,
         leftOut,
+        testFiles,
     )
+
+    @Test
+    fun aTestFileWaitingShowsUntilTheUserRemovesIt() = runTest {
+        grantLibraryAccess()
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.consumerName != null }.testFileBytes shouldBe null
+
+        testFiles.add(25L * 1024 * 1024)
+        testFiles.held(testFiles.waiting()!!, TestFileHeld.RECEIVER_OUTDATED)
+
+        val waiting = viewModel.uiState.first { it.testFileBytes != null }
+        waiting.testFileBytes shouldBe 25L * 1024 * 1024
+        waiting.testFileProblem shouldBe TestFileHeld.RECEIVER_OUTDATED
+        viewModel.removeTestFile()
+        viewModel.uiState.first { it.testFileBytes == null }.testFileProblem shouldBe null
+    }
 
     @Test
     fun unpairingStopsASyncAndForgetsTheReceivingPhone() {

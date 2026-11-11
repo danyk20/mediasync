@@ -41,8 +41,10 @@ class ParallelSync(
     private val latest = ConcurrentHashMap<Int, TransferProgress>()
 
     fun sync(first: PeerConnection): SyncResult {
-        val (held, pending) = session(ProgressListener {}).pendingFor(first.peerId).partition(holdBack)
-        val queue = WorkQueue(pending)
+        val probe = session(ProgressListener {})
+        val (held, pending) = probe.pendingFor(first.peerId).partition(holdBack)
+        // The relay saver never holds the test file back: it's there to test this very connection.
+        val queue = WorkQueue(pending, probe.waitingTestFile())
         val pool = Executors.newCachedThreadPool { task -> Thread(task, "mediasync-stream").apply { isDaemon = true } }
         try {
             val streams = mutableListOf(start(pool, 0, queue) { session(it).sync(first, queue) })
@@ -79,7 +81,7 @@ class ParallelSync(
     }
 
     private fun mayGrow(streams: List<Future<SyncResult>>, queue: WorkQueue) =
-        streams.size < maxStreams && !queue.isEmpty() && mayAddStream()
+        streams.size < maxStreams && !queue.isEmpty() && !queue.sendingTestFile && mayAddStream()
 
     private fun megabytes(bytesPerProbe: Double) =
         String.format(Locale.ROOT, "%.1f", bytesPerProbe / BYTES_PER_MEGABYTE / (probeMillis / MILLIS_PER_SECOND))
@@ -112,6 +114,7 @@ class ParallelSync(
                         bytesTotal = queue.totalBytes,
                         currentItem = part.currentItem,
                         bytesSkipped = all.sumOf { it.bytesSkipped },
+                        testFile = part.testFile,
                     ),
                 )
             }

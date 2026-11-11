@@ -233,4 +233,11 @@
     </plurals>
     <string name="producer_waiting_undo">Zpět</string>
     <string name="producer_waiting_no_viewer">Žádná aplikace v tomto telefonu to neumí otevřít.</string>
+    <string name="producer_test_file_title">Čeká testovací soubor</string>
+    <string name="producer_test_file_body">Testovací soubor o velikosti %1$s půjde na %2$s jako první při příští synchronizaci, aby otestoval rychlost a spojení. Po ověření se tam smaže.</string>
+    <string name="producer_test_file_outdated">%1$s potřebuje novější verzi MediaSync, aby ho přijal. Aktualizujte tam MediaSync.</string>
+    <string name="producer_test_file_no_space">%1$s pro něj teď nemá místo.</string>
+    <string name="producer_test_file_not_writable">%1$s ho minule nemohl zapsat.</string>
+    <string name="producer_test_file_remove">Odebrat</string>
+    <string name="producer_status_sending_test_file">Nejdřív testovací soubor · %1$s z %2$s</string>
 </resources>

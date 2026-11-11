@@ -11,6 +11,7 @@ import kotlin.math.roundToLong
  * A snapshot of a running transfer, for progress UI. Totals grow as further batches are offered. [bytesSkipped]: of
  * [bytesDone], what didn't cross the link: the start of a resumed file, which the other phone already kept, and files
  * that weren't sent after all (the other phone had them, or they couldn't be read). It's done, but it isn't speed.
+ * [testFile]: the test file (docs/PLAN.md §7, *Test file*) is on its way now; its bytes count, but it isn't an item.
  */
 data class TransferProgress(
     val itemsDone: Int,
@@ -19,6 +20,7 @@ data class TransferProgress(
     val bytesTotal: Long,
     val currentItem: String?,
     val bytesSkipped: Long = 0,
+    val testFile: Boolean = false,
 ) {
     /** The bytes that actually crossed the link. */
     val bytesMoved: Long get() = bytesDone - bytesSkipped

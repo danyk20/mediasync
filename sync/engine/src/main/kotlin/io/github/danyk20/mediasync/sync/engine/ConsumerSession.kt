@@ -24,6 +24,7 @@ import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
 import io.github.danyk20.mediasync.sync.protocol.PairRequest
 import io.github.danyk20.mediasync.sync.protocol.PairResult
 import io.github.danyk20.mediasync.sync.protocol.ProtocolException
+import io.github.danyk20.mediasync.sync.protocol.TestFileBegin
 import io.github.danyk20.mediasync.sync.protocol.TurboRequest
 import io.github.danyk20.mediasync.sync.protocol.Want
 import io.github.danyk20.mediasync.sync.protocol.WireRole
@@ -77,6 +78,11 @@ class ConsumerSession(
     private val space: SpaceBudget = SpaceBudget(sink),
     /** Opens a direct link for Turbo transfer; `null` where there is none. */
     private val turbo: TurboHost? = null,
+    /**
+     * Where test files (docs/PLAN.md §7, *Test file*) are checked, never the gallery; `null`: this phone doesn't
+     * take them, and says so.
+     */
+    private val testFiles: TestFileStore? = null,
 ) {
 
     fun serve(connection: PeerConnection): ServeResult {
@@ -95,6 +101,7 @@ class ConsumerSession(
                 (if (paired) registry.pairSecret(connection.peerId) else null) ?: ByteString.EMPTY,
                 local.rendezvousUrl?.takeIf { paired }.orEmpty(),
                 local.wifiAddresses.takeIf { paired }.orEmpty(),
+                testFiles = testFiles != null,
             ),
         )
         if (hello.protocolVersion != PROTOCOL_VERSION || hello.role != WireRole.PRODUCER) {
@@ -200,6 +207,7 @@ class ConsumerSession(
         private var bytesTotal = 0L
         private var bytesDone = 0L
         private var bytesSkipped = 0L // The kept start of resumed files: done, but not received now.
+        private var testFileBytes = 0L // Done, but not photos or videos.
         private var received = 0
         private var alreadyHad = 0
         private var failed = 0
@@ -216,6 +224,7 @@ class ConsumerSession(
                     when (message) {
                         is Offer -> answer(message)
                         is FileBegin -> receive(message)
+                        is TestFileBegin -> testFile(message)
                         else -> throw ProtocolException("Unexpected ${message::class.simpleName} while syncing")
                     }
                     message = channel.receive()
@@ -223,8 +232,23 @@ class ConsumerSession(
             } finally {
                 space.release(reserved.values.sum()) // Wanted but never (fully) sent.
             }
-            return ServeResult.Synced(received, alreadyHad, failed, bytesDone, waitingForSpace)
+            return ServeResult.Synced(received, alreadyHad, failed, bytesDone - testFileBytes, waitingForSpace)
         }
+
+        /** A test file: checked and deleted, never stored as a photo or video or recorded in the ledger. */
+        private fun testFile(begin: TestFileBegin) {
+            val outcome = TestFileReceiver(channel, testFiles, space) { count ->
+                testFileBytes += count
+                bytesDone += count
+                bytesTotal += count
+                report(currentItem = null, testFile = true)
+            }.receive(begin, buffer)
+            outcome?.let { testFiles?.checked(producer, it) }
+        }
+
+        private fun report(currentItem: String?, testFile: Boolean = false) = progress.onProgress(
+            TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, currentItem, bytesSkipped, testFile),
+        )
 
         private fun answer(offer: Offer) {
             val want = mutableListOf<Want>()
@@ -318,16 +342,7 @@ class ConsumerSession(
                     digest.update(buffer, 0, byteCount)
                     if (writable) writable = writeOrFail(byteCount)
                 }
-                progress.onProgress(
-                    TransferProgress(
-                        itemsDone,
-                        itemsTotal,
-                        bytesDone,
-                        bytesTotal,
-                        descriptor.displayName,
-                        bytesSkipped,
-                    ),
-                )
+                report(descriptor.displayName)
             }
 
             fun finish(end: FileEnd) {
