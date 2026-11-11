@@ -409,11 +409,10 @@ class ProducerSync internal constructor(
         )
         val run = Run(consumer, details, order, System.currentTimeMillis())
         return try {
+            if (turbo) return run.overTurboAnyWay()
             val connection = connect(consumer)
             when {
-                connection != null && turbo -> run.overTurbo(connection)
                 connection != null -> run.overWifi(connection)
-                turbo -> run.overTurboViaInternet() ?: run.overTurboReceive()
                 else -> run.overInternet() ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
             }
         } catch (e: IOException) {
@@ -481,13 +480,49 @@ class ProducerSync internal constructor(
         }
 
         /**
-         * Not on a network with the consumer, but reachable over the internet (docs/PLAN.md §8.3): asks it there for a
-         * direct link, as over Wi-Fi, so its user needn't tap *Turbo receive*. What the link doesn't carry goes over
-         * the internet. `null` if the internet doesn't reach it.
+         * Turbo asked for: over Wi-Fi if the consumer is on this phone's network, else over the internet, else its
+         * *Turbo receive* link. Where it was last reached is tried first. If it isn't there, it's asked over the
+         * internet already while it's looked for on the network, as each can take seconds: the first that reaches it
+         * is used, and the other one given up.
          */
-        suspend fun overTurboViaInternet(): ProducerState? {
+        suspend fun overTurboAnyWay(): ProducerState {
+            connectKnown(consumer)?.let { return overTurbo(it) }
             _state.value = ProducerState.SettingUpTurbo
-            val connection = internetConnection() ?: return null
+            val viaInternet = scope.async(Dispatchers.IO) { openInternet() }
+            // Found on the network first (or stopped): the internet connection, if it comes, isn't needed.
+            val dropInternet = { scope.launch { viaInternet.await()?.close() } }
+            val (connection, overInternet) = try {
+                coroutineScope {
+                    val onWifi = async { search(consumer) }
+                    val first = select {
+                        onWifi.onAwait { it to false }
+                        viaInternet.onAwait { it to true }
+                    }
+                    when {
+                        first.first == null && !first.second -> viaInternet.await() to true
+                        first.first == null -> onWifi.await() to false
+                        else -> first.also { onWifi.cancel() }
+                    }
+                }
+            } catch (e: CancellationException) {
+                dropInternet()
+                throw e
+            }
+            if (!overInternet) dropInternet()
+            return when {
+                connection == null -> overTurboReceive()
+                overInternet -> overTurboViaInternet(connection)
+                else -> overTurbo(connection)
+            }
+        }
+
+        /**
+         * Not on a network with the consumer, but reachable over the internet (docs/PLAN.md §8.3): asks it there, over
+         * [connection], for a direct link, as over Wi-Fi, so its user needn't tap *Turbo receive*. What the link
+         * doesn't carry goes over the internet.
+         */
+        private suspend fun overTurboViaInternet(connection: PeerConnection): ProducerState {
+            mobileDataLeft = internet.mobileDataLeft()
             Diagnostics.log(Area.SEND, "Turbo: asking the receiving phone over the internet")
             return overTurbo(connection, reconnect = ::internetConnection) { problem -> internetAgain(problem) }
         }
@@ -602,15 +637,18 @@ class ProducerSync internal constructor(
         private fun internetAgain(problem: TurboProblem): ProducerState =
             overInternet(problem) ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
 
+        /** A connection to the consumer through its rendezvous Worker, to send over; `null` if there's none. */
+        private fun internetConnection(): PeerConnection? =
+            openInternet()?.also { mobileDataLeft = internet.mobileDataLeft() }
+
         /** A connection to the consumer through its rendezvous Worker; `null` if there's none. */
-        private fun internetConnection(): PeerConnection? {
+        private fun openInternet(): PeerConnection? {
             val worker = consumer.rendezvousUrl ?: return null
             val secret = consumer.pairSecret ?: return null
             if (!internet.allowed()) {
                 Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed or its limit is used")
                 return null
             }
-            mobileDataLeft = internet.mobileDataLeft()
             val connection = try {
                 internet.connect(consumer.id, worker, secret)
             } catch (e: IOException) {
@@ -725,12 +763,19 @@ class ProducerSync internal constructor(
      * Where the consumer said it listens on this phone's Wi-Fi, and where it was last reached, first (fast); then
      * whatever the network advertises (docs/PLAN.md §8.2): mDNS doesn't get through on every Wi-Fi.
      */
-    private suspend fun connect(consumer: Peer): PeerConnection? {
+    private suspend fun connect(consumer: Peer): PeerConnection? = connectKnown(consumer) ?: search(consumer)
+
+    /** [consumer] where it was last reached, or said it is, on this phone's network; `null` if not there. */
+    private fun connectKnown(consumer: Peer): PeerConnection? {
         val known = addressesToTry(consumer.lastAddress, consumer.wifiAddresses, sockets::isOnLocalNetwork)
-        if (known.isNotEmpty()) {
-            connectToFirst(known, consumer.id)?.let { return it }
-            Diagnostics.log(Area.SEND, "Not at ${known.joinToString(" or ")}; looking for it on the network")
-        }
+        if (known.isEmpty()) return null
+        connectToFirst(known, consumer.id)?.let { return it }
+        Diagnostics.log(Area.SEND, "Not at ${known.joinToString(" or ")}; looking for it on the network")
+        return null
+    }
+
+    /** [consumer] found on this phone's network; `null` if it isn't found in time. */
+    private suspend fun search(consumer: Peer): PeerConnection? {
         val found = discovery.find(serviceIdOf(consumer.id), DISCOVERY_TIMEOUT_MILLIS)
         if (found == null) {
             Diagnostics.log(Area.SEND, "Not found on the network within ${since(0, DISCOVERY_TIMEOUT_MILLIS)}")

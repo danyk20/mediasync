@@ -68,10 +68,17 @@ class RuntimeEndToEndTest {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val loopback = AddressProvider { listOf(InetAddress.getLoopbackAddress()) }
+
+    /** How long looking for a phone on the network takes, finding nothing. */
+    @Volatile
+    private var discoveryMillis = 0L
     private val noDiscovery = object : ServiceDiscovery {
         override fun advertise(port: Int, serviceId: String) = Closeable {}
 
-        override suspend fun find(serviceId: String, timeoutMillis: Long): String? = null
+        override suspend fun find(serviceId: String, timeoutMillis: Long): String? {
+            delay(discoveryMillis)
+            return null
+        }
     }
 
     // The receiving phone.
@@ -90,7 +97,7 @@ class RuntimeEndToEndTest {
 
     /** What the receiving phone showed for its links: before Android 13, MediaSync on screen. */
     private val screenCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
-    private val receiver = ConsumerReceiver(
+    private val receiver: ConsumerReceiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
         ledger = received,
@@ -106,7 +113,7 @@ class RuntimeEndToEndTest {
             }
 
             override fun hide() {
-                screenCalls += "hide"
+                screenCalls += if (receiver.state.value.directLinkOpen) "hide, link open" else "hide"
             }
 
             override val needsPermission = false
@@ -610,14 +617,16 @@ class RuntimeEndToEndTest {
         withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }.shouldBeInstanceOf<ProducerState.Idle>()
         screenCalls.toList() shouldBe listOf("show", "hide")
 
-        // One that opens keeps it on screen until it closes.
+        // One that opens keeps it on screen until the sync over it ends, while the link stays open a little longer.
         consumerLinks.answer =
             { port, _ -> TurboAnswer.Ready(DirectLink("DIRECT-ij-MediaSync", "pass", "127.0.0.1", port)) }
         source.put(FakeMedia("turbo", Random(14).nextBytes(100_000)))
         withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }.shouldBeInstanceOf<ProducerState.Idle>()
         screenCalls[2] shouldBe "show"
         withTimeout(TIMEOUT) { while (screenCalls.size < 4) delay(POLL) }
-        screenCalls.toList() shouldBe listOf("show", "hide", "show", "hide")
+        screenCalls[3] shouldBe "hide, link open"
+        withTimeout(TIMEOUT) { receiver.state.first { !it.directLinkOpen } }
+        screenCalls.drop(4).forEach { it shouldBe "hide" } // Closing the link hides it too, if still there.
     }
 
     @Test
@@ -646,7 +655,25 @@ class RuntimeEndToEndTest {
     }
 
     @Test
-    fun turboGoesOverWifiAwareWhenBothPhonesHaveIt() = runBlocking<Unit> {
+    fun turboGoesOverWifiDirectEvenWhenBothPhonesHaveWifiAware() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        consumerLinks.aware = true
+        producerLinks.aware = true
+        consumerLinks.answer = { port, _ ->
+            TurboAnswer.Ready(DirectLink("DIRECT-gh-MediaSync", "pass", "127.0.0.1", port))
+        }
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 4
+        done.turboProblem shouldBe null
+        consumerLinks.kinds shouldBe listOf(LinkKind.WIFI_DIRECT)
+        producerLinks.joined?.networkName shouldBe "DIRECT-gh-MediaSync"
+    }
+
+    @Test
+    fun turboGoesOverWifiAwareWhenWifiDirectWontOpen() = runBlocking<Unit> {
         receiver.start()
         pairWithApproval()
         consumerLinks.aware = true
@@ -667,8 +694,14 @@ class RuntimeEndToEndTest {
         receiver.start()
         pairWithApproval()
         consumerLinks.aware = true
+        // Wi-Fi Direct won't open at first, so the link is a Wi-Fi Aware one; asked again, it does.
+        val directTries = java.util.concurrent.atomic.AtomicInteger()
         consumerLinks.answer = { port, _ ->
-            TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port))
+            if (directTries.getAndIncrement() == 0) {
+                TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+            } else {
+                TurboAnswer.Ready(DirectLink("DIRECT-ab-MediaSync", "pass", "127.0.0.1", port))
+            }
         }
         producerLinks.aware = true
         producerLinks.joinable = { it.kind == LinkKind.WIFI_DIRECT }
@@ -771,6 +804,25 @@ class RuntimeEndToEndTest {
         far.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
         far.lastResult?.sent shouldBe 1
         internet.connects.get() shouldBe 3 // To ask, then to send.
+    }
+
+    @Test
+    fun awayFromTheWifiTurboAsksOverTheInternetWhileStillLookingOnTheNetwork() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        consumerLinks.answer =
+            { port, _ -> TurboAnswer.Ready(DirectLink("DIRECT-kl-MediaSync", "pass", "127.0.0.1", port)) }
+        offWifi = true
+        discoveryMillis = TIMEOUT // Looking on the network finds nothing for longer than the test waits.
+        source.put(FakeMedia("away", Random(15).nextBytes(150_000)))
+
+        val done = withTimeout(TIMEOUT / 2) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        producerLinks.joined?.networkName shouldBe "DIRECT-kl-MediaSync"
     }
 
     @Test

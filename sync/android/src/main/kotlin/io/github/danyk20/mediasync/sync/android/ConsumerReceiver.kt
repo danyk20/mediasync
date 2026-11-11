@@ -354,20 +354,22 @@ class ConsumerReceiver internal constructor(
         val started = System.currentTimeMillis()
         markActivity()
         countSession(+1)
+        var result: ServeResult? = null
         try {
-            addresses.keepingAwake { receive(connection.peerId, connection, started) }
+            result = addresses.keepingAwake { receive(connection.peerId, connection, started) }
         } finally {
             countSession(-1)
             markActivity()
+            if (result is ServeResult.Synced) turbo.syncEnded()
             if (server != null) listenOverInternet() // It may have just got its pair secret.
         }
     }
 
-    /** One session with [producer], from its first message to its end. */
-    private fun receive(producer: DeviceId, connection: PeerConnection, started: Long) {
+    /** One session with [producer], from its first message to its end; `null` if it dropped. */
+    private fun receive(producer: DeviceId, connection: PeerConnection, started: Long): ServeResult? {
         val id = nextSession.incrementAndGet()
         sessionStarts(producer)
-        connection.use {
+        return connection.use {
             val session = ConsumerSession(
                 device.local().copy(wifiAddresses = wifiAddresses()),
                 peers,
@@ -407,21 +409,25 @@ class ConsumerReceiver internal constructor(
                 )
                 null // Dropped: kept partial files resume next time.
             }
-            synchronized(tally) {
-                // Its bytes stay in the producer's total: they move from its session to what ended.
-                sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesMoved, Long::plus) }
-                if (sessions.values.none { it.first == producer }) quietSince[producer] = System.currentTimeMillis()
-                val transfers = transfers()
-                _state.update { state ->
-                    state.copy(
-                        transfers = transfers,
-                        speeds = speeds(transfers),
-                        lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
-                        lastActivityMillis = System.currentTimeMillis(),
-                        waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
-                    )
-                }
-            }
+            sessionEnded(id, producer, result)
+            result
+        }
+    }
+
+    /** Session [id] with [producer] ended with [result] (`null`: dropped). */
+    private fun sessionEnded(id: Long, producer: DeviceId, result: ServeResult?) = synchronized(tally) {
+        // Its bytes stay in the producer's total: they move from its session to what ended.
+        sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesMoved, Long::plus) }
+        if (sessions.values.none { it.first == producer }) quietSince[producer] = System.currentTimeMillis()
+        val transfers = transfers()
+        _state.update { state ->
+            state.copy(
+                transfers = transfers,
+                speeds = speeds(transfers),
+                lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
+                lastActivityMillis = System.currentTimeMillis(),
+                waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
+            )
         }
     }
 
@@ -510,6 +516,15 @@ class ConsumerReceiver internal constructor(
         fun permissionHandled() = _state.update { it.copy(turboNeedsPermission = false) }
 
         /**
+         * A sync ended. Once no other session runs, MediaSync no longer needs to be on screen for the link: it goes,
+         * and the phone's screen turns off after its usual timeout, while the link itself stays open a little longer
+         * for the sending phone to come back.
+         */
+        internal fun syncEnded() {
+            if (link.get() != null && activeSessions.get() == 0) linkScreen.hide()
+        }
+
+        /**
          * *Turbo receive*: opens a direct link that paired sending phones find without a network in common, as its
          * name and passphrase come from this phone's Turbo key and the time. It stays open until [stopReceive], or
          * 10 minutes without a session over it. Blocks while Wi-Fi Direct sets it up.
@@ -537,7 +552,7 @@ class ConsumerReceiver internal constructor(
         /**
          * Opens a direct link for a sending phone that asked for Turbo transfer, or hands out the one already open.
          * It stays open, and this phone keeps listening, until [idleMillis] after the last session. [aware]: the
-         * sending phone can join over Wi-Fi Aware, which is then tried first.
+         * sending phone can join over Wi-Fi Aware, which is then tried if Wi-Fi Direct fails.
          */
         private fun open(
             credentials: Pair<String, String> = DirectLink.credentials(),
@@ -587,14 +602,15 @@ class ConsumerReceiver internal constructor(
             return answer
         }
 
-        /** Over Wi-Fi Aware if [aware] and this phone can, else (or if that fails) over Wi-Fi Direct. */
+        /**
+         * Over Wi-Fi Direct, else (if it fails, [aware] and this phone can) over Wi-Fi Aware. Wi-Fi Direct comes first:
+         * on real phones it set up as fast and moved photos about 15 times faster (docs/PLAN.md §8.3).
+         */
         private fun openLink(port: Int, credentials: Pair<String, String>, aware: Boolean): TurboAnswer {
-            if (aware && directLinks.awareAvailable()) {
-                val answer = openAllowed(port, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE)
-                if (answer is TurboAnswer.Ready) return answer
-                Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Aware ${answer.describe()}; Wi-Fi Direct instead")
-            }
-            return openAllowed(port, credentials, LinkKind.WIFI_DIRECT)
+            val answer = openAllowed(port, credentials, LinkKind.WIFI_DIRECT)
+            if (answer is TurboAnswer.Ready || !aware || !directLinks.awareAvailable()) return answer
+            Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Direct ${answer.describe()}; Wi-Fi Aware instead")
+            return openAllowed(port, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE)
         }
 
         /**
