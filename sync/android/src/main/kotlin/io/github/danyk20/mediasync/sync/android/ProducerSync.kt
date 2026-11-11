@@ -413,7 +413,7 @@ class ProducerSync internal constructor(
             when {
                 connection != null && turbo -> run.overTurbo(connection)
                 connection != null -> run.overWifi(connection)
-                turbo -> run.overTurboReceive()
+                turbo -> run.overTurboViaInternet() ?: run.overTurboReceive()
                 else -> run.overInternet() ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
             }
         } catch (e: IOException) {
@@ -442,18 +442,21 @@ class ProducerSync internal constructor(
         /**
          * Asks the consumer for a direct link over [connection], joins it and sends over it. Whatever doesn't work
          * on the way, everything (or the rest) still goes over Wi-Fi, and the home screen says why. [aware]: asks
-         * for Wi-Fi Aware, and for Wi-Fi Direct again if that can't be joined.
+         * for Wi-Fi Aware, and for Wi-Fi Direct again if that can't be joined. [reconnect] and [otherwise]: the way
+         * [connection] came, to ask again and to send what the link doesn't carry; Wi-Fi unless said otherwise.
          */
         suspend fun overTurbo(
             connection: PeerConnection,
             aware: Boolean = directLinks.awareAvailable(),
+            reconnect: suspend () -> PeerConnection? = { connect(consumer) },
+            otherwise: suspend (TurboProblem) -> ProducerState = { problem -> wifiAgain(problem) },
         ): ProducerState {
             _state.value = ProducerState.SettingUpTurbo
             val answer = connection.use { TurboSetup(device.local()).request(it, aware) }
             Diagnostics.log(Area.SEND, "Turbo: the receiving phone is ${answer.describe()}")
             val link = when (answer) {
                 is TurboAnswer.Ready -> answer.link
-                is TurboAnswer.Unavailable -> return wifiAgain(answer.reason.toProblem())
+                is TurboAnswer.Unavailable -> return otherwise(answer.reason.toProblem())
             }
             val outcome = try {
                 overDirectLink(link)
@@ -463,18 +466,30 @@ class ProducerSync internal constructor(
             return when {
                 outcome == null && link.kind == LinkKind.WIFI_AWARE -> {
                     Diagnostics.log(Area.SEND, "Turbo: no Wi-Fi Aware link; asking for Wi-Fi Direct instead")
-                    val again = connect(consumer) ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
-                    overTurbo(again, aware = false)
+                    val again = reconnect() ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
+                    overTurbo(again, aware = false, reconnect, otherwise)
                 }
 
-                outcome == null -> wifiAgain(TurboProblem.NO_LINK)
+                outcome == null -> otherwise(TurboProblem.NO_LINK)
 
-                outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED -> wifiAgain(
+                outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED -> otherwise(
                     TurboProblem.DROPPED,
                 )
 
                 else -> outcome
             }
+        }
+
+        /**
+         * Not on a network with the consumer, but reachable over the internet (docs/PLAN.md §8.3): asks it there for a
+         * direct link, as over Wi-Fi, so its user needn't tap *Turbo receive*. What the link doesn't carry goes over
+         * the internet. `null` if the internet doesn't reach it.
+         */
+        suspend fun overTurboViaInternet(): ProducerState? {
+            _state.value = ProducerState.SettingUpTurbo
+            val connection = internetConnection() ?: return null
+            Diagnostics.log(Area.SEND, "Turbo: asking the receiving phone over the internet")
+            return overTurbo(connection, reconnect = ::internetConnection) { problem -> internetAgain(problem) }
         }
 
         /**
@@ -574,9 +589,21 @@ class ProducerSync internal constructor(
 
         /**
          * Not on a network with the consumer: through its rendezvous Worker (docs/PLAN.md §8.4), if it has one and
-         * this phone isn't on mobile data. `null` if there's no way to it that way.
+         * this phone isn't on mobile data. `null` if there's no way to it that way. [turboProblem]: Turbo was asked
+         * for, and why it didn't carry this.
          */
-        fun overInternet(): ProducerState? {
+        fun overInternet(turboProblem: TurboProblem? = null): ProducerState? {
+            val connection = internetConnection() ?: return null
+            _state.value = ProducerState.Syncing(progress = null, internet = true)
+            return sockets.keepingAwake { send(connection, Path.INTERNET) }.copy(turboProblem = turboProblem)
+        }
+
+        /** Back on the internet after Turbo didn't work out; the rest goes there. */
+        private fun internetAgain(problem: TurboProblem): ProducerState =
+            overInternet(problem) ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
+
+        /** A connection to the consumer through its rendezvous Worker; `null` if there's none. */
+        private fun internetConnection(): PeerConnection? {
             val worker = consumer.rendezvousUrl ?: return null
             val secret = consumer.pairSecret ?: return null
             if (!internet.allowed()) {
@@ -591,8 +618,7 @@ class ProducerSync internal constructor(
                 return null
             }
             Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone ${connection.internetRoute()}")
-            _state.value = ProducerState.Syncing(progress = null, internet = true)
-            return sockets.keepingAwake { send(connection, Path.INTERNET) }
+            return connection
         }
 
         /**

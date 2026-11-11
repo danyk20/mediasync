@@ -720,6 +720,7 @@ interface SecureSession : Closeable {
   - Only groups whose name ends in `-MediaSync` are ever removed. If another app's group is up (Android Auto, say), Turbo isn't used.
 - **Signaling the consumer:**
   - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session. *Built (M3).*
+    - *Fixed (M6, after a real-phone test):* away from the consumer's Wi-Fi, Turbo went straight to looking for a *Turbo receive* link, so the user had to tap it on the consumer even when the internet reached it. Now the producer first asks over the internet (waking the consumer if needed), and joins the link the consumer opens by itself. What the link doesn't carry (it can't be joined, it drops, or the consumer can't open one) goes over the internet. Only if the internet doesn't reach the consumer either does it look for *Turbo receive*.
   - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**. *Built (M3):*
     - The consumer keeps a random 32-byte Turbo key (outside backups) and tells it to paired producers in every session (`Hello.turboKey`, only once the producer is paired). Phones paired earlier learn it at their next sync: no new pairing.
     - *Turbo receive* opens a group whose name (`DIRECT-xy-MediaSync-abcdef`) and passphrase are an HMAC of the key and the 15-minute epoch, so the name changes on its own and isn't a lasting trace of the phone.
