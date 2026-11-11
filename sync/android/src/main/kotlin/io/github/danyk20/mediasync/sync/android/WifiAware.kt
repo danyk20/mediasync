@@ -116,33 +116,40 @@ class WifiAware @Inject constructor(@ApplicationContext private val context: Con
         val started = CompletableDeferred<Boolean>()
         val greeted = mutableSetOf<PeerHandle>()
         val config = PublishConfig.Builder().setServiceName(name).build()
-        session.publish(
-            config,
-            object : DiscoverySessionCallback() {
-                override fun onPublishStarted(session: PublishDiscoverySession) {
-                    opened.discovery = session
-                    started.complete(true)
-                }
+        // Refused with an exception where Android doesn't allow it now: the attachment is let go first.
+        try {
+            session.publish(
+                config,
+                object : DiscoverySessionCallback() {
+                    override fun onPublishStarted(session: PublishDiscoverySession) {
+                        opened.discovery = session
+                        started.complete(true)
+                    }
 
-                override fun onSessionConfigFailed() {
-                    Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Aware couldn't publish")
-                    started.complete(false)
-                }
+                    override fun onSessionConfigFailed() {
+                        Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Aware couldn't publish")
+                        started.complete(false)
+                    }
 
-                // A sending phone found the service and said hello: its data path, if it has the passphrase.
-                override fun onMessageReceived(peer: PeerHandle, message: ByteArray) {
-                    val publishing = opened.discovery ?: return
-                    if (!greeted.add(peer)) return
-                    val specifier = WifiAwareNetworkSpecifier.Builder(publishing, peer)
-                        .setPskPassphrase(passphrase)
-                        .setPort(port)
-                        .setTransportProtocol(TCP)
-                        .build()
-                    opened.dataPaths += requestDataPath(specifier, object : ConnectivityManager.NetworkCallback() {})
-                }
-            },
-            callbacks,
-        )
+                    // A sending phone found the service and said hello: its data path, if it has the passphrase.
+                    override fun onMessageReceived(peer: PeerHandle, message: ByteArray) {
+                        val publishing = opened.discovery ?: return
+                        if (!greeted.add(peer)) return
+                        val specifier = WifiAwareNetworkSpecifier.Builder(publishing, peer)
+                            .setPskPassphrase(passphrase)
+                            .setPort(port)
+                            .setTransportProtocol(TCP)
+                            .build()
+                        opened.dataPaths +=
+                            requestDataPath(specifier, object : ConnectivityManager.NetworkCallback() {})
+                    }
+                },
+                callbacks,
+            )
+        } catch (e: SecurityException) {
+            close(name)
+            throw e
+        }
         if (!started.await()) {
             close(name)
             return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
