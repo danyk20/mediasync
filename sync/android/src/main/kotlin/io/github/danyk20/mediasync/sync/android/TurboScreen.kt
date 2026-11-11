@@ -30,7 +30,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * There, Wi-Fi Direct and Wi-Fi Aware need location, which the user may allow only while MediaSync is in use. A sending
  * phone's Turbo wakes this phone over the internet, in the background, and Android then refuses the link. If the user
  * let MediaSync display over other apps, it starts [TurboScreenActivity] instead: over the lock screen, turning the
- * screen on, so MediaSync is in use while the link opens. It goes away when the link closes.
+ * screen on, so MediaSync is in use while the link opens. It goes away when the sync over the link ends, or the link
+ * closes.
  */
 @Singleton
 @ExercisedOnDevice(coveredBy = "sync:android TurboScreenTest")
@@ -110,8 +111,8 @@ internal fun screenAction(sdk: Int, inForeground: Boolean, mayShow: Boolean): Sc
 }
 
 /**
- * What [TurboScreen] shows: one line saying Turbo is receiving, over the lock screen, while the link is open. It keeps
- * the screen on meanwhile, as Wi-Fi Aware sets up each sending phone's data path after the link opened.
+ * What [TurboScreen] shows: one line saying Turbo is receiving, over the lock screen, until the sync over the link
+ * ends. It keeps the screen on meanwhile, as Wi-Fi Aware sets up each sending phone's data path after the link opened.
  */
 @ExercisedOnDevice(coveredBy = "sync:android TurboScreenTest")
 class TurboScreenActivity : Activity() {
