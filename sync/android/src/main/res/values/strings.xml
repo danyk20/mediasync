@@ -26,4 +26,6 @@
         <item quantity="other">%d photos and videos sent</item>
     </plurals>
     <string name="sync_notification_sent_to">They\'re safe on %1$s.</string>
+    <!-- Shown over the lock screen while a Turbo link is open (TurboScreenActivity). -->
+    <string name="turbo_screen_receiving">Receiving with Turbo…</string>
 </resources>

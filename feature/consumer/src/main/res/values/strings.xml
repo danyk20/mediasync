@@ -149,4 +149,7 @@
     <!-- A sending phone's wake-up wouldn't reach this phone (checked once a day). %1$s: why, technical. -->
     <string name="consumer_wake_ups_failing_title">Sending phones can\'t wake this phone</string>
     <string name="consumer_wake_ups_failing_body">Over the internet, they reach it only while MediaSync is open here. Setting up internet sync again may fix it. Why: %1$s</string>
+    <string name="consumer_turbo_screen_title">Let Turbo start with the screen off</string>
+    <string name="consumer_turbo_screen_body">On this Android version, a direct link only opens while MediaSync is on screen. Allow MediaSync to display over other apps: when a sending phone starts Turbo, it then comes up here by itself, even on the lock screen, and goes away when the transfer ends.</string>
+    <string name="consumer_turbo_screen_allow">Allow</string>
 </resources>

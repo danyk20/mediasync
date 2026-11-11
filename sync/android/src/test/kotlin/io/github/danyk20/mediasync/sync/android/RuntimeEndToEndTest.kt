@@ -87,6 +87,9 @@ class RuntimeEndToEndTest {
     /** The receiving phone's rendezvous Worker, once set up (docs/PLAN.md §8.4). */
     private var consumerWorker: String? = null
     private val internet = FakeInternet { producerIdentity.id }
+
+    /** What the receiving phone showed for its links: before Android 13, MediaSync on screen. */
+    private val screenCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val receiver = ConsumerReceiver(
         identity = { consumerIdentity },
         peers = consumerPeers,
@@ -97,6 +100,17 @@ class RuntimeEndToEndTest {
         scope = scope,
         preferredPort = 0,
         directLinkIdleMillis = 300,
+        linkScreen = object : LinkScreen {
+            override fun show() {
+                screenCalls += "show"
+            }
+
+            override fun hide() {
+                screenCalls += "hide"
+            }
+
+            override val needsPermission = false
+        },
     )
 
     // The sending phone.
@@ -584,6 +598,26 @@ class RuntimeEndToEndTest {
         } finally {
             Diagnostics.install { _, _ -> }
         }
+    }
+
+    @Test
+    fun theReceivingPhoneShowsItselfWhileItsLinkIsOpen() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+
+        // A link that can't be opened lets it go at once.
+        consumerLinks.answer = { _, _ -> TurboAnswer.Unavailable(TurboUnavailable.FAILED) }
+        withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }.shouldBeInstanceOf<ProducerState.Idle>()
+        screenCalls.toList() shouldBe listOf("show", "hide")
+
+        // One that opens keeps it on screen until it closes.
+        consumerLinks.answer =
+            { port, _ -> TurboAnswer.Ready(DirectLink("DIRECT-ij-MediaSync", "pass", "127.0.0.1", port)) }
+        source.put(FakeMedia("turbo", Random(14).nextBytes(100_000)))
+        withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }.shouldBeInstanceOf<ProducerState.Idle>()
+        screenCalls[2] shouldBe "show"
+        withTimeout(TIMEOUT) { while (screenCalls.size < 4) delay(POLL) }
+        screenCalls.toList() shouldBe listOf("show", "hide", "show", "hide")
     }
 
     @Test

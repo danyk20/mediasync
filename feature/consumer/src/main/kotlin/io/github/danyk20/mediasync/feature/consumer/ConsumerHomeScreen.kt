@@ -152,6 +152,7 @@ fun ConsumerHomeRoute(
             }
         },
         onStopTurboReceive = viewModel::stopTurboReceive,
+        onAllowTurboScreen = { context.openDisplayOverOtherApps() },
     )
 }
 
@@ -169,6 +170,11 @@ private fun SpeedHistorySheet(
 /** MediaSync's page in the system settings: permissions, battery use. */
 private fun Context.openAppSettings() = startActivity(
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+)
+
+/** MediaSync's *Display over other apps* switch in the system settings. */
+private fun Context.openDisplayOverOtherApps() = startActivity(
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", packageName, null)),
 )
 
 /** Asks to post notifications, where Android asks for that (13 on). */
@@ -198,6 +204,7 @@ fun ConsumerHomeScreen(
     onDismissTurbo: () -> Unit = {},
     onStartTurboReceive: () -> Unit = {},
     onStopTurboReceive: () -> Unit = {},
+    onAllowTurboScreen: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -227,6 +234,7 @@ fun ConsumerHomeScreen(
             }
             StorageNotice(state, onOpenStorage)
             TurboNotice(state, onAllowTurbo, onDismissTurbo)
+            TurboScreenNotice(state.askTurboScreen, onAllowTurboScreen) { onDismiss(SetupPrompt.TURBO_SCREEN) }
             BackgroundSetupNotices(
                 askNotifications = state.askNotifications,
                 askBattery = state.askBattery,
@@ -269,6 +277,23 @@ private fun TurboNotice(state: ConsumerHomeUiState, onAllowTurbo: () -> Unit, on
         ),
         onAction = onAllowTurbo,
         onDismiss = onDismissTurbo,
+    )
+}
+
+/**
+ * Before Android 13, a Turbo link needs MediaSync on screen (docs/PLAN.md §8.3): allowed to display over other apps, it
+ * shows itself when a sending phone asks, even with the screen off.
+ */
+@Composable
+private fun TurboScreenNotice(ask: Boolean, onAllow: () -> Unit, onDismiss: () -> Unit) {
+    if (!ask) return
+    NoticeCard(
+        title = stringResource(R.string.consumer_turbo_screen_title),
+        body = stringResource(R.string.consumer_turbo_screen_body),
+        icon = MediaSyncIcons.Turbo,
+        action = stringResource(R.string.consumer_turbo_screen_allow),
+        onAction = onAllow,
+        onDismiss = onDismiss,
     )
 }
 

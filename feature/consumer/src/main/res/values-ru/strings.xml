@@ -154,4 +154,7 @@
     <string name="consumer_cloudflare_wake_ups_failing">Но отправляющие телефоны не могут разбудить этот телефон, поэтому через интернет они достучатся до него, только пока здесь открыт MediaSync. Причина: %1$s</string>
     <string name="consumer_wake_ups_failing_title">Отправляющие телефоны не могут разбудить этот телефон</string>
     <string name="consumer_wake_ups_failing_body">Через интернет они достучатся до него, только пока здесь открыт MediaSync. Помочь может повторная настройка синхронизации через интернет. Причина: %1$s</string>
+    <string name="consumer_turbo_screen_title">Запуск Turbo при выключенном экране</string>
+    <string name="consumer_turbo_screen_body">В этой версии Android прямое соединение открывается, только пока MediaSync на экране. Разрешите MediaSync показываться поверх других приложений: когда отправляющий телефон запустит Turbo, MediaSync сам появится здесь, даже на экране блокировки, и исчезнет после передачи.</string>
+    <string name="consumer_turbo_screen_allow">Разрешить</string>
 </resources>

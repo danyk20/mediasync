@@ -38,8 +38,21 @@
     <uses-feature
         android:name="android.hardware.wifi.aware"
         android:required="false" />
+    <!-- Before Android 13, a Turbo link needs location, which the user may allow only while MediaSync is in use.
+         Woken in the background for one, MediaSync shows itself over the lock screen if the user allows it
+         (TurboScreen). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application>
+        <activity
+            android:name=".TurboScreenActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:turnScreenOn="true" />
         <!-- Wake-ups from the receiving phone's Worker (docs/PLAN.md §10.4). Firebase doesn't start on its own: only a
              receiving phone with internet sync turns it on. -->
         <service

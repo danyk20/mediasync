@@ -175,6 +175,32 @@ enum class TurboAvailability {
 }
 
 /**
+ * Before Android 13, a Turbo link needs location, which the user may allow only while MediaSync is on screen
+ * (docs/PLAN.md §8.3). A receiving phone woken in the background shows MediaSync while it opens one.
+ */
+interface LinkScreen {
+    /** Puts MediaSync on screen if a link needs it and it may; blocks until it's there, briefly. */
+    fun show()
+
+    /** The link closed: MediaSync needn't stay on screen. */
+    fun hide()
+
+    /** A link may need MediaSync on screen here, and the user hasn't let it show itself from the background. */
+    val needsPermission: Boolean
+
+    companion object {
+        /** Where nothing needs to be on screen: tests, and phones where links never need it. */
+        val None = object : LinkScreen {
+            override fun show() = Unit
+
+            override fun hide() = Unit
+
+            override val needsPermission = false
+        }
+    }
+}
+
+/**
  * Direct links between the two phones, for Turbo transfer (docs/PLAN.md §8.3): Wi-Fi Direct, or Wi-Fi Aware where
  * both phones have it. The receiving phone opens a fresh one for each transfer, and the sending phone joins it with
  * what it was told in an encrypted session.

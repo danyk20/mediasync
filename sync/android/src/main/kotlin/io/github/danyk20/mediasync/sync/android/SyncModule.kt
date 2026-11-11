@@ -71,6 +71,9 @@ internal abstract class SyncModule {
     @Binds
     abstract fun bindInternetLinks(impl: AndroidInternetLinks): InternetLinks
 
+    @Binds
+    abstract fun bindLinkScreen(impl: TurboScreen): LinkScreen
+
     companion object {
         @Provides
         @Singleton

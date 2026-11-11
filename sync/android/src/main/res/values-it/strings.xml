@@ -26,4 +26,5 @@
         <item quantity="other">%d foto e video inviati</item>
     </plurals>
     <string name="sync_notification_sent_to">Sono al sicuro su %1$s.</string>
+    <string name="turbo_screen_receiving">Ricezione con Turbo…</string>
 </resources>

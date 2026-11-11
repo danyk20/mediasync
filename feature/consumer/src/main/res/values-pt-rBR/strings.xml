@@ -149,4 +149,7 @@
     <string name="consumer_cloudflare_wake_ups_failing">Mas os telefones que enviam não conseguem acordar este telefone: pela internet, eles só o alcançam enquanto o MediaSync estiver aberto aqui. Motivo: %1$s</string>
     <string name="consumer_wake_ups_failing_title">Os telefones que enviam não conseguem acordar este telefone</string>
     <string name="consumer_wake_ups_failing_body">Pela internet, eles só o alcançam enquanto o MediaSync estiver aberto aqui. Configurar a sincronização pela internet de novo pode resolver. Motivo: %1$s</string>
+    <string name="consumer_turbo_screen_title">Deixar o Turbo começar com a tela apagada</string>
+    <string name="consumer_turbo_screen_body">Nesta versão do Android, um link direto só abre enquanto o MediaSync está na tela. Permita que o MediaSync apareça sobre outros apps: quando um celular que envia iniciar o Turbo, o MediaSync aparece aqui sozinho, até na tela de bloqueio, e some quando a transferência termina.</string>
+    <string name="consumer_turbo_screen_allow">Permitir</string>
 </resources>

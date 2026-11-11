@@ -101,6 +101,8 @@ class ConsumerReceiver internal constructor(
     private val directLinkIdleMillis: Long = DIRECT_LINK_IDLE_MILLIS,
     /** Listening over the internet through this Worker, started or again: wake-ups may be checked. */
     private val onInternet: (worker: String) -> Unit = {},
+    /** Shows MediaSync while a direct link opens and stays open, where Android only allows one then. */
+    private val linkScreen: LinkScreen = LinkScreen.None,
 ) {
     @Inject
     constructor(
@@ -112,7 +114,19 @@ class ConsumerReceiver internal constructor(
         network: Connectivity,
         @ApplicationScope scope: CoroutineScope,
         wakeUps: WakeUpCheck,
-    ) : this(identity, peers, ledger, sink, device, network, scope, PREFERRED_PORT, onInternet = wakeUps::checkIfDue)
+        linkScreen: LinkScreen,
+    ) : this(
+        identity,
+        peers,
+        ledger,
+        sink,
+        device,
+        network,
+        scope,
+        PREFERRED_PORT,
+        onInternet = wakeUps::checkIfDue,
+        linkScreen = linkScreen,
+    )
 
     private val addresses = network.addresses
     private val discovery = network.discovery
@@ -486,6 +500,12 @@ class ConsumerReceiver internal constructor(
         /** Whether sending phones can use Turbo transfer with this phone now. */
         fun availability(): TurboAvailability = directLinks.availability()
 
+        /**
+         * Before Android 13, a sending phone's Turbo needs MediaSync on screen here, and the user hasn't let it show
+         * itself: with the screen off, the photos then go over the internet instead.
+         */
+        fun screenNeedsPermission(): Boolean = linkScreen.needsPermission
+
         /** The user allowed Turbo here, or dismissed the request: stop asking. */
         fun permissionHandled() = _state.update { it.copy(turboNeedsPermission = false) }
 
@@ -539,11 +559,14 @@ class ConsumerReceiver internal constructor(
             val answer = synchronized(opening) {
                 link.get() ?: run {
                     val port = _state.value.port ?: return TurboAnswer.Unavailable(TurboUnavailable.FAILED)
+                    linkScreen.show()
                     openLink(port, credentials, aware).also { answer ->
                         Diagnostics.log(Area.RECEIVE, "Turbo: ${answer.describe()}")
                         if (answer is TurboAnswer.Ready) {
                             link.set(answer)
                             opened = answer
+                        } else {
+                            linkScreen.hide()
                         }
                     }
                 }
@@ -608,6 +631,7 @@ class ConsumerReceiver internal constructor(
             Diagnostics.log(Area.RECEIVE, "Turbo: direct link closed")
             _state.update { it.copy(directLinkOpen = false, turboReceiving = false) }
             release(DIRECT_LINK_HOLDER)
+            linkScreen.hide()
             return true
         }
     }

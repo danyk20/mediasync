@@ -27,4 +27,5 @@
         <item quantity="other">Odoslané: %d</item>
     </plurals>
     <string name="sync_notification_sent_to">Sú v bezpečí na %1$s.</string>
+    <string name="turbo_screen_receiving">Prijímanie cez Turbo…</string>
 </resources>
