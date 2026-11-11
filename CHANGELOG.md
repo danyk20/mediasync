@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.6](https://github.com/danyk20/mediasync/compare/v0.9.5...v0.9.6) (2026-11-11)
+
+
+### Features
+
+* before Android 13, the receiving phone shows itself so Turbo starts with its screen off ([#124](https://github.com/danyk20/mediasync/issues/124)) ([efa0c55](https://github.com/danyk20/mediasync/commit/efa0c556136d0d8b5d5c7f764eb7a9bed82cf5bb))
+
+
+### Miscellaneous Chores
+
+* release 0.9.6 ([#126](https://github.com/danyk20/mediasync/issues/126)) ([8f60740](https://github.com/danyk20/mediasync/commit/8f60740c9145270c821dd120e2424e5b1f59242c))
+
 ## [0.9.5](https://github.com/danyk20/mediasync/compare/v0.9.4...v0.9.5) (2026-11-11)
 
 
