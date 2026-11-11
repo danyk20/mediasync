@@ -675,6 +675,24 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun aLinkAndroidRefusesToOpenLeavesEverythingToWifiWithoutCrashing() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        // Before Android 13, woken in the background with location allowed only while MediaSync is on screen.
+        consumerLinks.aware = true
+        producerLinks.aware = true
+        consumerLinks.awareAnswer = { _, _ -> throw SecurityException("No Coarse/Fine Location permission") }
+        consumerLinks.answer = { _, _ -> throw SecurityException("No Coarse/Fine Location permission") }
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
+        done.lastResult?.sent shouldBe 4
+        receiver.state.value.listening shouldBe true
+        receiver.state.value.directLinkOpen shouldBe false
+    }
+
+    @Test
     fun aDirectLinkThatDropsLeavesTheRestToWifi() = runBlocking<Unit> {
         receiver.start()
         pairWithApproval()

@@ -567,11 +567,24 @@ class ConsumerReceiver internal constructor(
         /** Over Wi-Fi Aware if [aware] and this phone can, else (or if that fails) over Wi-Fi Direct. */
         private fun openLink(port: Int, credentials: Pair<String, String>, aware: Boolean): TurboAnswer {
             if (aware && directLinks.awareAvailable()) {
-                val answer = directLinks.open(port, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE)
+                val answer = openAllowed(port, DirectLink.awareCredentials(), LinkKind.WIFI_AWARE)
                 if (answer is TurboAnswer.Ready) return answer
                 Diagnostics.log(Area.RECEIVE, "Turbo: Wi-Fi Aware ${answer.describe()}; Wi-Fi Direct instead")
             }
-            return directLinks.open(port, credentials)
+            return openAllowed(port, credentials, LinkKind.WIFI_DIRECT)
+        }
+
+        /**
+         * Opens a link of [kind], if Android allows it now. Before Android 13, it takes location, which the user may
+         * have allowed only while MediaSync is on screen: woken in the background, Android then refuses with an
+         * exception. The sending phone is told Turbo didn't work out, and goes on another way.
+         */
+        private fun openAllowed(port: Int, credentials: Pair<String, String>, kind: LinkKind): TurboAnswer = try {
+            directLinks.open(port, credentials, kind)
+        } catch (e: SecurityException) {
+            val name = if (kind == LinkKind.WIFI_AWARE) "Wi-Fi Aware" else "Wi-Fi Direct"
+            Diagnostics.log(Area.RECEIVE, "Turbo: Android didn't allow $name now", e)
+            TurboAnswer.Unavailable(TurboUnavailable.FAILED)
         }
 
         /** Closes [open] once nothing came over it (or anywhere) for [idleMillis]; done if it closed before. */
