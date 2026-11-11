@@ -143,6 +143,68 @@ class TurboTest {
     }
 
     @Test
+    fun aProducerWaitingForTurboReceiveLooksForTheCurrentAndThePreviousEpochsLinks() {
+        val epoch = DirectLink.EPOCH_MILLIS
+        val start = epoch * 1_000 + epoch / 2
+
+        // First, a link started in either epoch may be up already.
+        DirectLink.epochsToLookFor(start, lastLooked = null) shouldBe listOf(1_000L, 999L)
+        // Then only a link started meanwhile, which has the current epoch's name.
+        DirectLink.epochsToLookFor(start + 1_000, lastLooked = 1_000) shouldBe listOf(1_000L)
+        // Once that epoch is over, a link started late in it keeps its name, and one started now has the new one.
+        DirectLink.epochsToLookFor(epoch * 1_001 + 1, lastLooked = 1_000) shouldBe listOf(1_001L, 1_000L)
+    }
+
+    @Test
+    fun onlyAPairedProducerLearnsWhereTheConsumerIsOnItsWifi() {
+        val addresses = listOf("192.168.1.20:47420", "[fd00::20]:47420")
+        val onWifi = local.copy(wifiAddresses = addresses)
+        fun helloFrom(paired: Boolean): Hello {
+            val connection = ConnectionPair(producerId, consumerId)
+            val registry =
+                if (paired) {
+                    FakePeerRegistry(
+                        PairedPeer(producerId, "Producer", DeviceRole.PRODUCER),
+                    )
+                } else {
+                    FakePeerRegistry()
+                }
+            val consumer = ConsumerSession(
+                onWifi,
+                registry,
+                FakeReceivedLedger(),
+                FakeMediaSink(),
+                FakePairingGate("one-time-token!!".encodeToByteArray().toByteString()),
+            )
+            return runBothSides(
+                producer = {
+                    val channel = FrameChannel(connection.producerEnd)
+                    channel.send(Hello(PROTOCOL_VERSION, "Producer", WireRole.PRODUCER, "test"))
+                    channel.expect<Hello>().also { channel.send(Bye()) }
+                },
+                consumer = { runCatching { consumer.serve(connection.consumerEnd) } },
+            ).first.getOrThrow()
+        }
+
+        helloFrom(paired = true).wifiAddresses shouldBe addresses
+        helloFrom(paired = false).wifiAddresses shouldBe emptyList()
+    }
+
+    @Test
+    fun aProducerKeepsAFewShortWifiAddressesOnly() {
+        fun told(vararg addresses: String) = wifiAddressesOf(
+            Hello(PROTOCOL_VERSION, "Pixel 2 XL", WireRole.CONSUMER, wifiAddresses = addresses.toList()),
+        )
+
+        told() shouldBe null // On no Wi-Fi, or an older version: nothing changes.
+        told("", " ") shouldBe null
+        told("192.168.1.20:47420", "192.168.1.20:47420") shouldBe listOf("192.168.1.20:47420")
+        told("[fd00:0000:0000:0000:0000:0000:0000:0020]:47420")?.size shouldBe 1
+        told("x".repeat(48)) shouldBe null
+        told("10.0.0.1:1", "10.0.0.2:1", "10.0.0.3:1", "10.0.0.4:1", "10.0.0.5:1")?.size shouldBe 4
+    }
+
+    @Test
     fun onlyAPairedProducerLearnsTheTurboKey() {
         val key = ByteArray(TURBO_KEY_BYTES) { 3 }.toByteString()
         val keyed = local.copy(turboKey = key)

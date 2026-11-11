@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.android
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.LeftOutStore
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
@@ -31,6 +32,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeMediaSource
 import io.github.danyk20.mediasync.transport.PeerConnection
 import io.github.danyk20.mediasync.transport.lan.testIdentity
 import io.kotest.matchers.doubles.shouldBeGreaterThan
+import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -45,6 +47,7 @@ import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -60,6 +63,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** Two phones' runtimes, each with its own database, pairing and syncing over loopback TLS. */
 @RunWith(RobolectricTestRunner::class)
+@Suppress("LargeClass") // Every way two phones sync, on one setup of both: split, each part would repeat it.
 class RuntimeEndToEndTest {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -132,6 +136,7 @@ class RuntimeEndToEndTest {
         history = history,
         conditions = { null },
         scope = scope,
+        turboSearch = TurboReceiveSearch(searchMillis = 3_000, joinMillis = 500, pauseMillis = 50),
     )
 
     @After
@@ -329,6 +334,7 @@ class RuntimeEndToEndTest {
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
                 consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
+                consumerWifiAddresses = listOf(receiverAddress()),
             )
         sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         producer.pendingCount() shouldBe Pending()
@@ -346,7 +352,28 @@ class RuntimeEndToEndTest {
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
                 consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
+                consumerWifiAddresses = listOf(receiverAddress()),
             )
+    }
+
+    @Test
+    fun theSendingPhoneFindsTheReceivingPhoneWhereItSaidItIsOnItsWifi() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        // The pairing code says where it listens; so does every session.
+        producerPeers.consumer()?.wifiAddresses shouldBe listOf(receiverAddress())
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        producerPeers.consumer()?.wifiAddresses shouldBe listOf(receiverAddress())
+
+        // Last reached on another Wi-Fi, and mDNS doesn't get through here (noDiscovery): where it said, it is.
+        val consumer = producerPeers.consumer().shouldNotBeNull()
+        producerPeers.recordConsumer(consumer.id, ConsumerFacts(address = "192.0.2.1:47420"))
+        source.put(FakeMedia("moved", Random(12).nextBytes(120_000)))
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait() }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        producerPeers.consumer()?.lastAddress shouldBe receiverAddress()
     }
 
     @Test
@@ -378,6 +405,7 @@ class RuntimeEndToEndTest {
                 consumerSchedule = SyncSchedule.Default,
                 consumerTurboKey = consumerKey,
                 consumerPairSecret = consumerPeers.pairSecret(producerIdentity.id),
+                consumerWifiAddresses = listOf(receiverAddress()),
             )
         sink.storedContents() shouldBe (photos + newPhoto).map { it.bytes.toByteString() }.toSet()
     }
@@ -665,6 +693,35 @@ class RuntimeEndToEndTest {
     }
 
     @Test
+    fun awayFromTheWifiTurboAsksOverTheInternetSoNobodyTapsTurboReceive() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        // A sync over Wi-Fi tells the sending phone the receiving phone's Worker and gives the pair its secret.
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        consumerLinks.answer =
+            { port, _ -> TurboAnswer.Ready(DirectLink("DIRECT-ef-MediaSync", "pass", "127.0.0.1", port)) }
+        offWifi = true
+        source.put(FakeMedia("away", Random(12).nextBytes(150_000)))
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        done.turboProblem shouldBe null
+        producerLinks.joined?.networkName shouldBe "DIRECT-ef-MediaSync"
+        internet.connects.get() shouldBe 1 // Only to ask: the photo went over the link.
+        receiver.state.value.turboReceiving shouldBe false // Its user didn't have to start Turbo receive.
+
+        // Far apart, the link is out of reach: the rest goes over the internet.
+        producerLinks.joinable = { false }
+        source.put(FakeMedia("far", Random(13).nextBytes(150_000)))
+        val far = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        far.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
+        far.lastResult?.sent shouldBe 1
+        internet.connects.get() shouldBe 3 // To ask, then to send.
+    }
+
+    @Test
     fun turboReceiveLetsAPhoneAwayFromTheWifiSendDirectly() = runBlocking<Unit> {
         receiver.start()
         pairWithApproval()
@@ -704,6 +761,56 @@ class RuntimeEndToEndTest {
         withTimeout(TIMEOUT) { while (consumerLinks.closed.isEmpty()) delay(POLL) }
     }
 
+    @Test
+    fun turboReceiveStartedAfterTurboOnTheSendingPhoneStillLinksUp() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        consumerLinks.answer = { port, (name, passphrase) ->
+            TurboAnswer.Ready(DirectLink(name, passphrase, "127.0.0.1", port))
+        }
+        producerLinks.joinable = consumerLinks::isOpen
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>() // Learns the key.
+        offWifi = true
+        source.put(FakeMedia("away", Random(13).nextBytes(150_000)))
+
+        // Turbo here first: it looks for the link a while, and Turbo receive there is started meanwhile.
+        val sending = async { producer.syncAndWait(turbo = true) }
+        withTimeout(TIMEOUT) { producer.state.first { it == ProducerState.LookingForTurboReceive } }
+        delay(300)
+        receiver.turbo.startReceive().shouldBeInstanceOf<TurboAnswer.Ready>()
+
+        val done = withTimeout(TIMEOUT) { sending.await() }
+
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        producerLinks.left shouldBe true
+    }
+
+    @Test
+    fun theUserCanStopLookingForTurboReceive() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>() // Learns the key.
+        producerLinks.joinable = { false }
+        offWifi = true
+        source.put(FakeMedia("away", Random(14).nextBytes(150_000)))
+
+        val sending = async { producer.syncAndWait(turbo = true) }
+        withTimeout(TIMEOUT) { producer.state.first { it == ProducerState.LookingForTurboReceive } }
+        // Stopped while it searches: once it has tried a link, not in the moment before its search begins.
+        withTimeout(TIMEOUT) { while (producerLinks.joinTries.get() == 0) delay(POLL) }
+        val stopped = System.currentTimeMillis()
+        producer.cancel()
+
+        // At once, well before the search would have ended; nothing was sent.
+        withTimeout(TIMEOUT) { sending.await() } shouldBe ProducerState.Idle()
+        (System.currentTimeMillis() - stopped) shouldBeLessThan 2_000L
+        sink.stored.size shouldBe photos.size
+        producerLinks.left shouldBe true
+    }
+
+    /** Where the receiving phone listens on its "Wi-Fi": loopback here. */
+    private fun receiverAddress() = "127.0.0.1:${receiver.state.value.port}"
+
     /** Shows the consumer's QR code, scans it on the producer, and approves the request on the consumer. */
     private suspend fun pairWithApproval(): PairingResult {
         val link = receiver.openPairing().shouldNotBeNull()
@@ -738,6 +845,11 @@ private class FakeDirectLinks : DirectLinks {
     /** Which links this phone can join: any, or only those another phone opened. */
     var joinable: (DirectLink) -> Boolean = { true }
     var joined: DirectLink? = null
+
+    /** How often this phone tried to join a link. */
+    val joinTries = java.util.concurrent.atomic.AtomicInteger()
+
+    @Volatile
     var left = false
     val opened = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
     val kinds = java.util.concurrent.CopyOnWriteArrayList<LinkKind>()
@@ -762,6 +874,7 @@ private class FakeDirectLinks : DirectLinks {
     }
 
     override suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? {
+        joinTries.incrementAndGet()
         val joins = joinable(link)
         if (joins) joined = link
         return if (joins) JoinedLink(InetAddress.getByName("127.0.0.1")) else null

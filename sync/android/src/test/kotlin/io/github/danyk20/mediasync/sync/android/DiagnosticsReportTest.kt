@@ -97,13 +97,17 @@ class DiagnosticsReportTest {
         settings.setPhotoDetails(PhotoDetails.REMOVE_LOCATION)
         peers.register(PairedPeer(deviceId(7), "Anna's Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
         val everySix = SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0))
-        peers.recordConsumer(deviceId(7), ConsumerFacts(schedule = everySix))
+        peers.recordConsumer(
+            deviceId(7),
+            ConsumerFacts(schedule = everySix, wifiAddresses = listOf("10.128.0.57:47420")),
+        )
         history.recordProblem(SyncProblem.UNREACHABLE)
 
         val facts = report().facts().associate { it.label to it.value }
 
         facts["Role"] shouldBe "producer"
         facts["Sends to"] shouldBe deviceId(7).short()
+        facts["Finds it at"] shouldBe "192.168.1.x:47420 (last reached), 10.128.0.x:47420 (its Wi-Fi)"
         facts["Schedule"] shouldBe "hours:6@03:00 (the receiving phone's)"
         facts["Photo details"] shouldBe "remove_location"
         facts["Last sync"] shouldBe "never"

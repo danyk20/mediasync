@@ -13,6 +13,7 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.Worker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
@@ -28,6 +29,7 @@ import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.longs.shouldBeInRange
 import io.kotest.matchers.nulls.shouldBeNull
@@ -90,11 +92,22 @@ class BackgroundTest {
         override fun instant(): Instant = now.toInstant()
     }
 
+    /** What a background run WorkManager starts answers, where a test sets it; else WorkManager's own default. */
+    private var answer: ListenableWorker.Result? = null
+    private val workers = object : WorkerFactory() {
+        override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
+            answer?.let { result ->
+                object : Worker(appContext, workerParameters) {
+                    override fun doWork() = result
+                }
+            }
+    }
+
     @Before
     fun setUp() {
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
-            Configuration.Builder().setExecutor(SynchronousExecutor()).build(),
+            Configuration.Builder().setExecutor(SynchronousExecutor()).setWorkerFactory(workers).build(),
         )
         workManager = WorkManager.getInstance(context)
     }
@@ -177,6 +190,35 @@ class BackgroundTest {
         scheduler.applyCurrentPlan() // Opening the app reschedules: it still runs at once.
 
         pending(DeviceRole.PRODUCER).single().initialDelayMillis shouldBe 0
+    }
+
+    @Test
+    fun aRunWaitingToTryAgainKeepsItsWaitWhenTheAppStartsAgain() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        state.markHandled(DeviceRole.PRODUCER, millis("2026-10-13T03:00+02:00")) // Today's 03:00 is still to do.
+        val scheduler = scheduler()
+        scheduler.applyCurrentPlan()
+        val first = pending(DeviceRole.PRODUCER).single()
+
+        // It couldn't reach the receiving phone: WorkManager has it try again after a wait.
+        answer = ListenableWorker.Result.retry()
+        WorkManagerTestInitHelper.getTestDriver(context)!!.setAllConstraintsMet(first.id)
+        pending(DeviceRole.PRODUCER).single().runAttemptCount shouldBe 1
+
+        // Android starts the app for the next try, which plans again: the wait stays, and nothing runs at once.
+        scheduler.applyCurrentPlan()
+
+        pending(DeviceRole.PRODUCER).single().let { waiting ->
+            waiting.id shouldBe first.id
+            waiting.runAttemptCount shouldBe 1
+        }
+
+        // A new schedule meanwhile replaces it.
+        peers.recordConsumer(consumer, ConsumerFacts(schedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))))
+        scheduler.applyCurrentPlan()
+
+        pending(DeviceRole.PRODUCER).single().runAttemptCount shouldBe 0
     }
 
     @Test
@@ -298,7 +340,11 @@ class BackgroundTest {
         runSyncWorker(sync) shouldBe ListenableWorker.Result.success()
 
         coVerify(exactly = 0) { sync.syncAndWait(any()) } // WorkManager would stop this run at once.
-        runs(DeviceRole.PRODUCER).single().constraints.requiresCharging() shouldBe false
+        val onTheCharger = runs(DeviceRole.PRODUCER).single()
+        onTheCharger.constraints.requiresCharging() shouldBe false
+        // Queued for this plan: waiting to try again, it stays when the app starts again.
+        onTheCharger.tags shouldContain
+            SyncScheduler.planTagOf(BackgroundPlan(DeviceRole.PRODUCER, SyncSchedule.Default))
     }
 
     @Test

@@ -42,9 +42,16 @@ interface PeerDao {
     /** Keeps what's given; a `null` leaves what's stored. */
     @Query(
         "UPDATE peers SET turboKey = COALESCE(:turboKey, turboKey), pairSecret = COALESCE(:pairSecret, pairSecret), " +
-            "rendezvousUrl = COALESCE(:rendezvousUrl, rendezvousUrl) WHERE deviceId = :deviceId",
+            "rendezvousUrl = COALESCE(:rendezvousUrl, rendezvousUrl), " +
+            "wifiAddresses = COALESCE(:wifiAddresses, wifiAddresses) WHERE deviceId = :deviceId",
     )
-    fun recordFacts(deviceId: String, turboKey: String?, pairSecret: String?, rendezvousUrl: String?)
+    fun recordFacts(
+        deviceId: String,
+        turboKey: String?,
+        pairSecret: String?,
+        rendezvousUrl: String?,
+        wifiAddresses: String? = null,
+    )
 
     @Query("DELETE FROM peers WHERE deviceId = :deviceId")
     fun delete(deviceId: String)

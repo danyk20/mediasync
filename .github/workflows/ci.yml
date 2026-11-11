@@ -51,11 +51,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Formatting, detekt, Android Lint, dependency licenses
         run: ./gradlew spotlessCheck detekt lintDebug licenseeDebug --continue
       - name: Upload reports
@@ -78,11 +78,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       # Robolectric fetches Android itself (about 200 MB) from Maven Central while the tests run, outside Gradle and
       # its cache. Kept here per Robolectric version, it isn't fetched again each run, and a dropped connection can't
       # fail the tests, as it once did ("Connection reset").
@@ -139,11 +139,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       # Whole sync sessions over loopback TLS and over a simulated Wi-Fi hop (docs/PLAN.md §7).
       - name: Measure sync throughput
         run: ./gradlew :transport:lan:benchmark
@@ -154,11 +154,20 @@ jobs:
           path: benchmark-history
           key: benchmark-${{ github.run_id }}
           restore-keys: benchmark-
-      # Shared CI machines vary a lot: only a halving fails the check.
+      # GitHub's runners don't all have the same CPU, and on the same code runs measured either 218–265 MB/s or
+      # 535–604 MB/s (one 128 MB video over TLS): a slow runner after a fast one failed the check. Each CPU model keeps
+      # its own history, so a run is compared with one on the same kind of machine.
+      - name: Runner CPU
+        id: cpu
+        run: |
+          model=$(lscpu | sed -n 's/^Model name:[[:space:]]*//p' | head -n 1)
+          echo "Runner CPU: ${model:-unknown}"
+          echo "model=${model:-unknown}" >> "$GITHUB_OUTPUT"
+      # Shared CI machines still vary: only a halving fails the check.
       - name: Compare with earlier results
         uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
-          name: Sync throughput
+          name: Sync throughput on ${{ steps.cpu.outputs.model }}
           tool: customBiggerIsBetter
           output-file-path: transport/lan/build/benchmark/results.json
           external-data-json-path: benchmark-history/data.json
@@ -181,11 +190,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Assemble debug and (unsigned) release
         run: ./gradlew :app:assembleDebug :app:assembleRelease
       # WebRTC's native code looks these classes up by name when it loads. Without them in the release build, the
@@ -247,9 +256,9 @@ jobs:
             exit 1
           fi
 
-  # One job per API level, side by side on their own runners. Branch protection requires the summary's name.
+  # Two jobs per API level, side by side on their own runners. Branch protection requires the summary's name.
   instrumented-tests:
-    name: Instrumented tests (API ${{ matrix.api }})
+    name: Instrumented tests (API ${{ matrix.api }}, part ${{ matrix.part }} of 2)
     needs: changes
     # Skipped only on an explicit "docs or Worker only": if the filter failed, everything runs.
     if: ${{ !cancelled() && needs.changes.outputs.android != 'false' }}
@@ -257,22 +266,26 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      # Each module's device tests boot an emulator of their own, one after another: most of a job. Split over two
+      # jobs, an API level takes about half as long: part 1 the two slowest modules (app, sync:android), part 2 every
+      # other module, so a module that gains device tests runs without a change here.
       matrix:
         api: [29, 36]
+        part: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Enable KVM for hardware-accelerated emulators
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       # Downloaded each time: caching an image (1–2 GB) would push the Gradle caches out of the repository's 10 GB.
-      - name: Install the emulator image
+      - name: Download the emulator and its system image
         run: scripts/install-emulator-image.sh ${{ matrix.api }}
       # A run was once stopped from outside (exit code 143, every later step skipped) while four emulators were
       # alive: each test task boots its own, and they keep running for a while after it ends. Two API 36 emulators
@@ -284,11 +297,42 @@ jobs:
             echo "$(date -u +%T) $(free -m | awk "/^Mem:/ {print \"used=\" \$3 \"MB available=\" \$7 \"MB\"}") disk_free=$(df -m / | awk "NR==2 {print \$4}")MB emulators=$(pgrep -c qemu-system || true)"
             sleep 10
           done' > memory.log 2>&1 &
-      - name: Run on API ${{ matrix.api }}
+      # One Gradle call: it creates the emulator and boots it once for its snapshot (about a minute) while it compiles
+      # the app and the test APKs, then runs each module's tests.
+      # Part 2 also sets the app's emulator up: the other modules' setups wait for it (build-logic), so it's set up once.
+      - name: Run on API ${{ matrix.api }}, part ${{ matrix.part }}
         id: device-tests
-        run: >
-          ./gradlew api${{ matrix.api }}DebugAndroidTest
-          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+        env:
+          API: ${{ matrix.api }}
+          PART: ${{ matrix.part }}
+        run: |
+          first=(:app :sync:android)
+          if [ "$PART" = 1 ]; then
+            tasks=("${first[@]/%/:api${API}DebugAndroidTest}")
+          else
+            tasks=(":app:api${API}Setup" "api${API}DebugAndroidTest")
+            for module in "${first[@]}"; do tasks+=(-x "${module}:api${API}DebugAndroidTest"); done
+          fi
+          ./gradlew "${tasks[@]}" -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+      # How many tests ran in each module, from Gradle's results: a module whose tests didn't run shows up missing.
+      - name: Device tests per module
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          rows = {}
+          for path in glob.glob("**/build/outputs/androidTest-results/managedDevice/**/TEST-*.xml", recursive=True):
+              suite = ET.parse(path).getroot()
+              row = rows.setdefault(path.split("/build/")[0], [0, 0, 0])
+              row[0] += int(suite.get("tests", 0))
+              row[1] += int(suite.get("skipped", 0))
+              row[2] += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+          print("### Device tests on API ${{ matrix.api }}, part ${{ matrix.part }}\n\n| Module | Tests | Skipped | Failed |\n|---|---|---|---|")
+          for module, (tests, skipped, failed) in sorted(rows.items()):
+              print(f"| `{module}` | {tests} | {skipped} | {failed} |")
+          totals = [sum(row[i] for row in rows.values()) for i in range(3)]
+          print(f"| **Total** | **{totals[0]}** | {totals[1]} | {totals[2]} |")
+          EOF
       # always(): when the runner is stopped from outside, failure() steps are skipped.
       - name: Show why the tests stopped
         if: always() && steps.device-tests.outcome != 'success'
@@ -300,7 +344,7 @@ jobs:
         if: always() && steps.device-tests.outcome != 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: instrumented-test-reports-api${{ matrix.api }}
+          name: instrumented-test-reports-api${{ matrix.api }}-part${{ matrix.part }}
           path: |
             **/build/reports/androidTests/
             **/build/outputs/androidTest-results/

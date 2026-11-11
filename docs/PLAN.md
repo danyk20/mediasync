@@ -695,6 +695,7 @@ interface SecureSession : Closeable {
 
 - The consumer advertises the NSD/mDNS service `_mediasync._tcp`. The TXT record holds only a rotating, keyed hash of the device ID, so device names are not broadcast.
 - The producer also tries the **last known IP:port** directly, because mDNS is unreliable on some routers.
+- *Fixed (M6, after a real-phone test):* on one home Wi-Fi, mDNS never found the receiving phone, and its last known IP was from another network, so Turbo fell back to *Turbo receive*. Now the consumer tells paired producers where it listens on its Wi-Fi in every session (`Hello.wifiAddresses`, also over the internet or a direct link), and in the pairing code as before. The producer tries those first when one is on a network it's on, then the last known IP, then mDNS. Diagnostics shows both.
 - *Client isolation* (guest networks) is detected, and the app suggests Turbo transfer instead.
 
 ### 8.3 Turbo transfer (Wi-Fi Direct), manual and optional
@@ -719,10 +720,12 @@ interface SecureSession : Closeable {
   - Only groups whose name ends in `-MediaSync` are ever removed. If another app's group is up (Android Auto, say), Turbo isn't used.
 - **Signaling the consumer:**
   - If the phones can already reach each other (same Wi-Fi or internet), the producer's request travels over the existing encrypted session. *Built (M3).*
+    - *Fixed (M6, after a real-phone test):* away from the consumer's Wi-Fi, Turbo went straight to looking for a *Turbo receive* link, so the user had to tap it on the consumer even when the internet reached it. Now the producer first asks over the internet (waking the consumer if needed), and joins the link the consumer opens by itself. What the link doesn't carry (it can't be joined, it drops, or the consumer can't open one) goes over the internet. Only if the internet doesn't reach the consumer either does it look for *Turbo receive*.
   - Otherwise, the user opens MediaSync on the consumer and taps **Turbo receive**. *Built (M3):*
     - The consumer keeps a random 32-byte Turbo key (outside backups) and tells it to paired producers in every session (`Hello.turboKey`, only once the producer is paired). Phones paired earlier learn it at their next sync: no new pairing.
     - *Turbo receive* opens a group whose name (`DIRECT-xy-MediaSync-abcdef`) and passphrase are an HMAC of the key and the 15-minute epoch, so the name changes on its own and isn't a lasting trace of the phone.
     - A producer that can't reach the consumer over Wi-Fi derives the same for the current and the previous epoch, joins, and sends. If it hasn't learned the key yet, it says one sync on the same Wi-Fi is needed first.
+    - *Fixed (M6, after a real-phone test):* the user may start *Turbo receive* after Turbo on the producer. Android joins a group only if it's up when asked (on the test phones, a group that was up was joined in 3 to 4 seconds; one that came up during the try never was), so the producer looks for 2 minutes: it tries each name for 20 seconds, asks again after a short pause, and looks for the previous epoch's name only while a link started then may still be new to it. Its home screen says to tap *Turbo receive* on the other phone, and has a **Stop** button.
     - The group stays until the user taps **Stop**, or 10 minutes without a session over it.
     - Removing a sending phone gives the receiving phone a new key, so the removed phone can't find the link any more. The phones still paired learn it in their next session over Wi-Fi or the internet. *Built (M6).*
 - **Permissions:** *Nearby devices* from Android 13 (declared `neverForLocation`), and location (permission, and location turned on) before. The producer asks when the user taps **Start Turbo**. A consumer that hasn't allowed it answers "not allowed": the producer sends over Wi-Fi and says so, and the consumer shows a card asking for it.
@@ -997,8 +1000,9 @@ How a scheduled sync runs:
   - Android 14+ batches background jobs, so a window or a producer's sync may start up to ~31 minutes after its time (seen on API 36: `max_cpu_only_job_batch_delay_ms`). Producers that arrive too early retry every 15 minutes; the hour of quiet leaves each at least two tries while the window is open.
 - **Staggered starts.** Producers spread their start over a few random minutes so they don't all connect at once. The consumer still shares bandwidth fairly (§5.4).
 - **Retries.**
-  - If a due producer can't reach the consumer, it retries every 15 minutes while charging. From M5 it also asks the Worker to wake the consumer (§10.4).
+  - If a due producer can't reach the consumer, it retries while charging: after 15 minutes, then 15 more each time (30, 45, 60…). From M5 it also asks the Worker to wake the consumer (§10.4).
   - Each attempt is a short job. The foreground service starts only once a transfer actually begins.
+  - *Fixed (M6, after a real-phone test):* Android starts the app for each try, and the app then plans its background work again. A try without Wi-Fi ends at once, so that planning found nothing running and replaced the waiting retry: the wait started over at 15 minutes, and another try ran right away (a Galaxy S22 tried every 15 to 30 minutes all night). A run waiting to try again now stays, unless the schedule changed meanwhile. Each run carries its plan as a tag for that.
 - **Timing accuracy.**
   - Scheduling uses WorkManager: one-time work delayed to the next due time, with `requiresCharging`, re-enqueued after each run.
   - Doze doesn't apply while a phone is charging, and app-standby limits are relaxed. Job batching can still start the sync up to ~31 minutes after 03:00 on Android 14+ (see the receive window above).
