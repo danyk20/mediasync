@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.7](https://github.com/danyk20/mediasync/compare/v0.9.6...v0.9.7) (2026-11-11)
+
+
+### Features
+
+* a Settings page, and a diagnostics file size the user chooses ([#128](https://github.com/danyk20/mediasync/issues/128)) ([6bda266](https://github.com/danyk20/mediasync/commit/6bda2669c1a3829eac7f1c292f4f6dd9a32d7070))
+* a test file in Diagnostics, to test the speed and connection to the receiving phone ([#130](https://github.com/danyk20/mediasync/issues/130)) ([c71504d](https://github.com/danyk20/mediasync/commit/c71504d07912e1e2d925b2135c539151b506821a))
+
+
+### Bug Fixes
+
+* Turbo goes over Wi-Fi Direct first, starts sooner, and the receiving screen goes when the sync ends ([#127](https://github.com/danyk20/mediasync/issues/127)) ([617e3a1](https://github.com/danyk20/mediasync/commit/617e3a176bc313d2a495b653d5555e55d43a033d))
+
 ## [0.9.6](https://github.com/danyk20/mediasync/compare/v0.9.5...v0.9.6) (2026-11-11)
 
 
