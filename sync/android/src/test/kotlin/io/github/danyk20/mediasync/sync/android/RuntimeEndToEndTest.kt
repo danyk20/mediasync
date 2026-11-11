@@ -63,6 +63,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** Two phones' runtimes, each with its own database, pairing and syncing over loopback TLS. */
 @RunWith(RobolectricTestRunner::class)
+@Suppress("LargeClass") // Every way two phones sync, on one setup of both: split, each part would repeat it.
 class RuntimeEndToEndTest {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -689,6 +690,35 @@ class RuntimeEndToEndTest {
             sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
             producerLinks.left shouldBe true
         }
+    }
+
+    @Test
+    fun awayFromTheWifiTurboAsksOverTheInternetSoNobodyTapsTurboReceive() = runBlocking<Unit> {
+        consumerWorker = "https://mediasync.example.workers.dev"
+        receiver.start()
+        pairWithApproval()
+        // A sync over Wi-Fi tells the sending phone the receiving phone's Worker and gives the pair its secret.
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        withTimeout(TIMEOUT) { receiver.state.first { it.overInternet } }
+        consumerLinks.answer =
+            { port, _ -> TurboAnswer.Ready(DirectLink("DIRECT-ef-MediaSync", "pass", "127.0.0.1", port)) }
+        offWifi = true
+        source.put(FakeMedia("away", Random(12).nextBytes(150_000)))
+
+        val done = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        done.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe 1
+        done.turboProblem shouldBe null
+        producerLinks.joined?.networkName shouldBe "DIRECT-ef-MediaSync"
+        internet.connects.get() shouldBe 1 // Only to ask: the photo went over the link.
+        receiver.state.value.turboReceiving shouldBe false // Its user didn't have to start Turbo receive.
+
+        // Far apart, the link is out of reach: the rest goes over the internet.
+        producerLinks.joinable = { false }
+        source.put(FakeMedia("far", Random(13).nextBytes(150_000)))
+        val far = withTimeout(TIMEOUT) { producer.syncAndWait(turbo = true) }
+        far.shouldBeInstanceOf<ProducerState.Idle>().turboProblem shouldBe TurboProblem.NO_LINK
+        far.lastResult?.sent shouldBe 1
+        internet.connects.get() shouldBe 3 // To ask, then to send.
     }
 
     @Test
