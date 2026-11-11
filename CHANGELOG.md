@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.4](https://github.com/danyk20/mediasync/compare/v0.9.3...v0.9.4) (2026-11-11)
+
+
+### Features
+
+* away from the Wi-Fi, Turbo asks the receiving phone over the internet ([#120](https://github.com/danyk20/mediasync/issues/120)) ([af7f3eb](https://github.com/danyk20/mediasync/commit/af7f3ebf3b7da368082b9c173b2b18fd05858b6c))
+
+
+### Bug Fixes
+
+* a stopped receiving phone turns away a connection Linux still accepts ([#118](https://github.com/danyk20/mediasync/issues/118)) ([825dce8](https://github.com/danyk20/mediasync/commit/825dce83548e3b00af57baecf20454a7ba047319))
+
+
+### Miscellaneous Chores
+
+* release 0.9.4 ([#121](https://github.com/danyk20/mediasync/issues/121)) ([8384ec3](https://github.com/danyk20/mediasync/commit/8384ec35b68e24b0df39f14bb406059f57e72ae1))
+
 ## [0.9.3](https://github.com/danyk20/mediasync/compare/v0.9.2...v0.9.3) (2026-11-06)
 
 
