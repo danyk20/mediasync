@@ -82,7 +82,8 @@ class TurboScreen @Inject constructor(@ApplicationContext private val context: C
     }
 
     companion object {
-        private const val SHOW_TIMEOUT_MILLIS = 5_000L
+        /** Android holds a screen started from the background for up to 5 s after the user went home. */
+        private const val SHOW_TIMEOUT_MILLIS = 10_000L
 
         /** Before Android 13: a Turbo link may need MediaSync on screen. */
         val canNeedIt: Boolean get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU

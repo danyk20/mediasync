@@ -34,8 +34,8 @@ class TurboScreenTest {
     @Test
     fun allowedToShowItselfMediaSyncComesOnScreenAndGoesWhenTheLinkCloses() {
         assumeTrue(TurboScreen.canNeedIt)
+        // Not after going home: Android would hold the screen for 5 s.
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
-        shell("input keyevent KEYCODE_HOME")
         TurboScreen.mayShow(context) shouldBe true
 
         screen.bringUp() shouldBe true
