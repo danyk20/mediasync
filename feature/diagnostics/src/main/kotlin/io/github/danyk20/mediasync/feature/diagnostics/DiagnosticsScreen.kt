@@ -49,9 +49,11 @@ import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.TestFileSize
 import io.github.danyk20.mediasync.sync.android.DiagnosticsReport
 import io.github.danyk20.mediasync.sync.android.Fact
 import io.github.danyk20.mediasync.sync.android.ProducerSync
+import io.github.danyk20.mediasync.sync.android.TestFiles
 import java.io.File
 import java.io.IOException
 import java.util.Locale
@@ -71,6 +73,8 @@ data class DiagnosticsUiState(
     val recent: List<String> = emptyList(),
     /** On a paired sending phone only. */
     val linkTest: LinkTestUi? = null,
+    /** On a paired sending phone, and on any phone that checked one. */
+    val testFile: TestFileUi? = null,
 )
 
 /** The link test (docs/PLAN.md §7): speeds in MB/s once it ran. */
@@ -88,6 +92,7 @@ class DiagnosticsViewModel @Inject constructor(
     private val sync: ProducerSync,
     settings: SettingsRepository,
     peers: PeerStore,
+    private val testFiles: TestFiles,
 ) : ViewModel() {
     private val state = MutableStateFlow(DiagnosticsUiState())
     val uiState: StateFlow<DiagnosticsUiState> = state.asStateFlow()
@@ -103,6 +108,45 @@ class DiagnosticsViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            combine(settings.role, peers.observeConsumer(), testFiles.state) { role, consumer, test ->
+                consumer?.name?.takeIf { role == DeviceRole.PRODUCER } to test
+            }.collect { (consumer, test) ->
+                state.update {
+                    val shown = consumer != null || test.last != null
+                    it.copy(
+                        testFile = (it.testFile ?: TestFileUi()).copy(
+                            consumerName = consumer,
+                            waitingBytes = test.waiting?.size,
+                            problem = test.problem,
+                            last = test.last,
+                        ).takeIf { shown },
+                    )
+                }
+            }
+        }
+    }
+
+    fun onTestFileSizeChange(text: String) = state.update {
+        it.copy(testFile = it.testFile?.copy(size = text, sizeInvalid = TestFileSize.parseMegabytes(text) == null))
+    }
+
+    /** Adds a test file of the size typed, to send first in the next sync. */
+    fun addTestFile() {
+        val test = state.value.testFile?.takeIf { it.consumerName != null } ?: return
+        val bytes = TestFileSize.parseMegabytes(test.size)
+        if (bytes == null) {
+            state.update { it.copy(testFile = test.copy(sizeInvalid = true)) }
+            return
+        }
+        testFiles.add(bytes)
+        refresh()
+    }
+
+    /** Removes the test file waiting, before it's sent. */
+    fun removeTestFile() {
+        testFiles.remove()
+        refresh()
     }
 
     fun refresh() {
@@ -165,6 +209,11 @@ fun DiagnosticsRoute(
     DiagnosticsScreen(
         state = state,
         onTestLink = viewModel::runLinkTest,
+        testFileActions = TestFileActions(
+            onSizeChange = viewModel::onTestFileSizeChange,
+            onAdd = viewModel::addTestFile,
+            onRemove = viewModel::removeTestFile,
+        ),
         onShare = { scope.launch { share(context, viewModel.export()) } },
         onSave = { save.launch(FILE_NAME) },
         onClear = viewModel::clear,
@@ -175,7 +224,8 @@ fun DiagnosticsRoute(
 
 /**
  * *Diagnostics* (docs/PLAN.md §3.3): what to share when MediaSync doesn't work as expected. The log leaves the phone
- * only when the user shares or saves it (docs/PLAN.md §11).
+ * only when the user shares or saves it (docs/PLAN.md §11). A sending phone also tests the link and sends test files
+ * (docs/PLAN.md §7).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -187,6 +237,7 @@ fun DiagnosticsScreen(
     onClear: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    testFileActions: TestFileActions = TestFileActions(),
 ) {
     Scaffold(
         modifier = modifier,
@@ -217,6 +268,7 @@ fun DiagnosticsScreen(
                 Text(stringResource(R.string.diagnostics_save))
             }
             state.linkTest?.let { LinkTestSection(it, onTestLink) }
+            state.testFile?.let { TestFileSection(it, testFileActions) }
             Facts(state.facts)
             Recent(state.recent)
             TextButton(onClick = onClear) { Text(stringResource(R.string.diagnostics_clear)) }

@@ -228,4 +228,11 @@
     </plurals>
     <string name="producer_waiting_undo">Undo</string>
     <string name="producer_waiting_no_viewer">No app on this phone can open it.</string>
+    <string name="producer_test_file_title">Test file waiting</string>
+    <string name="producer_test_file_body">A %1$s test file goes to %2$s first in the next sync, to test the speed and the connection. It\'s deleted there once checked.</string>
+    <string name="producer_test_file_outdated">%1$s needs a newer version of MediaSync to take it. Update MediaSync there.</string>
+    <string name="producer_test_file_no_space">%1$s doesn\'t have room for it now.</string>
+    <string name="producer_test_file_not_writable">%1$s couldn\'t write it last time.</string>
+    <string name="producer_test_file_remove">Remove</string>
+    <string name="producer_status_sending_test_file">Test file first · %1$s of %2$s</string>
 </resources>

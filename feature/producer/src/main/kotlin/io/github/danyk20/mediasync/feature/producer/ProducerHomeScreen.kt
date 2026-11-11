@@ -73,6 +73,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
+import io.github.danyk20.mediasync.core.designsystem.component.formatMegabytes
 import io.github.danyk20.mediasync.core.designsystem.component.pastMoment
 import io.github.danyk20.mediasync.core.designsystem.component.relativeMoment
 import io.github.danyk20.mediasync.core.designsystem.component.transferRate
@@ -88,6 +89,7 @@ import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboPermissions
 import io.github.danyk20.mediasync.sync.android.TurboProblem
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -132,6 +134,7 @@ fun ProducerHomeRoute(
         onSyncNow = viewModel::syncNow,
         onStop = viewModel::stop,
         onUnpair = viewModel::unpair,
+        onRemoveTestFile = viewModel::removeTestFile,
         onShowSpeeds = { showSpeeds = true },
         onGrantAccess = { requestPermissions.launch(MediaPermissions.required.toTypedArray()) },
         onOpenSettings = { context.openAppSettings() },
@@ -200,6 +203,7 @@ fun ProducerHomeScreen(
     onUnpair: () -> Unit = {},
     onShowSpeeds: () -> Unit = {},
     onSeeWaiting: (leftOut: Boolean) -> Unit = {},
+    onRemoveTestFile: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -232,6 +236,7 @@ fun ProducerHomeScreen(
                             onSeeWaiting(false)
                         },
                     )
+                    TestFileNotice(state, consumer, onRemoveTestFile)
                     Notices(state, consumer, onOpenSettings)
                     BackgroundSetupNotices(
                         askNotifications = state.askNotifications,
@@ -445,6 +450,33 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, actions: Paired
             }
         }
     }
+}
+
+/**
+ * A test file waits to go first in the next sync (docs/PLAN.md §7, *Test file*), added in *Diagnostics*; and what
+ * keeps it waiting, if anything. While it's sent, the progress card says so instead.
+ */
+@Composable
+private fun TestFileNotice(state: ProducerHomeUiState, consumer: String, onRemove: () -> Unit) {
+    val bytes = state.testFileBytes ?: return
+    if (state.sync is ProducerState.Syncing) return
+    val problem = when (state.testFileProblem) {
+        TestFileHeld.RECEIVER_OUTDATED -> R.string.producer_test_file_outdated
+        TestFileHeld.NO_SPACE -> R.string.producer_test_file_no_space
+        TestFileHeld.NOT_WRITABLE -> R.string.producer_test_file_not_writable
+        TestFileHeld.STOPPED, null -> null
+    }
+    NoticeCard(
+        title = stringResource(R.string.producer_test_file_title),
+        body = listOfNotNull(
+            stringResource(R.string.producer_test_file_body, formatMegabytes(bytes), consumer),
+            problem?.let { stringResource(it, consumer) },
+        ).joinToString("\n\n"),
+        icon = MediaSyncIcons.Info,
+        action = stringResource(R.string.producer_test_file_remove),
+        onAction = onRemove,
+        warning = problem != null,
+    )
 }
 
 /** What needs the user's attention while nothing is being sent: a missed sync, a full receiving phone. */
@@ -842,6 +874,12 @@ private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds:
             ),
             body = if (progress == null) {
                 stringResource(R.string.producer_status_sending_preparing)
+            } else if (progress.testFile) {
+                stringResource(
+                    R.string.producer_status_sending_test_file,
+                    formatBytes(progress.bytesDone),
+                    formatBytes(progress.bytesTotal),
+                )
             } else {
                 stringResource(
                     R.string.producer_status_sending_body,

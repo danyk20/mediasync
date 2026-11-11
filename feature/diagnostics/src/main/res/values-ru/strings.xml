@@ -35,4 +35,25 @@
     <string name="settings_log_size_save">Сохранить</string>
     <string name="settings_reset_title">Начать заново</string>
     <string name="settings_reset_intro">Этот телефон забудет свою роль, сопряжённые телефоны, настройки и историю. Фото и видео останутся.</string>
+    <string name="diagnostics_test_file">Тестовый файл</string>
+    <string name="diagnostics_test_file_intro">Отправляет на %1$s файл выбранного размера, первым при следующей синхронизации, чтобы проверить скорость и соединение. %1$s только проверяет, что он дошёл в точности таким, каким был отправлен, и удаляет его: он никогда не появляется в галерее и не попадает в резервные копии.</string>
+    <string name="diagnostics_test_file_received">Отправляющий телефон может прислать тестовый файл, чтобы проверить скорость и соединение. Этот телефон только проверяет, что он дошёл в точности таким, каким был отправлен, и удаляет его.</string>
+    <string name="diagnostics_test_file_size">Размер (МБ)</string>
+    <string name="diagnostics_test_file_size_hint">От 0,1 МБ до 10 ГБ (10240 МБ). 25 МБ, если вы его не измените.</string>
+    <string name="diagnostics_test_file_size_invalid">Введите размер от 0,1 до 10240 МБ, например 25 или 500.</string>
+    <string name="diagnostics_test_file_add">Добавить тестовый файл</string>
+    <string name="diagnostics_test_file_waiting">Тестовый файл размером %1$s ждёт отправки первым при следующей синхронизации.</string>
+    <string name="diagnostics_test_file_remove">Убрать тестовый файл</string>
+    <string name="diagnostics_test_file_outdated">Чтобы принять тестовый файл, на %1$s нужна более новая версия MediaSync. Обновите там MediaSync; до тех пор файл ждёт.</string>
+    <string name="diagnostics_test_file_no_space">На %1$s сейчас нет для него места. Он подождёт, пока место появится.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s не смог его записать. Попытка повторится при следующей синхронизации.</string>
+    <string name="diagnostics_test_file_last">Последний тестовый файл</string>
+    <string name="diagnostics_test_file_matched">Дошёл в точности таким, каким был отправлен.</string>
+    <string name="diagnostics_test_file_mismatched">Дошёл не таким, каким был отправлен.</string>
+    <string name="diagnostics_test_file_not_stored">Принимающий телефон не смог его записать.</string>
+    <string name="diagnostics_test_file_result">%1$s за %2$s с: %3$s МБ/с через %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">Wi-Fi</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">интернет</string>
+    <string name="diagnostics_test_file_over_relay">интернет, через ретранслятор</string>
 </resources>

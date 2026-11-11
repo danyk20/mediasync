@@ -295,7 +295,7 @@ Grouped, each group with one plain-language choice:
 - *Data usage*: relay allowance meter and budget; this phone's mobile data used by MediaSync.
 - *Battery*: unrestricted-battery check and minimum battery level.
 - *Diagnostics*: logs export (M2, from ⋮ on the home screens) and the link test (M3).
-- *Built (M6):* ⋮ on the home screens offers *Settings* and *Diagnostics*. *Settings* holds the diagnostic log's size (1 MB unless changed; typed in MB, from 0.1 to 1024), *Check for updates* (copies installed from GitHub only, §14.4) and *Reset MediaSync*, which asks first. *Diagnostics* keeps only what's for sharing: the log, the phone's setup, *Share log* / *Save to a file* / *Clear log*, and the link test.
+- *Built (M6):* ⋮ on the home screens offers *Settings* and *Diagnostics*. *Settings* holds the diagnostic log's size (1 MB unless changed; typed in MB, from 0.1 to 1024), *Check for updates* (copies installed from GitHub only, §14.4) and *Reset MediaSync*, which asks first. *Diagnostics* keeps only what's for sharing: the log, the phone's setup, *Share log* / *Save to a file* / *Clear log*, and the link test. On a sending phone it also adds a test file of a chosen size, sent first in the next sync; both phones show the last one's result (§7).
 
 **Notifications**
 
@@ -441,6 +441,7 @@ The `meta` sidecar carries details that live *outside* the file, in the producer
 
 - `HELLO` negotiates the protocol version and capability flags.
 - Unknown message types are ignored.
+- *Test file (M6):* the receiving phone says `Hello.testFiles` (field 11) when it takes test files. Only then does the sending phone send `TEST_FILE_BEGIN(size, path)` (0x11) first; the receiving phone answers `TEST_FILE_READY(ok | noSpace | failed)` (0x12), `DATA` frames follow, then `TEST_FILE_END(sha256 | cancelled)` (0x13), and it answers `TEST_FILE_RESULT(matched | mismatched | failed | cancelled, bytes, micros)` (0x14) once the file is deleted. Older receiving phones don't say `testFiles`, so they're never sent one (they'd see unknown messages, never a photo); the test file keeps waiting and *Diagnostics* says the receiving phone needs updating. See §7, *Test file*.
 
 **Streams**
 
@@ -658,6 +659,13 @@ Speed is the top non-functional requirement. The strategy has six parts:
   - On a sending phone, *Diagnostics → Link test* sends incompressible filler for 5 seconds over one connection, then over four at once.
   - The receiving phone measures it from the first to the last byte and stores nothing. Only paired phones may run it.
   - Both results go into the diagnostic log.
+- *Built (M6):* a **test file** (*Diagnostics → Test file*, sending phone) tests the speed and the connection with a real transfer, over whatever path the sync takes.
+  - The user types its size in MB: 25 MB unless changed, from 0.1 MB to 10 GB (10240 MB). Its bytes are a pseudo-random stream (SplitMix64) from a random seed, made while it's sent, so it takes no space on the sending phone; only its size and seed are kept (in the app's own preferences) until it's sent.
+  - **Any** sync sends it, **first**: *Sync now*, Turbo, the scheduled run, a share. It goes alone on the first connection; parallel connections join only after it. Over the internet it goes like any file: it counts toward the mobile data limit and the relay allowance, and the relay saver never holds it back.
+  - The receiving phone checks it has the space (the shared space budget), writes it to `noBackupFilesDir/test-files` (never MediaStore, never the received ledger, never anything a connector or backup sees), hashes it while writing, answers matched or not, and deletes it, also when the sync drops or is stopped. What a crash left there goes the first time the folder is used after start.
+  - The sending phone forgets it once the receiving phone answered (matched, didn't match, or couldn't write it). Both phones' *Diagnostics* then show the result: matched or not, size, time, speed (as the receiving phone measured it, first byte to last) and the path: Wi-Fi, Turbo, the internet, or the internet through the relay. Both log it. To test again, the user adds a new one, and can remove a waiting one before it goes.
+  - A drop mid-file keeps it waiting; next time it starts again from zero (no resume: it's cheap to remake and gives a clean measurement). Without room on the receiving phone, or with a receiving phone that can't take test files, it keeps waiting, and *Diagnostics* and the home screen say why.
+  - While one waits, the sending phone's home screen shows a *Test file waiting* card (with *Remove*); while it's sent, the progress card says *Test file first*. It never counts as a photo or video on either phone.
 - **Target:** ≥ 85 % of the measured raw link throughput on Wi-Fi and Turbo, for both large videos and 1,000-photo batches.
 - A JVM loopback benchmark runs in CI, and an on-device benchmark runs before each release, to catch regressions.
   - `./gradlew :transport:lan:benchmark` measures whole sessions: one 128 MB video and 500 photos over TLS on loopback, and 300 photos over a simulated Wi-Fi hop with 5 ms latency, over one connection and over up to four.

@@ -30,7 +30,10 @@ import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.SyncRecord
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
+import io.github.danyk20.mediasync.sync.android.TestFileState
+import io.github.danyk20.mediasync.sync.android.TestFiles
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import java.time.Clock
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -99,6 +102,10 @@ data class ProducerHomeUiState(
     val mobileDataCap: Long? = null,
     /** What it sent over mobile data this month. */
     val mobileDataSent: Long = 0,
+    /** The size of the test file waiting to go first in the next sync (docs/PLAN.md §7); `null` while none waits. */
+    val testFileBytes: Long? = null,
+    /** Why the test file still waits, if it was held back. */
+    val testFileProblem: TestFileHeld? = null,
 )
 
 /** Which folders this phone sends, and from which days. */
@@ -128,8 +135,11 @@ private data class Extras(
     val record: SyncRecord,
     val dismissed: Set<SetupPrompt>,
     val choices: SendingChoices,
-    val turboDeclined: Boolean,
+    val flags: Flags,
 )
+
+/** What the user decided on this screen, and the test file waiting. */
+private data class Flags(val turboDeclined: Boolean, val testFile: TestFileState)
 
 /** What the phone allows MediaSync, as of [checkedAtMillis]. */
 private data class DeviceAccess(
@@ -143,7 +153,7 @@ private data class DeviceAccess(
 )
 
 @HiltViewModel
-@Suppress("LongParameterList") // Injected collaborators, one each.
+@Suppress("LongParameterList", "TooManyFunctions") // Injected collaborators and the screen's actions, one each.
 class ProducerHomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sync: ProducerSync,
@@ -156,6 +166,7 @@ class ProducerHomeViewModel @Inject constructor(
     private val clock: Clock,
     mobileDataUsage: MobileDataUsage,
     leftOut: LeftOutItems,
+    private val testFiles: TestFiles,
 ) : ViewModel() {
 
     private val access = MutableStateFlow(checkAccess())
@@ -179,7 +190,7 @@ class ProducerHomeViewModel @Inject constructor(
             history.record,
             settings.dismissedPrompts,
             combine(settings.photoDetails, settings.sendingOrder, ::SendingChoices),
-            turboDeclined,
+            combine(turboDeclined, testFiles.state, ::Flags),
             ::Extras,
         ),
     ) { consumer, state, count, internet, extras ->
@@ -197,7 +208,7 @@ class ProducerHomeViewModel @Inject constructor(
             leftOutCount = count?.leftOut ?: 0,
             turbo = access.turbo,
             turboBatteryLow = access.turboBatteryLow,
-            turboDeclined = extras.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
+            turboDeclined = extras.flags.turboDeclined && access.turbo == TurboAvailability.NOT_ALLOWED,
             withheldCount = count?.withheld ?: 0,
             photoDetails = extras.choices.details,
             sendingOrder = extras.choices.order,
@@ -219,6 +230,8 @@ class ProducerHomeViewModel @Inject constructor(
             videosOverRelay = internet.videosOverRelay,
             mobileDataCap = internet.mobileDataCap,
             mobileDataSent = internet.mobileDataSent,
+            testFileBytes = extras.flags.testFile.waiting?.size,
+            testFileProblem = extras.flags.testFile.problem,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 
@@ -253,6 +266,9 @@ class ProducerHomeViewModel @Inject constructor(
     fun syncNow() = scheduler.syncNow()
 
     fun stop() = sync.cancel()
+
+    /** Removes the test file waiting, before it's sent. */
+    fun removeTestFile() = testFiles.remove()
 
     /**
      * Forgets the receiving phone, stopping a sync to it first. This phone can then pair with another one, or with

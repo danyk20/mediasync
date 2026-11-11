@@ -55,6 +55,11 @@ data class Hello(
      * the consumer also where mDNS doesn't get through (docs/PLAN.md §8.2). Empty when it's on no Wi-Fi.
      */
     @ProtoNumber(10) val wifiAddresses: List<String> = emptyList(),
+    /**
+     * Consumer only: it takes test files ([TestFileBegin], docs/PLAN.md §7, *Test file*). Versions before don't say,
+     * and are never sent one.
+     */
+    @ProtoNumber(11) val testFiles: Boolean = false,
 ) : ControlMessage
 
 /** Producer → consumer while pairing: proves it scanned this consumer's QR code. */
@@ -206,6 +211,76 @@ data class TurboReady(
 
         /** Wi-Fi Direct is there, but the link couldn't be set up now (Wi-Fi off, or busy). */
         const val FAILED = 4
+    }
+}
+
+/**
+ * Producer → consumer, first in a sync and only to a consumer that said [Hello.testFiles]: a test file of [size]
+ * bytes follows (docs/PLAN.md §7, *Test file*), to measure the speed and check the connection. The consumer answers
+ * with [TestFileReady]; when it's [TestFileReady.Status.OK], `DATA` frames follow until [TestFileEnd]. It's never
+ * stored as a photo or video. [path]: how this connection goes ([Path]), for both phones' *Diagnostics*.
+ */
+@Serializable
+data class TestFileBegin(@ProtoNumber(1) val size: Long, @ProtoNumber(2) val path: Int = Path.WIFI) :
+    ControlMessage {
+    object Path {
+        const val WIFI = 0
+        const val TURBO = 1
+
+        /** Over the internet, directly between the phones. */
+        const val INTERNET = 2
+
+        /** Over the internet, through the relay. */
+        const val RELAY = 3
+    }
+}
+
+/** Consumer → producer: whether it takes the test file announced with [TestFileBegin]. */
+@Serializable
+data class TestFileReady(@ProtoNumber(1) val status: Int) : ControlMessage {
+    object Status {
+        const val OK = 1
+
+        /** It doesn't fit in the free space now. */
+        const val NO_SPACE = 2
+
+        /** It can't be written now. */
+        const val FAILED = 3
+    }
+}
+
+/**
+ * Producer → consumer: the test file is complete; [sha256] covers all of it. [cancelled]: the sync stopped before the
+ * test file was all sent; the consumer deletes what arrived and the producer sends it another time.
+ */
+@Serializable
+data class TestFileEnd(
+    @ProtoNumber(1) @Serializable(with = ByteStringSerializer::class) val sha256: ByteString = ByteString.EMPTY,
+    @ProtoNumber(2) val cancelled: Boolean = false,
+) : ControlMessage
+
+/**
+ * Consumer → producer: how the test file arrived, already deleted: [bytes] in [micros], from the first byte to the
+ * last, as the consumer measured them.
+ */
+@Serializable
+data class TestFileResult(
+    @ProtoNumber(1) val status: Int,
+    @ProtoNumber(2) val bytes: Long = 0,
+    @ProtoNumber(3) val micros: Long = 0,
+) : ControlMessage {
+    object Status {
+        /** All of it arrived, exactly as sent. */
+        const val MATCHED = 1
+
+        /** It arrived, but its size or hash doesn't match what was sent. */
+        const val MISMATCHED = 2
+
+        /** It couldn't be written while it came. */
+        const val FAILED = 3
+
+        /** The producer cancelled it ([TestFileEnd.cancelled]). */
+        const val CANCELLED = 4
     }
 }
 

@@ -214,4 +214,11 @@
     </plurals>
     <string name="producer_waiting_undo">Annuler</string>
     <string name="producer_waiting_no_viewer">Aucune application de ce téléphone ne peut l\'ouvrir.</string>
+    <string name="producer_test_file_title">Fichier de test en attente</string>
+    <string name="producer_test_file_body">Un fichier de test de %1$s part en premier vers %2$s lors de la prochaine synchronisation, pour tester la vitesse et la connexion. Il y est supprimé une fois vérifié.</string>
+    <string name="producer_test_file_outdated">%1$s a besoin d\'une version plus récente de MediaSync pour l\'accepter. Mettez MediaSync à jour sur ce téléphone.</string>
+    <string name="producer_test_file_no_space">%1$s n\'a pas la place pour lui en ce moment.</string>
+    <string name="producer_test_file_not_writable">%1$s n\'a pas pu l\'enregistrer la dernière fois.</string>
+    <string name="producer_test_file_remove">Retirer</string>
+    <string name="producer_status_sending_test_file">D\'abord le fichier de test · %1$s sur %2$s</string>
 </resources>

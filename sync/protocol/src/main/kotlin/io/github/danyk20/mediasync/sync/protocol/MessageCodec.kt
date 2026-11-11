@@ -33,6 +33,10 @@ object MessageCodec {
         FrameType.LINK_TEST_RESULT to LinkTestResult.serializer(),
         FrameType.TURBO_REQUEST to TurboRequest.serializer(),
         FrameType.TURBO_READY to TurboReady.serializer(),
+        FrameType.TEST_FILE_BEGIN to TestFileBegin.serializer(),
+        FrameType.TEST_FILE_READY to TestFileReady.serializer(),
+        FrameType.TEST_FILE_END to TestFileEnd.serializer(),
+        FrameType.TEST_FILE_RESULT to TestFileResult.serializer(),
     )
 
     @Suppress("CyclomaticComplexMethod") // One branch per message type, checked to be exhaustive by the compiler.
@@ -51,6 +55,10 @@ object MessageCodec {
         is LinkTestResult -> frame(FrameType.LINK_TEST_RESULT, LinkTestResult.serializer(), message)
         is TurboRequest -> frame(FrameType.TURBO_REQUEST, TurboRequest.serializer(), message)
         is TurboReady -> frame(FrameType.TURBO_READY, TurboReady.serializer(), message)
+        is TestFileBegin -> frame(FrameType.TEST_FILE_BEGIN, TestFileBegin.serializer(), message)
+        is TestFileReady -> frame(FrameType.TEST_FILE_READY, TestFileReady.serializer(), message)
+        is TestFileEnd -> frame(FrameType.TEST_FILE_END, TestFileEnd.serializer(), message)
+        is TestFileResult -> frame(FrameType.TEST_FILE_RESULT, TestFileResult.serializer(), message)
     }
 
     /**

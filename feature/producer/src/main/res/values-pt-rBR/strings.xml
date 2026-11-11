@@ -222,4 +222,11 @@
     </plurals>
     <string name="producer_waiting_undo">Desfazer</string>
     <string name="producer_waiting_no_viewer">Nenhum app neste telefone consegue abrir isso.</string>
+    <string name="producer_test_file_title">Arquivo de teste esperando</string>
+    <string name="producer_test_file_body">Um arquivo de teste de %1$s vai primeiro para %2$s na próxima sincronização, para testar a velocidade e a conexão. Lá ele é apagado depois de conferido.</string>
+    <string name="producer_test_file_outdated">%1$s precisa de uma versão mais nova do MediaSync para recebê-lo. Atualize o MediaSync lá.</string>
+    <string name="producer_test_file_no_space">%1$s não tem espaço para ele agora.</string>
+    <string name="producer_test_file_not_writable">%1$s não conseguiu salvá-lo da última vez.</string>
+    <string name="producer_test_file_remove">Remover</string>
+    <string name="producer_status_sending_test_file">Primeiro o arquivo de teste · %1$s de %2$s</string>
 </resources>

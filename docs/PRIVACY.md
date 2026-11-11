@@ -15,6 +15,7 @@ MediaSync copies photos and videos from your phones to another phone of yours, a
 - **Your photos and videos, with all their details:** dates, places, camera information, album and file names. They are kept on the sending phone and copied to the receiving phone you paired, as they are, unless you choose in *Photo details* to remove the place or all details before sending.
 - **Pairing keys.** Each phone creates its own keys, kept in Android's Keystore, and the paired phones exchange theirs through a QR code. They encrypt and authenticate every transfer.
 - **Settings and the record of what was sent and received.**
+- **Test files.** A test file you add in *Diagnostics* is made of random bytes, not your photos. The receiving phone keeps it only until it has checked it, in MediaSync's own storage, then deletes it; it never reaches its gallery or a backup.
 - **The diagnostic log.** It records what MediaSync did, without file names or places. It leaves the phone only if you share it yourself, for example to report a problem. It keeps 1 MB of the newest entries, or the size you choose in *Settings*.
 
 ## How your photos travel

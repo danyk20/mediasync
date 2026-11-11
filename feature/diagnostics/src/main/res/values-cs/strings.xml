@@ -35,4 +35,25 @@
     <string name="settings_log_size_save">Uložit</string>
     <string name="settings_reset_title">Začít znovu</string>
     <string name="settings_reset_intro">Tento telefon zapomene svou roli, spárované telefony, nastavení a historii. Fotky a videa zůstanou.</string>
+    <string name="diagnostics_test_file">Testovací soubor</string>
+    <string name="diagnostics_test_file_intro">Odešle na %1$s soubor zvolené velikosti, jako první při příští synchronizaci, aby otestoval rychlost a spojení. %1$s jen ověří, že dorazil přesně tak, jak byl odeslán, a pak ho smaže: nikdy se neobjeví v galerii a nikdy se nezálohuje.</string>
+    <string name="diagnostics_test_file_received">Odesílající telefon může poslat testovací soubor, aby otestoval rychlost a spojení. Tento telefon jen ověří, že dorazil přesně tak, jak byl odeslán, a pak ho smaže.</string>
+    <string name="diagnostics_test_file_size">Velikost (MB)</string>
+    <string name="diagnostics_test_file_size_hint">Od 0,1 MB do 10 GB (10240 MB). 25 MB, dokud ji nezměníte.</string>
+    <string name="diagnostics_test_file_size_invalid">Zadejte velikost od 0,1 do 10240 MB, například 25 nebo 500.</string>
+    <string name="diagnostics_test_file_add">Přidat testovací soubor</string>
+    <string name="diagnostics_test_file_waiting">Testovací soubor o velikosti %1$s čeká, až bude odeslán jako první při příští synchronizaci.</string>
+    <string name="diagnostics_test_file_remove">Odebrat testovací soubor</string>
+    <string name="diagnostics_test_file_outdated">%1$s potřebuje novější verzi MediaSync, aby přijal testovací soubor. Aktualizujte tam MediaSync; do té doby soubor čeká.</string>
+    <string name="diagnostics_test_file_no_space">%1$s pro něj teď nemá místo. Počká, dokud nebude.</string>
+    <string name="diagnostics_test_file_not_writable">%1$s ho nemohl zapsat. Zkusí se to znovu při příští synchronizaci.</string>
+    <string name="diagnostics_test_file_last">Poslední testovací soubor</string>
+    <string name="diagnostics_test_file_matched">Dorazil přesně tak, jak byl odeslán.</string>
+    <string name="diagnostics_test_file_mismatched">Nedorazil přesně tak, jak byl odeslán.</string>
+    <string name="diagnostics_test_file_not_stored">Přijímající telefon ho nemohl zapsat.</string>
+    <string name="diagnostics_test_file_result">%1$s za %2$s s: %3$s MB/s přes %4$s</string>
+    <string name="diagnostics_test_file_over_wifi">Wi-Fi</string>
+    <string name="diagnostics_test_file_over_turbo">Turbo</string>
+    <string name="diagnostics_test_file_over_internet">internet</string>
+    <string name="diagnostics_test_file_over_relay">internet, přes relay</string>
 </resources>

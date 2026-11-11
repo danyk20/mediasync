@@ -233,4 +233,11 @@
     </plurals>
     <string name="producer_waiting_undo">Скасувати</string>
     <string name="producer_waiting_no_viewer">На цьому телефоні немає застосунку, який може це відкрити.</string>
+    <string name="producer_test_file_title">Чекає тестовий файл</string>
+    <string name="producer_test_file_body">Тестовий файл розміром %1$s піде на %2$s першим під час наступної синхронізації, щоб перевірити швидкість і з\'єднання. Там його видаляють після перевірки.</string>
+    <string name="producer_test_file_outdated">Щоб прийняти його, на %1$s потрібна новіша версія MediaSync. Оновіть там MediaSync.</string>
+    <string name="producer_test_file_no_space">На %1$s зараз немає для нього місця.</string>
+    <string name="producer_test_file_not_writable">%1$s не зміг записати його минулого разу.</string>
+    <string name="producer_test_file_remove">Прибрати</string>
+    <string name="producer_status_sending_test_file">Спершу тестовий файл · %1$s з %2$s</string>
 </resources>
