@@ -45,6 +45,8 @@ import java.io.Closeable
 import java.net.InetAddress
 import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import javax.net.SocketFactory
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -175,6 +177,50 @@ class RuntimeEndToEndTest {
         scope.cancel()
         consumerDb.close()
         producerDb.close()
+    }
+
+    @Test
+    fun aScheduledSyncBecomesTheUsersWhenTheyAskForOneMeanwhile() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        val asked = CountDownLatch(1)
+        val shown = CopyOnWriteArrayList<ProducerState.Syncing>()
+        val watching =
+            launch(Dispatchers.IO) { producer.state.collect { if (it is ProducerState.Syncing) shown += it } }
+        // Held before its first file until the user has asked.
+        val scheduled = async(Dispatchers.IO) { producer.syncAndWait(pauseWhen = { asked.await().let { false } }) }
+
+        withTimeout(TIMEOUT) { producer.state.first { it is ProducerState.Syncing } }
+            .shouldBeInstanceOf<ProducerState.Syncing>().manual shouldBe false
+        producer.syncNow() // Joins the sync running.
+        producer.state.value.shouldBeInstanceOf<ProducerState.Syncing>().manual shouldBe true
+        asked.countDown()
+
+        withTimeout(TIMEOUT) { scheduled.await() }.shouldBeInstanceOf<ProducerState.Idle>().lastResult?.sent shouldBe
+            photos.size
+        watching.cancel()
+        shown.dropWhile { !it.manual }.all { it.manual } shouldBe true
+    }
+
+    @Test
+    fun aSyncTheUserStartsIsTheirsAndAScheduledOneIsnt() = runBlocking<Unit> {
+        receiver.start()
+        pairWithApproval()
+        val shown = CopyOnWriteArrayList<ProducerState.Syncing>()
+        val watching =
+            launch(Dispatchers.IO) { producer.state.collect { if (it is ProducerState.Syncing) shown += it } }
+
+        withTimeout(TIMEOUT) { producer.syncAndWait(manual = true) }.shouldBeInstanceOf<ProducerState.Idle>()
+        source.put(FakeMedia("later", Random(13).nextBytes(100_000)))
+        withTimeout(TIMEOUT) { producer.syncAndWait() }.shouldBeInstanceOf<ProducerState.Idle>()
+        watching.cancel()
+
+        // The screen may miss some states, never get them wrong.
+        val (asked, scheduled) = shown.partition { it.manual }
+        asked.isNotEmpty() shouldBe true
+        scheduled.isNotEmpty() shouldBe true
+        photos.map { it.key }.containsAll(asked.mapNotNull { it.progress?.sending?.key }) shouldBe true
+        scheduled.mapNotNull { it.progress?.sending?.key }.all { it == "later" } shouldBe true
     }
 
     @Test

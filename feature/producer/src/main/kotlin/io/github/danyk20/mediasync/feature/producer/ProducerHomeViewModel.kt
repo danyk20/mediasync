@@ -106,6 +106,11 @@ data class ProducerHomeUiState(
     val testFileBytes: Long? = null,
     /** Why the test file still waits, if it was held back. */
     val testFileProblem: TestFileHeld? = null,
+    /**
+     * A sync the user started runs, and the sending animation is on in *Settings* (docs/PLAN.md §3.3): each file
+     * folds into a paper airplane.
+     */
+    val showSendAnimation: Boolean = false,
 )
 
 /** Which folders this phone sends, and from which days. */
@@ -138,8 +143,8 @@ private data class Extras(
     val flags: Flags,
 )
 
-/** What the user decided on this screen, and the test file waiting. */
-private data class Flags(val turboDeclined: Boolean, val testFile: TestFileState)
+/** What the user decided on this screen, the test file waiting, and whether the sending animation is on. */
+private data class Flags(val turboDeclined: Boolean, val testFile: TestFileState, val sendAnimation: Boolean)
 
 /** What the phone allows MediaSync, as of [checkedAtMillis]. */
 private data class DeviceAccess(
@@ -190,7 +195,7 @@ class ProducerHomeViewModel @Inject constructor(
             history.record,
             settings.dismissedPrompts,
             combine(settings.photoDetails, settings.sendingOrder, ::SendingChoices),
-            combine(turboDeclined, testFiles.state, ::Flags),
+            combine(turboDeclined, testFiles.state, settings.sendAnimation, ::Flags),
             ::Extras,
         ),
     ) { consumer, state, count, internet, extras ->
@@ -232,6 +237,7 @@ class ProducerHomeViewModel @Inject constructor(
             mobileDataSent = internet.mobileDataSent,
             testFileBytes = extras.flags.testFile.waiting?.size,
             testFileProblem = extras.flags.testFile.problem,
+            showSendAnimation = extras.flags.sendAnimation && (state as? ProducerState.Syncing)?.manual == true,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProducerHomeUiState())
 

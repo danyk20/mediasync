@@ -20,6 +20,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.maps.shouldBeEmpty
@@ -381,7 +382,8 @@ class SyncSessionTest {
             },
         )
 
-        updates.last() shouldBe TransferProgress(2, 2, 2L * MIB + 500, 2L * MIB + 500, updates.last().currentItem)
+        val last = updates.last()
+        last shouldBe TransferProgress(2, 2, 2L * MIB + 500, 2L * MIB + 500, last.currentItem, sending = last.sending)
     }
 
     /** Syncs, and returns the last progress each side reported: the one with the most bytes done. */
@@ -475,7 +477,61 @@ class SyncSessionTest {
         result.getOrThrow().sent shouldBe 2
         consumer.ledger.items.map { it.descriptor.displayName } shouldContainExactlyInAnyOrder listOf("a.jpg", "c.jpg")
         val last = sent.maxWith(compareBy({ it.bytesDone }, { it.itemsDone }))
-        last shouldBe TransferProgress(3, 3, 3500, 3500, last.currentItem, bytesSkipped = 2000)
+        last shouldBe TransferProgress(3, 3, 3500, 3500, last.currentItem, bytesSkipped = 2000, sending = last.sending)
+        // Left out: it never shows as being sent.
+        sent.mapNotNull { it.sending?.key }.distinct() shouldContainExactlyInAnyOrder listOf("a", "c")
+    }
+
+    @Test
+    fun `the file being sent advances chunk by chunk, and a confirmation doesn't change it`() {
+        val video = FakeMedia("video", Random(1).nextBytes(MIB), mimeType = "video/mp4")
+        val media = listOf(media("big", 3 * MIB + 17), media("small", 500), video)
+        val updates = CopyOnWriteArrayList<TransferProgress>()
+        syncReporting(Producer(media), Consumer(), updates)
+
+        val sending = updates.mapNotNull { it.sending }
+        // One file after the other: confirmations of earlier files come later, but never bring them back.
+        val keys = sending.map { it.key }
+        keys.zipWithNext().count { (a, b) -> a != b } shouldBe keys.distinct().size - 1
+        keys.distinct() shouldContainExactlyInAnyOrder listOf("big", "small", "video")
+        val big = sending.filter { it.key == "big" }
+        big.first().bytesSent shouldBe 0
+        val steps = big.map { it.bytesSent }.distinct()
+        steps.zipWithNext().all { (a, b) -> b > a } shouldBe true
+        steps.size shouldBeGreaterThan 3
+        steps.last() shouldBe 3L * MIB + 17
+        big.last().finished shouldBe true
+        big.map { it.startedNanos }.distinct().size shouldBe 1
+        big.first() shouldBe big.first().copy(name = "big.jpg", size = 3L * MIB + 17, video = false)
+        sending.first { it.key == "video" }.video shouldBe true
+        updates.last().sending?.finished shouldBe true
+    }
+
+    @Test
+    fun `a file the consumer already has never shows as being sent`() {
+        val producer = Producer(listOf(media("a", 1000), media("b", 2000)))
+        val consumer = Consumer()
+        sync(producer, consumer)
+        val again = Producer(listOf(media("a", 1000), media("b", 2000), media("c", 300))) // Its ledger was lost.
+        val updates = CopyOnWriteArrayList<TransferProgress>()
+
+        syncReporting(again, consumer, updates)
+
+        updates.mapNotNull { it.sending?.key }.distinct() shouldBe listOf("c")
+    }
+
+    private fun syncReporting(producer: Producer, consumer: Consumer, updates: MutableList<TransferProgress>) {
+        val connection = ConnectionPair(producerId, consumerId)
+        runBothSides(
+            producer = {
+                ProducerSession(local, producer.source, producer.ledger, progress = { updates += it })
+                    .sync(connection.producerEnd)
+            },
+            consumer = {
+                ConsumerSession(local, consumer.registry, consumer.ledger, consumer.sink, FakePairingGate(TOKEN))
+                    .serve(connection.consumerEnd)
+            },
+        ).first.getOrThrow()
     }
 
     @Test

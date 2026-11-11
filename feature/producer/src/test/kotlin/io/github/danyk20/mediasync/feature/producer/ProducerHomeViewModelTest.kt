@@ -268,6 +268,21 @@ class ProducerHomeViewModelTest {
     }
 
     @Test
+    fun theSendingAnimationShowsOnlyForASyncTheUserStartedWithItOn() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.consumerName != null }.showSendAnimation shouldBe false
+
+        syncState.value = ProducerState.Syncing(progress = null, manual = false) // Scheduled.
+        viewModel.uiState.first { it.sync is ProducerState.Syncing }.showSendAnimation shouldBe false
+
+        syncState.value = ProducerState.Syncing(progress = null, manual = true)
+        viewModel.uiState.first { it.showSendAnimation }
+
+        settings.setSendAnimation(false)
+        viewModel.uiState.first { !it.showSendAnimation }.sync shouldBe syncState.value
+    }
+
+    @Test
     fun buttonsReachTheSyncRuntime() {
         val viewModel = viewModel()
 

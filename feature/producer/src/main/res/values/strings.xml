@@ -234,5 +234,7 @@
     <string name="producer_test_file_no_space">%1$s doesn\'t have room for it now.</string>
     <string name="producer_test_file_not_writable">%1$s couldn\'t write it last time.</string>
     <string name="producer_test_file_remove">Remove</string>
+    <string name="producer_plane_sending">Sending %1$s</string>
+    <string name="producer_plane_test_file">Sending the test file</string>
     <string name="producer_status_sending_test_file">Test file first · %1$s of %2$s</string>
 </resources>

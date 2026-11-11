@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -390,7 +391,7 @@ private data class PairedActions(
 private fun Paired(consumer: String, state: ProducerHomeUiState, actions: PairedActions) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
-            Sending(consumer, sync, actions.onShowSpeeds)
+            Sending(consumer, sync, state.showSendAnimation, actions.onShowSpeeds)
             OutlinedButton(onClick = actions.onStop, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.producer_stop))
             }
@@ -833,6 +834,9 @@ private fun sourcesSummary(sources: SourceSelection): String {
 
 private const val SUMMARY_NAMES = 2
 
+/** The sending animation's card (docs/PLAN.md §3.3): room for the sheet and its way out. */
+private val PLANE_HEIGHT = 180.dp
+
 private fun SourceSelection.isEmpty() = preset == null && folders.isEmpty()
 
 @Composable
@@ -859,10 +863,19 @@ private fun SyncNowButton(onSyncNow: () -> Unit) {
 }
 
 @Composable
-private fun Sending(consumer: String, sync: ProducerState.Syncing, onShowSpeeds: () -> Unit) {
+private fun Sending(consumer: String, sync: ProducerState.Syncing, animate: Boolean, onShowSpeeds: () -> Unit) {
     val progress = sync.progress
     val turbo = sync.turbo
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // From the first file on (docs/PLAN.md §3.3): it doesn't come and go between files.
+        val sending = progress?.sending
+        if (animate && sending != null) {
+            PaperPlane(
+                item = sending,
+                bytesPerSecond = sync.estimate?.bytesPerSecond,
+                modifier = Modifier.fillMaxWidth().height(PLANE_HEIGHT),
+            )
+        }
         StatusCard(
             title = stringResource(
                 when {

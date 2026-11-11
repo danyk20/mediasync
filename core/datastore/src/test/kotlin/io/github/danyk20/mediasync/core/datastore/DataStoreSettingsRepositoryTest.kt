@@ -178,6 +178,16 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun theSendAnimationIsOnAtFirstAndCanBeTurnedOff() = runTest {
+        val dataStore = dataStore()
+        DataStoreSettingsRepository(dataStore).sendAnimation.first() shouldBe true
+
+        DataStoreSettingsRepository(dataStore).setSendAnimation(false)
+
+        DataStoreSettingsRepository(dataStore).sendAnimation.first() shouldBe false
+    }
+
+    @Test
     fun internetSyncHasNoWorkerAndStaysOffMobileDataUntilSetUp() = runTest {
         val repository = DataStoreSettingsRepository(dataStore())
         repository.rendezvousUrl.first() shouldBe null

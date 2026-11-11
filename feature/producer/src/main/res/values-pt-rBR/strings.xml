@@ -228,5 +228,7 @@
     <string name="producer_test_file_no_space">%1$s não tem espaço para ele agora.</string>
     <string name="producer_test_file_not_writable">%1$s não conseguiu salvá-lo da última vez.</string>
     <string name="producer_test_file_remove">Remover</string>
+    <string name="producer_plane_sending">Enviando %1$s</string>
+    <string name="producer_plane_test_file">Enviando o arquivo de teste</string>
     <string name="producer_status_sending_test_file">Primeiro o arquivo de teste · %1$s de %2$s</string>
 </resources>

@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">Impossible de joindre %1$s. Ouvrez MediaSync dessus, sur le même Wi-Fi, puis réessayez.</string>
     <string name="diagnostics_link_test_one">Une connexion : %1$s Mo/s</string>
     <string name="diagnostics_link_test_four">Quatre connexions : %1$s Mo/s</string>
+    <string name="settings_animation_title">Animation d\'envoi</string>
+    <string name="settings_animation_switch">Avions en papier</string>
+    <string name="settings_animation_intro">Quand vous envoyez vous-même des photos et des vidéos, chacune se plie en avion en papier qui s\'envole aussi vite qu\'elle est envoyée.</string>
     <string name="settings_updates_title">Mises à jour</string>
     <string name="settings_updates_installed">MediaSync %1$s, installée depuis GitHub.</string>
     <string name="settings_updates_check">Rechercher des mises à jour</string>

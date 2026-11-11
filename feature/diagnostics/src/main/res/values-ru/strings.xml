@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">Не удалось связаться с %1$s. Откройте на нём MediaSync, в той же сети Wi-Fi, и попробуйте снова.</string>
     <string name="diagnostics_link_test_one">Одно соединение: %1$s МБ/с</string>
     <string name="diagnostics_link_test_four">Четыре соединения: %1$s МБ/с</string>
+    <string name="settings_animation_title">Анимация отправки</string>
+    <string name="settings_animation_switch">Бумажные самолётики</string>
+    <string name="settings_animation_intro">Когда вы сами отправляете фото и видео, каждое складывается в бумажный самолётик, который улетает с той же скоростью, с какой отправляется.</string>
     <string name="settings_updates_title">Обновления</string>
     <string name="settings_updates_installed">MediaSync %1$s, установлен с GitHub.</string>
     <string name="settings_updates_check">Проверить обновления</string>

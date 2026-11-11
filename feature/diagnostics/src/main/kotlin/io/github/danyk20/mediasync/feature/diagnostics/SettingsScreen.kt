@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -17,10 +18,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -30,9 +34,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -66,6 +72,8 @@ data class SettingsUiState(
     val savedLogSize: String = "",
     /** [logSize] isn't a size from 0.1 to 1024 MB. */
     val logSizeInvalid: Boolean = false,
+    /** A sending phone folds each file it sends into a paper airplane, while the user watches a sync they started. */
+    val sendAnimation: Boolean = true,
     /** Installed from GitHub only: from Google Play, Play updates it. */
     val updates: UpdatesUi? = null,
 ) {
@@ -108,6 +116,14 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
                 }
             }
         }
+        viewModelScope.launch {
+            settings.sendAnimation.collect { on -> state.update { it.copy(sendAnimation = on) } }
+        }
+    }
+
+    fun onSendAnimationChange(on: Boolean) {
+        state.update { it.copy(sendAnimation = on) }
+        viewModelScope.launch { settings.setSendAnimation(on) }
     }
 
     fun onLogSizeChange(text: String) {
@@ -155,6 +171,7 @@ fun SettingsRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: 
         state = state,
         onLogSizeChange = viewModel::onLogSizeChange,
         onSaveLogSize = viewModel::saveLogSize,
+        onSendAnimation = viewModel::onSendAnimationChange,
         onCheckUpdates = viewModel::checkForUpdates,
         onOpenRelease = { links.openUri(it) },
         onReset = { context.resetMediaSync() },
@@ -164,8 +181,8 @@ fun SettingsRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: 
 }
 
 /**
- * *Settings* (docs/PLAN.md §3.3), from ⋮ on the home screens: how much of the diagnostic log is kept, updates for a
- * copy installed from GitHub, and *Reset MediaSync*, which asks first.
+ * *Settings* (docs/PLAN.md §3.3), from ⋮ on the home screens: how much of the diagnostic log is kept, the sending
+ * animation, updates for a copy installed from GitHub, and *Reset MediaSync*, which asks first.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,6 +195,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onCheckUpdates: () -> Unit = {},
     onOpenRelease: (String) -> Unit = {},
+    onSendAnimation: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -197,6 +215,8 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LogSizeSection(state, onLogSizeChange, onSaveLogSize)
+            HorizontalDivider()
+            SendAnimationSection(state.sendAnimation, onSendAnimation)
             state.updates?.let {
                 HorizontalDivider()
                 UpdatesSection(it, onCheckUpdates, onOpenRelease)
@@ -241,6 +261,26 @@ private fun LogSizeSection(state: SettingsUiState, onChange: (String) -> Unit, o
         Button(onClick = onSave, enabled = state.canSaveLogSize) {
             Text(stringResource(R.string.settings_log_size_save))
         }
+    }
+}
+
+/** The sending animation (docs/PLAN.md §3.3): a paper airplane for each file a sync the user started sends. */
+@Composable
+private fun SendAnimationSection(on: Boolean, onChange: (Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.settings_animation_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        ListItem(
+            // The whole row toggles, and reads out as one switch.
+            modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onChange),
+            headlineContent = { Text(stringResource(R.string.settings_animation_switch)) },
+            supportingContent = { Text(stringResource(R.string.settings_animation_intro)) },
+            trailingContent = { Switch(checked = on, onCheckedChange = null) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
     }
 }
 

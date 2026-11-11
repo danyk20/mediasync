@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">Не вдалося зв’язатися з %1$s. Відкрийте на ньому MediaSync, у тій самій мережі Wi-Fi, і спробуйте знову.</string>
     <string name="diagnostics_link_test_one">Одне з’єднання: %1$s МБ/с</string>
     <string name="diagnostics_link_test_four">Чотири з’єднання: %1$s МБ/с</string>
+    <string name="settings_animation_title">Анімація надсилання</string>
+    <string name="settings_animation_switch">Паперові літачки</string>
+    <string name="settings_animation_intro">Коли ви самі надсилаєте фото й відео, кожне складається в паперовий літачок, який відлітає так швидко, як надсилається.</string>
     <string name="settings_updates_title">Оновлення</string>
     <string name="settings_updates_installed">MediaSync %1$s, встановлено з GitHub.</string>
     <string name="settings_updates_check">Перевірити оновлення</string>

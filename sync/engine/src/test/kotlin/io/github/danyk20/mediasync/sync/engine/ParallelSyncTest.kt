@@ -90,6 +90,10 @@ class ParallelSyncTest {
         (sink as FakeMediaSink).storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
         synchronized(last) { last.maxOf { it.itemsDone } } shouldBe 200
         last.first().itemsTotal shouldBe 200
+        // One file shows at a time, from its start to its end, though several go at once.
+        val shown = last.mapNotNull { it.sending?.key }
+        shown.zipWithNext().count { (a, b) -> a != b } shouldBe shown.distinct().size - 1
+        shown.distinct().size shouldBeGreaterThan 1
     }
 
     @Test

@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">%1$s war nicht erreichbar. Öffne MediaSync darauf, im selben WLAN, und versuche es erneut.</string>
     <string name="diagnostics_link_test_one">Eine Verbindung: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Vier Verbindungen: %1$s MB/s</string>
+    <string name="settings_animation_title">Sendeanimation</string>
+    <string name="settings_animation_switch">Papierflieger</string>
+    <string name="settings_animation_intro">Wenn du Fotos und Videos selbst sendest, faltet sich jedes zu einem Papierflieger, der so schnell davonfliegt, wie es gesendet wird.</string>
     <string name="settings_updates_title">Updates</string>
     <string name="settings_updates_installed">MediaSync %1$s, von GitHub installiert.</string>
     <string name="settings_updates_check">Nach Updates suchen</string>

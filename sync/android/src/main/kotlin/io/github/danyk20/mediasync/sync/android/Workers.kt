@@ -141,7 +141,7 @@ class SyncNowWorker @AssistedInject constructor(
         val turbo = inputData.getBoolean(TURBO, false)
         return logged(if (turbo) "Turbo transfer" else "Sync now") {
             val consumer = withContext(Dispatchers.IO) { peers.consumer() }
-            send(sync, notifications, consumer?.name) { sync.syncAndWait(turbo = turbo) }
+            send(sync, notifications, consumer?.name) { sync.syncAndWait(turbo = turbo, manual = true) }
             Result.success() // However it went, the home screen shows it.
         }
     }

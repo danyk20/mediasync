@@ -137,6 +137,13 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[SimpleFileNamesKey] = on }
     }
 
+    override val sendAnimation: Flow<Boolean> =
+        dataStore.data.map { it[SendAnimationKey] ?: true }.distinctUntilChanged()
+
+    override suspend fun setSendAnimation(on: Boolean) {
+        dataStore.edit { it[SendAnimationKey] = on }
+    }
+
     override val diagnosticsLogBytes: Flow<Long> = dataStore.data
         .map { preferences -> preferences[DiagnosticsLogBytesKey]?.let(LogSize::clamp) ?: LogSize.DEFAULT_BYTES }
         .distinctUntilChanged()
@@ -171,6 +178,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val InternetOverMobileDataKey = booleanPreferencesKey("internet_over_mobile_data")
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
         val SimpleFileNamesKey = booleanPreferencesKey("simple_file_names")
+        val SendAnimationKey = booleanPreferencesKey("send_animation")
         val MobileDataCapKey = longPreferencesKey("mobile_data_cap_bytes")
         val DiagnosticsLogBytesKey = longPreferencesKey("diagnostics_log_bytes")
 

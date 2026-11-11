@@ -110,6 +110,14 @@ class FakeSettingsRepository(
         simpleFileNamesState.value = on
     }
 
+    private val sendAnimationState = MutableStateFlow(true)
+
+    override val sendAnimation: StateFlow<Boolean> = sendAnimationState
+
+    override suspend fun setSendAnimation(on: Boolean) {
+        sendAnimationState.value = on
+    }
+
     private val diagnosticsLogBytesState = MutableStateFlow(LogSize.DEFAULT_BYTES)
 
     override val diagnosticsLogBytes: StateFlow<Long> = diagnosticsLogBytesState

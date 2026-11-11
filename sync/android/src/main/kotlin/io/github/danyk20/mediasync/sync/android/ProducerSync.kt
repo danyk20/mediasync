@@ -128,13 +128,16 @@ sealed interface ProducerState {
 
     /**
      * [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4).
-     * [estimate]: how fast it goes and how long the rest takes, once there's enough to go on.
+     * [estimate]: how fast it goes and how long the rest takes, once there's enough to go on. [manual]: the user
+     * started it, or a sync already running when they asked (*Sync now*, Turbo, sharing, the quick action), so the
+     * home screen may show the sending animation (docs/PLAN.md §3.3); a scheduled run alone isn't.
      */
     data class Syncing(
         val progress: TransferProgress?,
         val turbo: Boolean = false,
         val internet: Boolean = false,
         val estimate: TransferEstimate? = null,
+        val manual: Boolean = false,
     ) : ProducerState
 
     data class Failed(val reason: SyncFailure) : ProducerState
@@ -233,6 +236,10 @@ class ProducerSync internal constructor(
     @Volatile
     private var pauseWhen: () -> Boolean = { false }
 
+    /** The user asked for the sync running now ([ProducerState.Syncing.manual]). */
+    @Volatile
+    private var manual = false
+
     val state: StateFlow<ProducerState> = _state.asStateFlow()
 
     suspend fun pair(link: PairingLink): PairingResult = withContext(Dispatchers.IO) {
@@ -262,9 +269,9 @@ class ProducerSync internal constructor(
         }
     }
 
-    /** Starts sending to the paired consumer, unless a sync is already running. */
+    /** Starts sending to the paired consumer, unless a sync is already running; either way, as the user asked. */
     fun syncNow() {
-        launchSync(pauseWhen = { false }, turbo = false)
+        launchSync(pauseWhen = { false }, turbo = false, manual = true)
     }
 
     /** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
@@ -277,10 +284,15 @@ class ProducerSync internal constructor(
      * Syncs now, or joins the sync already running, and returns how it ended. For background work: if the
      * caller is cancelled (the charger was unplugged), or [pauseWhen] of the sync it started becomes true (the
      * phone got hot), the sync stops after the current file. With [turbo], over a direct link (docs/PLAN.md §8.3)
-     * if one can be set up, else over Wi-Fi.
+     * if one can be set up, else over Wi-Fi. [manual]: the user asked for it ([ProducerState.Syncing.manual]); joining
+     * a sync already running, that one becomes theirs.
      */
-    suspend fun syncAndWait(pauseWhen: () -> Boolean = { false }, turbo: Boolean = false): ProducerState {
-        val running = launchSync(pauseWhen, turbo)
+    suspend fun syncAndWait(
+        pauseWhen: () -> Boolean = { false },
+        turbo: Boolean = false,
+        manual: Boolean = false,
+    ): ProducerState {
+        val running = launchSync(pauseWhen, turbo, manual)
         try {
             running.join()
         } catch (e: CancellationException) {
@@ -321,10 +333,17 @@ class ProducerSync internal constructor(
     }
 
     @Synchronized
-    private fun launchSync(pauseWhen: () -> Boolean, turbo: Boolean): Job {
-        job?.takeIf { syncing }?.let { return it }
+    private fun launchSync(pauseWhen: () -> Boolean, turbo: Boolean, manual: Boolean): Job {
+        job?.takeIf { syncing }?.let { running ->
+            if (manual) {
+                this.manual = true
+                _state.update { state -> if (state is ProducerState.Syncing) state.copy(manual = true) else state }
+            }
+            return running
+        }
         syncing = true
         cancelled = false
+        this.manual = manual
         this.pauseWhen = pauseWhen
         estimator.reset()
         done.set(0)
@@ -443,8 +462,11 @@ class ProducerSync internal constructor(
         /** On mobile data: how much more this month allows (docs/PLAN.md §2.2); `null` off mobile data. */
         var mobileDataLeft: Long? = null
 
+        /** Progress comes every chunk; the home screen needs far less. */
+        private val shown = ProgressThrottle()
+
         fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
-            _state.value = ProducerState.Syncing(progress = null)
+            _state.value = ProducerState.Syncing(progress = null, manual = manual)
             return sockets.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
         }
 
@@ -616,7 +638,7 @@ class ProducerSync internal constructor(
             // Where the phone that opened the link is on it: it said so, but the link knows best.
             val direct = connectOver(joined, link.port, consumer.id) ?: return null
             Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host.hostAddress}")
-            _state.value = ProducerState.Syncing(progress = null, turbo = true)
+            _state.value = ProducerState.Syncing(progress = null, turbo = true, manual = manual)
             return try {
                 sockets.keepingAwake { send(direct, Path.DIRECT) { connectOver(joined, link.port, consumer.id) } }
             } catch (e: IOException) {
@@ -639,7 +661,7 @@ class ProducerSync internal constructor(
          */
         fun overInternet(turboProblem: TurboProblem? = null): ProducerState? {
             val connection = internetConnection() ?: return null
-            _state.value = ProducerState.Syncing(progress = null, internet = true)
+            _state.value = ProducerState.Syncing(progress = null, internet = true, manual = manual)
             return sockets.keepingAwake { send(connection, Path.INTERNET) }.copy(turboProblem = turboProblem)
         }
 
@@ -691,12 +713,16 @@ class ProducerSync internal constructor(
                 bytesTotal = before + progress.bytesTotal,
                 bytesSkipped = skippedBefore + progress.bytesSkipped,
             )
-            _state.value = ProducerState.Syncing(
-                progress,
-                turbo = path == Path.DIRECT,
-                internet = path == Path.INTERNET,
-                estimate = estimator.update(all),
-            )
+            val estimate = estimator.update(all)
+            if (shown.due(progress)) {
+                _state.value = ProducerState.Syncing(
+                    progress,
+                    turbo = path == Path.DIRECT,
+                    internet = path == Path.INTERNET,
+                    estimate = estimate,
+                    manual = manual,
+                )
+            }
             // This month's mobile data limit reached: stops after the current file.
             if (progress.bytesMoved >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
         }
