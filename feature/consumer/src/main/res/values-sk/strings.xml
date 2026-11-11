@@ -154,4 +154,7 @@
     <string name="consumer_cloudflare_wake_ups_failing">Odosielajúce telefóny však tento telefón nedokážu zobudiť, takže cez internet ho zastihnú, len keď je tu otvorený MediaSync. Dôvod: %1$s</string>
     <string name="consumer_wake_ups_failing_title">Odosielajúce telefóny nedokážu tento telefón zobudiť</string>
     <string name="consumer_wake_ups_failing_body">Cez internet ho zastihnú, len keď je tu otvorený MediaSync. Pomôcť môže nové nastavenie synchronizácie cez internet. Dôvod: %1$s</string>
+    <string name="consumer_turbo_screen_title">Nech Turbo začne aj pri vypnutej obrazovke</string>
+    <string name="consumer_turbo_screen_body">V tejto verzii Androidu sa priame spojenie otvorí len vtedy, keď je MediaSync na obrazovke. Povoľte MediaSync zobrazenie cez iné aplikácie: keď odosielajúci telefón spustí Turbo, MediaSync sa tu sám zobrazí, aj na uzamknutej obrazovke, a po prenose zase zmizne.</string>
+    <string name="consumer_turbo_screen_allow">Povoliť</string>
 </resources>

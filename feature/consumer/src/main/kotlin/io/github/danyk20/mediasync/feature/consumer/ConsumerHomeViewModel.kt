@@ -76,6 +76,11 @@ data class ConsumerHomeUiState(
     /** A sending phone asked for Turbo transfer, which needs the user's permission (or location on) here. */
     val askTurbo: Boolean = false,
     val turbo: TurboAvailability = TurboAvailability.UNSUPPORTED,
+    /**
+     * Before Android 13: ask to let MediaSync display over other apps, so a sending phone's Turbo starts here with the
+     * screen off (docs/PLAN.md §8.3).
+     */
+    val askTurboScreen: Boolean = false,
     /** *Turbo receive* is on: waiting for a sending phone that isn't on this phone's Wi-Fi. */
     val turboReceiving: Boolean = false,
     /** Internet sync (docs/PLAN.md §8.4) is set up: this phone has a rendezvous Worker. */
@@ -108,6 +113,7 @@ private data class DeviceAccess(
     val batteryRestricted: Boolean,
     val freeBytes: Long,
     val turbo: TurboAvailability,
+    val turboScreenNeedsPermission: Boolean,
 )
 
 @HiltViewModel
@@ -191,6 +197,8 @@ class ConsumerHomeViewModel @Inject constructor(
             directLinkOpen = state.directLinkOpen,
             askTurbo = state.turboNeedsPermission && access.turbo != TurboAvailability.AVAILABLE,
             turbo = access.turbo,
+            askTurboScreen = access.turboScreenNeedsPermission && producers.isNotEmpty() &&
+                access.turbo != TurboAvailability.UNSUPPORTED && SetupPrompt.TURBO_SCREEN !in dismissed,
             turboReceiving = state.turboReceiving,
             internetSync = worker != null,
             relay = relay?.takeIf { worker != null },
@@ -272,6 +280,7 @@ class ConsumerHomeViewModel @Inject constructor(
         setup.batteryRestricted(),
         receiver.freeBytes(),
         receiver.turbo.availability(),
+        receiver.turbo.screenNeedsPermission(),
     )
 
     private companion object {

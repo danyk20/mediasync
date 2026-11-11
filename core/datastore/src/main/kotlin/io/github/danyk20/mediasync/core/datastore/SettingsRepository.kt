@@ -89,4 +89,7 @@ enum class SetupPrompt {
 
     /** Android 12+: set battery use to *Unrestricted*. */
     BATTERY,
+
+    /** Before Android 13: let MediaSync display over other apps, so Turbo starts with the screen off. */
+    TURBO_SCREEN,
 }

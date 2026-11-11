@@ -146,4 +146,7 @@
     <string name="consumer_cloudflare_wake_ups_failing">Però i telefoni che inviano non possono svegliare questo telefono: via Internet lo raggiungono solo mentre MediaSync è aperto qui. Motivo: %1$s</string>
     <string name="consumer_wake_ups_failing_title">I telefoni che inviano non possono svegliare questo telefono</string>
     <string name="consumer_wake_ups_failing_body">Via Internet lo raggiungono solo mentre MediaSync è aperto qui. Configurare di nuovo la sincronizzazione via Internet può risolverlo. Motivo: %1$s</string>
+    <string name="consumer_turbo_screen_title">Avvia Turbo a schermo spento</string>
+    <string name="consumer_turbo_screen_body">Su questa versione di Android un collegamento diretto si apre solo mentre MediaSync è sullo schermo. Consenti a MediaSync di apparire sopra le altre app: quando un telefono che invia avvia Turbo, MediaSync compare qui da solo, anche sulla schermata di blocco, e scompare a trasferimento finito.</string>
+    <string name="consumer_turbo_screen_allow">Consenti</string>
 </resources>

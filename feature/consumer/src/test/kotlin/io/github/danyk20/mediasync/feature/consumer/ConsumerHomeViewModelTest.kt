@@ -66,8 +66,10 @@ class ConsumerHomeViewModelTest {
     private val receiverState = MutableStateFlow(ReceiverState(listening = true, port = 47_420))
     private var freeBytes = 20L * 1024 * 1024 * 1024
     private var turboAvailability = TurboAvailability.AVAILABLE
+    private var turboScreenNeedsPermission = false
     private val turbo = mockk<ConsumerReceiver.Turbo>(relaxed = true) {
         every { availability() } answers { turboAvailability }
+        every { screenNeedsPermission() } answers { turboScreenNeedsPermission }
     }
     private val receiver = mockk<ConsumerReceiver>(relaxed = true) {
         every { state } returns receiverState
@@ -247,6 +249,25 @@ class ConsumerHomeViewModelTest {
         viewModel.onTurboAnswered()
         viewModel.uiState.first { !it.askTurbo && it.turbo == TurboAvailability.AVAILABLE }
         verify { turbo.permissionHandled() }
+    }
+
+    @Test
+    fun beforeAndroid13ItAsksToShowItselfForTurboUntilAllowedOrDismissed() = runTest {
+        turboScreenNeedsPermission = true
+        val viewModel = viewModel()
+        viewModel.uiState.first { it.askTurboScreen }
+
+        // Allowed in the system settings: back on the home screen, the card goes.
+        turboScreenNeedsPermission = false
+        viewModel.refresh()
+        viewModel.uiState.first { it.listening && !it.askTurboScreen }
+
+        // Not now: it doesn't come back.
+        turboScreenNeedsPermission = true
+        viewModel.refresh()
+        viewModel.uiState.first { it.askTurboScreen }
+        viewModel.dismiss(SetupPrompt.TURBO_SCREEN)
+        viewModel.uiState.first { !it.askTurboScreen }
     }
 
     @Test

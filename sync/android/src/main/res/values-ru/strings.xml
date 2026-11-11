@@ -27,4 +27,5 @@
         <item quantity="other">Отправлено: %d</item>
     </plurals>
     <string name="sync_notification_sent_to">Они сохранены на %1$s.</string>
+    <string name="turbo_screen_receiving">Приём через Turbo…</string>
 </resources>
