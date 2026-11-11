@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/danyk20/mediasync/compare/v0.9.4...v0.9.5) (2026-11-11)
+
+
+### Bug Fixes
+
+* the receiving phone no longer crashes when Android refuses a Turbo link ([#122](https://github.com/danyk20/mediasync/issues/122)) ([e7211a8](https://github.com/danyk20/mediasync/commit/e7211a8dabf0764c108733fde252c13f32657395))
+
 ## [0.9.4](https://github.com/danyk20/mediasync/compare/v0.9.3...v0.9.4) (2026-11-11)
 
 
