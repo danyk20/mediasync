@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.core.testing
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
@@ -107,6 +108,14 @@ class FakeSettingsRepository(
 
     override suspend fun setSimpleFileNames(on: Boolean) {
         simpleFileNamesState.value = on
+    }
+
+    private val diagnosticsLogBytesState = MutableStateFlow(LogSize.DEFAULT_BYTES)
+
+    override val diagnosticsLogBytes: StateFlow<Long> = diagnosticsLogBytesState
+
+    override suspend fun setDiagnosticsLogBytes(bytes: Long) {
+        diagnosticsLogBytesState.value = LogSize.clamp(bytes)
     }
 
     private val dismissedPromptsState = MutableStateFlow(emptySet<SetupPrompt>())

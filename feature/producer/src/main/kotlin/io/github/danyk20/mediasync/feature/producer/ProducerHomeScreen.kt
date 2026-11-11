@@ -100,6 +100,7 @@ fun ProducerHomeRoute(
     modifier: Modifier = Modifier,
     onChooseDetails: () -> Unit = {},
     onChooseOrder: () -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onSeeWaiting: (leftOut: Boolean) -> Unit = {},
     viewModel: ProducerHomeViewModel = hiltViewModel(),
@@ -141,6 +142,7 @@ fun ProducerHomeRoute(
         onInternetOverMobileData = viewModel::setInternetOverMobileData,
         onVideosOverRelay = viewModel::setVideosOverRelay,
         onMobileDataCap = viewModel::setMobileDataCap,
+        onOpenMediaSyncSettings = onOpenMediaSyncSettings,
         onOpenDiagnostics = onOpenDiagnostics,
         onStartTurbo = {
             if (state.turbo == TurboAvailability.NOT_ALLOWED) {
@@ -191,6 +193,7 @@ fun ProducerHomeScreen(
     onVideosOverRelay: (Boolean) -> Unit = {},
     onMobileDataCap: (Long?) -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onStartTurbo: () -> Unit = {},
     onOpenLocationSettings: () -> Unit = {},
@@ -203,7 +206,7 @@ fun ProducerHomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.producer_home_title)) },
-                actions = { MoreMenu(onOpenDiagnostics) },
+                actions = { MoreMenu(onOpenSettings = onOpenMediaSyncSettings, onOpenDiagnostics = onOpenDiagnostics) },
             )
         },
     ) { padding ->

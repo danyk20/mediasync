@@ -22,8 +22,9 @@
 
     <string name="notice_not_now">Ahora no</string>
     <string name="more_options">Más opciones</string>
+    <string name="menu_settings">Ajustes</string>
     <string name="menu_diagnostics">Diagnóstico</string>
-    <string name="menu_reset">Restablecer MediaSync</string>
+    <string name="reset_mediasync">Restablecer MediaSync</string>
     <string name="reset_title">¿Restablecer MediaSync?</string>
     <string name="reset_body">Este teléfono olvida su función, sus teléfonos emparejados, sus ajustes y su historial, y MediaSync empieza de cero como si acabara de instalarse. Las fotos y los vídeos se quedan donde están. Un Worker de Cloudflare que hayas configurado sigue en tu cuenta de Cloudflare.</string>
     <string name="reset_confirm">Restablecer</string>

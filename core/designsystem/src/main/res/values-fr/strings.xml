@@ -20,8 +20,9 @@
     <string name="moment_weekday">%1$s à %2$s</string>
     <string name="notice_not_now">Pas maintenant</string>
     <string name="more_options">Plus d\'options</string>
+    <string name="menu_settings">Paramètres</string>
     <string name="menu_diagnostics">Diagnostic</string>
-    <string name="menu_reset">Réinitialiser MediaSync</string>
+    <string name="reset_mediasync">Réinitialiser MediaSync</string>
     <string name="reset_title">Réinitialiser MediaSync ?</string>
     <string name="reset_body">Ce téléphone oublie son rôle, ses téléphones associés, ses réglages et son historique, et MediaSync repart de zéro comme s\'il venait d\'être installé. Les photos et vidéos restent où elles sont. Un Worker Cloudflare que vous avez configuré reste dans votre compte Cloudflare.</string>
     <string name="reset_confirm">Réinitialiser</string>

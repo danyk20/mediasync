@@ -32,6 +32,10 @@ sealed interface Destination : NavKey {
     @Serializable
     data object ProducerFolders : Destination
 
+    /** *Settings* (docs/PLAN.md §3.3): the diagnostic log's size, updates, and *Reset MediaSync*. */
+    @Serializable
+    data object Settings : Destination
+
     /** What to share when something doesn't work (docs/PLAN.md §3.3). */
     @Serializable
     data object Diagnostics : Destination

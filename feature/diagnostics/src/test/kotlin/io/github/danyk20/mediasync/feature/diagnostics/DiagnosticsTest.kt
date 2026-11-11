@@ -9,7 +9,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -74,99 +73,13 @@ class DiagnosticsTest {
     private val sync =
         mockk<ProducerSync> { coEvery { linkTest(any(), any()) } answers { speeds[firstArg<Int>() / 4] } }
 
-    private val releases = FakeReleases()
-
-    private fun viewModel() = DiagnosticsViewModel(report, sync, settings, peers, releases)
-
-    @Test
-    fun installedFromPlayThereIsNoUpdateCheck() {
-        releases.fromPlay = true
-
-        viewModel().uiState.value.updates shouldBe null
-    }
-
-    @Test
-    fun aNewerReleaseIsOfferedOnlyAfterAskingGitHub() {
-        val viewModel = viewModel()
-        viewModel.uiState.value.updates shouldBe UpdatesUi("0.4.0")
-        releases.asked shouldBe 0
-
-        releases.latest = Release("0.5.0", RELEASE_URL)
-        viewModel.checkForUpdates()
-        viewModel.uiState.value.updates?.check shouldBe UpdateCheck.Newer(Release("0.5.0", RELEASE_URL))
-
-        releases.latest = Release("0.4.0", RELEASE_URL)
-        viewModel.checkForUpdates()
-        viewModel.uiState.value.updates?.check shouldBe UpdateCheck.Latest
-
-        releases.latest = null
-        viewModel.checkForUpdates()
-        viewModel.uiState.value.updates?.check shouldBe UpdateCheck.Failed
-        releases.asked shouldBe 3
-    }
-
-    @Test
-    fun versionsCompareNumberByNumber() {
-        isNewer("0.5.0", "0.4.0") shouldBe true
-        isNewer("0.10.0", "0.9.3") shouldBe true
-        isNewer("1.0", "0.99.99") shouldBe true
-        isNewer("0.4.0", "0.4.0") shouldBe false
-        isNewer("0.4.0", "0.4.1") shouldBe false
-        isNewer("v0.4.1", "0.4.0-debug") shouldBe true
-        isNewer("nightly", "0.4.0") shouldBe false
-    }
-
-    @Test
-    fun gitHubsAnswerGivesTheVersionAndThePage() {
-        parseRelease("""{"tag_name": "v0.5.0", "html_url": "$RELEASE_URL", "assets": []}""") shouldBe
-            Release("0.5.0", RELEASE_URL)
-        parseRelease("""{"message": "Not Found"}""") shouldBe null
-        parseRelease("not json") shouldBe null
-    }
-
-    @Test
-    fun anAvailableReleaseOpensItsPage() {
-        show(DiagnosticsUiState(updates = UpdatesUi("0.4.0", UpdateCheck.Newer(Release("0.5.0", RELEASE_URL)))))
-
-        composeRule.onNodeWithText("MediaSync 0.5.0 is available.").assertExists()
-        composeRule.onNodeWithText("Download").performScrollTo().performClick()
-
-        events shouldBe listOf("open $RELEASE_URL")
-    }
-
-    @Test
-    fun screenshot_updateAvailable_light() {
-        show(
-            DiagnosticsUiState(
-                facts = facts,
-                updates = UpdatesUi("0.4.0", UpdateCheck.Newer(Release("0.5.0", RELEASE_URL))),
-            ),
-        )
-        composeRule.onRoot().captureScreenshot("diagnostics_update_available_light")
-    }
-
-    /** GitHub's releases, as the test sets them. */
-    private class FakeReleases : Releases {
-        var fromPlay = false
-        var latest: Release? = null
-        var asked = 0
-            private set
-
-        override fun fromPlay() = fromPlay
-
-        override fun installed() = "0.4.0"
-
-        override suspend fun latest(): Release? {
-            asked++
-            return latest
-        }
-    }
+    private fun viewModel() = DiagnosticsViewModel(report, sync, settings, peers)
 
     @Test
     fun itShowsTheReportAndRecentEventsAndClears() = runTest {
         val viewModel = viewModel()
         viewModel.uiState.first { it.facts.isNotEmpty() && it.linkTest != null } shouldBe
-            DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL"), UpdatesUi("0.4.0"))
+            DiagnosticsUiState(facts, recent, LinkTestUi("Pixel 2 XL"))
 
         entries = emptyList()
         viewModel.clear()
@@ -214,6 +127,7 @@ class DiagnosticsTest {
         composeRule.onNodeWithText("Save to a file").performClick()
         composeRule.onNodeWithText("Clear log").performClick()
         composeRule.onNodeWithText("remove_location").assertIsDisplayed()
+        composeRule.onNodeWithText("Check for updates").assertDoesNotExist() // It's in Settings.
         events shouldBe listOf("share", "save", "clear")
     }
 
@@ -240,7 +154,6 @@ class DiagnosticsTest {
     fun screenshot_dark() = screenshot(darkTheme = true, "diagnostics_dark")
 
     private companion object {
-        const val RELEASE_URL = "https://github.com/danyk20/mediasync/releases/tag/v0.5.0"
         const val MB = 1024L * 1024
     }
 
@@ -259,8 +172,6 @@ class DiagnosticsTest {
                     onSave = { events += "save" },
                     onClear = { events += "clear" },
                     onDone = { events += "done" },
-                    onCheckUpdates = { events += "check" },
-                    onOpenRelease = { events += "open $it" },
                 )
             }
         }

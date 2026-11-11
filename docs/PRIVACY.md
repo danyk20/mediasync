@@ -15,7 +15,7 @@ MediaSync copies photos and videos from your phones to another phone of yours, a
 - **Your photos and videos, with all their details:** dates, places, camera information, album and file names. They are kept on the sending phone and copied to the receiving phone you paired, as they are, unless you choose in *Photo details* to remove the place or all details before sending.
 - **Pairing keys.** Each phone creates its own keys, kept in Android's Keystore, and the paired phones exchange theirs through a QR code. They encrypt and authenticate every transfer.
 - **Settings and the record of what was sent and received.**
-- **The diagnostic log.** It records what MediaSync did, without file names or places. It leaves the phone only if you share it yourself, for example to report a problem.
+- **The diagnostic log.** It records what MediaSync did, without file names or places. It leaves the phone only if you share it yourself, for example to report a problem. It keeps 1 MB of the newest entries, or the size you choose in *Settings*.
 
 ## How your photos travel
 
@@ -48,7 +48,7 @@ MediaSync doesn't upload anything to Google Photos. It keeps received files in t
 
 ## Checking for updates (copies from GitHub only)
 
-A copy of MediaSync installed from GitHub can't be updated by Google Play. Its *Diagnostics* screen has a *Check for updates* button that asks GitHub which release is the latest. MediaSync checks only when you tap the button, and sends nothing but that request; GitHub sees the phone's IP address, as with any web request. [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) applies. Copies installed from Google Play don't have the button and never contact GitHub.
+A copy of MediaSync installed from GitHub can't be updated by Google Play. Its *Settings* screen has a *Check for updates* button that asks GitHub which release is the latest. MediaSync checks only when you tap the button, and sends nothing but that request; GitHub sees the phone's IP address, as with any web request. [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) applies. Copies installed from Google Play don't have the button and never contact GitHub.
 
 ## Permissions
 

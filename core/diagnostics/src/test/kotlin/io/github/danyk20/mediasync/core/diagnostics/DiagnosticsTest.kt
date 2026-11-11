@@ -5,7 +5,9 @@
 package io.github.danyk20.mediasync.core.diagnostics
 
 import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.longs.shouldBeLessThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
+import io.kotest.matchers.longs.shouldBeGreaterThan
+import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -96,17 +98,89 @@ class DiagnosticsTest {
     }
 
     @Test
-    fun theLogKeepsAtMostTwoFilesWorthOfTheNewestEntries() {
-        val log = FileDiagnosticLog(directory, clock, maxBytes = 1_000)
+    fun theLogRollsOverDroppingTheOldestEntriesFirst() {
+        val log = FileDiagnosticLog(directory, clock, maxBytes = 10_000)
 
-        repeat(200) { log.log(Area.WORK, "entry $it") }
+        repeat(1_000) {
+            log.log(Area.WORK, "entry $it")
+            log.flush()
+            stored() shouldBeLessThanOrEqual 10_000
+        }
 
-        val kept = log.read()
-        kept.length.toLong() shouldBeLessThan 2_000
-        kept.trimEnd().lines().last() shouldContain "entry 199"
-        kept shouldNotContain "entry 0\n"
-        directory.listFiles()!!.size shouldBe 2
+        val kept = log.recent(Int.MAX_VALUE).map { it.substringAfter("entry ").toInt() }
+        kept.last() shouldBe 999
+        kept shouldBe (kept.first()..999).toList() // The newest, in order, with nothing missing in between.
+        stored() shouldBeGreaterThan 8_000 // At most about a tenth is dropped at once.
+        directory.listFiles()!!.size shouldBeLessThanOrEqual 11
     }
+
+    @Test
+    fun aSmallerLimitDropsTheOldestEntriesAtOnce() {
+        val log = FileDiagnosticLog(directory, clock, maxBytes = 100_000)
+        repeat(1_000) { log.log(Area.WORK, "entry $it") }
+        log.flush()
+        stored() shouldBeGreaterThan 40_000
+
+        log.limitTo(5_000)
+
+        log.read().length shouldBeLessThanOrEqual 5_000
+        stored() shouldBeLessThanOrEqual 5_000
+        log.recent(1).single() shouldContain "entry 999"
+        log.read() shouldNotContain "entry 0\n"
+
+        repeat(500) { log.log(Area.WORK, "more $it") }
+        log.flush()
+        stored() shouldBeLessThanOrEqual 5_000
+        log.recent(1).single() shouldContain "more 499"
+    }
+
+    @Test
+    fun aLargerLimitKeepsWhatsThere() {
+        val log = FileDiagnosticLog(directory, clock, maxBytes = 5_000)
+        repeat(200) { log.log(Area.WORK, "entry $it") }
+        val before = log.read()
+
+        log.limitTo(50_000)
+        repeat(200) { log.log(Area.WORK, "more $it") }
+
+        log.read() shouldStartWith before
+        stored() shouldBeGreaterThan 10_000
+    }
+
+    @Test
+    fun anEntryLargerThanTheWholeLogIsntKept() {
+        val log = FileDiagnosticLog(directory, clock, maxBytes = 50)
+        repeat(3) { log.log(Area.WORK, "a line longer than fifty bytes, number $it") }
+
+        log.read() shouldBe ""
+        stored() shouldBe 0
+    }
+
+    @Test
+    fun aLogFromAnEarlierVersionIsKeptAsItsOldestPart() {
+        File(directory, "diagnostics.1.log").writeText("older\n")
+        File(directory, "diagnostics.log").writeText("newer\n")
+        val log = FileDiagnosticLog(directory, clock)
+
+        log.log(Area.APP, "newest")
+
+        log.recent(3).map { it.substringAfterLast(' ') } shouldContainExactly listOf("older", "newer", "newest")
+    }
+
+    @Test
+    fun theDefaultLimitIsOneMegabyte() {
+        FileDiagnosticLog.DEFAULT_MAX_BYTES shouldBe 1_048_576
+        val log = FileDiagnosticLog(directory, clock)
+        val entry = "x".repeat(1_000)
+
+        repeat(1_500) { log.log(Area.WORK, entry) }
+        log.flush()
+
+        stored() shouldBeLessThanOrEqual 1_048_576
+        stored() shouldBeGreaterThan 900_000
+    }
+
+    private fun stored() = directory.listFiles()!!.sumOf { it.length() }
 
     @Test
     fun manyThreadsCanLogAtOnce() {

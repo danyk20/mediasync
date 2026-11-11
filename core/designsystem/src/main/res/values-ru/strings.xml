@@ -24,8 +24,9 @@
 
     <string name="notice_not_now">Не сейчас</string>
     <string name="more_options">Дополнительно</string>
+    <string name="menu_settings">Настройки</string>
     <string name="menu_diagnostics">Диагностика</string>
-    <string name="menu_reset">Сбросить MediaSync</string>
+    <string name="reset_mediasync">Сбросить MediaSync</string>
     <string name="reset_title">Сбросить MediaSync?</string>
     <string name="reset_body">Этот телефон забудет свою роль, сопряжённые телефоны, настройки и историю, и MediaSync начнёт работу заново, как после установки. Фото и видео останутся на месте. Настроенный вами Worker в Cloudflare останется в вашем аккаунте Cloudflare.</string>
     <string name="reset_confirm">Сбросить</string>

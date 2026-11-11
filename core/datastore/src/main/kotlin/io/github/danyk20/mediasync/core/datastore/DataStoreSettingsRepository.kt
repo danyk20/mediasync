@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SendingOrder
@@ -136,6 +137,14 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         dataStore.edit { it[SimpleFileNamesKey] = on }
     }
 
+    override val diagnosticsLogBytes: Flow<Long> = dataStore.data
+        .map { preferences -> preferences[DiagnosticsLogBytesKey]?.let(LogSize::clamp) ?: LogSize.DEFAULT_BYTES }
+        .distinctUntilChanged()
+
+    override suspend fun setDiagnosticsLogBytes(bytes: Long) {
+        dataStore.edit { it[DiagnosticsLogBytesKey] = LogSize.clamp(bytes) }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -163,6 +172,7 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
         val SimpleFileNamesKey = booleanPreferencesKey("simple_file_names")
         val MobileDataCapKey = longPreferencesKey("mobile_data_cap_bytes")
+        val DiagnosticsLogBytesKey = longPreferencesKey("diagnostics_log_bytes")
 
         /** Stored instead of a preset name when the user picked folders by hand. */
         private const val CHOSEN_FOLDERS = "CHOSEN_FOLDERS"

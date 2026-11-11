@@ -17,13 +17,23 @@
     <!-- "One connection: 48.2 MB/s" -->
     <string name="diagnostics_link_test_one">One connection: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Four connections: %1$s MB/s</string>
-    <string name="diagnostics_updates_title">Updates</string>
-    <string name="diagnostics_updates_installed">MediaSync %1$s, installed from GitHub.</string>
-    <string name="diagnostics_updates_check">Check for updates</string>
-    <string name="diagnostics_updates_checking">Checking…</string>
-    <string name="diagnostics_updates_latest">This is the latest version.</string>
-    <string name="diagnostics_updates_newer">MediaSync %1$s is available.</string>
-    <string name="diagnostics_updates_download">Download</string>
-    <string name="diagnostics_updates_failed">GitHub couldn\'t be reached. Try again later.</string>
-    <string name="diagnostics_updates_note">Checking asks GitHub which release is the latest. MediaSync sends nothing else, and never checks on its own.</string>
+    <string name="settings_updates_title">Updates</string>
+    <string name="settings_updates_installed">MediaSync %1$s, installed from GitHub.</string>
+    <string name="settings_updates_check">Check for updates</string>
+    <string name="settings_updates_checking">Checking…</string>
+    <string name="settings_updates_latest">This is the latest version.</string>
+    <string name="settings_updates_newer">MediaSync %1$s is available.</string>
+    <string name="settings_updates_download">Download</string>
+    <string name="settings_updates_failed">GitHub couldn\'t be reached. Try again later.</string>
+    <string name="settings_updates_note">Checking asks GitHub which release is the latest. MediaSync sends nothing else, and never checks on its own.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_done">Done</string>
+    <string name="settings_log_title">Diagnostic log</string>
+    <string name="settings_log_intro">How much of the log MediaSync keeps on this phone. When it\'s full, the oldest entries make room for new ones.</string>
+    <string name="settings_log_size">Size (MB)</string>
+    <string name="settings_log_size_hint">From 0.1 to 1024 MB. 1 MB unless you change it.</string>
+    <string name="settings_log_size_invalid">Type a size from 0.1 to 1024 MB, such as 0.5 or 20.</string>
+    <string name="settings_log_size_save">Save</string>
+    <string name="settings_reset_title">Start over</string>
+    <string name="settings_reset_intro">This phone forgets its role, paired phones, settings and history. Photos and videos stay.</string>
 </resources>

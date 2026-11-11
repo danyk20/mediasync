@@ -13,6 +13,7 @@ import android.provider.Settings
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -89,6 +90,7 @@ fun ConsumerHomeRoute(
     onChangeSchedule: () -> Unit,
     modifier: Modifier = Modifier,
     onSetUpInternet: () -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
     viewModel: ConsumerHomeViewModel = hiltViewModel(),
@@ -99,12 +101,10 @@ fun ConsumerHomeRoute(
         if (!it) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
         viewModel.refresh()
     }
-    val requestTurbo = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+    val requestTurbo = rememberLauncherForActivityResult(RequestMultiplePermissions()) {
         viewModel.onTurboAnswered()
     }
-    val requestTurboReceive = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { granted ->
+    val requestTurboReceive = rememberLauncherForActivityResult(RequestMultiplePermissions()) { granted ->
         viewModel.refresh()
         if (granted.isNotEmpty() && granted.values.all { it }) viewModel.startTurboReceive()
     }
@@ -130,6 +130,7 @@ fun ConsumerHomeRoute(
         onOpenSettings = { context.openAppSettings() },
         onOpenStorage = { context.startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
         onDismiss = viewModel::dismiss,
+        onOpenMediaSyncSettings = onOpenMediaSyncSettings,
         onOpenDiagnostics = onOpenDiagnostics,
         onAllowTurbo = {
             if (state.turbo == TurboAvailability.LOCATION_OFF) {
@@ -199,6 +200,7 @@ fun ConsumerHomeScreen(
     onOpenSettings: () -> Unit = {},
     onOpenStorage: () -> Unit = {},
     onDismiss: (SetupPrompt) -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onAllowTurbo: () -> Unit = {},
     onDismissTurbo: () -> Unit = {},
@@ -211,7 +213,7 @@ fun ConsumerHomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.consumer_home_title)) },
-                actions = { MoreMenu(onOpenDiagnostics) },
+                actions = { MoreMenu(onOpenSettings = onOpenMediaSyncSettings, onOpenDiagnostics = onOpenDiagnostics) },
             )
         },
     ) { padding ->

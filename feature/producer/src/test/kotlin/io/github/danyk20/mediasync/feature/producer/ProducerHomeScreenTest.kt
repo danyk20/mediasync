@@ -337,12 +337,14 @@ class ProducerHomeScreenTest {
     }
 
     @Test
-    fun diagnostics_areInTheMenu() {
+    fun settingsAndDiagnostics_areInTheMenu() {
         show(paired.copy(pendingCount = 0))
 
         composeRule.onNodeWithContentDescription("More options").performClick()
         composeRule.onNodeWithText("Diagnostics").performClick()
-        events shouldBe listOf("diagnostics")
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Settings").performClick()
+        events shouldBe listOf("diagnostics", "mediasync settings")
     }
 
     @Test
@@ -641,6 +643,7 @@ class ProducerHomeScreenTest {
                     onInternetOverMobileData = { events += "mobile data $it" },
                     onVideosOverRelay = { events += "relay videos $it" },
                     onMobileDataCap = { events += "cap $it" },
+                    onOpenMediaSyncSettings = { events += "mediasync settings" },
                     onOpenDiagnostics = { events += "diagnostics" },
                     onStartTurbo = { events += "turbo" },
                     onOpenLocationSettings = { events += "location" },

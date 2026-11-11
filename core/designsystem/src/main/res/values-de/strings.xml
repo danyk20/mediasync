@@ -18,8 +18,9 @@
     <string name="moment_weekday">%1$s um %2$s</string>
     <string name="notice_not_now">Nicht jetzt</string>
     <string name="more_options">Weitere Optionen</string>
+    <string name="menu_settings">Einstellungen</string>
     <string name="menu_diagnostics">Diagnose</string>
-    <string name="menu_reset">MediaSync zurücksetzen</string>
+    <string name="reset_mediasync">MediaSync zurücksetzen</string>
     <string name="reset_title">MediaSync zurücksetzen?</string>
     <string name="reset_body">Dieses Telefon vergisst seine Rolle, seine gekoppelten Telefone, seine Einstellungen und seinen Verlauf, und MediaSync beginnt neu, als wäre es gerade installiert worden. Fotos und Videos bleiben, wo sie sind. Ein Cloudflare-Worker, den du eingerichtet hast, bleibt in deinem Cloudflare-Konto.</string>
     <string name="reset_confirm">Zurücksetzen</string>

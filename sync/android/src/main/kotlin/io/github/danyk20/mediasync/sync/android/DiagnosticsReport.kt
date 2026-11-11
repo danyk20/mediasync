@@ -26,6 +26,7 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.core.diagnostics.Sanitizer
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.LogSize
 import java.io.File
 import java.time.Clock
 import java.time.Instant
@@ -177,9 +178,12 @@ class DiagnosticsReport @Inject constructor(
 @Module
 @InstallIn(SingletonComponent::class)
 internal object DiagnosticsModule {
-    /** Kept in the app's own files: nothing else can read it, and uninstalling removes it. */
+    /**
+     * Kept in the app's own files: nothing else can read it, and uninstalling removes it. Until [DiagnosticLogLimit]
+     * has read the size the user chose, nothing is dropped, so a log bigger than the default isn't cut at start-up.
+     */
     @Provides
     @Singleton
     fun diagnosticLog(@ApplicationContext context: Context, clock: Clock): FileDiagnosticLog =
-        FileDiagnosticLog(File(context.filesDir, "diagnostics"), clock)
+        FileDiagnosticLog(File(context.filesDir, "diagnostics"), clock, maxBytes = LogSize.MAX_BYTES)
 }
