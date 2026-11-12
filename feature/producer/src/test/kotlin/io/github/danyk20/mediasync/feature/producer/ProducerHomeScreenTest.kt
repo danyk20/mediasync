@@ -561,6 +561,34 @@ class ProducerHomeScreenTest {
     }
 
     @Test
+    fun turbo_isOfferedForATestFileAlone() {
+        show(paired.copy(pendingCount = 0, testFileBytes = 25L * 1024 * 1024, turbo = TurboAvailability.AVAILABLE))
+
+        composeRule.onNodeWithText("Turbo transfer").assertIsDisplayed()
+        composeRule.onNodeWithText("Start Turbo").performClick()
+        events shouldBe listOf("turbo")
+    }
+
+    @Test
+    fun turbo_countsABigTestFileInWhatsWaiting() {
+        show(paired.copy(pendingCount = 0, testFileBytes = 3_000_000_000, turbo = TurboAvailability.AVAILABLE))
+        composeRule.onNodeWithText("3.0 GB waiting: try Turbo transfer").assertIsDisplayed()
+    }
+
+    @Test
+    fun turbo_isntOfferedForATestFileTheReceiverCantCheck() {
+        show(
+            paired.copy(
+                pendingCount = 0,
+                testFileBytes = 25L * 1024 * 1024,
+                testFileProblem = TestFileHeld.RECEIVER_OUTDATED,
+                turbo = TurboAvailability.AVAILABLE,
+            ),
+        )
+        composeRule.onAllNodesWithText("Start Turbo").fetchSemanticsNodes().size shouldBe 0
+    }
+
+    @Test
     fun turbo_isntOfferedWithoutWifiDirectOrWithNothingToSend() {
         show(paired.copy(pendingCount = 12, turbo = TurboAvailability.UNSUPPORTED))
         composeRule.onAllNodesWithText("Start Turbo").fetchSemanticsNodes().size shouldBe 0

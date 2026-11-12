@@ -754,8 +754,9 @@ private fun WithheldNotice(state: ProducerHomeUiState, onChooseDetails: () -> Un
 }
 
 /**
- * Turbo transfer (docs/PLAN.md §8.3), while there's something to send and this phone has Wi-Fi Direct. Suggested
- * when more than 2 GB are waiting; says what it needs first: location on, or permission from the app's settings.
+ * Turbo transfer (docs/PLAN.md §8.3), while there's something to send and this phone has Wi-Fi Direct: photos and
+ * videos, or a test file alone. Suggested when more than 2 GB are waiting; says what it needs first: location on, or
+ * permission from the app's settings.
  */
 @Composable
 private fun TurboCard(
@@ -766,7 +767,8 @@ private fun TurboCard(
     onOpenLocationSettings: () -> Unit,
 ) {
     val idle = state.sync is ProducerState.Idle || state.sync is ProducerState.Failed
-    if (!idle || (state.pendingCount ?: 0) == 0 || state.turbo == TurboAvailability.UNSUPPORTED) return
+    val waiting = turboWaitingBytes(state)
+    if (!idle || waiting == null || state.turbo == TurboAvailability.UNSUPPORTED) return
     val body = buildList {
         add(stringResource(R.string.producer_turbo_body, consumer))
         if (state.turboBatteryLow) add(stringResource(R.string.producer_turbo_battery_low))
@@ -782,8 +784,8 @@ private fun TurboCard(
         else -> stringResource(R.string.producer_turbo_start) to onStartTurbo
     }
     NoticeCard(
-        title = if (state.pendingBytes > TURBO_SUGGESTED_BYTES) {
-            stringResource(R.string.producer_turbo_suggestion_title, formatBytes(state.pendingBytes))
+        title = if (waiting > TURBO_SUGGESTED_BYTES) {
+            stringResource(R.string.producer_turbo_suggestion_title, formatBytes(waiting))
         } else {
             stringResource(R.string.producer_turbo_title)
         },
@@ -796,6 +798,16 @@ private fun TurboCard(
 
 /** More than this waiting, Turbo is worth suggesting: a first sync, or after a holiday. */
 private const val TURBO_SUGGESTED_BYTES = 2_000_000_000L
+
+/** What Turbo would send, in bytes: photos and videos, and a test file the next sync sends; `null` if nothing. */
+private fun turboWaitingBytes(state: ProducerHomeUiState): Long? {
+    val testFile = state.testFileBytes?.takeIf { state.testFileProblem in SENDABLE_TEST_FILE }
+    if ((state.pendingCount ?: 0) == 0 && testFile == null) return null
+    return state.pendingBytes + (testFile ?: 0)
+}
+
+/** A test file the next sync sends: none held back, or only stopped by the user's last sync. */
+private val SENDABLE_TEST_FILE = setOf(null, TestFileHeld.STOPPED)
 
 /** The [folders] summary, with the days sent when they're limited. */
 @Composable
