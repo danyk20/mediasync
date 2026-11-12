@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/danyk20/mediasync/compare/v0.10.0...v0.10.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* offer Turbo when only a test file is waiting ([#134](https://github.com/danyk20/mediasync/issues/134)) ([8162f6c](https://github.com/danyk20/mediasync/commit/8162f6caaf4ef9dcbe365338dff17f026e0afef2))
+
 ## [0.10.0](https://github.com/danyk20/mediasync/compare/v0.9.7...v0.10.0) (2026-11-12)
 
 
