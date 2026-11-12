@@ -96,7 +96,9 @@ jobs:
           key: robolectric-${{ steps.robolectric.outputs.version }}
       # The Kover tasks run every module's unit tests once (debug variant on Android), including screenshot
       # verification, and then check the coverage gates: 70 % overall, 85 % for sync and transport modules.
+      # Its own limit, under the job's: a test that hangs still leaves its reports uploaded below.
       - name: Tests, screenshot verification and coverage gates
+        timeout-minutes: 22
         run: ./gradlew koverXmlReportCi koverVerifyCi --continue
       - name: Coverage summary
         if: always()

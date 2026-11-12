@@ -22,6 +22,7 @@ import io.github.danyk20.mediasync.connector.SkipReason
 import io.github.danyk20.mediasync.connector.UploadResult
 import io.kotest.matchers.shouldBe
 import java.io.ByteArrayInputStream
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -82,8 +83,8 @@ class MediaStoreFolderTest {
         connector.removedFromPhone(listOf(receipt(trashed, 3))) shouldBe emptySet()
         // Android may report the trash a moment after the update.
         var file = folder.find(trashed.toString())
-        val end = System.currentTimeMillis() + TRASH_TIMEOUT_MILLIS
-        while ((file as? PhoneFile.Found)?.trashed != true && System.currentTimeMillis() < end) {
+        val end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TRASH_TIMEOUT_MILLIS) // The clock may be set.
+        while ((file as? PhoneFile.Found)?.trashed != true && System.nanoTime() - end < 0) {
             delay(POLL_MILLIS)
             file = folder.find(trashed.toString())
         }

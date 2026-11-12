@@ -7,8 +7,10 @@ package io.github.danyk20.mediasync.sync.android
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.sync.engine.ConsumerSession
 import io.github.danyk20.mediasync.sync.engine.LocalDevice
@@ -48,6 +50,11 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class InternetLinksTest {
+
+    init {
+        // What the links log, in logcat: a test that fails on CI says where it stopped.
+        Diagnostics.install { area, message -> Log.i("InternetLinksTest", "$area: $message") }
+    }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val worker = FakeWorker(iceServers = "[]") // Host candidates: the phones are on one device.
