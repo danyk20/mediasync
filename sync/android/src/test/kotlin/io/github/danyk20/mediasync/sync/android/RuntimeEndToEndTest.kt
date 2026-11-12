@@ -47,6 +47,7 @@ import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.net.SocketFactory
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -998,12 +999,12 @@ class RuntimeEndToEndTest {
         withTimeout(TIMEOUT) { producer.state.first { it == ProducerState.LookingForTurboReceive } }
         // Stopped while it searches: once it has tried a link, not in the moment before its search begins.
         withTimeout(TIMEOUT) { while (producerLinks.joinTries.get() == 0) delay(POLL) }
-        val stopped = System.currentTimeMillis()
+        val stopped = System.nanoTime()
         producer.cancel()
 
         // At once, well before the search would have ended; nothing was sent.
         withTimeout(TIMEOUT) { sending.await() } shouldBe ProducerState.Idle()
-        (System.currentTimeMillis() - stopped) shouldBeLessThan 2_000L
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - stopped) shouldBeLessThan 2_000L
         sink.stored.size shouldBe photos.size
         producerLinks.left shouldBe true
     }

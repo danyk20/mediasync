@@ -51,6 +51,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -596,7 +597,8 @@ class ProducerSync internal constructor(
          * over it. `null` if none came up in time, or the user stopped looking.
          */
         private suspend fun searchTurboReceive(key: ByteString, port: Int): ProducerState? {
-            val until = System.currentTimeMillis() + turboSearch.searchMillis
+            // On the monotonic clock: the phone's own may be set meanwhile. The epochs go by the clock, as the link's.
+            val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(turboSearch.searchMillis)
             var looked: Long? = null
             while (!cancelled) {
                 val now = System.currentTimeMillis()
@@ -606,7 +608,7 @@ class ProducerSync internal constructor(
                     overTurboReceiveLink(DirectLink(name, passphrase, host = "", port = port))?.let { return it }
                 }
                 looked = DirectLink.epochAt(now)
-                val left = until - System.currentTimeMillis()
+                val left = TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())
                 if (left <= 0) break
                 untilStopped { delay(minOf(turboSearch.pauseMillis, left)) }
             }

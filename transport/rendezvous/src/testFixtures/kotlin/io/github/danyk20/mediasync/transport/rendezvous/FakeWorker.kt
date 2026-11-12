@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.transport.rendezvous
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -74,11 +75,14 @@ class FakeWorker(
         }
     }
 
-    /** Waits until a phone has the mailbox of [pair] open. */
+    /**
+     * Waits until a phone has the mailbox of [pair] open. Timed on the monotonic clock: an emulator sets its clock to
+     * the host's while tests run, and a jump of the wall clock would end the wait at once.
+     */
     fun awaitOnline(pair: String, timeoutMillis: Long = 5_000) {
-        val end = System.currentTimeMillis() + timeoutMillis
+        val end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
         while (sockets[pair].orEmpty().isEmpty()) {
-            check(System.currentTimeMillis() < end) { "Nobody came online for $pair" }
+            check(System.nanoTime() - end < 0) { "Nobody came online for $pair" }
             Thread.sleep(10)
         }
     }

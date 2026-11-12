@@ -33,6 +33,7 @@ import java.io.Closeable
 import java.io.IOException
 import java.net.BindException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -167,8 +168,15 @@ class ConsumerReceiver internal constructor(
     private val endedBytes = ConcurrentHashMap<DeviceId, Long>()
     private val estimators = ConcurrentHashMap<DeviceId, TransferEstimator>()
 
-    /** When each producer's last session ended: one that comes back soon after is the same sync going on. */
+    /**
+     * When each producer's last session ended ([System.nanoTime]: the phone's clock may be set meanwhile): one that
+     * comes back soon after is the same sync going on.
+     */
     private val quietSince = ConcurrentHashMap<DeviceId, Long>()
+
+    /** When something last came or went, as [System.nanoTime] (`null`: never): Turbo's idle link closes by it. */
+    @Volatile
+    private var activeAtNanos: Long? = null
 
     /**
      * Held while a producer's sessions are added up: each session reports on its own thread, and a total from one
@@ -415,14 +423,14 @@ class ConsumerReceiver internal constructor(
     private fun sessionEnded(id: Long, producer: DeviceId, result: ServeResult?) = synchronized(tally) {
         // Its bytes stay in the producer's total: they move from its session to what ended.
         sessions.remove(id)?.let { (_, last) -> endedBytes.merge(producer, last.bytesMoved, Long::plus) }
-        if (sessions.values.none { it.first == producer }) quietSince[producer] = System.currentTimeMillis()
+        if (sessions.values.none { it.first == producer }) quietSince[producer] = System.nanoTime()
         val transfers = transfers()
         _state.update { state ->
             state.copy(
                 transfers = transfers,
                 speeds = speeds(transfers),
                 lastPaired = (result as? ServeResult.Paired)?.peer ?: state.lastPaired,
-                lastActivityMillis = System.currentTimeMillis(),
+                lastActivityMillis = activeNow(),
                 waitingForSpace = (result as? ServeResult.Synced)?.waitingForSpace ?: state.waitingForSpace,
             )
         }
@@ -436,7 +444,7 @@ class ConsumerReceiver internal constructor(
             it.copy(
                 transfers = transfers,
                 speeds = speeds(transfers),
-                lastActivityMillis = System.currentTimeMillis(),
+                lastActivityMillis = activeNow(),
             )
         }
     }
@@ -447,7 +455,7 @@ class ConsumerReceiver internal constructor(
      */
     private fun sessionStarts(producer: DeviceId) = synchronized(tally) {
         val quiet = quietSince.remove(producer) ?: return@synchronized
-        if (System.currentTimeMillis() - quiet > SAME_SYNC_GAP_MILLIS) {
+        if (System.nanoTime() - quiet > TimeUnit.MILLISECONDS.toNanos(SAME_SYNC_GAP_MILLIS)) {
             endedBytes.remove(producer)
             estimators[producer]?.reset()
         }
@@ -493,7 +501,13 @@ class ConsumerReceiver internal constructor(
             }
         }
 
-    private fun markActivity() = _state.update { it.copy(lastActivityMillis = System.currentTimeMillis()) }
+    private fun markActivity() = _state.update { it.copy(lastActivityMillis = activeNow()) }
+
+    /** Something came or went now: the time, for the user, as the clock shows it. */
+    private fun activeNow(): Long {
+        activeAtNanos = System.nanoTime()
+        return System.currentTimeMillis()
+    }
 
     private fun countSession(change: Int) {
         val now = activeSessions.addAndGet(change)
@@ -641,7 +655,8 @@ class ConsumerReceiver internal constructor(
         private suspend fun closeWhenIdle(open: TurboAnswer.Ready, idleMillis: Long) {
             while (link.get() === open) {
                 delay(minOf(idleMillis, IDLE_CHECK_MILLIS))
-                val quietFor = System.currentTimeMillis() - (_state.value.lastActivityMillis ?: 0L)
+                val quietFor =
+                    activeAtNanos?.let { TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - it) } ?: Long.MAX_VALUE
                 if (activeSessions.get() == 0 && quietFor >= idleMillis) close(open)
             }
         }

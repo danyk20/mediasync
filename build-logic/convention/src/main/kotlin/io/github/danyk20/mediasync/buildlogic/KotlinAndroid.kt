@@ -9,6 +9,7 @@ import com.android.build.api.dsl.Lint
 import com.android.build.api.dsl.ManagedVirtualDevice
 import com.android.build.api.dsl.TestOptions
 import com.android.build.api.dsl.UnitTestOptions
+import java.time.Duration
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
@@ -75,12 +76,25 @@ internal fun Project.configureKotlin() {
     }
 }
 
+/**
+ * How unit tests report. A test that hangs fails its module after [TEST_TIMEOUT_MINUTES], rather than the whole CI
+ * job at its limit, with no log kept; on CI, the log names each test as it starts, so the last one named is the one
+ * that hung.
+ */
 internal fun Test.configureTestLogging() {
+    timeout.set(Duration.ofMinutes(TEST_TIMEOUT_MINUTES))
     testLogging {
-        events("failed", "skipped")
+        if (project.providers.environmentVariable("CI").isPresent) {
+            events("started", "failed", "skipped")
+        } else {
+            events("failed", "skipped")
+        }
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+/** A module's unit tests take up to about 5 minutes on CI. */
+private const val TEST_TIMEOUT_MINUTES = 12L
 
 /**
  * Emulators for instrumented tests (Gradle Managed Devices). `ciGroup…` runs on every PR: the oldest

@@ -85,8 +85,8 @@ class InternetPathTest {
         served.poll(WAIT, TimeUnit.MILLISECONDS)!!.close()
 
         links.relayed.set(1_000_000)
-        val end = System.currentTimeMillis() + WAIT
-        while (worker.relayReports.isEmpty() && System.currentTimeMillis() < end) Thread.sleep(10)
+        val end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(WAIT)
+        while (worker.relayReports.isEmpty() && System.nanoTime() - end < 0) Thread.sleep(10)
         links.relayed.set(3_000_000)
         connection.close()
 
