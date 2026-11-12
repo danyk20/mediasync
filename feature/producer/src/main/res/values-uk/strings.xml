@@ -239,5 +239,7 @@
     <string name="producer_test_file_no_space">На %1$s зараз немає для нього місця.</string>
     <string name="producer_test_file_not_writable">%1$s не зміг записати його минулого разу.</string>
     <string name="producer_test_file_remove">Прибрати</string>
+    <string name="producer_plane_sending">Надсилання %1$s</string>
+    <string name="producer_plane_test_file">Надсилання тестового файлу</string>
     <string name="producer_status_sending_test_file">Спершу тестовий файл · %1$s з %2$s</string>
 </resources>

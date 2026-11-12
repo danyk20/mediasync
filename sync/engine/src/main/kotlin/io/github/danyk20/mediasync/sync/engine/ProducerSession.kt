@@ -183,6 +183,9 @@ class ProducerSession(
         private var withheld = 0
         private var bytesSent = 0L
         private var cancelled = false
+
+        /** The file streamed now, or last; confirmations and skipped files report it as it is. */
+        private var sending: SendingItem? = null
         var consumerSchedule: SyncSchedule? = null
         var consumerTurboKey: ByteString? = null
         var consumerPairSecret: ByteString? = null
@@ -279,19 +282,24 @@ class ProducerSession(
 
                     !shouldContinue() -> TestFileSent.Held(TestFileHeld.STOPPED)
 
-                    else -> TestFileSender(channel, route.path, shouldContinue) { n ->
-                        moved += n
-                        count {
-                            bytesSent += n
-                            bytesDone += n
-                        }
-                        report(currentItem = null, testFile = true)
-                    }.send(file, buffer)
+                    else -> {
+                        startSending(SendingItem.TEST_FILE_KEY, name = "", file.size, video = false, offset = 0)
+                        TestFileSender(channel, route.path, shouldContinue) { n ->
+                            moved += n
+                            count {
+                                bytesSent += n
+                                bytesDone += n
+                                sending = sending?.let { it.copy(bytesSent = it.bytesSent + n) }
+                            }
+                            report(currentItem = null, testFile = true)
+                        }.send(file, buffer)
+                    }
                 }
                 when (sent) {
                     is TestFileSent.Checked -> route.queue.checked(file, sent.outcome)
 
                     is TestFileSent.Held -> {
+                        count { sending = null } // Not sent after all: no airplane flies off with it.
                         skip(file.size - moved)
                         route.queue.held(file, sent.reason)
                     }
@@ -336,7 +344,7 @@ class ProducerSession(
             input.use {
                 awaitInFlight(window - 1)
                 lock.withLock { inFlight[offerId] = prepared }
-                val sha256 = stream(offerId, prepared.item, offset, it)
+                val sha256 = stream(offerId, prepared, offset, it)
                 channel.send(FileEnd(offerId, sha256))
             }
             return true
@@ -354,10 +362,14 @@ class ProducerSession(
         }
 
         /** Sends `FILE_BEGIN` and the bytes after [offset]; returns the SHA-256 of the whole file. */
-        private fun stream(offerId: Int, item: SourceItem, offset: Long, input: BufferedSource): ByteString {
+        private fun stream(offerId: Int, prepared: Prepared, offset: Long, input: BufferedSource): ByteString {
+            val item = prepared.item
             val digest = MessageDigest.getInstance("SHA-256")
             hashPrefix(input, digest, offset)
             channel.send(FileBegin(offerId, offset))
+            val descriptor = prepared.descriptor
+            startSending(item.key, descriptor.displayName, descriptor.size, item.isVideo(), offset)
+            report(item)
             var n = input.read(buffer, 0, buffer.size)
             while (n != -1) {
                 digest.update(buffer, 0, n)
@@ -365,11 +377,17 @@ class ProducerSession(
                 count {
                     bytesSent += n
                     bytesDone += n
+                    sending = sending?.let { it.copy(bytesSent = it.bytesSent + n) }
                 }
                 report(item)
                 n = input.read(buffer, 0, buffer.size)
             }
             return digest.digest().toByteString()
+        }
+
+        /** [key] starts going over the link, [offset] bytes in (docs/PLAN.md §7, *Per-file progress*). */
+        private fun startSending(key: String, name: String, size: Long, video: Boolean, offset: Long) = count {
+            sending = SendingItem(key, name, size, video, bytesSent = offset, startedNanos = System.nanoTime())
         }
 
         /** The consumer already holds the first [offset] bytes; hash them without sending. */
@@ -458,7 +476,16 @@ class ProducerSession(
 
         private fun report(currentItem: String?, testFile: Boolean = false) {
             val snapshot = lock.withLock {
-                TransferProgress(itemsDone, itemsTotal, bytesDone, bytesTotal, currentItem, bytesSkipped, testFile)
+                TransferProgress(
+                    itemsDone,
+                    itemsTotal,
+                    bytesDone,
+                    bytesTotal,
+                    currentItem,
+                    bytesSkipped,
+                    testFile,
+                    sending,
+                )
             }
             progress.onProgress(snapshot)
         }

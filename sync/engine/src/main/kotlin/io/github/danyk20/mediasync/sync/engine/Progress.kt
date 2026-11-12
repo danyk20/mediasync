@@ -12,6 +12,7 @@ import kotlin.math.roundToLong
  * [bytesDone], what didn't cross the link: the start of a resumed file, which the other phone already kept, and files
  * that weren't sent after all (the other phone had them, or they couldn't be read). It's done, but it isn't speed.
  * [testFile]: the test file (docs/PLAN.md §7, *Test file*) is on its way now; its bytes count, but it isn't an item.
+ * [sending]: the file going over the link now, or last; `null` before the first one starts.
  */
 data class TransferProgress(
     val itemsDone: Int,
@@ -21,9 +22,58 @@ data class TransferProgress(
     val currentItem: String?,
     val bytesSkipped: Long = 0,
     val testFile: Boolean = false,
+    val sending: SendingItem? = null,
 ) {
     /** The bytes that actually crossed the link. */
     val bytesMoved: Long get() = bytesDone - bytesSkipped
+}
+
+/**
+ * The file a session streams now (docs/PLAN.md §7, *Per-file progress*), for the sending animation: [key] is the
+ * source's own handle ([SourceItem.key]), or [TEST_FILE_KEY] for the test file. [bytesSent] counts from the file's
+ * start, so a resumed file starts partway; it reaches [size] once the whole file went, before the consumer confirms
+ * it. [startedNanos]: when it started, on [System.nanoTime]'s clock, so parallel connections can tell the oldest.
+ */
+data class SendingItem(
+    val key: String,
+    val name: String,
+    val size: Long,
+    val video: Boolean,
+    val bytesSent: Long,
+    val startedNanos: Long,
+) {
+    /** All of it went over the link. */
+    val finished: Boolean get() = bytesSent >= size
+
+    companion object {
+        /** [key] of the test file, which has no thumbnail. */
+        const val TEST_FILE_KEY = "test-file"
+    }
+}
+
+/**
+ * Of several connections' files, the one to show (docs/PLAN.md §7, *Per-file progress*): the one followed so far while
+ * it's still going (and once more when it's done), then the oldest one still going, so a file shows from its start to
+ * its end. With nothing going, the last one followed.
+ */
+class SendingFollower {
+    private var followed: SendingItem? = null
+
+    /** The file to show of [items], each connection's latest. */
+    @Synchronized
+    fun follow(items: Collection<SendingItem?>): SendingItem? {
+        val current = followed
+        val next = current?.let { items.firstOrNull { item -> item?.key == it.key } }
+        followed = when {
+            // Still going, or just finished: shown done once before the next one.
+            next != null && (!next.finished || !current.finished) -> next
+
+            else -> items.filterNotNull()
+                .filter { !it.finished && it.key != current?.key }
+                .minByOrNull { it.startedNanos } ?: next ?: current
+        }
+        return followed
+    }
 }
 
 /** Called often (every chunk); implementations should be cheap and throttle UI updates themselves. */

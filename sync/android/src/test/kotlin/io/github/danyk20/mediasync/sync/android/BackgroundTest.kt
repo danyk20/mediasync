@@ -19,6 +19,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import androidx.work.workDataOf
 import io.github.danyk20.mediasync.core.database.ConsumerFacts
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
@@ -300,6 +301,21 @@ class BackgroundTest {
     }
 
     @Test
+    fun onlyASyncTheUserAskedForIsTheirs() = runTest {
+        settings.setRole(DeviceRole.PRODUCER)
+        pairWithConsumer(SyncSchedule.Default)
+        val sync = producerSync { ProducerState.Idle() }
+
+        runSyncWorker(sync) shouldBe ListenableWorker.Result.success()
+        coVerify(exactly = 1) { sync.syncAndWait(any(), turbo = false, manual = false) }
+
+        runWorker<SyncNowWorker>(workDataOf(SyncNowWorker.TURBO to true)) { appContext, parameters ->
+            SyncNowWorker(appContext, parameters, sync, peers, notifications)
+        } shouldBe ListenableWorker.Result.success()
+        coVerify(exactly = 1) { sync.syncAndWait(any(), turbo = true, manual = true) }
+    }
+
+    @Test
     fun aHotPhoneWaitsToSync() = runTest {
         settings.setRole(DeviceRole.PRODUCER)
         pairWithConsumer(SyncSchedule.Default)
@@ -522,7 +538,7 @@ class BackgroundTest {
     /** A sync that ends as [end] says, given the worker's `pauseWhen`. */
     private fun producerSync(end: (pauseWhen: () -> Boolean) -> ProducerState) = mockk<ProducerSync> {
         every { state } returns MutableStateFlow(ProducerState.Idle())
-        coEvery { syncAndWait(any()) } answers { end(firstArg()) }
+        coEvery { syncAndWait(any(), any(), any()) } answers { end(firstArg()) }
     }
 
     private suspend fun kotlinx.coroutines.test.TestScope.runSyncWorker(

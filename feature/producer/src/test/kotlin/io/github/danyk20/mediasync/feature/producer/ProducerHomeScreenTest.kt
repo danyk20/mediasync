@@ -27,6 +27,7 @@ import io.github.danyk20.mediasync.sync.android.SyncFailure
 import io.github.danyk20.mediasync.sync.android.SyncProblem
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboProblem
+import io.github.danyk20.mediasync.sync.engine.SendingItem
 import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
@@ -62,6 +63,20 @@ class ProducerHomeScreenTest {
             TransferProgress(12, 40, 145_000_000, 830_000_000, "PXL_1.jpg"),
             estimate = TransferEstimate(8_400_000, 81_500), // 685 MB left at 8.4 MB/s.
         ),
+    )
+    private val sendingByHand = syncing.copy(
+        sync = (syncing.sync as ProducerState.Syncing).copy(
+            progress = TransferProgress(
+                12,
+                40,
+                145_000_000,
+                830_000_000,
+                "PXL_13.jpg",
+                sending = SendingItem("content://media/13", "PXL_13.jpg", 3_200_000, false, 800_000, 0),
+            ),
+            manual = true,
+        ),
+        showSendAnimation = true,
     )
     private val events = mutableListOf<String>()
 
@@ -461,6 +476,28 @@ class ProducerHomeScreenTest {
 
     @Test
     fun screenshot_syncing_dark() = screenshot(syncing, "producer_home_syncing_dark", darkTheme = true)
+
+    @Test
+    fun syncing_aSyncTheUserStartedFoldsEachFileIntoAPaperAirplane() {
+        show(sendingByHand)
+
+        composeRule.onNodeWithContentDescription("Sending PXL_13.jpg").assertIsDisplayed()
+        composeRule.onNodeWithText("Stop").assertIsDisplayed()
+    }
+
+    @Test
+    fun syncing_withoutTheAnimationThereIsNoAirplane() {
+        show(sendingByHand.copy(showSendAnimation = false))
+
+        composeRule.onNodeWithContentDescription("Sending PXL_13.jpg").assertDoesNotExist()
+    }
+
+    @Test
+    fun screenshot_syncing_animation_light() = screenshot(sendingByHand, "producer_home_syncing_animation_light")
+
+    @Test
+    fun screenshot_syncing_animation_dark() =
+        screenshot(sendingByHand, "producer_home_syncing_animation_dark", darkTheme = true)
 
     @Test
     fun screenshot_failed_light() = screenshot(

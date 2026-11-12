@@ -92,6 +92,9 @@ class TestFileTest {
         // First: every report of it comes before any photo's.
         progress.first().testFile shouldBe true
         progress.dropWhile { it.testFile }.none { it.testFile } shouldBe true
+        // It flies as the test file, with no photo of its own.
+        progress.filter { it.testFile }.all { it.sending?.key == SendingItem.TEST_FILE_KEY } shouldBe true
+        progress.first { it.testFile }.sending?.size shouldBe file.size
         progress.last().bytesTotal shouldBe photoBytes + file.size
         progress.last().itemsTotal shouldBe 2
     }

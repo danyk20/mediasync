@@ -267,6 +267,12 @@ flowchart LR
   - When more than 2 GB is waiting, a hint: "Phones next to each other? Turbo is faster."
 - Summary chip, e.g. *Camera, Screenshots · 12,431 items* → opens Sources.
 - An info row, e.g. "Syncs at 03:00 while charging · Last night's sync didn't run: phone wasn't charging", shown when relevant.
+- *Built (M6):* **Sending animation.** While a sync the user started runs (*Sync now*, Turbo, a share, the quick action; also a scheduled run they asked for meanwhile), the progress card shows, at its top, the file going now: its thumbnail, printed on a sheet of paper (a play badge for a video, ruled lines for the test file, a plain picture until a thumbnail is read), folds into a paper airplane, which flies off up and to the right with a faint dashed trail. Then the next file's sheet comes in. The scheduled run alone shows none.
+  - It runs in real time: the first 35 % of the file's bytes fold the sheet, the rest fly it away, so a big video flies slowly and the airplane leaves as its last byte goes. Between progress reports it goes on at the last reports' speed (else the transfer's), never more than one report ahead, and never back.
+  - Each airplane takes at least 0.6 s. A file done sooner plays the rest at that pace; the next airplane then shows the file going at that moment, so with many small photos some don't show. With parallel connections, one airplane follows the oldest file still going (§7, *Per-file progress*).
+  - The sheet is 3D: ten rigid triangles, folded along the dart's creases (corners in, in half, wings down), each showing its part of the photo, or the paper's back, shaded by how the light falls on it, with a soft shadow that lifts as it flies. It's drawn on a Canvas each frame, allocating nothing.
+  - With the phone's animations off (*Remove animations*), the sheet stays still with a ring going round instead. For TalkBack it's one image, "Sending PXL_….jpg", not announced as it changes.
+  - *Settings → Sending animation* turns it off; it's on at first.
 
 **Consumer home**
 
@@ -295,7 +301,7 @@ Grouped, each group with one plain-language choice:
 - *Data usage*: relay allowance meter and budget; this phone's mobile data used by MediaSync.
 - *Battery*: unrestricted-battery check and minimum battery level.
 - *Diagnostics*: logs export (M2, from ⋮ on the home screens) and the link test (M3).
-- *Built (M6):* ⋮ on the home screens offers *Settings* and *Diagnostics*. *Settings* holds the diagnostic log's size (1 MB unless changed; typed in MB, from 0.1 to 1024), *Check for updates* (copies installed from GitHub only, §14.4) and *Reset MediaSync*, which asks first. *Diagnostics* keeps only what's for sharing: the log, the phone's setup, *Share log* / *Save to a file* / *Clear log*, and the link test. On a sending phone it also adds a test file of a chosen size, sent first in the next sync; both phones show the last one's result (§7).
+- *Built (M6):* ⋮ on the home screens offers *Settings* and *Diagnostics*. *Settings* holds the diagnostic log's size (1 MB unless changed; typed in MB, from 0.1 to 1024), *Sending animation* (on unless turned off; the paper airplanes on the sending phone's home screen, *Producer home* above), *Check for updates* (copies installed from GitHub only, §14.4) and *Reset MediaSync*, which asks first. *Diagnostics* keeps only what's for sharing: the log, the phone's setup, *Share log* / *Save to a file* / *Clear log*, and the link test. On a sending phone it also adds a test file of a chosen size, sent first in the next sync; both phones show the last one's result (§7).
 
 **Notifications**
 
@@ -637,6 +643,7 @@ Speed is the top non-functional requirement. The strategy has six parts:
      - On the receiving phone, all connections share one space budget. Each file reserves its size before it is accepted, so together they never take more space than there is.
    - Large socket buffers (4–8 MB).
    - 1 MiB chunks.
+   - *Per-file progress (M6):* progress also names the file streamed now (`TransferProgress.sending`: its key, name, size, whether it's a video, the bytes of it sent so far, counted from its start, and when it started). It advances with every chunk; confirmations, files left out, and files the other phone already has never change it. With parallel connections, the progress shown follows one file at a time: the one followed while it's still going (and once more when it's all sent), then the oldest one still going. The sending phone's screen state takes progress at most every 50 ms, apart from what must show: an item done, a file starting or fully sent, the test file starting or ending, and everything done. It's for the sending animation (§3.3).
    - Pipelining: the next file starts immediately, and ACKs are asynchronous and windowed, so there is no round trip per file. This matters a lot for thousands of small photos.
      - Up to 16 files are in flight. The protocol is unchanged: confirmations already name their file, and consumers already read the next file right after confirming one.
 3. **Keep the CPU out of the way.**

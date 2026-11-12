@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -92,6 +94,29 @@ class SettingsTest {
 
         viewModel.uiState.value.logSize shouldBe "3"
         viewModel.uiState.value.savedLogSize shouldBe "1"
+    }
+
+    @Test
+    fun theSendingAnimationIsOnUntilTheUserTurnsItOff() {
+        val viewModel = viewModel()
+        viewModel.uiState.value.sendAnimation shouldBe true
+
+        viewModel.onSendAnimationChange(false)
+
+        settings.sendAnimation.value shouldBe false
+        viewModel.uiState.value.sendAnimation shouldBe false
+    }
+
+    @Test
+    fun theWholeAnimationRowTogglesIt() {
+        show(SettingsUiState("1", "1", sendAnimation = true))
+
+        composeRule.onNodeWithText("Paper airplanes").performScrollTo().assertIsOn().performClick()
+        events shouldBe listOf("animation false")
+
+        show(SettingsUiState("1", "1", sendAnimation = false))
+        composeRule.onNodeWithText("Paper airplanes").assertIsOff().performClick()
+        events shouldBe listOf("animation false", "animation true")
     }
 
     @Test
@@ -249,6 +274,7 @@ class SettingsTest {
                     onDone = { events += "done" },
                     onCheckUpdates = { events += "check" },
                     onOpenRelease = { events += "open $it" },
+                    onSendAnimation = { events += "animation $it" },
                 )
             }
         }

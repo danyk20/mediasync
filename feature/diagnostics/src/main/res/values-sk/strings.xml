@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">Na %1$s sa nedá dostať. Otvorte na ňom MediaSync, na rovnakej Wi-Fi, a skúste to znova.</string>
     <string name="diagnostics_link_test_one">Jedno spojenie: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Štyri spojenia: %1$s MB/s</string>
+    <string name="settings_animation_title">Animácia odosielania</string>
+    <string name="settings_animation_switch">Papierové lietadielka</string>
+    <string name="settings_animation_intro">Keď fotky a videá odošlete sami, každá sa poskladá do papierového lietadielka, ktoré odletí tak rýchlo, ako sa odosiela.</string>
     <string name="settings_updates_title">Aktualizácie</string>
     <string name="settings_updates_installed">MediaSync %1$s, nainštalovaný z GitHubu.</string>
     <string name="settings_updates_check">Skontrolovať aktualizácie</string>

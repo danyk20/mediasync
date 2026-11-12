@@ -239,5 +239,7 @@
     <string name="producer_test_file_no_space">%1$s pro něj teď nemá místo.</string>
     <string name="producer_test_file_not_writable">%1$s ho minule nemohl zapsat.</string>
     <string name="producer_test_file_remove">Odebrat</string>
+    <string name="producer_plane_sending">Odesílá se %1$s</string>
+    <string name="producer_plane_test_file">Odesílá se testovací soubor</string>
     <string name="producer_status_sending_test_file">Nejdřív testovací soubor · %1$s z %2$s</string>
 </resources>

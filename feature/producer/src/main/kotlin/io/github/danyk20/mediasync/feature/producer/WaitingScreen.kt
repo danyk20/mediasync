@@ -8,11 +8,7 @@ import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.media.ThumbnailUtils
 import android.text.format.DateFormat
-import android.util.LruCache
-import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -64,7 +60,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -93,8 +88,6 @@ import io.github.danyk20.mediasync.sync.android.LeftOutItems
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.engine.SourceItem
-import java.io.File
-import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -225,7 +218,7 @@ class WaitingViewModel @Inject constructor(
         val meta = item.descriptor.meta
         WaitingMedia(
             key = item.key,
-            uri = item.key.toUri().buildUpon().clearQuery().build().toString(),
+            uri = MediaThumbnails.uriOf(item.key),
             video = item.descriptor.mimeType.startsWith("video/"),
             takenAtMillis = meta.capturedAtMillis ?: meta.modifiedAtMillis ?: 0,
         )
@@ -559,54 +552,17 @@ private fun SelectionMark(selected: Boolean, onImage: Boolean, modifier: Modifie
 @Composable
 private fun Thumbnail(media: WaitingMedia, modifier: Modifier) {
     val context = LocalContext.current
-    val image by produceState(Thumbnails.cached(media.uri), media.uri) {
-        if (value == null) value = withContext(Dispatchers.IO) { Thumbnails.load(context, media) }
+    val image by produceState(MediaThumbnails.cached(media.uri)?.asImageBitmap(), media.uri) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) { MediaThumbnails.load(context, media.uri, media.video) }
+                ?.asImageBitmap()
+        }
     }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
         image?.let {
             Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
-}
-
-/** Thumbnails already shown, so scrolling back doesn't read them again. */
-private object Thumbnails {
-    private val cache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / MEMORY_SHARE).toInt()) {
-        override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
-    }
-
-    fun cached(uri: String): ImageBitmap? = cache.get(uri)?.asImageBitmap()
-
-    /** `null` if it can't be read: gone, or no longer allowed. */
-    fun load(context: Context, media: WaitingMedia): ImageBitmap? {
-        val uri = media.uri.toUri()
-        val size = Size(THUMBNAIL_PX, THUMBNAIL_PX)
-        val bitmap = try {
-            when {
-                // A shared file's copy isn't in the gallery: read from the file itself.
-                uri.scheme == ContentResolver.SCHEME_FILE && media.video ->
-                    ThumbnailUtils.createVideoThumbnail(File(uri.path!!), size, null)
-
-                uri.scheme == ContentResolver.SCHEME_FILE -> ThumbnailUtils.createImageThumbnail(
-                    File(uri.path!!),
-                    size,
-                    null,
-                )
-
-                else -> context.contentResolver.loadThumbnail(uri, size, null)
-            }
-        } catch (_: IOException) {
-            null
-        } catch (_: SecurityException) {
-            null
-        } ?: return null
-        cache.put(media.uri, bitmap)
-        return bitmap.asImageBitmap()
-    }
-
-    /** Up to an eighth of the app's memory. */
-    private const val MEMORY_SHARE = 8
-    private const val THUMBNAIL_PX = 256
 }
 
 private val TILE_MIN_SIZE = 96.dp

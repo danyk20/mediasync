@@ -16,6 +16,9 @@
     <string name="diagnostics_link_test_failed">Impossibile raggiungere %1$s. Apri MediaSync su di esso, sullo stesso Wi-Fi, e riprova.</string>
     <string name="diagnostics_link_test_one">Una connessione: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Quattro connessioni: %1$s MB/s</string>
+    <string name="settings_animation_title">Animazione di invio</string>
+    <string name="settings_animation_switch">Aeroplanini di carta</string>
+    <string name="settings_animation_intro">Quando invii tu foto e video, ognuno si piega in un aeroplanino di carta che vola via alla velocità con cui viene inviato.</string>
     <string name="settings_updates_title">Aggiornamenti</string>
     <string name="settings_updates_installed">MediaSync %1$s, installato da GitHub.</string>
     <string name="settings_updates_check">Controlla aggiornamenti</string>

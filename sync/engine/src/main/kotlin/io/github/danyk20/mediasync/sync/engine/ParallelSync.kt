@@ -40,6 +40,9 @@ class ParallelSync(
 ) {
     private val latest = ConcurrentHashMap<Int, TransferProgress>()
 
+    /** One file shows at a time, though several connections send at once. */
+    private val follower = SendingFollower()
+
     fun sync(first: PeerConnection): SyncResult {
         val probe = session(ProgressListener {})
         val (held, pending) = probe.pendingFor(first.peerId).partition(holdBack)
@@ -104,22 +107,28 @@ class ParallelSync(
     ): Future<SyncResult> = pool.submit(
         Callable {
             run { part ->
-                latest[index] = part
-                val all = latest.values
-                progress.onProgress(
-                    TransferProgress(
-                        itemsDone = all.sumOf { it.itemsDone },
-                        itemsTotal = queue.total,
-                        bytesDone = all.sumOf { it.bytesDone },
-                        bytesTotal = queue.totalBytes,
-                        currentItem = part.currentItem,
-                        bytesSkipped = all.sumOf { it.bytesSkipped },
-                        testFile = part.testFile,
-                    ),
-                )
+                // One at a time: the file shown follows one order, whichever connection reported last.
+                synchronized(follower) { report(index, part, queue) }
             }
         },
     )
+
+    private fun report(index: Int, part: TransferProgress, queue: WorkQueue) {
+        latest[index] = part
+        val all = latest.values
+        progress.onProgress(
+            TransferProgress(
+                itemsDone = all.sumOf { it.itemsDone },
+                itemsTotal = queue.total,
+                bytesDone = all.sumOf { it.bytesDone },
+                bytesTotal = queue.totalBytes,
+                currentItem = part.currentItem,
+                bytesSkipped = all.sumOf { it.bytesSkipped },
+                testFile = part.testFile,
+                sending = follower.follow(all.map { it.sending }),
+            ),
+        )
+    }
 
     /** One result for the whole sync; if a connection failed, its failure once every one has ended. */
     private fun merge(streams: List<Future<SyncResult>>): SyncResult {

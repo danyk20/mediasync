@@ -78,6 +78,14 @@ interface SettingsRepository {
     suspend fun setSimpleFileNames(on: Boolean)
 
     /**
+     * A sending phone: while a sync the user started runs, its home screen folds each photo or video into a paper
+     * airplane that flies away as fast as the file goes (docs/PLAN.md §3.3); on at first.
+     */
+    val sendAnimation: Flow<Boolean>
+
+    suspend fun setSendAnimation(on: Boolean)
+
+    /**
      * How much of the diagnostic log is kept (docs/PLAN.md §11), in bytes: [LogSize.DEFAULT_BYTES] until the user
      * chooses, always within [LogSize.MIN_BYTES] and [LogSize.MAX_BYTES].
      */

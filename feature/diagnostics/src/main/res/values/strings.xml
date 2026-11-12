@@ -17,6 +17,9 @@
     <!-- "One connection: 48.2 MB/s" -->
     <string name="diagnostics_link_test_one">One connection: %1$s MB/s</string>
     <string name="diagnostics_link_test_four">Four connections: %1$s MB/s</string>
+    <string name="settings_animation_title">Sending animation</string>
+    <string name="settings_animation_switch">Paper airplanes</string>
+    <string name="settings_animation_intro">When you send photos and videos yourself, each one folds into a paper airplane that flies away as fast as it\'s sent.</string>
     <string name="settings_updates_title">Updates</string>
     <string name="settings_updates_installed">MediaSync %1$s, installed from GitHub.</string>
     <string name="settings_updates_check">Check for updates</string>
