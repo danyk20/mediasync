@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/danyk20/mediasync/compare/v0.9.7...v0.10.0) (2026-11-12)
+
+
+### Features
+
+* a paper-airplane animation while sending, with a switch in Settings ([#131](https://github.com/danyk20/mediasync/issues/131)) ([2f9f759](https://github.com/danyk20/mediasync/commit/2f9f7593d54a9baf828a283bc0f87b2d13e873fd))
+
+
+### Bug Fixes
+
+* time-outs on the monotonic clock, and a hung unit test that fails fast and names itself ([#133](https://github.com/danyk20/mediasync/issues/133)) ([894ea51](https://github.com/danyk20/mediasync/commit/894ea519cec5b09c1d7191aeb9684063053c9dd3))
+
 ## [0.9.7](https://github.com/danyk20/mediasync/compare/v0.9.6...v0.9.7) (2026-11-11)
 
 
