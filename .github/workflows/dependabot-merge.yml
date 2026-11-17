@@ -1,0 +1,66 @@
+# Dependabot's PRs merge once everything required passed on the updated dependencies (docs/RELEASING.md).
+#
+# Not run by Dependabot's own events: those can't read the repository's secrets, and a merge with GITHUB_TOKEN
+# wouldn't start CI or release-please on main. So it looks every half hour, and after each push to main, with the
+# token release-please uses:
+#   - a Dependabot PR whose required checks all passed, up to date with main: squash-merged;
+#   - one behind main (another merged first): Dependabot is asked to rebase it, and CI runs again on it.
+# Branch protection still decides: a PR that isn't mergeable (a check failed, a conflict) is left for a person.
+name: Dependabot merge
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Merge or rebase Dependabot's PRs
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::RELEASE_PLEASE_TOKEN isn't set: Dependabot's PRs aren't merged automatically."
+            exit 0
+          fi
+          # One at a time: once one merges, the others are behind main and rebase first.
+          merged=false
+          gh pr list --author "app/dependabot" --state open --json number,title \
+            --jq '.[] | "\(.number)\t\(.title)"' |
+          while IFS=$'\t' read -r number title; do
+            state=$(gh pr view "$number" --json mergeStateStatus --jq .mergeStateStatus)
+            echo "#$number $title: $state"
+            case "$state" in
+              CLEAN)
+                if [ "$merged" = false ]; then
+                  gh pr merge "$number" --squash
+                  merged=true
+                fi
+                ;;
+              BEHIND)
+                # Asked again only once it rebased since: meanwhile, the rebase asked for is under way.
+                pushed=$(gh pr view "$number" --json commits --jq '.commits[-1].committedDate')
+                asked=$(gh pr view "$number" --json comments \
+                  --jq '[.comments[] | select(.body == "@dependabot rebase") | .createdAt] | max // ""')
+                if [[ "$asked" < "$pushed" ]]; then
+                  gh pr comment "$number" --body "@dependabot rebase"
+                fi
+                ;;
+              *)
+                # BLOCKED (checks running or failed), DIRTY (conflict: Dependabot rebases it itself), UNKNOWN.
+                ;;
+            esac
+          done
