@@ -38,3 +38,7 @@ Signing secrets live in a GitHub **environment** called `release`, which require
 ## Optional: CI on release pull requests
 
 Pull requests opened by the built-in `GITHUB_TOKEN` don't trigger other workflows, so CI doesn't run on release-please's pull request. To get CI there, create a fine-grained personal access token for this repository only (Contents: write, Pull requests: write) and store it as the secret `RELEASE_PLEASE_TOKEN`. Without it, merge the release pull request as an administrator. It only changes `version.txt` and `CHANGELOG.md`.
+
+## Dependency updates
+
+Dependabot's pull requests merge by themselves once every required check passed on the updated dependencies (`.github/workflows/dependabot-merge.yml`). Every half hour, and after each push to `main`, the workflow squash-merges one that is ready. One that fell behind `main`, because another merged first, is asked to rebase (`@dependabot rebase`), and CI runs again on it. One with a failed check or a conflict waits for a person. The workflow acts with `RELEASE_PLEASE_TOKEN`, so CI and release-please run on the merge. Without the token, nothing merges automatically. The fixes in a merged update ship with the next release, which still needs approving.

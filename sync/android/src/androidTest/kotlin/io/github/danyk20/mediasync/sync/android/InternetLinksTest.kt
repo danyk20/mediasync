@@ -99,8 +99,11 @@ class InternetLinksTest {
         val usage = MobileDataUsage(context, java.time.Clock.systemDefaultZone())
         val alerts = RelayAlerts(context)
         val tokens = PushTokens(context) // No Firebase in the test app: no token.
+        // The device's loopback network too: the emulator's Wi-Fi may drop meanwhile.
         val consumer = AndroidInternetLinks(context, { consumerIdentity }, noMobileData, alerts, usage, tokens)
+            .apply { loopback = true }
         val producer = AndroidInternetLinks(context, { producerIdentity }, noMobileData, alerts, usage, tokens)
+            .apply { loopback = true }
         val photos = List(4) { FakeMedia("p$it", Random(it).nextBytes(400_000)) }
         val sink = FakeMediaSink()
         val local = LocalDevice("Test phone", "test")

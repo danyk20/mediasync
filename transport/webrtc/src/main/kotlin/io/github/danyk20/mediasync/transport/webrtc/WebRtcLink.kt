@@ -39,15 +39,20 @@ import org.webrtc.SessionDescription
  * TURN relay otherwise. One ordered, reliable data channel carries an ordinary sync session, so the sync engine runs as
  * on Wi-Fi. The signals that set it up are sealed with the pair's key, which also vouches for the DTLS fingerprints in
  * them: nobody in between can take part.
+ *
+ * @param loopback whether the device's loopback network counts too, for two links on one device (tests): they then
+ *   connect without Wi-Fi, which an emulator sometimes drops. Between phones it would never help: WebRTC leaves it out.
  */
-class WebRtcLink(context: Context) : PeerLinks {
+class WebRtcLink(context: Context, private val loopback: Boolean = false) : PeerLinks {
     private val factory: PeerConnectionFactory by lazy {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(
                 context.applicationContext,
             ).createInitializationOptions(),
         )
-        PeerConnectionFactory.builder().createPeerConnectionFactory()
+        PeerConnectionFactory.builder().apply {
+            if (loopback) setOptions(PeerConnectionFactory.Options().apply { networkIgnoreMask = 0 })
+        }.createPeerConnectionFactory()
     }
 
     /** As the producer: offers, and returns the connection once its data channel is open. Blocks. */

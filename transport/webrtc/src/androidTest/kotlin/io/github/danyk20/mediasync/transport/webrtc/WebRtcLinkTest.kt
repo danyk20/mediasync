@@ -34,7 +34,10 @@ import okio.ByteString.Companion.toByteString
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Two phones' WebRTC links, here in one app over the device's own network, set up by their signals (PLAN §8.4). */
+/**
+ * Two phones' WebRTC links, here in one app, set up by their signals (PLAN §8.4). Over the device's loopback network
+ * too: the emulator's Wi-Fi may drop meanwhile.
+ */
 @RunWith(AndroidJUnit4::class)
 class WebRtcLinkTest {
 
@@ -67,13 +70,16 @@ class WebRtcLinkTest {
         val pool = Executors.newCachedThreadPool()
         try {
             val producerLink = pool.submit(
-                Callable { WebRtcLink(context).connect(consumerId, emptyList(), producerPipe, TIMEOUT_MILLIS) },
+                Callable {
+                    WebRtcLink(context, loopback = true).connect(consumerId, emptyList(), producerPipe, TIMEOUT_MILLIS)
+                },
             )
             val offer = generateSequence { consumerPipe.incoming.poll(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) }
                 .first { it is Signal.Offer } as Signal.Offer
             val forward = pool.submit { while (true) consumerQueue += consumerPipe.incoming.take() }
             val consumerConnection = WebRtcLink(
                 context,
+                loopback = true,
             ).accept(producerId, offer, emptyList(), consumerSide, TIMEOUT_MILLIS)
             val producerConnection = producerLink.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
             forward.cancel(true)

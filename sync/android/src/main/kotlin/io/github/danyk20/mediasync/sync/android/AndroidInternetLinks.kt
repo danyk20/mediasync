@@ -39,7 +39,9 @@ class AndroidInternetLinks @Inject internal constructor(
     private val usage: MobileDataUsage,
     private val pushTokens: PushTokens,
 ) : InternetLinks {
-    private val links by lazy { WebRtcLink(context) }
+    /** For two phones' links in one app (tests): see [WebRtcLink]'s `loopback`. Set before the first connection. */
+    internal var loopback = false
+    private val links by lazy { WebRtcLink(context, loopback) }
     private val signer by lazy {
         val device = identity.identity()
         RendezvousSigner(device.certificate.encoded, { data ->
