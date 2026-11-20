@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/danyk20/mediasync/compare/v0.10.1...v0.10.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* WebRTC device tests connect without the emulator's Wi-Fi, and Dependabot's PRs merge once green ([#138](https://github.com/danyk20/mediasync/issues/138)) ([162ecbe](https://github.com/danyk20/mediasync/commit/162ecbe61e651082c9cedc9d0c11dcb3652556af))
+
 ## [0.10.1](https://github.com/danyk20/mediasync/compare/v0.10.0...v0.10.1) (2026-11-12)
 
 
