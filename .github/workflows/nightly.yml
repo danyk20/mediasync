@@ -55,7 +55,7 @@ jobs:
       # memory and systemd-oomd stops the job (exit code 143): two API 36 emulators already do.
       - name: Run on API ${{ matrix.api }}
         run: >
-          ./gradlew api${{ matrix.api }}DebugAndroidTest
+          scripts/gradlew-retrying.sh api${{ matrix.api }}DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
       - name: Upload reports
         if: failure()
