@@ -84,8 +84,8 @@ jobs:
         # Two builds: with resource shrinking, the Android Gradle Plugin can't build the App Bundle while the
         # per-CPU APKs are on (https://issuetracker.google.com/402800800). v0.2.0's first build failed on it.
         run: |
-          ./gradlew :app:bundleRelease
-          ./gradlew :app:assembleRelease -Pmediasync.abiSplits
+          scripts/gradlew-retrying.sh :app:bundleRelease
+          scripts/gradlew-retrying.sh :app:assembleRelease -Pmediasync.abiSplits
       - name: Collect artifacts and checksums
         run: |
           mkdir dist

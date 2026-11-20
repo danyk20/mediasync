@@ -59,7 +59,7 @@ jobs:
       - if: matrix.build-mode == 'manual'
         name: Build (CodeQL observes the compiler)
         run: >
-          ./gradlew :app:compileDebugJavaWithJavac :app:hiltJavaCompileDebug
+          scripts/gradlew-retrying.sh :app:compileDebugJavaWithJavac :app:hiltJavaCompileDebug
           --no-build-cache --no-configuration-cache --rerun-tasks
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
