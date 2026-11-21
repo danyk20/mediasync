@@ -21,6 +21,7 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
             "implementation"(project(":core:designsystem"))
             "implementation"(project(":core:model"))
             "implementation"(libs.library("androidx-activity-compose"))
+            "implementation"(libs.library("compose-multiplatform-resources"))
             "implementation"(libs.library("metrox-viewmodel-compose"))
             "implementation"(libs.library("androidx-lifecycle-runtime-compose"))
             "implementation"(libs.library("androidx-lifecycle-viewmodel-compose"))

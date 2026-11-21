@@ -13,7 +13,6 @@ import android.provider.Settings
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -96,6 +94,8 @@ import java.time.Instant
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.toJavaLocalDate
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ProducerHomeRoute(
@@ -569,7 +569,7 @@ private fun NextSync(state: ProducerHomeUiState) {
 private fun SettingRow(
     title: String,
     summary: String,
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     onClick: () -> Unit,
     action: String = stringResource(R.string.producer_sources_change),
 ) {
@@ -715,7 +715,7 @@ private val MOBILE_DATA_CAPS = listOf(1L, 2L, 5L, 10L, 20L).map { it * 1_000_000
 private fun SwitchRow(
     title: String,
     body: String,
-    @DrawableRes icon: Int,
+    icon: DrawableResource,
     checked: Boolean,
     onChange: (Boolean) -> Unit,
 ) {

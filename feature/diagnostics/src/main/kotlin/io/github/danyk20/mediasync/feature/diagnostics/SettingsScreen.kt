@@ -54,9 +54,10 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
-import io.github.danyk20.mediasync.core.designsystem.R as DesignR
 import io.github.danyk20.mediasync.core.designsystem.component.ResetDialog
 import io.github.danyk20.mediasync.core.designsystem.component.resetMediaSync
+import io.github.danyk20.mediasync.core.designsystem.generated.resources.Res
+import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_mediasync
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
@@ -66,6 +67,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 data class SettingsUiState(
     /** The diagnostic log's size as the user types it, in MB. */
@@ -345,7 +347,7 @@ private fun ResetSection(onReset: () -> Unit) {
             onClick = { confirm = true },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
         ) {
-            Text(stringResource(DesignR.string.reset_mediasync))
+            Text(stringResource(Res.string.reset_mediasync))
         }
     }
     if (confirm) {

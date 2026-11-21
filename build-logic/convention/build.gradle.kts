@@ -18,6 +18,7 @@ kotlin {
 dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.compose.gradlePlugin)
+    compileOnly(libs.compose.multiplatform.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.kover.gradlePlugin)
@@ -59,6 +60,10 @@ gradlePlugin {
         register("kmpLibrary") {
             id = libs.plugins.mediasync.kmp.library.get().pluginId
             implementationClass = "KmpLibraryConventionPlugin"
+        }
+        register("kmpCompose") {
+            id = libs.plugins.mediasync.kmp.compose.get().pluginId
+            implementationClass = "KmpComposeConventionPlugin"
         }
         register("jvmLibrary") {
             id = libs.plugins.mediasync.jvm.library.get().pluginId

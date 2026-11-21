@@ -75,6 +75,18 @@ internal fun Project.configureKover(sourceVariant: String) {
     }
 }
 
+/**
+ * Detekt reads `src/main` and `src/test` by default, so a multiplatform module's `commonMain`, `androidMain`,
+ * `desktopMain`, `jvmMain`, … were never analysed. This scans every source set under `src`; tests stay in scope, as
+ * they were before.
+ */
+internal fun Project.configureDetektAllSourceSets() {
+    val sourceRoot = projectDir.resolve("src")
+    extensions.configure<DetektExtension> {
+        source.setFrom(sourceRoot)
+    }
+}
+
 internal fun Project.configureCodeQuality(koverSourceVariant: String) {
     configureSpotless()
     configureDetekt()
