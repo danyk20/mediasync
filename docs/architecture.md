@@ -23,14 +23,14 @@ flowchart TB
 | `:core:datastore` | Android library | Persistent settings (DataStore) |
 | `:core:model` | Pure Kotlin | Domain types shared everywhere |
 | `:core:testing` | Android library | Fakes, test rules, screenshot helper |
-| `:sync:protocol` | Pure Kotlin | Wire protocol: frame encoding and decoding |
+| `:sync:protocol` | Kotlin Multiplatform | Wire protocol: frame encoding and decoding |
 
 The plan adds `sync:engine`, `transport:*`, `connector:*`, `core:metadata`, `core:media`, `core:crypto` and `core:database` in the milestones that need them.
 
 ## Rules
 
 1. **Features never depend on other features.** Navigation between them happens in `:app`.
-2. **Sync logic stays pure Kotlin** (`sync:*`, `core:model`, later `core:metadata`, `transport:api`, `connector:api`). These modules have no Android dependency, their tests run on the JVM in milliseconds, and they're ready for a future desktop consumer.
+2. **Sync logic stays pure Kotlin** (`sync:*`, `core:model`, later `core:metadata`, `transport:api`, `connector:api`). These modules have no Android dependency and their tests run on the JVM in milliseconds. They are moving to Kotlin Multiplatform for the desktop and iOS apps ([ADR 0010](adr/0010-multiplatform-desktop-and-ios.md)): a module on the `mediasync.kmp.library` convention keeps its code in `src/commonMain` (JVM-only code in `src/jvmMain`) and its tests in `src/jvmTest`; Android uses its `jvm` target. Done so far: `sync:protocol`, `transport:api`.
 3. **Android-specific code stays at the edges:** MediaStore, the keystore, WorkManager and Wi-Fi P2P each live behind an interface.
 4. **One-way data flow in the UI:** a ViewModel exposes a `StateFlow` of UI state, and screens send events up as callbacks. Screens are stateless composables, wrapped by a thin `…Route` that obtains the ViewModel. This keeps every screen testable without Hilt.
 5. **Build configuration lives in convention plugins** (`build-logic/`). Module build files only declare their namespace and dependencies.

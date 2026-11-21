@@ -1,8 +1,12 @@
 plugins {
-    alias(libs.plugins.mediasync.jvm.library)
+    alias(libs.plugins.mediasync.kmp.library)
 }
 
-dependencies {
-    api(projects.core.model)
-    api(libs.okio)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.core.model)
+            api(libs.okio)
+        }
+    }
 }
