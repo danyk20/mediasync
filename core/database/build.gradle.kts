@@ -22,6 +22,7 @@ room {
 
 dependencies {
     api(projects.sync.engine)
+    api(projects.sync.runtime)
     api(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

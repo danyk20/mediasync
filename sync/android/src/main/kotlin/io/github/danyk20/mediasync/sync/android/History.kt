@@ -35,13 +35,13 @@ data class SyncRecord(
 
 /** Keeps the [SyncRecord] across restarts: background syncs usually run while the app isn't open. */
 @Singleton
-class SyncHistory @Inject constructor(@ApplicationContext context: Context) {
+class SyncHistory @Inject constructor(@ApplicationContext context: Context) : SyncRecorder {
     private val preferences = context.getSharedPreferences("sync_history", Context.MODE_PRIVATE)
     private val _record = MutableStateFlow(read())
 
     val record: StateFlow<SyncRecord> = _record.asStateFlow()
 
-    fun recordSync(atMillis: Long, waitingForSpace: Int) = write {
+    override fun recordSync(atMillis: Long, waitingForSpace: Int) = write {
         putLong(LAST_SYNC, atMillis)
         putInt(WAITING_FOR_SPACE, waitingForSpace)
         remove(PROBLEM)

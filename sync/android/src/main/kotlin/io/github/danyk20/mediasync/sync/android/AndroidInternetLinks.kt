@@ -7,14 +7,13 @@ package io.github.danyk20.mediasync.sync.android
 import android.content.Context
 import android.net.ConnectivityManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.danyk20.mediasync.core.crypto.IdentityProvider
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import io.github.danyk20.mediasync.transport.rendezvous.InternetPath
-import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.RendezvousSigner
 import io.github.danyk20.mediasync.transport.webrtc.WebRtcLink
 import java.io.Closeable
@@ -104,7 +103,3 @@ class AndroidInternetLinks @Inject internal constructor(
         const val SIGNATURE = "SHA256withECDSA"
     }
 }
-
-/** How an internet connection runs, for the log: directly between the phones, or through the relay (PLAN §8.4). */
-internal fun PeerConnection.internetRoute(): String =
-    if ((this as? RelayCounter)?.throughRelay() == true) "through the relay" else "directly"

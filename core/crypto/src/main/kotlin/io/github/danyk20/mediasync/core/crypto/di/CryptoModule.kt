@@ -8,8 +8,8 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import io.github.danyk20.mediasync.core.crypto.IdentityProvider
 import io.github.danyk20.mediasync.core.crypto.KeystoreIdentityProvider
+import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 
 @Module
 @InstallIn(SingletonComponent::class)

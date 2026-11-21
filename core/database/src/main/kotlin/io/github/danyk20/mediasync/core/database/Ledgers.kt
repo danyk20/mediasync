@@ -7,6 +7,8 @@ package io.github.danyk20.mediasync.core.database
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.sync.android.LeftOutList
+import io.github.danyk20.mediasync.sync.android.PeerBook
 import io.github.danyk20.mediasync.sync.engine.PAIR_SECRET_BYTES
 import io.github.danyk20.mediasync.sync.engine.PairedPeer
 import io.github.danyk20.mediasync.sync.engine.PeerRegistry
@@ -22,59 +24,20 @@ import okio.ByteString
 import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.toByteString
 
-/** A paired device as the UI shows it. */
-data class Peer(
-    val id: DeviceId,
-    val name: String,
-    val role: DeviceRole,
-    val pairedAtMillis: Long,
-    val lastAddress: String?,
-    val lastSeenMillis: Long?,
-    /** Producer side: the schedule the consumer asked for; `null` until it says. */
-    val schedule: SyncSchedule? = null,
-    /** Producer side: the consumer's *Turbo receive* key (docs/PLAN.md §8.3); `null` until it says. */
-    val turboKey: ByteString? = null,
-    /** The pair's secret for internet signaling (ADR 0009 §4); `null` until known. */
-    val pairSecret: ByteString? = null,
-    /** Producer side: the consumer's rendezvous Worker for internet sync; `null` until it says. */
-    val rendezvousUrl: String? = null,
-    /** Producer side: where the consumer last said it listens on its Wi-Fi (`192.168.1.20:47420`). */
-    val wifiAddresses: List<String> = emptyList(),
-) {
-    /** Never the key: this may end up in logs. */
-    override fun toString() = "Peer($id, $name, $role, paired at $pairedAtMillis, last at $lastAddress)"
-}
-
-/**
- * What a producer learns about its consumer in a session: where it was reached ([address], on the local network only),
- * its [schedule], its *Turbo receive* [turboKey] (docs/PLAN.md §8.3), their [pairSecret] and its [rendezvousUrl] for
- * internet sync (ADR 0009), and where it said it listens on its Wi-Fi ([wifiAddresses], docs/PLAN.md §8.2). A `null`
- * (not said, or an older consumer) changes nothing.
- */
-data class ConsumerFacts(
-    val address: String? = null,
-    val schedule: SyncSchedule? = null,
-    val turboKey: ByteString? = null,
-    val pairSecret: ByteString? = null,
-    val rendezvousUrl: String? = null,
-    val wifiAddresses: List<String>? = null,
-) {
-    /** Never the keys: this may end up in logs. */
-    override fun toString() = "ConsumerFacts(address=$address, schedule=$schedule, rendezvousUrl=$rendezvousUrl, " +
-        "wifiAddresses=$wifiAddresses)"
-}
+typealias Peer = io.github.danyk20.mediasync.sync.android.Peer
+typealias ConsumerFacts = io.github.danyk20.mediasync.sync.android.ConsumerFacts
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
 @Singleton
 @Suppress("TooManyFunctions") // One question about the paired phones each.
-class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
+class PeerStore @Inject constructor(private val dao: PeerDao) : PeerBook {
     override fun isPaired(id: DeviceId): Boolean = dao.get(id.hex) != null
 
     override fun register(peer: PairedPeer) {
         dao.upsert(PeerEntity(peer.id.hex, peer.name, peer.role.name, System.currentTimeMillis()))
     }
 
-    fun register(peer: PairedPeer, address: String?) {
+    override fun register(peer: PairedPeer, address: String?) {
         val now = System.currentTimeMillis()
         dao.upsert(PeerEntity(peer.id.hex, peer.name, peer.role.name, now, address, address?.let { now }))
     }
@@ -82,20 +45,20 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerRegistry {
     fun observeAll(): Flow<List<Peer>> = dao.observeAll().map { peers -> peers.map { it.toPeer() } }
 
     /** The consumer this producer sends to (one in v1.0): the most recently paired. */
-    fun consumer(): Peer? = dao.withRole(DeviceRole.CONSUMER.name).firstOrNull()?.toPeer()
+    override fun consumer(): Peer? = dao.withRole(DeviceRole.CONSUMER.name).firstOrNull()?.toPeer()
 
     /** As a receiving phone: the sending phones paired with it. */
-    fun producers(): List<Peer> = dao.withRole(DeviceRole.PRODUCER.name).map { it.toPeer() }
+    override fun producers(): List<Peer> = dao.withRole(DeviceRole.PRODUCER.name).map { it.toPeer() }
 
     /** [consumer], as it changes. */
     fun observeConsumer(): Flow<Peer?> =
         dao.observeWithRole(DeviceRole.CONSUMER.name).map { it.firstOrNull()?.toPeer() }
 
     /** Producer side: pairing with a consumer replaces any earlier one (one in v1.0); what was sent stays recorded. */
-    fun keepOnlyConsumer(id: DeviceId) = dao.deleteOthersWithRole(DeviceRole.CONSUMER.name, id.hex)
+    override fun keepOnlyConsumer(id: DeviceId) = dao.deleteOthersWithRole(DeviceRole.CONSUMER.name, id.hex)
 
     /** Producer side: keeps what it learned about the consumer in a session; what [facts] leaves `null` stays. */
-    fun recordConsumer(id: DeviceId, facts: ConsumerFacts) {
+    override fun recordConsumer(id: DeviceId, facts: ConsumerFacts) {
         facts.address?.let { dao.recordAddress(id.hex, it, System.currentTimeMillis()) }
         facts.schedule?.let { dao.recordSchedule(id.hex, it.encode()) }
         with(facts) {
@@ -177,19 +140,19 @@ class RoomReceivedLedger @Inject constructor(private val dao: ReceivedItemDao) :
 
 /** Producer side: the fingerprints of the photos and videos the user chose not to sync. */
 @Singleton
-class LeftOutStore @Inject constructor(private val dao: LeftOutItemDao) {
+class LeftOutStore @Inject constructor(private val dao: LeftOutItemDao) : LeftOutList {
     /** Blocking, for the sync engine's I/O threads. */
-    fun fingerprints(): Set<ByteString> = dao.fingerprints().toFingerprints()
+    override fun fingerprints(): Set<ByteString> = dao.fingerprints().toFingerprints()
 
-    fun observe(): Flow<Set<ByteString>> = dao.observeFingerprints().map { it.toFingerprints() }
+    override fun observe(): Flow<Set<ByteString>> = dao.observeFingerprints().map { it.toFingerprints() }
 
-    suspend fun add(fingerprints: Collection<ByteString>) {
+    override suspend fun add(fingerprints: Collection<ByteString>) {
         val now = System.currentTimeMillis()
         dao.insert(fingerprints.map { LeftOutItemEntity(it.hex(), now) })
     }
 
     // In chunks: Android 10's SQLite takes at most 999 arguments.
-    suspend fun remove(fingerprints: Collection<ByteString>) =
+    override suspend fun remove(fingerprints: Collection<ByteString>) =
         fingerprints.map { it.hex() }.chunked(MAX_ARGUMENTS).forEach { dao.delete(it) }
 
     private fun List<String>.toFingerprints(): Set<ByteString> = mapTo(HashSet()) { it.decodeHex() }

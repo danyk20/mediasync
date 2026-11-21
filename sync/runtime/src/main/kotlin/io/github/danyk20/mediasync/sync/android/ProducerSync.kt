@@ -4,10 +4,6 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
-import io.github.danyk20.mediasync.core.crypto.IdentityProvider
-import io.github.danyk20.mediasync.core.database.ConsumerFacts
-import io.github.danyk20.mediasync.core.database.Peer
-import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.metadata.isWithheld
@@ -44,6 +40,7 @@ import io.github.danyk20.mediasync.sync.engine.TurboSetup
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import io.github.danyk20.mediasync.transport.lan.LanClient
 import io.github.danyk20.mediasync.transport.lan.LanTimeouts
 import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
@@ -53,8 +50,6 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import javax.inject.Inject
-import javax.inject.Singleton
 import javax.net.SocketFactory
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -164,7 +159,7 @@ sealed interface PairingResult {
  * all, joining each name it may have for up to [joinMillis], with [pauseMillis] between rounds. Its user may start
  * Turbo receive only after Turbo here, and Android joins a link only if it's up when asked: so this phone asks again.
  */
-internal data class TurboReceiveSearch(
+data class TurboReceiveSearch(
     val searchMillis: Long = 120_000,
     /** A link that's up is joined in a few seconds (3 to 4 on the test phones, docs/PLAN.md §8.3). */
     val joinMillis: Long = 20_000,
@@ -172,51 +167,22 @@ internal data class TurboReceiveSearch(
 )
 
 /** The sending side: pairs with the consumer and sends new photos and videos to it (docs/PLAN.md §5). */
-@Singleton
 @Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
-class ProducerSync internal constructor(
+class ProducerSync(
     private val identity: IdentityProvider,
-    private val peers: PeerStore,
+    private val peers: PeerBook,
     private val ledger: SentLedger,
     private val source: MediaSource,
     private val leftOut: LeftOutItems,
     private val device: DeviceInfo,
     network: Connectivity,
-    private val history: SyncHistory,
+    private val history: SyncRecorder,
     private val conditions: DeviceConditions,
     private val scope: CoroutineScope,
     private val turboSearch: TurboReceiveSearch,
     /** The test file waiting to be sent first (docs/PLAN.md §7, *Test file*). */
     private val testFiles: TestFileQueue = NoTestFile,
 ) {
-    @Inject
-    constructor(
-        identity: IdentityProvider,
-        peers: PeerStore,
-        ledger: SentLedger,
-        source: MediaSource,
-        leftOut: LeftOutItems,
-        device: DeviceInfo,
-        network: Connectivity,
-        history: SyncHistory,
-        conditions: DeviceConditions,
-        @ApplicationScope scope: CoroutineScope,
-        testFiles: TestFiles,
-    ) : this(
-        identity,
-        peers,
-        ledger,
-        source,
-        leftOut,
-        device,
-        network,
-        history,
-        conditions,
-        scope,
-        TurboReceiveSearch(),
-        testFiles,
-    )
-
     private val discovery = network.discovery
     private val sockets = network.sockets
     private val directLinks = network.directLinks

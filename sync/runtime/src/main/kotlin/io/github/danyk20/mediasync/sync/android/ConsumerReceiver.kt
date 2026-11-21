@@ -4,8 +4,6 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
-import io.github.danyk20.mediasync.core.crypto.IdentityProvider
-import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
@@ -27,6 +25,7 @@ import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboHost
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import io.github.danyk20.mediasync.transport.lan.LanServer
 import io.github.danyk20.mediasync.transport.lan.PeerTrust
 import java.io.Closeable
@@ -37,8 +36,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -88,11 +85,10 @@ data class ReceiverState(
  * background while charging (docs/PLAN.md §10.1). In every session it tells the sending phone its schedule, and
  * where it listens on its Wi-Fi.
  */
-@Singleton
 @Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
-class ConsumerReceiver internal constructor(
+class ConsumerReceiver(
     private val identity: IdentityProvider,
-    private val peers: PeerStore,
+    private val peers: PeerBook,
     private val ledger: ReceivedLedger,
     private val sink: MediaSink,
     private val device: DeviceInfo,
@@ -108,32 +104,6 @@ class ConsumerReceiver internal constructor(
     /** Where test files are checked (docs/PLAN.md §7, *Test file*); `null`: this phone doesn't take them. */
     private val testFiles: TestFileStore? = null,
 ) {
-    @Inject
-    constructor(
-        identity: IdentityProvider,
-        peers: PeerStore,
-        ledger: ReceivedLedger,
-        sink: MediaSink,
-        device: DeviceInfo,
-        network: Connectivity,
-        @ApplicationScope scope: CoroutineScope,
-        wakeUps: WakeUpCheck,
-        linkScreen: LinkScreen,
-        testFiles: TestFiles,
-    ) : this(
-        identity,
-        peers,
-        ledger,
-        sink,
-        device,
-        network,
-        scope,
-        PREFERRED_PORT,
-        onInternet = wakeUps::checkIfDue,
-        linkScreen = linkScreen,
-        testFiles = testFiles,
-    )
-
     private val addresses = network.addresses
     private val discovery = network.discovery
     private val directLinks = network.directLinks
