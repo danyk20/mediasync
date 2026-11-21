@@ -4,13 +4,10 @@
  */
 package io.github.danyk20.mediasync.core.database.di
 
-import android.content.Context
-import androidx.room.Room
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
-import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.BackupDao
 import io.github.danyk20.mediasync.core.database.LeftOutItemDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
@@ -23,11 +20,6 @@ import io.github.danyk20.mediasync.core.database.SentItemDao
 @ContributesTo(AppScope::class)
 @BindingContainer
 object DatabaseModule {
-
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideDatabase(context: Context): MediaSyncDatabase =
-        Room.databaseBuilder(context, MediaSyncDatabase::class.java, MediaSyncDatabase.NAME).build()
 
     @Provides
     fun providePeerDao(database: MediaSyncDatabase): PeerDao = database.peerDao()

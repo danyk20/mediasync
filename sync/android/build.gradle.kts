@@ -7,6 +7,15 @@ android {
     namespace = "io.github.danyk20.mediasync.sync.android"
 }
 
+// The migration tests read the exported schemas as assets, on the JVM too.
+androidComponents {
+    onVariants { variant ->
+        variant.hostTests.values.forEach {
+            it.sources.assets?.addStaticSourceDirectory("${rootProject.projectDir}/core/database/schemas")
+        }
+    }
+}
+
 dependencies {
     api(projects.sync.runtime)
     api(projects.sync.engine)
@@ -28,6 +37,7 @@ dependencies {
     testImplementation(testFixtures(projects.core.metadata))
     testImplementation(testFixtures(projects.transport.lan))
     testImplementation(libs.androidx.room.runtime)
+    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.work.testing)
