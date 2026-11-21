@@ -26,7 +26,9 @@ import android.net.wifi.aware.WifiAwareNetworkSpecifier
 import android.net.wifi.aware.WifiAwareSession
 import android.os.Handler
 import android.os.HandlerThread
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
@@ -37,8 +39,6 @@ import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import java.net.Inet6Address
 import java.net.NetworkInterface
 import java.util.concurrent.CopyOnWriteArrayList
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -56,8 +56,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest without Wi-Fi Aware; the radio on real phones only")
 @SuppressLint("MissingPermission") // Each call that needs a permission runs after availability() found it granted.
-@Singleton
-class WifiAware @Inject constructor(@ApplicationContext private val context: Context) : DirectLinks {
+@SingleIn(AppScope::class)
+@Inject
+class WifiAware(private val context: Context) : DirectLinks {
     private val manager: WifiAwareManager? = context.getSystemService(WifiAwareManager::class.java)
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 

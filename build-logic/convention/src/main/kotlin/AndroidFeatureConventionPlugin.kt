@@ -15,13 +15,13 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
         pluginManager.apply(libs.pluginId("mediasync-android-library"))
         pluginManager.apply(libs.pluginId("mediasync-android-compose"))
-        pluginManager.apply(libs.pluginId("mediasync-hilt"))
+        pluginManager.apply(libs.pluginId("mediasync-di"))
 
         dependencies {
             "implementation"(project(":core:designsystem"))
             "implementation"(project(":core:model"))
             "implementation"(libs.library("androidx-activity-compose"))
-            "implementation"(libs.library("androidx-hilt-lifecycle-viewmodel-compose"))
+            "implementation"(libs.library("metrox-viewmodel-compose"))
             "implementation"(libs.library("androidx-lifecycle-runtime-compose"))
             "implementation"(libs.library("androidx-lifecycle-viewmodel-compose"))
 

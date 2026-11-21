@@ -45,11 +45,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.R as DesignR
 import io.github.danyk20.mediasync.core.designsystem.component.ResetDialog
@@ -58,7 +61,6 @@ import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.LogSize
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -96,9 +98,10 @@ sealed interface UpdateCheck {
     data object Failed : UpdateCheck
 }
 
-@HiltViewModel
-class SettingsViewModel @Inject constructor(private val settings: SettingsRepository, private val releases: Releases) :
-    ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class SettingsViewModel(private val settings: SettingsRepository, private val releases: Releases) : ViewModel() {
     private val state = MutableStateFlow(
         SettingsUiState(updates = UpdatesUi(releases.installed()).takeUnless { releases.fromPlay() }),
     )
@@ -163,7 +166,7 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
 }
 
 @Composable
-fun SettingsRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: SettingsViewModel = metroViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val links = LocalUriHandler.current

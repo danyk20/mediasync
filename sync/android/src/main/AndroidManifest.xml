@@ -55,7 +55,9 @@
             android:turnScreenOn="true" />
         <!-- Wake-ups from the receiving phone's Worker (docs/PLAN.md §10.4). Firebase doesn't start on its own: only a
              receiving phone with internet sync turns it on. -->
+        <!-- Metro constructor-injects this component; the app's component factory instantiates it. -->
         <service
+            tools:ignore="Instantiatable"
             android:name=".WakeUpService"
             android:exported="false">
             <intent-filter>

@@ -7,9 +7,9 @@ package io.github.danyk20.mediasync.sync.android
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +34,9 @@ data class SyncRecord(
 )
 
 /** Keeps the [SyncRecord] across restarts: background syncs usually run while the app isn't open. */
-@Singleton
-class SyncHistory @Inject constructor(@ApplicationContext context: Context) : SyncRecorder {
+@SingleIn(AppScope::class)
+@Inject
+class SyncHistory(context: Context) : SyncRecorder {
     private val preferences = context.getSharedPreferences("sync_history", Context.MODE_PRIVATE)
     private val _record = MutableStateFlow(read())
 

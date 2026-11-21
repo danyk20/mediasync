@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.share
 
+import android.app.Activity
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -24,14 +25,19 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import dev.zacsweers.metrox.android.ActivityKey
+import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceRole
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,8 +54,10 @@ sealed interface ShareState {
     data class Sending(val queued: Queued, val consumer: String?) : ShareState
 }
 
-@HiltViewModel
-class ShareViewModel @Inject constructor(private val queue: ShareQueue, private val peers: PeerStore) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class ShareViewModel(private val queue: ShareQueue, private val peers: PeerStore) : ViewModel() {
     private val _state = MutableStateFlow<ShareState>(ShareState.Preparing(0, 0))
     val state: StateFlow<ShareState> = _state.asStateFlow()
     private var started = false
@@ -71,9 +79,14 @@ class ShareViewModel @Inject constructor(private val queue: ShareQueue, private 
  * MediaSync in the share sheet of a gallery app (docs/PLAN.md, M6): the photos and videos shared go to the receiving
  * phone now. Only on a paired sending phone; [ShareTarget] switches it on and off.
  */
-@AndroidEntryPoint
-class ShareActivity : ComponentActivity() {
+@ContributesIntoMap(AppScope::class, binding<Activity>())
+@ActivityKey
+@Inject
+class ShareActivity(private val viewModelFactory: MetroViewModelFactory) : ComponentActivity() {
     private val viewModel: ShareViewModel by viewModels()
+
+    override val defaultViewModelProviderFactory: ViewModelProvider.Factory
+        get() = viewModelFactory
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

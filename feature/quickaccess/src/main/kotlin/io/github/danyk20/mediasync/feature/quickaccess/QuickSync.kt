@@ -6,6 +6,9 @@ package io.github.danyk20.mediasync.feature.quickaccess
 
 import android.content.Context
 import android.text.format.DateUtils
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -16,8 +19,6 @@ import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.android.SyncHistory
 import io.github.danyk20.mediasync.sync.android.SyncRecord
 import io.github.danyk20.mediasync.sync.android.SyncScheduler
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -38,8 +39,9 @@ enum class QuickAction {
 data class QuickStatus(val action: QuickAction, val busy: Boolean = false, val lastSyncMillis: Long? = null)
 
 /** *Sync now* from outside the app (docs/PLAN.md §3.3: quick access). */
-@Singleton
-class QuickSync @Inject constructor(
+@SingleIn(AppScope::class)
+@Inject
+class QuickSync(
     settings: SettingsRepository,
     peers: PeerStore,
     producer: ProducerSync,

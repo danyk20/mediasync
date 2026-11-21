@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.connector.googlephotos
 
+import dev.zacsweers.metro.Inject
 import io.github.danyk20.mediasync.connector.AuthState
 import io.github.danyk20.mediasync.connector.BackupItem
 import io.github.danyk20.mediasync.connector.BackupReceipt
@@ -23,7 +24,6 @@ import io.github.danyk20.mediasync.connector.SetupStep
 import io.github.danyk20.mediasync.connector.SkipReason
 import io.github.danyk20.mediasync.connector.UploadResult
 import io.github.danyk20.mediasync.connector.VerifyResult
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -32,8 +32,8 @@ import kotlinx.coroutines.flow.Flow
  * MediaSync uploads nothing and deletes nothing: it checks that each file is where the app backs it up, and notices
  * when the app's *Free up space*, or the phone's *Smart Storage*, removes it.
  */
-class GooglePhotosAppConnectorFactory @Inject internal constructor(private val folder: PhoneFolder) :
-    DeviceAppConnectorFactory {
+@Inject
+class GooglePhotosAppConnectorFactory(private val folder: PhoneFolder) : DeviceAppConnectorFactory {
 
     override val descriptor: ConnectorDescriptor get() = DESCRIPTOR
 

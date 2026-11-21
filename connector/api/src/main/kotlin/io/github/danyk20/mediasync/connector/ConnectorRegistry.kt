@@ -10,7 +10,7 @@ import kotlinx.coroutines.delay
 
 /**
  * Every kind of connector this app has (docs/PLAN.md §9.1). Each connector module registers its factory under its
- * id (Hilt `@IntoMap @ConnectorKey("…")`), so the app finds them at runtime, and a new cloud needs no changes here.
+ * id (Metro `@IntoMap @ConnectorKey("…")`), so the app finds them at runtime, and a new cloud needs no changes here.
  */
 class ConnectorRegistry(
     registered: Map<String, BackupConnectorFactory>,

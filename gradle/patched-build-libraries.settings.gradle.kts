@@ -1,6 +1,6 @@
 // Build tools bring in some libraries in versions with known vulnerabilities: the Android Gradle plugin and its lint
 // (Bouncy Castle, jose4j, JDOM, Commons Lang, HttpClient, Guava), Kover (FreeMarker), Licensee (Plexus Utils), and the
-// KSP and Hilt processors and test runtimes (Guava). None of them ship in the app; they only run during builds. Until the tools bring patched versions themselves, every
+// KSP processors and test runtimes (Guava). None of them ship in the app; they only run during builds. Until the tools bring patched versions themselves, every
 // configuration of every project, plugin classpaths included, raises them to at least these versions.
 //
 // Remove a line once the tools bring that version or a newer one. Applied by settings.gradle.kts and by

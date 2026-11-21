@@ -9,8 +9,8 @@ updates:
     commit-message:
       prefix: "build(deps)"
     ignore:
-      # KSP 2.3.13 loses other modules' symbols when KSP runs in parallel (google/ksp#3286): Hilt then misses
-      # every binding from the library modules on CI. Its next version fixes it.
+      # KSP 2.3.13 loses other modules' symbols when KSP runs in parallel (google/ksp#3286): Room then misses
+      # every entity and DAO from the library modules on CI. Its next version fixes it.
       - dependency-name: "com.google.devtools.ksp*"
         versions: ["2.3.13"]
     groups:

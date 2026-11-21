@@ -6,7 +6,9 @@ package io.github.danyk20.mediasync.connector.android
 
 import android.content.Context
 import androidx.core.net.toUri
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.connector.AccountId
 import io.github.danyk20.mediasync.connector.BackupItem
 import io.github.danyk20.mediasync.connector.BackupLedger
@@ -21,8 +23,6 @@ import io.github.danyk20.mediasync.core.database.ConnectorAccountEntity
 import io.github.danyk20.mediasync.core.database.ReceivedItemEntity
 import java.io.FileNotFoundException
 import java.io.InputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONException
@@ -33,15 +33,16 @@ fun interface ContentOpener {
     fun open(location: String): InputStream
 }
 
-class ContentResolverOpener @Inject constructor(@ApplicationContext private val context: Context) : ContentOpener {
+@Inject
+class ContentResolverOpener(private val context: Context) : ContentOpener {
     override fun open(location: String): InputStream =
         context.contentResolver.openInputStream(location.toUri()) ?: throw FileNotFoundException("Can't open it")
 }
 
 /** The backup ledger (docs/PLAN.md §9.4) in the app's database, next to the record of everything received. */
-@Singleton
-class RoomBackupLedger @Inject constructor(private val dao: BackupDao, private val opener: ContentOpener) :
-    BackupLedger {
+@SingleIn(AppScope::class)
+@Inject
+class RoomBackupLedger(private val dao: BackupDao, private val opener: ContentOpener) : BackupLedger {
 
     override suspend fun pending(account: AccountId, limit: Int): List<BackupItem> =
         dao.pending(account.value, limit).mapNotNull { it.toItem() }
@@ -76,8 +77,9 @@ interface AccountStore {
     suspend fun remove(id: AccountId)
 }
 
-@Singleton
-class RoomAccountStore @Inject constructor(private val dao: BackupDao) : AccountStore {
+@SingleIn(AppScope::class)
+@Inject
+class RoomAccountStore(private val dao: BackupDao) : AccountStore {
     override fun observe(): Flow<List<ConnectorAccount>> =
         dao.observeAccounts().map { accounts -> accounts.mapNotNull { it.toAccount() } }
 

@@ -6,11 +6,11 @@ package io.github.danyk20.mediasync.core.database.di
 
 import android.content.Context
 import androidx.room.Room
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.BackupDao
 import io.github.danyk20.mediasync.core.database.LeftOutItemDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
@@ -19,15 +19,14 @@ import io.github.danyk20.mediasync.core.database.PartialTransferDao
 import io.github.danyk20.mediasync.core.database.PeerDao
 import io.github.danyk20.mediasync.core.database.ReceivedItemDao
 import io.github.danyk20.mediasync.core.database.SentItemDao
-import javax.inject.Singleton
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal object DatabaseModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+object DatabaseModule {
 
     @Provides
-    @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): MediaSyncDatabase =
+    @SingleIn(AppScope::class)
+    fun provideDatabase(context: Context): MediaSyncDatabase =
         Room.databaseBuilder(context, MediaSyncDatabase::class.java, MediaSyncDatabase.NAME).build()
 
     @Provides

@@ -29,22 +29,26 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SendingOrder
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-@HiltViewModel
-class SendingOrderViewModel @Inject constructor(private val settings: SettingsRepository) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class SendingOrderViewModel(private val settings: SettingsRepository) : ViewModel() {
 
     val uiState: StateFlow<SendingOrder> = settings.sendingOrder
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SendingOrder.Default)
@@ -62,7 +66,7 @@ class SendingOrderViewModel @Inject constructor(private val settings: SettingsRe
 fun SendingOrderRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SendingOrderViewModel = hiltViewModel(),
+    viewModel: SendingOrderViewModel = metroViewModel(),
 ) {
     val order by viewModel.uiState.collectAsStateWithLifecycle()
     SendingOrderScreen(order = order, onChoose = viewModel::choose, onDone = onDone, modifier = modifier)

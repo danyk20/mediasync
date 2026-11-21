@@ -6,12 +6,16 @@ package io.github.danyk20.mediasync.feature.quickaccess
 
 import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.app.Service
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import dagger.hilt.android.AndroidEntryPoint
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import dev.zacsweers.metrox.android.ServiceKey
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -19,11 +23,10 @@ import kotlinx.coroutines.launch
 
 /** *Sync now* in the Quick Settings panel: the label says what tapping does, the subtitle how syncing stands. */
 @ExercisedOnDevice(coveredBy = "feature:quickaccess QuickAccessTest (the tile's words) and a check on an emulator")
-@AndroidEntryPoint
-class SyncTileService : TileService() {
-    @Inject
-    lateinit var quickSync: QuickSync
-
+@ContributesIntoMap(AppScope::class, binding<Service>())
+@ServiceKey
+@Inject
+class SyncTileService(private val quickSync: QuickSync) : TileService() {
     private var scope: CoroutineScope? = null
     private var status: QuickStatus? = null
 

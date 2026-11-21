@@ -32,11 +32,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
@@ -44,7 +47,6 @@ import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.PendingApproval
 import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.engine.PairingLink
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,8 +64,10 @@ sealed interface ConsumerPairingUiState {
     data class Paired(val producerName: String) : ConsumerPairingUiState
 }
 
-@HiltViewModel
-class ConsumerPairingViewModel @Inject constructor(private val receiver: ConsumerReceiver) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class ConsumerPairingViewModel(private val receiver: ConsumerReceiver) : ViewModel() {
     private val link = MutableStateFlow(open())
 
     // Starts from the real current values (never a placeholder that would flash "Connect to Wi-Fi"), and
@@ -115,7 +119,7 @@ class ConsumerPairingViewModel @Inject constructor(private val receiver: Consume
 fun ConsumerPairingRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ConsumerPairingViewModel = hiltViewModel(),
+    viewModel: ConsumerPairingViewModel = metroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

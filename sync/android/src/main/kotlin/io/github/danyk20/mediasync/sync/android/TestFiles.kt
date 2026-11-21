@@ -7,7 +7,9 @@ package io.github.danyk20.mediasync.sync.android
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
@@ -24,8 +26,6 @@ import java.io.FileOutputStream
 import java.security.SecureRandom
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,8 +52,9 @@ data class TestFileState(
  *   isn't backed up, never the gallery. Each is deleted once checked, or once its sync drops; what a crash left there
  *   goes the first time it's used.
  */
-@Singleton
-class TestFiles @Inject constructor(@ApplicationContext context: Context) :
+@SingleIn(AppScope::class)
+@Inject
+class TestFiles(context: Context) :
     TestFileQueue,
     TestFileStore {
     private val preferences = context.getSharedPreferences("test_file", Context.MODE_PRIVATE)

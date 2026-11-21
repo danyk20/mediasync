@@ -44,17 +44,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.component.formatTime
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import java.time.format.TextStyle
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -86,8 +88,10 @@ enum class ScheduleOption {
 }
 
 /** The receiving phone's sync schedule, which its sending phones follow (docs/PLAN.md §10.1). Saved at once. */
-@HiltViewModel
-class SyncScheduleViewModel @Inject constructor(private val settings: SettingsRepository) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class SyncScheduleViewModel(private val settings: SettingsRepository) : ViewModel() {
 
     /** `null` while loading. */
     val schedule: StateFlow<SyncSchedule?> = settings.syncSchedule.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -149,7 +153,7 @@ internal fun SyncSchedule.time(): LocalTime? = when (this) {
 fun SyncScheduleRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SyncScheduleViewModel = hiltViewModel(),
+    viewModel: SyncScheduleViewModel = metroViewModel(),
 ) {
     val schedule by viewModel.schedule.collectAsStateWithLifecycle()
     SyncScheduleScreen(

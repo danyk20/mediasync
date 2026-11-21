@@ -15,7 +15,9 @@ import android.os.Build
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
 import io.github.danyk20.mediasync.core.database.MediaFingerprintEntity
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
@@ -38,8 +40,6 @@ import java.nio.ByteBuffer
 import java.time.ZoneId
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okio.ByteString
@@ -56,7 +56,7 @@ import okio.source
  * the location from what the app can read (docs/PLAN.md §6.2).
  */
 @ExercisedOnDevice(coveredBy = "core:media MediaStoreTest")
-@Singleton
+@SingleIn(AppScope::class)
 class MediaStoreSource internal constructor(
     private val context: Context,
     private val fingerprints: MediaFingerprintDao,
@@ -67,7 +67,7 @@ class MediaStoreSource internal constructor(
 
     @Inject
     constructor(
-        @ApplicationContext context: Context,
+        context: Context,
         fingerprints: MediaFingerprintDao,
         shared: SharedItems,
         settings: SettingsRepository,

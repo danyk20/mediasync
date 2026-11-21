@@ -4,14 +4,14 @@
  */
 package io.github.danyk20.mediasync.feature.diagnostics
 
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class DiagnosticsModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface DiagnosticsModule {
     @Binds
-    abstract fun bindReleases(impl: GitHubReleases): Releases
+    val GitHubReleases.bindReleases: Releases
 }

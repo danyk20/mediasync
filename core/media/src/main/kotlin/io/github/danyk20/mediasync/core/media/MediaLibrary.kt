@@ -9,15 +9,14 @@ import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
 import android.provider.MediaStore
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.SourceSelection
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -47,8 +46,9 @@ interface MediaLibrary {
 }
 
 @ExercisedOnDevice(coveredBy = "core:media MediaStoreTest")
-@Singleton
-class MediaStoreLibrary @Inject constructor(@ApplicationContext context: Context) : MediaLibrary {
+@SingleIn(AppScope::class)
+@Inject
+class MediaStoreLibrary(context: Context) : MediaLibrary {
     private val resolver = context.contentResolver
 
     override suspend fun folders(): List<MediaFolder> = withContext(Dispatchers.IO) {
@@ -118,9 +118,9 @@ class MediaStoreLibrary @Inject constructor(@ApplicationContext context: Context
     }
 }
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class MediaModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface MediaModule {
     @Binds
-    abstract fun bindMediaLibrary(impl: MediaStoreLibrary): MediaLibrary
+    val MediaStoreLibrary.bindMediaLibrary: MediaLibrary
 }

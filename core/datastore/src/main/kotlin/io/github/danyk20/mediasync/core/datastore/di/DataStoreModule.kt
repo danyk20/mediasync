@@ -9,27 +9,26 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
-import dagger.Binds
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.datastore.DataStoreSettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
-import javax.inject.Singleton
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class DataStoreModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface DataStoreModule {
 
     @Binds
-    abstract fun bindSettingsRepository(impl: DataStoreSettingsRepository): SettingsRepository
+    val DataStoreSettingsRepository.bindSettingsRepository: SettingsRepository
 
     companion object {
         @Provides
-        @Singleton
-        fun providePreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        @SingleIn(AppScope::class)
+        fun providePreferencesDataStore(context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("settings") }
     }
 }

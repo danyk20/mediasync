@@ -4,16 +4,16 @@
  */
 package io.github.danyk20.mediasync.core.crypto.di
 
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
 import io.github.danyk20.mediasync.core.crypto.KeystoreIdentityProvider
 import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class CryptoModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface CryptoModule {
     @Binds
-    abstract fun bindIdentityProvider(impl: KeystoreIdentityProvider): IdentityProvider
+    val KeystoreIdentityProvider.bindIdentityProvider: IdentityProvider
 }

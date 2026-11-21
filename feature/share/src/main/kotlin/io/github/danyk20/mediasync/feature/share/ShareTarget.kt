@@ -7,12 +7,12 @@ package io.github.danyk20.mediasync.feature.share
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,9 +25,10 @@ import kotlinx.coroutines.launch
  * Lists MediaSync in the share sheet only on a sending phone paired with its receiving phone: elsewhere sharing to
  * it would do nothing. Call [start] when the app starts.
  */
-@Singleton
-class ShareTarget @Inject constructor(
-    @ApplicationContext private val context: Context,
+@SingleIn(AppScope::class)
+@Inject
+class ShareTarget(
+    private val context: Context,
     private val settings: SettingsRepository,
     private val peers: PeerStore,
 ) {

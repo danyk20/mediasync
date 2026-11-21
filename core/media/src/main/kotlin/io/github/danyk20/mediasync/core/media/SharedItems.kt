@@ -7,21 +7,21 @@ package io.github.danyk20.mediasync.core.media
 import android.content.Context
 import androidx.core.content.edit
 import androidx.core.net.toUri
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import java.io.File
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Photos and videos the user shared to MediaSync from another app, to send now. Each is a gallery item's content
  * URI, or, for one that isn't in the gallery (a WhatsApp file, a photo only in the cloud), a copy's `file:` URI in
  * [copies]. They go before everything else, whatever folders are chosen, and are dropped once sent.
  */
-@Singleton
+@SingleIn(AppScope::class)
 class SharedItems internal constructor(context: Context, private val now: () -> Long) {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(context, System::currentTimeMillis)
+    constructor(context: Context) : this(context, System::currentTimeMillis)
 
     private val preferences = context.getSharedPreferences("shared_items", Context.MODE_PRIVATE)
 

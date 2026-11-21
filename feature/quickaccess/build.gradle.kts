@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
 }
 
 android {
@@ -13,6 +13,7 @@ dependencies {
     implementation(projects.core.model)
     implementation(projects.sync.android)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.metrox.android)
 
     testImplementation(projects.core.testing)
     testImplementation(libs.mockk)

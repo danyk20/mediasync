@@ -40,14 +40,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
-import dagger.assisted.AssistedInject
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
+import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
+import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
@@ -84,16 +87,15 @@ sealed interface ProducerPairingUiState {
  * @param openedLink a `mediasync://pair` link opened from outside the app. It's applied once, when the
  *   screen opens, so rotating the phone mid-pairing doesn't start over.
  */
-@HiltViewModel(assistedFactory = ProducerPairingViewModel.Factory::class)
-class ProducerPairingViewModel @AssistedInject constructor(
-    private val sync: ProducerSync,
-    @Assisted openedLink: String?,
-) : ViewModel() {
+@AssistedInject
+class ProducerPairingViewModel(private val sync: ProducerSync, @Assisted openedLink: String?) : ViewModel() {
     private val _uiState = MutableStateFlow(openedLink?.let(::confirmation) ?: ProducerPairingUiState.Scanning())
     val uiState: StateFlow<ProducerPairingUiState> = _uiState.asStateFlow()
 
     @AssistedFactory
-    interface Factory {
+    @ManualViewModelAssistedFactoryKey
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : ManualViewModelAssistedFactory {
         fun create(openedLink: String?): ProducerPairingViewModel
     }
 
@@ -157,9 +159,10 @@ fun ProducerPairingRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     openedLink: String? = null,
-    viewModel: ProducerPairingViewModel = hiltViewModel<ProducerPairingViewModel, ProducerPairingViewModel.Factory>(
-        creationCallback = { it.create(openedLink) },
-    ),
+    viewModel: ProducerPairingViewModel =
+        assistedMetroViewModel<ProducerPairingViewModel, ProducerPairingViewModel.Factory> {
+            create(openedLink)
+        },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

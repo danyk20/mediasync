@@ -12,7 +12,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.Inject
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.media.SharedItems
@@ -20,7 +20,6 @@ import io.github.danyk20.mediasync.sync.android.SyncScheduler
 import java.io.File
 import java.io.IOException
 import java.util.UUID
-import javax.inject.Inject
 
 /** How queueing shared photos and videos went. */
 data class Queued(val items: Int, val unreadable: Int = 0)
@@ -29,11 +28,8 @@ data class Queued(val items: Int, val unreadable: Int = 0)
  * Queues photos and videos shared to MediaSync, to send now (docs/PLAN.md, M6): gallery items as they are, other
  * files as copies. Must run while the share's read permission lasts, that is, while the share screen is open.
  */
-class ShareQueue @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val shared: SharedItems,
-    private val scheduler: SyncScheduler,
-) {
+@Inject
+class ShareQueue(private val context: Context, private val shared: SharedItems, private val scheduler: SyncScheduler) {
     private val resolver: ContentResolver = context.contentResolver
 
     /** Queues [uris] and starts a sync. [progress] hears how many are done. Blocking: call it off the main thread. */

@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.lint) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.google.services) apply false
-    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.metro) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.multiplatform) apply false
@@ -68,21 +68,18 @@ kover {
                 classes(
                     "*.BuildConfig",
                     "*.ComposableSingletons*",
-                    "*_Factory",
-                    "*_Factory\$*",
-                    "*_HiltModules*",
                     "*_Impl",
                     "*_Impl$*",
-                    "*_MembersInjector",
-                    "*Hilt_*",
+                    "*MetroFactory*",
+                    "*\$\$Metro*",
+                    "metro.hints.*",
                     "*.MainActivity",
                     "*.MediaSyncApplication",
-                    "dagger.hilt.*",
-                    "hilt_aggregated_deps.*",
                 )
                 annotatedBy(
                     "androidx.compose.ui.tooling.preview.Preview",
-                    "dagger.Module",
+                    "dev.zacsweers.metro.BindingContainer",
+                    "dev.zacsweers.metro.DependencyGraph",
                     // Tested on emulators instead; see the annotation's documentation.
                     "io.github.danyk20.mediasync.core.model.ExercisedOnDevice",
                 )

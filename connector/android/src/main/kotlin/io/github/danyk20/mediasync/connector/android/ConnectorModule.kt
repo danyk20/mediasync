@@ -4,60 +4,58 @@
  */
 package io.github.danyk20.mediasync.connector.android
 
-import dagger.Binds
-import dagger.MapKey
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.Multibinds
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.MapKey
+import dev.zacsweers.metro.Multibinds
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.connector.BackupConnectorFactory
 import io.github.danyk20.mediasync.connector.BackupLedger
 import io.github.danyk20.mediasync.connector.BackupOrchestrator
 import io.github.danyk20.mediasync.connector.ConnectorDecorators
 import io.github.danyk20.mediasync.connector.ConnectorRegistry
 import java.time.Clock
-import javax.inject.Singleton
 
 /**
  * Registers a connector module's factory under its connector id (docs/PLAN.md §9.1):
  *
  * ```
  * @Binds @IntoMap @ConnectorKey("google-photos-app")
- * abstract fun bind(factory: GooglePhotosAppConnectorFactory): BackupConnectorFactory
+ * val GooglePhotosAppConnectorFactory.bind: BackupConnectorFactory
  * ```
  */
-@MapKey
+@MapKey(unwrapValue = true)
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY, AnnotationTarget.PROPERTY_GETTER)
 annotation class ConnectorKey(val value: String)
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class ConnectorModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface ConnectorModule {
     /** Every connector module adds its factory; with none, the app simply has nothing to back up to. */
-    @Multibinds
-    abstract fun connectorFactories(): Map<String, BackupConnectorFactory>
+    @Multibinds(allowEmpty = true)
+    fun connectorFactories(): Map<String, BackupConnectorFactory>
 
     @Binds
-    abstract fun bindLedger(impl: RoomBackupLedger): BackupLedger
+    val RoomBackupLedger.bindLedger: BackupLedger
 
     @Binds
-    abstract fun bindAccounts(impl: RoomAccountStore): AccountStore
+    val RoomAccountStore.bindAccounts: AccountStore
 
     @Binds
-    abstract fun bindContentOpener(impl: ContentResolverOpener): ContentOpener
+    val ContentResolverOpener.bindContentOpener: ContentOpener
 
     @Binds
-    abstract fun bindInstalledApps(impl: PackageManagerApps): InstalledApps
+    val PackageManagerApps.bindInstalledApps: InstalledApps
 
     companion object {
         @Provides
-        @Singleton
-        fun provideRegistry(
-            factories: Map<String, @JvmSuppressWildcards BackupConnectorFactory>,
-            clock: Clock,
-        ): ConnectorRegistry = ConnectorRegistry(factories, ConnectorDecorators(clock))
+        @SingleIn(AppScope::class)
+        fun provideRegistry(factories: Map<String, BackupConnectorFactory>, clock: Clock): ConnectorRegistry =
+            ConnectorRegistry(factories, ConnectorDecorators(clock))
 
         @Provides
         fun provideOrchestrator(ledger: BackupLedger, clock: Clock): BackupOrchestrator =

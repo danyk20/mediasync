@@ -59,11 +59,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
@@ -80,7 +83,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.SharingStarted
@@ -109,11 +111,11 @@ sealed interface SourceFoldersUiState {
 }
 
 /** Which folders this phone sends (docs/PLAN.md §2.2), and from which days. Every change is saved at once. */
-@HiltViewModel
-class SourceFoldersViewModel @Inject constructor(
-    private val library: MediaLibrary,
-    private val settings: SettingsRepository,
-) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class SourceFoldersViewModel(private val library: MediaLibrary, private val settings: SettingsRepository) :
+    ViewModel() {
 
     @OptIn(FlowPreview::class)
     private val folders = flow {
@@ -162,7 +164,7 @@ internal const val LIBRARY_SETTLE_MILLIS = 500L
 fun SourceFoldersRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SourceFoldersViewModel = hiltViewModel(),
+    viewModel: SourceFoldersViewModel = metroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     SourceFoldersScreen(

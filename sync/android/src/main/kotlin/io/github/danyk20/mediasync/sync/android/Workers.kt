@@ -15,14 +15,17 @@ import android.text.format.Formatter
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
@@ -36,8 +39,6 @@ import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Clock
 import java.time.Duration
 import java.time.ZonedDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -56,8 +57,8 @@ import kotlinx.coroutines.withContext
  * Android 15+ also stops it after 6 hours of syncing a day (§10.3). Everything confirmed so far stays sent, and
  * WorkManager runs it again later, which carries on where it stopped.
  */
-@HiltWorker
-class ScheduledSyncWorker @AssistedInject constructor(
+@AssistedInject
+class ScheduledSyncWorker(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val sync: ProducerSync,
@@ -68,6 +69,13 @@ class ScheduledSyncWorker @AssistedInject constructor(
     private val history: SyncHistory,
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
+
+    @AssistedFactory
+    @WorkerKey(ScheduledSyncWorker::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : WorkerAssistedFactory {
+        override fun create(context: Context, params: WorkerParameters): ScheduledSyncWorker
+    }
 
     override suspend fun doWork(): Result =
         onTheCharger(DeviceRole.PRODUCER, conditions, scheduler) ?: logged("Scheduled sync") { scheduledSync() }
@@ -128,14 +136,21 @@ class ScheduledSyncWorker @AssistedInject constructor(
  * *Sync now* (docs/PLAN.md §10.2): sends as expedited work in the foreground, so it carries on when the user
  * leaves the app. The user asked for it, so it doesn't wait for charging or better conditions.
  */
-@HiltWorker
-class SyncNowWorker @AssistedInject constructor(
+@AssistedInject
+class SyncNowWorker(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val sync: ProducerSync,
     private val peers: PeerStore,
     private val notifications: SyncNotifications,
 ) : CoroutineWorker(context, params) {
+
+    @AssistedFactory
+    @WorkerKey(SyncNowWorker::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : WorkerAssistedFactory {
+        override fun create(context: Context, params: WorkerParameters): SyncNowWorker
+    }
 
     override suspend fun doWork(): Result {
         val turbo = inputData.getBoolean(TURBO, false)
@@ -225,8 +240,8 @@ private suspend fun CoroutineWorker.send(
  * until the phone is unplugged; WorkManager opens it again at the next charge. A hot phone or a battery below
  * 20 % closes it until later (§10.5); sending phones then try again.
  */
-@HiltWorker
-class ReceiveWindowWorker @AssistedInject constructor(
+@AssistedInject
+class ReceiveWindowWorker(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val receiver: ConsumerReceiver,
@@ -237,6 +252,13 @@ class ReceiveWindowWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
     private val clock: Clock,
 ) : CoroutineWorker(context, params) {
+
+    @AssistedFactory
+    @WorkerKey(ReceiveWindowWorker::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : WorkerAssistedFactory {
+        override fun create(context: Context, params: WorkerParameters): ReceiveWindowWorker
+    }
 
     override suspend fun doWork(): Result =
         onTheCharger(DeviceRole.CONSUMER, conditions, scheduler) ?: logged("Receive window") { receive() }
@@ -295,8 +317,8 @@ class ReceiveWindowWorker @AssistedInject constructor(
  * receive*, a session runs as this foreground work, so it carries on when the screen goes off or the user leaves
  * the app. Android keeps the phone awake for it, without a wake lock of MediaSync's own. It ends after a quiet minute.
  */
-@HiltWorker
-class ReceiveNowWorker @AssistedInject constructor(
+@AssistedInject
+class ReceiveNowWorker(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val receiver: ConsumerReceiver,
@@ -304,6 +326,13 @@ class ReceiveNowWorker @AssistedInject constructor(
     private val notifications: SyncNotifications,
     private val clock: Clock,
 ) : CoroutineWorker(context, params) {
+
+    @AssistedFactory
+    @WorkerKey(ReceiveNowWorker::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : WorkerAssistedFactory {
+        override fun create(context: Context, params: WorkerParameters): ReceiveNowWorker
+    }
 
     override suspend fun doWork(): Result = logged("Receiving") {
         notifications.runInForeground(this, notifications.receiving())
@@ -378,8 +407,9 @@ private val MAX_WINDOW: Duration = Duration.ofHours(4)
  * all the same.
  */
 @ExercisedOnDevice(coveredBy = "the two-emulator test")
-@Singleton
-class SyncNotifications @Inject constructor(@ApplicationContext private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class SyncNotifications(private val context: Context) {
 
     fun sending(consumerName: String?): ForegroundInfo = foreground(SENDING_ID, sendingNotification(consumerName, null))
 

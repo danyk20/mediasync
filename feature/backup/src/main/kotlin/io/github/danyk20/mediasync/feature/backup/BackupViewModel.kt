@@ -6,13 +6,15 @@ package io.github.danyk20.mediasync.feature.backup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.github.danyk20.mediasync.connector.ConnectorId
 import io.github.danyk20.mediasync.connector.DeviceAppProfile
 import io.github.danyk20.mediasync.connector.android.BackupOverview
 import io.github.danyk20.mediasync.connector.android.CloudBackup
 import io.github.danyk20.mediasync.connector.android.InstalledApps
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,9 +46,10 @@ data class BackupActions(
 )
 
 /** Cloud backup on the receiving phone (docs/PLAN.md §9): the apps that can back it up, and how that stands. */
-@HiltViewModel
-class BackupViewModel @Inject constructor(private val backup: CloudBackup, private val installedApps: InstalledApps) :
-    ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class BackupViewModel(private val backup: CloudBackup, private val installedApps: InstalledApps) : ViewModel() {
 
     private val checks = MutableStateFlow(0)
 

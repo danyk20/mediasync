@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.sync.android
 
 import android.annotation.SuppressLint
+import android.app.Service
 import android.content.Context
 import androidx.core.content.edit
 import com.google.android.gms.tasks.Tasks
@@ -12,16 +13,18 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
+import dev.zacsweers.metrox.android.ServiceKey
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * The receiving phone's FCM registration, its Firebase Installation ID, by which its Worker wakes it when a sending
@@ -30,8 +33,9 @@ import javax.inject.Singleton
  * app's Firebase project.
  */
 @ExercisedOnDevice(coveredBy = "the real-world internet sync test (docs/PLAN.md §15, M5)")
-@Singleton
-class PushTokens @Inject constructor(@ApplicationContext private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class PushTokens(private val context: Context) {
     private val preferences = context.getSharedPreferences("push", Context.MODE_PRIVATE)
 
     /**
@@ -84,21 +88,16 @@ class PushTokens @Inject constructor(@ApplicationContext private val context: Co
  * running; the sending phone, waiting, then connects.
  */
 @ExercisedOnDevice(coveredBy = "the real-world internet sync test (docs/PLAN.md §15, M5)")
-@AndroidEntryPoint
+@ContributesIntoMap(AppScope::class, binding<Service>())
+@ServiceKey
 @SuppressLint("MissingFirebaseInstanceTokenRefresh") // onRegistered replaces the deprecated onNewToken.
-class WakeUpService : FirebaseMessagingService() {
-    @Inject
-    lateinit var receiver: ConsumerReceiver
-
-    @Inject
-    lateinit var scheduler: SyncScheduler
-
-    @Inject
-    lateinit var tokens: PushTokens
-
-    @Inject
-    lateinit var wakeUps: WakeUpCheck
-
+@Inject
+class WakeUpService(
+    private val receiver: ConsumerReceiver,
+    private val scheduler: SyncScheduler,
+    private val tokens: PushTokens,
+    private val wakeUps: WakeUpCheck,
+) : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         when (message.data["type"]) {
             "wake" -> {

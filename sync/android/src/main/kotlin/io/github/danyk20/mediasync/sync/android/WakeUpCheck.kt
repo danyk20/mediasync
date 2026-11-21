@@ -7,7 +7,9 @@ package io.github.danyk20.mediasync.sync.android
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
@@ -16,8 +18,6 @@ import java.io.IOException
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -38,7 +38,7 @@ data class WakeUpStatus(val checkedAtMillis: Long, val problem: String? = null) 
  * sync is set up, and once a day while this phone listens over the internet, so a way that broke shows on this phone,
  * rather than as a sending phone that waits for it in vain.
  */
-@Singleton
+@SingleIn(AppScope::class)
 class WakeUpCheck internal constructor(
     private val preferences: SharedPreferences,
     private val peers: PeerStore,
@@ -53,7 +53,7 @@ class WakeUpCheck internal constructor(
 ) {
     @Inject
     constructor(
-        @ApplicationContext context: Context,
+        context: Context,
         peers: PeerStore,
         network: Connectivity,
         tokens: PushTokens,

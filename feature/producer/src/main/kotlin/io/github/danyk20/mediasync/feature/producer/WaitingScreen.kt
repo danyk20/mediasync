@@ -76,11 +76,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaLibrary
@@ -93,7 +96,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -148,12 +150,11 @@ data class WaitingChange(val leftOut: Boolean, val count: Int)
  * The photos and videos the next sync sends, and those the user chose not to sync ([LeftOutItems]). The user chooses
  * some and leaves them out, or brings them back. Each change is saved at once, and can be undone.
  */
-@HiltViewModel
-class WaitingViewModel @Inject constructor(
-    private val sync: ProducerSync,
-    private val leftOut: LeftOutItems,
-    library: MediaLibrary,
-) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class WaitingViewModel(private val sync: ProducerSync, private val leftOut: LeftOutItems, library: MediaLibrary) :
+    ViewModel() {
 
     private val items = MutableStateFlow<List<SourceItem>?>(null)
     private val selected = MutableStateFlow<Set<String>>(emptySet())
@@ -234,7 +235,7 @@ fun WaitingRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     leftOutFirst: Boolean = false,
-    viewModel: WaitingViewModel = hiltViewModel(),
+    viewModel: WaitingViewModel = metroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
 }
 
 android {
@@ -15,9 +15,9 @@ dependencies {
     implementation(projects.core.crypto)
     implementation(projects.core.metadata)
     implementation(projects.core.datastore)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.work.runtime)
-    implementation(libs.androidx.hilt.work)
-    ksp(libs.androidx.hilt.compiler)
+    implementation(libs.metrox.android)
     implementation(projects.core.media)
     implementation(projects.transport.lan)
     implementation(projects.transport.webrtc)

@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
 }
 
 android {

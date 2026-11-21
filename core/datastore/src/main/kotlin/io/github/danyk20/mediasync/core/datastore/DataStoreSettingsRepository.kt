@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import dev.zacsweers.metro.Inject
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.model.PhotoDetails
@@ -19,15 +20,14 @@ import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
 
 @Suppress("TooManyFunctions") // One setter per setting.
-internal class DataStoreSettingsRepository @Inject constructor(private val dataStore: DataStore<Preferences>) :
-    SettingsRepository {
+@Inject
+class DataStoreSettingsRepository(private val dataStore: DataStore<Preferences>) : SettingsRepository {
 
     override val role: Flow<DeviceRole?> = dataStore.data
         .map { preferences -> preferences[RoleKey]?.toDeviceRole() }

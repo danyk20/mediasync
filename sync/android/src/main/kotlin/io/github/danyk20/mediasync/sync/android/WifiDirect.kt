@@ -16,7 +16,9 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.HandlerThread
 import android.os.Looper
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
@@ -27,8 +29,6 @@ import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -63,8 +63,9 @@ object TurboPermissions {
  */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
 @SuppressLint("MissingPermission") // Each call that needs a permission runs after availability() found it granted.
-@Singleton
-class WifiDirect @Inject constructor(@ApplicationContext private val context: Context) : DirectLinks {
+@SingleIn(AppScope::class)
+@Inject
+class WifiDirect(private val context: Context) : DirectLinks {
     private val manager: WifiP2pManager? = context.getSystemService(WifiP2pManager::class.java)
     private var channel: WifiP2pManager.Channel? = null
 

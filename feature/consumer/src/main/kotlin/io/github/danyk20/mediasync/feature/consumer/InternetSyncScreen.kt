@@ -46,14 +46,22 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
+import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -70,7 +78,6 @@ import java.text.NumberFormat
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -100,15 +107,24 @@ data class InternetSyncUiState(
  * Internet sync (docs/PLAN.md §8.4), as the receiving phone sets it up: the rendezvous Worker its sending phones
  * find it through when they aren't on its Wi-Fi. Each household runs its own, in its own Cloudflare account.
  */
-@HiltViewModel
-class InternetSyncViewModel @Inject constructor(
+@AssistedInject
+class InternetSyncViewModel(
     private val settings: SettingsRepository,
     private val receiver: ConsumerReceiver,
     private val workerSetup: WorkerSetup,
     private val cloudflare: CloudflareSignIn,
     /** Keeps a sign-in under way while the browser is open, even if Android ends the app meanwhile. */
-    private val saved: SavedStateHandle,
+    @Assisted private val saved: SavedStateHandle,
 ) : ViewModel() {
+
+    @AssistedFactory
+    @ViewModelAssistedFactoryKey(InternetSyncViewModel::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : ViewModelAssistedFactory {
+        override fun create(extras: CreationExtras): InternetSyncViewModel = create(extras.createSavedStateHandle())
+
+        fun create(saved: SavedStateHandle): InternetSyncViewModel
+    }
 
     private val relay = MutableStateFlow<RelayUsage?>(null)
     private val setup = MutableStateFlow(
@@ -256,7 +272,7 @@ private fun URI.isPlainHost() = rawPath.isNullOrEmpty() && rawQuery == null && r
 fun InternetSyncRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: InternetSyncViewModel = hiltViewModel(),
+    viewModel: InternetSyncViewModel = assistedMetroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val links = LocalUriHandler.current

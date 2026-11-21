@@ -11,16 +11,15 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.core.net.toUri
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.Inject
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
-import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 
 /** What the phone has at a stored item's location. */
-internal sealed interface PhoneFile {
+sealed interface PhoneFile {
     /** There, in [folder] (a MediaStore relative path such as `DCIM/MediaSync/`), possibly in the trash. */
     data class Found(val folder: String, val trashed: Boolean) : PhoneFile {
         fun inFolder(path: String): Boolean = folder.trimEnd('/') == path.trimEnd('/')
@@ -34,7 +33,7 @@ internal sealed interface PhoneFile {
 }
 
 /** The received files on this phone, as the gallery sees them. */
-internal interface PhoneFolder {
+interface PhoneFolder {
     /** What is at [location], a MediaStore content URI. */
     fun find(location: String): PhoneFile
 
@@ -43,7 +42,8 @@ internal interface PhoneFolder {
 }
 
 @ExercisedOnDevice(coveredBy = "connector:google-photos-app MediaStoreFolderTest")
-internal class MediaStoreFolder @Inject constructor(@ApplicationContext context: Context) : PhoneFolder {
+@Inject
+class MediaStoreFolder(context: Context) : PhoneFolder {
     private val resolver: ContentResolver = context.contentResolver
 
     override fun find(location: String): PhoneFile = try {
