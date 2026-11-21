@@ -15,11 +15,12 @@ import android.os.PowerManager
 import android.os.StatFs
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
@@ -32,8 +33,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -46,10 +45,11 @@ data class Fact(val label: String, val value: String)
  * how MediaSync is set up on it, what Android allows it, and the state of its background work. Like the log, it
  * names no files, places or people.
  */
-@Singleton
+@SingleIn(AppScope::class)
 @Suppress("LongParameterList") // Injected collaborators, one each.
-class DiagnosticsReport @Inject constructor(
-    @ApplicationContext private val context: Context,
+@Inject
+class DiagnosticsReport(
+    private val context: Context,
     private val settings: SettingsRepository,
     private val peers: PeerStore,
     private val history: SyncHistory,
@@ -175,15 +175,15 @@ class DiagnosticsReport @Inject constructor(
     }
 }
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal object DiagnosticsModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+object DiagnosticsModule {
     /**
      * Kept in the app's own files: nothing else can read it, and uninstalling removes it. Until [DiagnosticLogLimit]
      * has read the size the user chose, nothing is dropped, so a log bigger than the default isn't cut at start-up.
      */
     @Provides
-    @Singleton
-    fun diagnosticLog(@ApplicationContext context: Context, clock: Clock): FileDiagnosticLog =
+    @SingleIn(AppScope::class)
+    fun diagnosticLog(context: Context, clock: Clock): FileDiagnosticLog =
         FileDiagnosticLog(File(context.filesDir, "diagnostics"), clock, maxBytes = LogSize.MAX_BYTES)
 }

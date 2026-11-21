@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.mediasync.android.application)
     alias(libs.plugins.mediasync.android.compose)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -86,7 +86,10 @@ tasks.withType<Test>().configureEach {
 dependencies {
     implementation(projects.connector.android)
     implementation(projects.connector.googlePhotosApp)
+    implementation(projects.core.crypto)
+    implementation(projects.core.database)
     implementation(projects.core.datastore)
+    implementation(projects.core.media)
     implementation(projects.core.designsystem)
     implementation(projects.core.model)
     implementation(projects.feature.backup)
@@ -98,12 +101,16 @@ dependencies {
     implementation(projects.feature.quickaccess)
     implementation(projects.feature.share)
     implementation(projects.sync.android)
-    implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.work.runtime)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.metrox.android)
+    implementation(libs.metrox.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigation3.runtime)

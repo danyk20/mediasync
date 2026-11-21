@@ -4,11 +4,14 @@
  */
 package io.github.danyk20.mediasync.feature.producer
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
@@ -37,7 +40,6 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import java.time.Clock
 import java.time.ZonedDateTime
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -158,10 +160,13 @@ private data class DeviceAccess(
     val checkedAtMillis: Long,
 )
 
-@HiltViewModel
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@SuppressLint("StaticFieldLeak") // The graph hands over the application Context, never an Activity.
 @Suppress("LongParameterList", "TooManyFunctions") // Injected collaborators and the screen's actions, one each.
-class ProducerHomeViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+@Inject
+class ProducerHomeViewModel(
+    private val context: Context,
     private val sync: ProducerSync,
     private val scheduler: SyncScheduler,
     private val peers: PeerStore,

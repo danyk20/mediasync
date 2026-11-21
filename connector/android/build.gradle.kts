@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
 }
 
 android {
@@ -22,14 +22,14 @@ dependencies {
     testImplementation(libs.robolectric)
 }
 
-// Keeps the backup ledger: held to the same bar as the pure connector code. Code Hilt generates doesn't count, as in
+// Keeps the backup ledger: held to the same bar as the pure connector code. Code Metro generates doesn't count, as in
 // the project-wide report.
 kover {
     reports {
         filters {
             excludes {
-                classes("*_Factory", "*_Provide*Factory", "*HiltWrapper_*", "hilt_aggregated_deps.*")
-                annotatedBy("dagger.Module")
+                classes("*MetroFactory*", "*\$\$Metro*", "metro.hints.*")
+                annotatedBy("dev.zacsweers.metro.BindingContainer")
             }
         }
         variant("ci") {

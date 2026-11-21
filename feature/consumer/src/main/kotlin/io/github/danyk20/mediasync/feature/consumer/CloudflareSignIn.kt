@@ -4,10 +4,16 @@
  */
 package io.github.danyk20.mediasync.feature.consumer
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import dagger.hilt.android.AndroidEntryPoint
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
+import dev.zacsweers.metrox.android.ActivityKey
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.sync.android.SetupFailure
@@ -15,8 +21,6 @@ import io.github.danyk20.mediasync.transport.rendezvous.CloudflareOAuth
 import io.github.danyk20.mediasync.transport.rendezvous.SignInException
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -33,7 +37,7 @@ sealed interface SignInResult {
  * infra/rendezvous/README.md). The browser comes back through [CloudflareRedirectActivity], which hands the address
  * here for the screen to [take].
  */
-@Singleton
+@SingleIn(AppScope::class)
 class CloudflareSignIn internal constructor(private val oauth: CloudflareOAuth?) {
 
     @Inject
@@ -98,11 +102,10 @@ class CloudflareSignIn internal constructor(private val oauth: CloudflareOAuth?)
  * a build with the OAuth client declares. It hands the address over and returns to the app, which closes the
  * browser tab above it.
  */
-@AndroidEntryPoint
-class CloudflareRedirectActivity : ComponentActivity() {
-
-    @Inject
-    lateinit var signIn: CloudflareSignIn
+@ContributesIntoMap(AppScope::class, binding<Activity>())
+@ActivityKey
+@Inject
+class CloudflareRedirectActivity(private val signIn: CloudflareSignIn) : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

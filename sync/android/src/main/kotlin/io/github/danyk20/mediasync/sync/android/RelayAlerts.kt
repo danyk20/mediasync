@@ -11,9 +11,9 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 
 /** How much of the month's free relay allowance is used, as far as the user is told (docs/PLAN.md §8.5). */
 enum class RelayLevel {
@@ -44,8 +44,9 @@ val RelayUsage.level: RelayLevel
  * Tells the receiving phone's user when the month's relay allowance runs low (docs/PLAN.md §8.5): once at 80 %, once
  * at 95 %, and when the relay stopped, each at most once a month.
  */
-@Singleton
-class RelayAlerts @Inject constructor(@ApplicationContext private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class RelayAlerts(private val context: Context) {
     private val preferences = context.getSharedPreferences("relay_alerts", Context.MODE_PRIVATE)
 
     /** Notifies if [usage] reached a level the user wasn't told about yet this month. */

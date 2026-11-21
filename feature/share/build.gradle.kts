@@ -12,6 +12,7 @@ dependencies {
     implementation(projects.core.media)
     implementation(projects.sync.android)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.metrox.android)
 
     testImplementation(libs.androidx.test.core)
 }

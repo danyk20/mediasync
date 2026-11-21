@@ -6,7 +6,9 @@ package io.github.danyk20.mediasync.sync.android
 
 import android.content.Context
 import android.net.ConnectivityManager
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceId
@@ -20,8 +22,6 @@ import java.io.Closeable
 import java.net.URI
 import java.security.Signature
 import java.time.Instant
-import javax.inject.Inject
-import javax.inject.Singleton
 import okio.ByteString
 
 /**
@@ -29,9 +29,10 @@ import okio.ByteString
  * identity, the one paired phones pin (ADR 0009).
  */
 @ExercisedOnDevice(coveredBy = "sync:android InternetLinksTest")
-@Singleton
-class AndroidInternetLinks @Inject internal constructor(
-    @ApplicationContext private val context: Context,
+@SingleIn(AppScope::class)
+@Inject
+class AndroidInternetLinks(
+    private val context: Context,
     private val identity: IdentityProvider,
     private val mobileData: MobileDataSource,
     private val alerts: RelayAlerts,

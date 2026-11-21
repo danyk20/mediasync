@@ -6,12 +6,11 @@ package io.github.danyk20.mediasync.feature.diagnostics
 
 import android.content.Context
 import android.os.Build
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.Inject
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONException
@@ -36,7 +35,8 @@ interface Releases {
 }
 
 @ExercisedOnDevice(coveredBy = "UpdatesTest (version rules and the GitHub answer); a check on an emulator")
-class GitHubReleases @Inject constructor(@ApplicationContext private val context: Context) : Releases {
+@Inject
+class GitHubReleases(private val context: Context) : Releases {
     override fun fromPlay(): Boolean = installer() == PLAY_STORE
 
     override fun installed(): String =

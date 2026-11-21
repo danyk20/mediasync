@@ -7,15 +7,18 @@ package io.github.danyk20.mediasync.feature.quickaccess
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
+import dev.zacsweers.metrox.android.BroadcastReceiverKey
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,11 +27,10 @@ import kotlinx.coroutines.launch
 
 /** The home-screen widget: how syncing stands, and *Sync now*. [QuickAccess] keeps it current while MediaSync runs. */
 @ExercisedOnDevice(coveredBy = "feature:quickaccess QuickAccessTest (the widget's views) and a check on an emulator")
-@AndroidEntryPoint
-class SyncWidget : AppWidgetProvider() {
-    @Inject
-    lateinit var quickSync: QuickSync
-
+@ContributesIntoMap(AppScope::class, binding<BroadcastReceiver>())
+@BroadcastReceiverKey
+@Inject
+class SyncWidget(private val quickSync: QuickSync) : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
@@ -59,11 +61,9 @@ class SyncWidget : AppWidgetProvider() {
 }
 
 /** Keeps the widgets current while MediaSync runs. Call [start] when the app starts. */
-@Singleton
-class QuickAccess @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val quickSync: QuickSync,
-) {
+@SingleIn(AppScope::class)
+@Inject
+class QuickAccess(private val context: Context, private val quickSync: QuickSync) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun start() {

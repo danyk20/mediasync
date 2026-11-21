@@ -6,10 +6,12 @@ package io.github.danyk20.mediasync
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.DeviceRole
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +27,10 @@ sealed interface MainUiState {
     data class Ready(val role: DeviceRole?) : MainUiState
 }
 
-@HiltViewModel
-class MainViewModel @Inject constructor(settingsRepository: SettingsRepository) : ViewModel() {
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class MainViewModel(settingsRepository: SettingsRepository) : ViewModel() {
 
     val uiState: StateFlow<MainUiState> = settingsRepository.role
         .map<DeviceRole?, MainUiState> { MainUiState.Ready(it) }

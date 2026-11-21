@@ -16,11 +16,12 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.Area
@@ -35,8 +36,6 @@ import java.time.Clock
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -49,55 +48,49 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** The receiving phone's schedule from its settings, kept current for the sessions that tell it. */
-@Singleton
-class SettingsScheduleSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : ScheduleSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsScheduleSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) : ScheduleSource {
     private val schedule = settings.syncSchedule.stateIn(scope, SharingStarted.Eagerly, SyncSchedule.Default)
 
     override fun current(): SyncSchedule = schedule.value
 }
 
 /** The sending phone's *Photo details* from its settings, kept current for the sessions that apply them. */
-@Singleton
-class SettingsPhotoDetailsSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : PhotoDetailsSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsPhotoDetailsSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) :
+    PhotoDetailsSource {
     private val details = settings.photoDetails.stateIn(scope, SharingStarted.Eagerly, PhotoDetails.Default)
 
     override fun current(): PhotoDetails = details.value
 }
 
 /** The sending phone's sending order from its settings, kept current for the syncs that follow it. */
-@Singleton
-class SettingsSendingOrderSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : SendingOrderSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsSendingOrderSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) :
+    SendingOrderSource {
     private val order = settings.sendingOrder.stateIn(scope, SharingStarted.Eagerly, SendingOrder.Default)
 
     override fun current(): SendingOrder = order.value
 }
 
 /** The receiving phone's rendezvous Worker from its settings, told to paired phones in every session (PLAN §8.4). */
-@Singleton
-class SettingsRendezvousSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : RendezvousSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsRendezvousSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) :
+    RendezvousSource {
     private val url = settings.rendezvousUrl.stateIn(scope, SharingStarted.Eagerly, null)
 
     override fun current(): String? = url.value
 }
 
 /** Whether the sending phone's internet sync may use mobile data, from its settings. */
-@Singleton
-class SettingsMobileDataSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : MobileDataSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsMobileDataSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) :
+    MobileDataSource {
     private val allowed = settings.internetOverMobileData.stateIn(scope, SharingStarted.Eagerly, false)
     private val cap = settings.mobileDataCapBytes.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -107,37 +100,36 @@ class SettingsMobileDataSource @Inject constructor(
 }
 
 /** Whether the sending phone sends videos through the relay too, from its settings. */
-@Singleton
-class SettingsRelayVideosSource @Inject constructor(
-    settings: SettingsRepository,
-    @ApplicationScope scope: CoroutineScope,
-) : RelayVideosSource {
+@SingleIn(AppScope::class)
+@Inject
+class SettingsRelayVideosSource(settings: SettingsRepository, @ApplicationScope scope: CoroutineScope) :
+    RelayVideosSource {
     private val allowed = settings.videosOverRelay.stateIn(scope, SharingStarted.Eagerly, false)
 
     override fun allowed(): Boolean = allowed.value
 }
 
 /** The settings the sync runtime follows as they change. */
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class SettingsSourcesModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface SettingsSourcesModule {
     @Binds
-    abstract fun bindScheduleSource(impl: SettingsScheduleSource): ScheduleSource
+    val SettingsScheduleSource.bindScheduleSource: ScheduleSource
 
     @Binds
-    abstract fun bindPhotoDetailsSource(impl: SettingsPhotoDetailsSource): PhotoDetailsSource
+    val SettingsPhotoDetailsSource.bindPhotoDetailsSource: PhotoDetailsSource
 
     @Binds
-    abstract fun bindSendingOrderSource(impl: SettingsSendingOrderSource): SendingOrderSource
+    val SettingsSendingOrderSource.bindSendingOrderSource: SendingOrderSource
 
     @Binds
-    abstract fun bindRendezvousSource(impl: SettingsRendezvousSource): RendezvousSource
+    val SettingsRendezvousSource.bindRendezvousSource: RendezvousSource
 
     @Binds
-    abstract fun bindMobileDataSource(impl: SettingsMobileDataSource): MobileDataSource
+    val SettingsMobileDataSource.bindMobileDataSource: MobileDataSource
 
     @Binds
-    abstract fun bindRelayVideosSource(impl: SettingsRelayVideosSource): RelayVideosSource
+    val SettingsRelayVideosSource.bindRelayVideosSource: RelayVideosSource
 }
 
 /** What runs in the background for one role, and when. `null` schedule: nothing runs. */
@@ -153,8 +145,9 @@ private fun workerOf(role: DeviceRole): Class<out ListenableWorker> = when (role
  * Remembers the latest due time each role has handled. A due time missed while the phone wasn't charging
  * therefore still runs at the next charge, even if the app is opened (and everything rescheduled) in between.
  */
-@Singleton
-class ScheduleState @Inject constructor(@ApplicationContext context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class ScheduleState(context: Context) {
     private val preferences = context.getSharedPreferences("sync_schedule_state", Context.MODE_PRIVATE)
 
     fun lastHandledDue(role: DeviceRole): Long? = preferences.getLong(key(role), NONE).takeIf { it != NONE }
@@ -183,8 +176,9 @@ class ScheduleState @Inject constructor(@ApplicationContext context: Context) {
  * A finished run queues the next one behind itself, so changing the schedule never cancels a transfer. A run waiting
  * to try again keeps its wait when Android starts the app for it, unless the schedule changed meanwhile.
  */
-@Singleton
-class SyncScheduler @Inject constructor(
+@SingleIn(AppScope::class)
+@Inject
+class SyncScheduler(
     private val workManager: WorkManager,
     private val settings: SettingsRepository,
     private val peers: PeerStore,

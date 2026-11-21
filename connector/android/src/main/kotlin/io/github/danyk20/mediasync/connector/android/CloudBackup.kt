@@ -6,7 +6,9 @@ package io.github.danyk20.mediasync.connector.android
 
 import android.content.Context
 import android.content.pm.PackageManager
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.connector.AccountId
 import io.github.danyk20.mediasync.connector.BackupConnectorFactory
 import io.github.danyk20.mediasync.connector.BackupCoordinator
@@ -25,8 +27,6 @@ import java.time.Clock
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +45,8 @@ fun interface InstalledApps {
 }
 
 /** Needs the package listed under `<queries>` in a manifest (Android 11+ package visibility). */
-class PackageManagerApps @Inject constructor(@ApplicationContext private val context: Context) : InstalledApps {
+@Inject
+class PackageManagerApps(private val context: Context) : InstalledApps {
     override fun isInstalled(packageName: String): Boolean = try {
         context.packageManager.getApplicationInfo(packageName, 0).enabled
     } catch (_: PackageManager.NameNotFoundException) {
@@ -72,7 +73,7 @@ data class BackupOverview(
  * Cloud backup on the receiving phone (docs/PLAN.md §9): the connectors this app has, the accounts the user set up,
  * and the backups themselves, which start as soon as items arrive (§9.6).
  */
-@Singleton
+@SingleIn(AppScope::class)
 class CloudBackup internal constructor(
     private val registry: ConnectorRegistry,
     private val accounts: AccountStore,

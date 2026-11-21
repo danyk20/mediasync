@@ -13,7 +13,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MediaSync">
 
+        <!-- Metro constructor-injects this component; the app's component factory instantiates it. -->
         <activity
+            tools:ignore="Instantiatable"
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop">
@@ -32,7 +34,7 @@
             </intent-filter>
         </activity>
 
-        <!-- WorkManager is configured by MediaSyncApplication (Hilt workers), not at start-up. -->
+        <!-- WorkManager is configured by MediaSyncApplication (workers from the Metro graph), not at start-up. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

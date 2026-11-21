@@ -4,17 +4,18 @@
  */
 package io.github.danyk20.mediasync.sync.android
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.sync.engine.DirectLink
 import io.github.danyk20.mediasync.sync.engine.LinkKind
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Turbo transfer's direct links (docs/PLAN.md §8.3): Wi-Fi Aware where both phones have it, Wi-Fi Direct otherwise.
  * Whether Turbo can be used at all goes by Wi-Fi Direct, which every phone with Wi-Fi Aware has too.
  */
-@Singleton
+@SingleIn(AppScope::class)
 class TurboLinks internal constructor(private val direct: DirectLinks, private val aware: DirectLinks) : DirectLinks {
     @Inject
     constructor(direct: WifiDirect, aware: WifiAware) : this(direct as DirectLinks, aware as DirectLinks)

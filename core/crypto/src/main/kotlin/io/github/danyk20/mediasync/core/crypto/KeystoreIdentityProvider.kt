@@ -7,6 +7,9 @@ package io.github.danyk20.mediasync.core.crypto
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.transport.lan.DeviceIdentity
 import io.github.danyk20.mediasync.transport.lan.IdentityProvider
@@ -19,8 +22,6 @@ import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 import java.util.Date
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import javax.security.auth.x500.X500Principal
 
 /**
@@ -32,7 +33,7 @@ import javax.security.auth.x500.X500Principal
  * phone gets a new identity and has to be paired again.
  */
 @ExercisedOnDevice(coveredBy = "core:crypto KeystoreIdentityTest")
-@Singleton
+@SingleIn(AppScope::class)
 class KeystoreIdentityProvider internal constructor(private val alias: String) : IdentityProvider {
 
     @Inject

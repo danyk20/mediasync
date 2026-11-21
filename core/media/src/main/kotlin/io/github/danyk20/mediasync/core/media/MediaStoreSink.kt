@@ -14,7 +14,9 @@ import android.os.ParcelFileDescriptor
 import android.os.StatFs
 import android.provider.MediaStore
 import androidx.core.net.toUri
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.PartialTransferDao
 import io.github.danyk20.mediasync.core.database.PartialTransferEntity
 import io.github.danyk20.mediasync.core.model.DeviceId
@@ -28,8 +30,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import javax.inject.Inject
-import javax.inject.Singleton
 import okio.ByteString
 import okio.Source
 import okio.source
@@ -44,7 +44,7 @@ import okio.source
  * named as [ReceivedNames] says: with *Simple file names* on, a name keeps only its last dot.
  */
 @ExercisedOnDevice(coveredBy = "core:media MediaStoreTest")
-@Singleton
+@SingleIn(AppScope::class)
 class MediaStoreSink internal constructor(
     context: Context,
     private val partials: PartialTransferDao,
@@ -54,7 +54,7 @@ class MediaStoreSink internal constructor(
 ) : MediaSink {
 
     @Inject
-    constructor(@ApplicationContext context: Context, partials: PartialTransferDao, names: ReceivedNames) :
+    constructor(context: Context, partials: PartialTransferDao, names: ReceivedNames) :
         this(context, partials, DEFAULT_RESERVE_BYTES, names::of)
 
     private val resolver: ContentResolver = context.contentResolver

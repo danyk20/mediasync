@@ -4,6 +4,9 @@
  */
 package io.github.danyk20.mediasync.core.database
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -16,8 +19,6 @@ import io.github.danyk20.mediasync.sync.engine.ReceivedItem
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.SentLedger
 import java.security.SecureRandom
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okio.ByteString
@@ -28,9 +29,10 @@ typealias Peer = io.github.danyk20.mediasync.sync.android.Peer
 typealias ConsumerFacts = io.github.danyk20.mediasync.sync.android.ConsumerFacts
 
 /** Paired devices: the engine's [PeerRegistry] plus what the UI and the transport need. */
-@Singleton
+@SingleIn(AppScope::class)
 @Suppress("TooManyFunctions") // One question about the paired phones each.
-class PeerStore @Inject constructor(private val dao: PeerDao) : PeerBook {
+@Inject
+class PeerStore(private val dao: PeerDao) : PeerBook {
     override fun isPaired(id: DeviceId): Boolean = dao.get(id.hex) != null
 
     override fun register(peer: PairedPeer) {
@@ -97,8 +99,9 @@ class PeerStore @Inject constructor(private val dao: PeerDao) : PeerBook {
     )
 }
 
-@Singleton
-class RoomSentLedger @Inject constructor(private val dao: SentItemDao) : SentLedger {
+@SingleIn(AppScope::class)
+@Inject
+class RoomSentLedger(private val dao: SentItemDao) : SentLedger {
     override fun sentFingerprints(consumer: DeviceId): Set<ByteString> =
         dao.fingerprintsFor(consumer.hex).mapTo(HashSet()) { it.decodeHex() }
 
@@ -109,8 +112,9 @@ class RoomSentLedger @Inject constructor(private val dao: SentItemDao) : SentLed
     fun observeLastSentAt(consumer: DeviceId): Flow<Long?> = dao.observeLastSentAt(consumer.hex)
 }
 
-@Singleton
-class RoomReceivedLedger @Inject constructor(private val dao: ReceivedItemDao) : ReceivedLedger {
+@SingleIn(AppScope::class)
+@Inject
+class RoomReceivedLedger(private val dao: ReceivedItemDao) : ReceivedLedger {
     override fun contentIdOf(fingerprint: ByteString): ByteString? = dao.contentIdOf(fingerprint.hex())?.decodeHex()
 
     override fun record(item: ReceivedItem) {
@@ -139,8 +143,9 @@ class RoomReceivedLedger @Inject constructor(private val dao: ReceivedItemDao) :
 }
 
 /** Producer side: the fingerprints of the photos and videos the user chose not to sync. */
-@Singleton
-class LeftOutStore @Inject constructor(private val dao: LeftOutItemDao) : LeftOutList {
+@SingleIn(AppScope::class)
+@Inject
+class LeftOutStore(private val dao: LeftOutItemDao) : LeftOutList {
     /** Blocking, for the sync engine's I/O threads. */
     override fun fingerprints(): Set<ByteString> = dao.fingerprints().toFingerprints()
 

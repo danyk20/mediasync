@@ -5,7 +5,9 @@
 package io.github.danyk20.mediasync.sync.android
 
 import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
@@ -14,8 +16,6 @@ import io.github.danyk20.mediasync.transport.rendezvous.WorkerDeployer
 import io.github.danyk20.mediasync.transport.rendezvous.WorkerScript
 import java.io.IOException
 import java.net.URLEncoder
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -67,7 +67,7 @@ sealed interface SetupResult {
  * deploys the Worker this app carries with a token the user made for it, waits for it to answer, and turns internet
  * sync on with it. The token is used for this and kept nowhere.
  */
-@Singleton
+@SingleIn(AppScope::class)
 class WorkerSetup internal constructor(
     private val bundle: () -> WorkerScript?,
     private val deployer: (String) -> WorkerDeployer,
@@ -80,7 +80,7 @@ class WorkerSetup internal constructor(
 ) {
     @Inject
     constructor(
-        @ApplicationContext context: Context,
+        context: Context,
         settings: SettingsRepository,
         receiver: ConsumerReceiver,
         wakeUps: WakeUpCheck,

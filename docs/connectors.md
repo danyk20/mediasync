@@ -8,11 +8,11 @@ A connector backs up what the receiving phone received to one kind of place: a c
 |---|---|
 | `:connector:api` | The interfaces (`BackupConnectorFactory`, `BackupConnector`, `DeviceAppConnector`), descriptors and limits, the settings schema, the registry, the shared decorators, and the pipeline (`BackupOrchestrator`, `BackupCoordinator`). Pure Kotlin. Its `testFixtures` have in-memory fakes. |
 | `:connector:contract-tests` | `BackupConnectorContractTest`: the checks every connector passes. |
-| `:connector:android` | The Hilt registration (`@ConnectorKey`), the backup ledger in the app's database, the accounts, and `CloudBackup`, which starts backups as items arrive. |
+| `:connector:android` | The Metro registration (`@ConnectorKey`), the backup ledger in the app's database, the accounts, and `CloudBackup`, which starts backups as items arrive. |
 
 ## Checklist
 
-1. **Create the module** `connector/<name>`, with the Android library and Hilt convention plugins, and `api(projects.connector.android)`.
+1. **Create the module** `connector/<name>`, with the Android library and Metro (`mediasync.di`) convention plugins, and `api(projects.connector.android)`.
 2. **Describe the connector** in a `ConnectorDescriptor`:
    - an id (`lowercase-with-dashes`), and the service's name;
    - its capabilities: `VIDEO`, `VERIFY` if it can check that a copy is still there, `HASH_LOOKUP`, `METADATA_FROM_FILE_ONLY` if the service only reads dates and places from the file (date repair then runs first), or `DELEGATED_TO_DEVICE_APP` if another app on the phone does the upload;
@@ -23,11 +23,15 @@ A connector backs up what the receiving phone received to one kind of place: a c
    - Messages never name a file, a place or an account: they reach the diagnostic log.
    - `verify()` answers for every receipt. Without `VERIFY`, it answers `UNSUPPORTED`.
 4. **Settings and sign-in:** declare a `SettingsSchema` (the generic settings screen comes with v1.1) and a `ConnectorAuthenticator` whose kind matches the descriptor.
-5. **Register** the factory in the module's Hilt module:
+5. **Register** the factory in the module's binding container:
 
    ```kotlin
-   @Binds @IntoMap @ConnectorKey("my-cloud")
-   abstract fun bindFactory(factory: MyCloudConnectorFactory): BackupConnectorFactory
+   @ContributesTo(AppScope::class)
+   @BindingContainer
+   interface MyCloudModule {
+       @Binds @IntoMap @ConnectorKey("my-cloud")
+       val MyCloudConnectorFactory.bindFactory: BackupConnectorFactory
+   }
    ```
 
 6. **Test** with the kit: subclass `BackupConnectorContractTest` with a fake service (MockWebServer, or an in-memory fake), and tell it how to see what reached the service and how to make the service fail. Checks your fake can't support are skipped, not passed. Add `testImplementation(projects.connector.contractTests)`.

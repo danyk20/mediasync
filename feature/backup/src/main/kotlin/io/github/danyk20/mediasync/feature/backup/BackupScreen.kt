@@ -34,9 +34,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.connector.CleanupShortcut
 import io.github.danyk20.mediasync.connector.ConnectorId
 import io.github.danyk20.mediasync.connector.DeviceAppProfile
@@ -45,7 +45,7 @@ import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import java.text.NumberFormat
 
 @Composable
-fun BackupRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: BackupViewModel = hiltViewModel()) {
+fun BackupRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: BackupViewModel = metroViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Back from installing or setting up the app.

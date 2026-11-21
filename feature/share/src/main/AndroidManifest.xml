@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application>
         <!-- Share photos and videos to MediaSync to send them now. Off until ShareTarget sees a paired sending phone. -->
+        <!-- Metro constructor-injects this component; the app's component factory instantiates it. -->
         <activity
+            tools:ignore="Instantiatable"
             android:name=".ShareActivity"
             android:enabled="false"
             android:excludeFromRecents="true"

@@ -38,11 +38,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -57,7 +60,6 @@ import io.github.danyk20.mediasync.sync.android.TestFiles
 import java.io.File
 import java.io.IOException
 import java.util.Locale
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,8 +88,10 @@ data class LinkTestUi(
     val failed: Boolean = false,
 )
 
-@HiltViewModel
-class DiagnosticsViewModel @Inject constructor(
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class DiagnosticsViewModel(
     private val report: DiagnosticsReport,
     private val sync: ProducerSync,
     settings: SettingsRepository,
@@ -198,7 +202,7 @@ class DiagnosticsViewModel @Inject constructor(
 fun DiagnosticsRoute(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: DiagnosticsViewModel = hiltViewModel(),
+    viewModel: DiagnosticsViewModel = metroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

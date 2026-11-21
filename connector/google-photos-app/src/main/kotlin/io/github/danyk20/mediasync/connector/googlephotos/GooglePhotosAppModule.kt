@@ -4,22 +4,22 @@
  */
 package io.github.danyk20.mediasync.connector.googlephotos
 
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoMap
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.IntoMap
 import io.github.danyk20.mediasync.connector.BackupConnectorFactory
 import io.github.danyk20.mediasync.connector.android.ConnectorKey
 
-@Module
-@InstallIn(SingletonComponent::class)
-internal abstract class GooglePhotosAppModule {
+@ContributesTo(AppScope::class)
+@BindingContainer
+interface GooglePhotosAppModule {
     @Binds
     @IntoMap
     @ConnectorKey("google-photos-app")
-    abstract fun bindFactory(factory: GooglePhotosAppConnectorFactory): BackupConnectorFactory
+    val GooglePhotosAppConnectorFactory.bindFactory: BackupConnectorFactory
 
     @Binds
-    abstract fun bindFolder(impl: MediaStoreFolder): PhoneFolder
+    val MediaStoreFolder.bindFolder: PhoneFolder
 }

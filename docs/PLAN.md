@@ -326,7 +326,7 @@ Grouped, each group with one plain-language choice:
 | Language | Kotlin (latest stable), coroutines and Flow |
 | UI | Jetpack Compose, Material 3, Navigation 3 (serializable keys, back stack as state), adaptive layouts |
 | Architecture | Clean architecture, MVVM with unidirectional data flow (`UiState` + intents), feature modules |
-| DI | Hilt, using multibindings for the connector and transport registries |
+| DI | Metro, using multibindings for the connector and transport registries |
 | Persistence | Room (with exported schemas and migration tests), DataStore (preferences) |
 | Background | WorkManager; JobScheduler user-initiated data transfer (UIDT) jobs on API 34+; foreground service (`dataSync`) |
 | Media | MediaStore; Media3 Transformer and Muxer for Storage saver and lossless video re-mux; ExifInterface plus MediaSync's own lossless metadata editor (§6.4) |
@@ -702,7 +702,7 @@ interface SecureSession : Closeable {
 }
 ```
 
-- Transports are registered through Hilt `@IntoSet`.
+- Transports are registered through Metro `@IntoSet`.
 - A `ConnectionManager` races the candidates allowed by the peer's network policy and hands the winner to the engine.
 - Turbo is never raced automatically. It is only used when the user starts it.
 - The engine never knows which transport it is using.
@@ -836,7 +836,7 @@ A Worker deployed from the phone has no analytics token (the deployment token is
 
 > **v1.0 scope:** MediaSync only places files in the consumer's folder. A **connector app** on the consumer (default: Google Photos, §9.3.1) uploads and deletes them. In v1.0 a connector is therefore a small *connector app profile*: which folder layout to use, how to guide setup, and which app or setting to open for cleanup. The full in-app connector framework below, for MediaSync uploading itself, starts in v1.1. The interfaces are designed now so both kinds fit.
 
-**Built (M4, part 1): the framework.** `:connector:api` (pure Kotlin) has the interfaces below, the registry, the four decorators, the pipeline (`BackupOrchestrator`) and `BackupCoordinator`, which runs it as soon as items arrive (§9.6). `:connector:contract-tests` is the kit (§9.5), with its own tests: well-behaved sample connectors pass it, and each way of misbehaving fails the check meant for it. `:connector:android` registers connectors through Hilt (`@ConnectorKey`), keeps the accounts and the backup ledger in the app's database (schema version 4: `connector_accounts`, `backup_receipts`), and starts backing up when the app starts on a receiving phone. How to write a connector is in [connectors.md](connectors.md). No connector ships in part 1, so nothing is backed up yet.
+**Built (M4, part 1): the framework.** `:connector:api` (pure Kotlin) has the interfaces below, the registry, the four decorators, the pipeline (`BackupOrchestrator`) and `BackupCoordinator`, which runs it as soon as items arrive (§9.6). `:connector:contract-tests` is the kit (§9.5), with its own tests: well-behaved sample connectors pass it, and each way of misbehaving fails the check meant for it. `:connector:android` registers connectors through Metro (`@ConnectorKey`), keeps the accounts and the backup ledger in the app's database (schema version 4: `connector_accounts`, `backup_receipts`), and starts backing up when the app starts on a receiving phone. How to write a connector is in [connectors.md](connectors.md). No connector ships in part 1, so nothing is backed up yet.
 
 ### 9.1 Pattern overview
 
@@ -845,7 +845,7 @@ Adding a new cloud should mean **one new Gradle module and no changes elsewhere*
 | Pattern | Where |
 |---|---|
 | **Strategy / Adapter** | Each `BackupConnector` adapts one external API to a common interface. |
-| **Abstract Factory + Registry** | A `BackupConnectorFactory` per connector type creates per-account instances. Factories self-register through a Hilt `@IntoMap @ConnectorKey("google-photos")`. The app discovers them at runtime. |
+| **Abstract Factory + Registry** | A `BackupConnectorFactory` per connector type creates per-account instances. Factories self-register through a Metro `@IntoMap @ConnectorKey("google-photos")`. The app discovers them at runtime. |
 | **Decorator** | Cross-cutting behaviour wraps any connector automatically: `Retrying`, `RateLimited` (token bucket from the connector's declared limits), `QuotaTracking` and `Instrumented` (logs and metrics). |
 | **Pipeline / Template Method** | `BackupOrchestrator` runs the same steps for every connector: select → **preprocess** → upload → record receipt → verify. Preprocessing applies the *Photo details* policy and date repair (§6), then the quality option (Original or Storage saver). These steps are shared strategies, so every connector gets them for free. |
 | **Declarative settings schema** | A connector describes its settings (fields, validation, auth kind). A generic Compose screen renders them, so simple connectors need no UI code. |
@@ -958,9 +958,9 @@ This section applies to uploading connectors (v1.1+). In Google Photos app mode,
 
 ### 9.5 "Write a new connector" checklist (in [connectors.md](connectors.md))
 
-1. Create `connector/<name>` (Android library + Hilt). *There's no `connector/_template` module: the checklist in connectors.md replaces it.*
+1. Create `connector/<name>` (Android library + Metro). *There's no `connector/_template` module: the checklist in connectors.md replaces it.*
 2. Implement `BackupConnectorFactory` and `BackupConnector`, and declare the descriptor (capabilities, limits) and settings schema.
-3. Add `@IntoMap` registration in the module's Hilt module.
+3. Add `@IntoMap` registration in the module's Metro binding container.
 4. Subclass `BackupConnectorContractTest` with a fake server (MockWebServer or Testcontainers). The kit includes metadata round-trip checks.
    - *As built (M4):* JUnit 4, so connectors in Android modules run it under Robolectric. Its checks: the descriptors agree; a photo and a video reach the destination byte for byte (so their date and place do); backing up twice keeps one copy; progress stays within the item; checks find deleted copies (and a connector that can't check never claims to); rate limits, server errors, a used-up allowance and an expired sign-in come back as results that say whether to retry; another app's connector skips what isn't on the phone and counts only what the app removed, never what's in the trash.
 5. Add the module to `:app` dependencies. No other code changes are needed.
@@ -1163,7 +1163,7 @@ Play submission checklist (M6):
 ```
 mediasync/
 ├─ app/                         # application module, DI graph, navigation
-├─ build-logic/                 # convention plugins (android-library, compose, hilt, kover, detekt …)
+├─ build-logic/                 # convention plugins (android-library, compose, di, kover, detekt …)
 ├─ core/{common,model,database,datastore,media,metadata,crypto,designsystem,ui,testing}/
 ├─ sync/{protocol,engine}/
 ├─ transport/{api,lan,turbo,internet}/

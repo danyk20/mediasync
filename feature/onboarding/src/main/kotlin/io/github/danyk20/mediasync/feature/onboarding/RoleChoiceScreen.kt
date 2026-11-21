@@ -23,14 +23,14 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.designsystem.component.ChoiceCard
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceRole
 
 @Composable
-fun RoleChoiceRoute(modifier: Modifier = Modifier, viewModel: RoleChoiceViewModel = hiltViewModel()) {
+fun RoleChoiceRoute(modifier: Modifier = Modifier, viewModel: RoleChoiceViewModel = metroViewModel()) {
     RoleChoiceScreen(onRoleChosen = viewModel::chooseRole, modifier = modifier)
 }
 

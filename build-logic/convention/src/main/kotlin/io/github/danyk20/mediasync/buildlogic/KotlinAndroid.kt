@@ -55,8 +55,8 @@ internal fun UnitTestOptions.configureUnitTests() {
     isIncludeAndroidResources = true
     all { test ->
         test.configureTestLogging()
-        // Hilt generates unit-test sources in every Android module, including ones whose tests all run
-        // on devices (e.g. core:crypto); Gradle would otherwise flag them as "sources but no tests".
+        // Some Android modules run all their tests on devices (e.g. core:crypto); Gradle would otherwise flag them as
+        // "sources but no tests".
         test.failOnNoDiscoveredTests.set(false)
         // Robolectric's Android 16 (API 36) runtime reads FileDescriptor internals, which JDK 17+ hides by default.
         test.jvmArgs(

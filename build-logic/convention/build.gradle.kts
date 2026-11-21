@@ -52,9 +52,9 @@ gradlePlugin {
             id = libs.plugins.mediasync.android.feature.get().pluginId
             implementationClass = "AndroidFeatureConventionPlugin"
         }
-        register("hilt") {
-            id = libs.plugins.mediasync.hilt.get().pluginId
-            implementationClass = "HiltConventionPlugin"
+        register("di") {
+            id = libs.plugins.mediasync.di.get().pluginId
+            implementationClass = "MetroConventionPlugin"
         }
         register("kmpLibrary") {
             id = libs.plugins.mediasync.kmp.library.get().pluginId

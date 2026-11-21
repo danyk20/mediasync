@@ -5,12 +5,12 @@
 package io.github.danyk20.mediasync.sync.android
 
 import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.sync.engine.TURBO_KEY_BYTES
 import java.io.File
 import java.security.SecureRandom
-import javax.inject.Inject
-import javax.inject.Singleton
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
@@ -18,10 +18,10 @@ import okio.ByteString.Companion.toByteString
  * This phone's *Turbo receive* key, as a receiving phone (docs/PLAN.md §8.3): made once, told to paired sending
  * phones in every session, and kept out of backups, so a restored phone makes its own.
  */
-@Singleton
+@SingleIn(AppScope::class)
 class TurboKeyStore internal constructor(private val file: File) {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(File(context.noBackupFilesDir, FILE_NAME))
+    constructor(context: Context) : this(File(context.noBackupFilesDir, FILE_NAME))
 
     private var key: ByteString? = null
 

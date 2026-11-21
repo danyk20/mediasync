@@ -6,7 +6,10 @@ package io.github.danyk20.mediasync.feature.consumer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.github.danyk20.mediasync.connector.android.CloudBackup
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -26,7 +29,6 @@ import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.github.danyk20.mediasync.sync.android.TurboKeyStore
 import io.github.danyk20.mediasync.sync.android.WakeUpCheck
 import io.github.danyk20.mediasync.sync.android.WakeUpStatus
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -116,8 +118,10 @@ private data class DeviceAccess(
     val turboScreenNeedsPermission: Boolean,
 )
 
-@HiltViewModel
-class ConsumerHomeViewModel @Inject constructor(
+@ViewModelKey
+@ContributesIntoMap(AppScope::class)
+@Inject
+class ConsumerHomeViewModel(
     private val receiver: ConsumerReceiver,
     private val peers: PeerStore,
     private val turboKeys: TurboKeyStore,

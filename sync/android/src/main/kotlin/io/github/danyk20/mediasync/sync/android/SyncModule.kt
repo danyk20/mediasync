@@ -6,12 +6,13 @@ package io.github.danyk20.mediasync.sync.android
 
 import android.content.Context
 import androidx.work.WorkManager
-import dagger.Binds
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.Qualifier
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.database.LeftOutStore
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -26,8 +27,6 @@ import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import javax.inject.Qualifier
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,69 +36,69 @@ import kotlinx.coroutines.SupervisorJob
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
-@Module
-@InstallIn(SingletonComponent::class)
+@ContributesTo(AppScope::class)
+@BindingContainer
 @Suppress("TooManyFunctions") // One binding each.
-internal abstract class SyncModule {
+interface SyncModule {
     @Binds
-    abstract fun bindMediaSource(impl: MediaStoreSource): MediaSource
+    val MediaStoreSource.bindMediaSource: MediaSource
 
     @Binds
-    abstract fun bindMediaSink(impl: MediaStoreSink): MediaSink
+    val MediaStoreSink.bindMediaSink: MediaSink
 
     @Binds
-    abstract fun bindSentLedger(impl: RoomSentLedger): SentLedger
+    val RoomSentLedger.bindSentLedger: SentLedger
 
     @Binds
-    abstract fun bindReceivedLedger(impl: RoomReceivedLedger): ReceivedLedger
+    val RoomReceivedLedger.bindReceivedLedger: ReceivedLedger
 
     @Binds
-    abstract fun bindDeviceInfo(impl: AndroidDeviceInfo): DeviceInfo
+    val AndroidDeviceInfo.bindDeviceInfo: DeviceInfo
 
     @Binds
-    abstract fun bindAddressProvider(impl: AndroidLocalNetwork): AddressProvider
+    val AndroidLocalNetwork.bindAddressProvider: AddressProvider
 
     @Binds
-    abstract fun bindLanSockets(impl: AndroidLocalNetwork): LanSockets
+    val AndroidLocalNetwork.bindLanSockets: LanSockets
 
     @Binds
-    abstract fun bindServiceDiscovery(impl: NsdServiceDiscovery): ServiceDiscovery
+    val NsdServiceDiscovery.bindServiceDiscovery: ServiceDiscovery
 
     @Binds
-    abstract fun bindDeviceConditions(impl: AndroidDeviceConditions): DeviceConditions
+    val AndroidDeviceConditions.bindDeviceConditions: DeviceConditions
 
     @Binds
-    abstract fun bindDirectLinks(impl: TurboLinks): DirectLinks
+    val TurboLinks.bindDirectLinks: DirectLinks
 
     @Binds
-    abstract fun bindInternetLinks(impl: AndroidInternetLinks): InternetLinks
+    val AndroidInternetLinks.bindInternetLinks: InternetLinks
 
     @Binds
-    abstract fun bindLinkScreen(impl: TurboScreen): LinkScreen
+    val TurboScreen.bindLinkScreen: LinkScreen
 
     @Binds
-    abstract fun bindPeerBook(impl: PeerStore): PeerBook
+    val PeerStore.bindPeerBook: PeerBook
 
     @Binds
-    abstract fun bindLeftOutList(impl: LeftOutStore): LeftOutList
+    val LeftOutStore.bindLeftOutList: LeftOutList
 
     @Binds
-    abstract fun bindSyncRecorder(impl: SyncHistory): SyncRecorder
+    val SyncHistory.bindSyncRecorder: SyncRecorder
 
     companion object {
         @Provides
-        @Singleton
+        @SingleIn(AppScope::class)
         @ApplicationScope
         fun provideApplicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         @Provides
-        @Singleton
-        fun provideWorkManager(@ApplicationContext context: Context): WorkManager = WorkManager.getInstance(context)
+        @SingleIn(AppScope::class)
+        fun provideWorkManager(context: Context): WorkManager = WorkManager.getInstance(context)
 
         @Provides
         fun provideClock(): Clock = PhoneClock
 
-        // The providers below mirror the @Inject constructors the classes had: same parameters, same arguments.
+        // The providers below mirror the constructors the classes had: same parameters, same arguments.
         @Provides
         fun provideConnectivity(
             addresses: AddressProvider,
@@ -110,11 +109,11 @@ internal abstract class SyncModule {
         ): Connectivity = Connectivity(addresses, sockets, discovery, directLinks, internet)
 
         @Provides
-        @Singleton
+        @SingleIn(AppScope::class)
         fun provideLeftOutItems(store: LeftOutList, source: MediaSource): LeftOutItems = LeftOutItems(store, source)
 
         @Provides
-        @Singleton
+        @SingleIn(AppScope::class)
         @Suppress("LongParameterList") // Collaborators, one each, as the constructor takes them.
         fun provideProducerSync(
             identity: IdentityProvider,
@@ -144,7 +143,7 @@ internal abstract class SyncModule {
         )
 
         @Provides
-        @Singleton
+        @SingleIn(AppScope::class)
         @Suppress("LongParameterList") // Collaborators, one each, as the constructor takes them.
         fun provideConsumerReceiver(
             identity: IdentityProvider,

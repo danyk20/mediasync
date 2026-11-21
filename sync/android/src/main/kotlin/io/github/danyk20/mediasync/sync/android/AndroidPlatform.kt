@@ -20,7 +20,9 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendingOrder
@@ -28,8 +30,6 @@ import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import javax.inject.Inject
-import javax.inject.Singleton
 import javax.net.SocketFactory
 import kotlin.coroutines.resume
 import kotlinx.coroutines.channels.awaitClose
@@ -40,9 +40,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
-@Singleton
-class AndroidDeviceInfo @Inject constructor(
-    @ApplicationContext private val context: Context,
+@SingleIn(AppScope::class)
+@Inject
+class AndroidDeviceInfo(
+    private val context: Context,
     private val schedule: ScheduleSource,
     private val details: PhotoDetailsSource,
     private val order: SendingOrderSource,
@@ -83,9 +84,9 @@ class AndroidDeviceInfo @Inject constructor(
 
 /** Battery level and temperature from Android, for the background guards (docs/PLAN.md §10.5). */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
-@Singleton
-class AndroidDeviceConditions @Inject constructor(@ApplicationContext private val context: Context) :
-    DeviceConditions {
+@SingleIn(AppScope::class)
+@Inject
+class AndroidDeviceConditions(private val context: Context) : DeviceConditions {
 
     override fun pauseReason(): PauseReason? {
         val power = context.getSystemService(PowerManager::class.java)
@@ -137,8 +138,9 @@ class AndroidDeviceConditions @Inject constructor(@ApplicationContext private va
  * - Android 13+ shows the progress notification only with the user's permission.
  */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
-@Singleton
-class BackgroundSetup @Inject constructor(@ApplicationContext private val context: Context) {
+@SingleIn(AppScope::class)
+@Inject
+class BackgroundSetup(private val context: Context) {
 
     fun batteryRestricted(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
         !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
@@ -153,8 +155,9 @@ class BackgroundSetup @Inject constructor(@ApplicationContext private val contex
  * Wi-Fi still reach each other through it.
  */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
-@Singleton
-class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Context) :
+@SingleIn(AppScope::class)
+@Inject
+class AndroidLocalNetwork(context: Context) :
     AddressProvider,
     LanSockets {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
@@ -207,8 +210,9 @@ class AndroidLocalNetwork @Inject constructor(@ApplicationContext context: Conte
 
 /** DNS-SD over mDNS through Android's [NsdManager]. */
 @ExercisedOnDevice(coveredBy = "sync:android AndroidPlatformTest")
-@Singleton
-class NsdServiceDiscovery @Inject constructor(@ApplicationContext context: Context) : ServiceDiscovery {
+@SingleIn(AppScope::class)
+@Inject
+class NsdServiceDiscovery(context: Context) : ServiceDiscovery {
     private val nsd = context.getSystemService(NsdManager::class.java)
 
     override fun advertise(port: Int, serviceId: String): Closeable {

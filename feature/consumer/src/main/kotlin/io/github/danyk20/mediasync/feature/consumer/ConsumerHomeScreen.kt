@@ -57,9 +57,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
@@ -93,7 +93,7 @@ fun ConsumerHomeRoute(
     onOpenMediaSyncSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
-    viewModel: ConsumerHomeViewModel = hiltViewModel(),
+    viewModel: ConsumerHomeViewModel = metroViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

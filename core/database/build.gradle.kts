@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.hilt)
+    alias(libs.plugins.mediasync.di)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
 

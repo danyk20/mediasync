@@ -14,12 +14,12 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,9 +33,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * screen on, so MediaSync is in use while the link opens. It goes away when the sync over the link ends, or the link
  * closes.
  */
-@Singleton
+@SingleIn(AppScope::class)
 @ExercisedOnDevice(coveredBy = "sync:android TurboScreenTest")
-class TurboScreen @Inject constructor(@ApplicationContext private val context: Context) : LinkScreen {
+@Inject
+class TurboScreen(private val context: Context) : LinkScreen {
     override fun show() {
         when (screenAction(Build.VERSION.SDK_INT, inForeground(), mayShow(context))) {
             ScreenAction.NOTHING -> Unit

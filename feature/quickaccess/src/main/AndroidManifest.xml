@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application>
         <!-- Sync now from the Quick Settings panel. -->
+        <!-- Metro constructor-injects this component; the app's component factory instantiates it. -->
         <service
+            tools:ignore="Instantiatable"
             android:name=".SyncTileService"
             android:exported="true"
             android:icon="@drawable/ic_quick_sync"
@@ -15,7 +18,9 @@
         </service>
 
         <!-- Sync now from the home screen. -->
+        <!-- Metro constructor-injects this component; the app's component factory instantiates it. -->
         <receiver
+            tools:ignore="Instantiatable"
             android:name=".SyncWidget"
             android:exported="false"
             android:label="@string/quick_widget_title">

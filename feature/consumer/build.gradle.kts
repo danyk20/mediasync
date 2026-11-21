@@ -52,6 +52,7 @@ if (cloudflareSignIn) {
 }
 
 dependencies {
+    implementation(libs.metrox.android)
     implementation(projects.connector.android)
     implementation(projects.core.datastore)
     implementation(projects.core.media)

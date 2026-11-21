@@ -6,11 +6,11 @@ package io.github.danyk20.mediasync.sync.android
 
 import android.content.Context
 import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import java.time.Clock
 import java.time.YearMonth
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,8 +19,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * What internet sync sent over mobile data this month (docs/PLAN.md §2.2: the optional monthly mobile data cap). It
  * starts over each calendar month, in the phone's time zone.
  */
-@Singleton
-class MobileDataUsage @Inject constructor(@ApplicationContext context: Context, private val clock: Clock) {
+@SingleIn(AppScope::class)
+@Inject
+class MobileDataUsage(context: Context, private val clock: Clock) {
     private val preferences = context.getSharedPreferences("mobile_data", Context.MODE_PRIVATE)
     private val _sentThisMonth = MutableStateFlow(read())
 

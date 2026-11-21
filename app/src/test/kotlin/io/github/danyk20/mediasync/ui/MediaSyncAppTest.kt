@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Screens need their Hilt view models, so navigation between them is covered by the instrumented
+ * Screens need their injected view models, so navigation between them is covered by the instrumented
  * MainActivityTest on real Android. This checks what renders without them.
  */
 @RunWith(RobolectricTestRunner::class)

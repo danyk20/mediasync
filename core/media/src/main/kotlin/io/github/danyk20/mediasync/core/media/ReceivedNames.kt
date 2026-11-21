@@ -10,11 +10,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -24,11 +24,11 @@ import kotlinx.coroutines.runBlocking
  * `20251018_101530.LS.mp4`, so it becomes `20251018_101530_LS.mp4`.
  */
 @ExercisedOnDevice(coveredBy = "core:media MediaStoreTest")
-@Singleton
+@SingleIn(AppScope::class)
 class ReceivedNames internal constructor(context: Context, private val simple: suspend () -> Boolean) {
 
     @Inject
-    constructor(@ApplicationContext context: Context, settings: SettingsRepository) :
+    constructor(context: Context, settings: SettingsRepository) :
         this(context, { settings.simpleFileNames.first() })
 
     private val resolver: ContentResolver = context.contentResolver
