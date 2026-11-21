@@ -12,7 +12,7 @@ import io.github.danyk20.mediasync.sync.engine.TransferProgress
  * that must never be missed: an item done, a file starting or all of it sent, the test file starting or ending, and
  * everything done. So the last progress of a sync always shows.
  */
-internal class ProgressThrottle(
+class ProgressThrottle(
     private val intervalNanos: Long = INTERVAL_NANOS,
     private val now: () -> Long = System::nanoTime,
 ) {

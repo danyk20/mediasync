@@ -9,7 +9,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import java.net.InetAddress
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
 class PlatformTest {
 

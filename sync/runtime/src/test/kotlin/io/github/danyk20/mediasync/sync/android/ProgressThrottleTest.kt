@@ -7,7 +7,7 @@ package io.github.danyk20.mediasync.sync.android
 import io.github.danyk20.mediasync.sync.engine.SendingItem
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
 class ProgressThrottleTest {
 

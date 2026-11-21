@@ -24,6 +24,7 @@ flowchart TB
 | `:core:model` | Kotlin Multiplatform | Domain types shared everywhere |
 | `:core:testing` | Android library | Fakes, test rules, screenshot helper |
 | `:sync:protocol` | Kotlin Multiplatform | Wire protocol: frame encoding and decoding |
+| `:sync:runtime` | Pure Kotlin | Sync platform ports (`Platform.kt`), pairing window, progress throttle: what the Android and desktop apps both implement or use |
 
 The plan adds `sync:engine`, `transport:*`, `connector:*`, `core:metadata`, `core:media`, `core:crypto` and `core:database` in the milestones that need them.
 

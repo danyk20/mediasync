@@ -21,7 +21,6 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.time.Instant
-import javax.inject.Inject
 import javax.net.SocketFactory
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
@@ -69,18 +68,6 @@ fun interface LanSockets {
     /** Whether a sync may open another connection: not on a warm phone, as more mean more radio and CPU work. */
     fun canUseMoreConnections(): Boolean = true
 }
-
-/**
- * How this phone reaches other phones: its local network, mDNS on it, direct links, and the internet
- * (docs/PLAN.md §8).
- */
-class Connectivity @Inject constructor(
-    val addresses: AddressProvider,
-    val sockets: LanSockets,
-    val discovery: ServiceDiscovery,
-    val directLinks: DirectLinks,
-    val internet: InternetLinks = InternetLinks.None,
-)
 
 /**
  * Internet sync (docs/PLAN.md §8.4): connections between the paired phones through the receiving phone's
@@ -331,7 +318,7 @@ fun serviceIdOf(device: DeviceId): String =
  * receiving phone said it listens on its Wi-Fi ([told]), if that's on a network this phone is on ([isLocal]); then
  * where it was last reached ([lastAddress]), wherever that is, as it worked before.
  */
-internal fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (InetAddress) -> Boolean): List<String> {
+fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (InetAddress) -> Boolean): List<String> {
     val nearby = told.filter { address -> parseAddress(address)?.address?.let(isLocal) == true }
     return (nearby + listOfNotNull(lastAddress)).distinct()
 }
@@ -342,7 +329,7 @@ internal fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (
  * Home networks route IPv4 reliably, so IPv6 is only used without it, and then only addresses that last:
  * private (ULA) ones first, then global ones, never deprecated site-local (`fec0::`) or link-local ones.
  */
-internal fun pairingAddresses(addresses: List<InetAddress>): List<InetAddress> {
+fun pairingAddresses(addresses: List<InetAddress>): List<InetAddress> {
     val usable = addresses.distinct().filterNot { it.isLinkLocalAddress || it.isAnyLocalAddress }
     val ipv4 = usable.filterIsInstance<Inet4Address>()
     if (ipv4.isNotEmpty()) return ipv4
@@ -353,13 +340,13 @@ internal fun pairingAddresses(addresses: List<InetAddress>): List<InetAddress> {
 }
 
 /** `192.168.1.20:47420` or `[fd00::1]:47420`. */
-internal fun formatAddress(address: InetAddress, port: Int): String {
+fun formatAddress(address: InetAddress, port: Int): String {
     val host = address.hostAddress?.substringBefore('%') ?: error("Unresolved address")
     return if (address is Inet6Address) "[$host]:$port" else "$host:$port"
 }
 
 /** Parses [formatAddress] output; `null` if malformed. */
-internal fun parseAddress(text: String): InetSocketAddress? {
+fun parseAddress(text: String): InetSocketAddress? {
     val separator = text.lastIndexOf(':').takeIf { it > 0 } ?: return null
     val host = text.substring(0, separator).removePrefix("[").removeSuffix("]")
     val port = text.substring(separator + 1).toIntOrNull()?.takeIf { it in 1..MAX_PORT }
