@@ -21,3 +21,8 @@ class DeviceIdentity(val certificate: X509Certificate, val privateKey: PrivateKe
 
 /** The certificate pin: SHA-256 over the DER encoding. */
 fun X509Certificate.deviceId(): DeviceId = DeviceId.of(MessageDigest.getInstance("SHA-256").digest(encoded))
+
+/** This device's TLS identity. */
+fun interface IdentityProvider {
+    fun identity(): DeviceIdentity
+}

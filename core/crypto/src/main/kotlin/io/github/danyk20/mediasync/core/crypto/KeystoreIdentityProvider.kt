@@ -9,6 +9,7 @@ import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.transport.lan.DeviceIdentity
+import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -21,11 +22,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import javax.security.auth.x500.X500Principal
-
-/** This device's TLS identity. */
-fun interface IdentityProvider {
-    fun identity(): DeviceIdentity
-}
 
 /**
  * Keeps the device identity in the Android Keystore (docs/PLAN.md §11).
