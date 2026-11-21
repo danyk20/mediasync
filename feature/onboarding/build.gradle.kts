@@ -1,11 +1,18 @@
 plugins {
-    alias(libs.plugins.mediasync.android.feature)
+    alias(libs.plugins.mediasync.kmp.feature)
 }
 
-android {
-    namespace = "io.github.danyk20.mediasync.feature.onboarding"
+kotlin {
+    android {
+        namespace = "io.github.danyk20.mediasync.feature.onboarding"
+    }
+    sourceSets {
+        commonMain.dependencies {
+            implementation(projects.core.datastore)
+        }
+    }
 }
 
-dependencies {
-    implementation(projects.core.datastore)
+compose.resources {
+    packageOfResClass = "io.github.danyk20.mediasync.feature.onboarding.generated.resources"
 }

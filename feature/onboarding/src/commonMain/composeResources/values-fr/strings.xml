@@ -10,6 +10,6 @@
     <string name="onboarding_how_title">Fonctionnement</string>
     <string name="onboarding_how_receive">Choisissez un téléphone pour recevoir. Un téléphone qui reste à la maison branché sur son chargeur convient le mieux, comme un ancien Pixel.</string>
     <string name="onboarding_how_pair">Associez une fois chaque téléphone émetteur, en scannant un code.</string>
-    <string name="onboarding_how_sync">Les nouvelles photos et vidéos sont envoyées chaque nuit pendant la charge, ou tout de suite avec Synchroniser maintenant. Elles passent directement d\'un téléphone à l\'autre, chiffrées, sans compte.</string>
+    <string name="onboarding_how_sync">Les nouvelles photos et vidéos sont envoyées chaque nuit pendant la charge, ou tout de suite avec Synchroniser maintenant. Elles passent directement d'un téléphone à l'autre, chiffrées, sans compte.</string>
     <string name="onboarding_change_later">Pour changer le rôle de ce téléphone plus tard, choisissez Réinitialiser MediaSync dans le menu ⋮.</string>
 </resources>

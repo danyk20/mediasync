@@ -11,6 +11,8 @@ import io.kotest.matchers.shouldBe
 import org.junit.Rule
 import org.junit.Test
 
+// Test names read as sentences with underscores, as in every other test source set (detekt skips only src/test).
+@Suppress("FunctionNaming")
 class RoleChoiceViewModelTest {
 
     @get:Rule

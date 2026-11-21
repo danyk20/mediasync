@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performClick
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.danyk20.mediasync.feature.consumer.R as ConsumerR
-import io.github.danyk20.mediasync.feature.onboarding.R as OnboardingR
 import io.github.danyk20.mediasync.feature.pairing.R as PairingR
 import io.github.danyk20.mediasync.feature.producer.R as ProducerR
 import org.junit.Rule
@@ -31,21 +30,21 @@ class MainActivityTest {
 
     @Test
     fun firstLaunch_choosingSends_opensProducerHome() {
-        awaitText(OnboardingR.string.onboarding_role_producer_title).performClick()
+        awaitNode(ONBOARDING_SENDS).performClick()
 
         awaitText(ProducerR.string.producer_status_not_paired_title).assertIsDisplayed()
     }
 
     @Test
     fun firstLaunch_choosingReceives_opensConsumerHome() {
-        awaitText(OnboardingR.string.onboarding_role_consumer_title).performClick()
+        awaitNode(ONBOARDING_RECEIVES).performClick()
 
         awaitText(ConsumerR.string.consumer_status_ready_title).assertIsDisplayed()
     }
 
     @Test
     fun sendingPhone_openingAPairingLink_asksBeforePairing() {
-        awaitText(OnboardingR.string.onboarding_role_producer_title).performClick()
+        awaitNode(ONBOARDING_SENDS).performClick()
         awaitText(ProducerR.string.producer_status_not_paired_title)
 
         val link = "mediasync://pair?v=1&id=${"a".repeat(64)}&t=AAAAAAAAAAAAAAAAAAAAAA&a=127.0.0.1%3A9&n=Test+phone"
@@ -60,8 +59,10 @@ class MainActivityTest {
      * Settings are read from and written to disk asynchronously, which Compose's idling doesn't track.
      * Waits until the text appears; on slow emulators the first DataStore read can take seconds.
      */
-    private fun awaitText(@StringRes id: Int, vararg args: Any): SemanticsNodeInteraction {
-        val text = composeRule.activity.getString(id, *args)
+    private fun awaitText(@StringRes id: Int, vararg args: Any): SemanticsNodeInteraction =
+        awaitNode(composeRule.activity.getString(id, *args))
+
+    private fun awaitNode(text: String): SemanticsNodeInteraction {
         composeRule.waitUntil(timeoutMillis = SCREEN_TIMEOUT_MILLIS) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
         }
@@ -69,6 +70,9 @@ class MainActivityTest {
     }
 
     private companion object {
+        // The onboarding strings are Compose resources now, which the Android `R` class no longer has.
+        const val ONBOARDING_SENDS = "This phone sends"
+        const val ONBOARDING_RECEIVES = "This phone receives"
         const val SCREEN_TIMEOUT_MILLIS = 10_000L
     }
 }

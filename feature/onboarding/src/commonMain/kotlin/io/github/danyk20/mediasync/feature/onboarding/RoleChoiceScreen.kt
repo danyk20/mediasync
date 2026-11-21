@@ -18,7 +18,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,6 +27,20 @@ import io.github.danyk20.mediasync.core.designsystem.component.ChoiceCard
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.Res
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_change_later
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_how_pair
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_how_receive
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_how_sync
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_how_title
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_question
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_role_consumer_description
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_role_consumer_title
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_role_producer_description
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_role_producer_title
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_subtitle
+import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun RoleChoiceRoute(modifier: Modifier = Modifier, viewModel: RoleChoiceViewModel = metroViewModel()) {
@@ -47,36 +60,36 @@ fun RoleChoiceScreen(onRoleChosen: (DeviceRole) -> Unit, modifier: Modifier = Mo
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.onboarding_title),
+                text = stringResource(Res.string.onboarding_title),
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = stringResource(R.string.onboarding_subtitle),
+                text = stringResource(Res.string.onboarding_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             HowItWorks()
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.onboarding_question),
+                text = stringResource(Res.string.onboarding_question),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() },
             )
             ChoiceCard(
-                title = stringResource(R.string.onboarding_role_producer_title),
-                description = stringResource(R.string.onboarding_role_producer_description),
+                title = stringResource(Res.string.onboarding_role_producer_title),
+                description = stringResource(Res.string.onboarding_role_producer_description),
                 icon = MediaSyncIcons.Send,
                 onClick = { onRoleChosen(DeviceRole.PRODUCER) },
             )
             ChoiceCard(
-                title = stringResource(R.string.onboarding_role_consumer_title),
-                description = stringResource(R.string.onboarding_role_consumer_description),
+                title = stringResource(Res.string.onboarding_role_consumer_title),
+                description = stringResource(Res.string.onboarding_role_consumer_description),
                 icon = MediaSyncIcons.Receive,
                 onClick = { onRoleChosen(DeviceRole.CONSUMER) },
             )
             Text(
-                text = stringResource(R.string.onboarding_change_later),
+                text = stringResource(Res.string.onboarding_change_later),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -88,11 +101,11 @@ fun RoleChoiceScreen(onRoleChosen: (DeviceRole) -> Unit, modifier: Modifier = Mo
 @Composable
 private fun HowItWorks() {
     Text(
-        text = stringResource(R.string.onboarding_how_title),
+        text = stringResource(Res.string.onboarding_how_title),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.semantics { heading() },
     )
-    listOf(R.string.onboarding_how_receive, R.string.onboarding_how_pair, R.string.onboarding_how_sync)
+    listOf(Res.string.onboarding_how_receive, Res.string.onboarding_how_pair, Res.string.onboarding_how_sync)
         .forEachIndexed { index, step ->
             // Read out as one: "1. Choose one phone to receive…".
             Row(
