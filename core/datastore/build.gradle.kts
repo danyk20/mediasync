@@ -1,14 +1,16 @@
 plugins {
-    alias(libs.plugins.mediasync.android.library)
+    alias(libs.plugins.mediasync.kmp.library)
     alias(libs.plugins.mediasync.di)
 }
 
-android {
-    namespace = "io.github.danyk20.mediasync.core.datastore"
-}
-
-dependencies {
-    api(projects.core.model)
-    api(libs.kotlinx.coroutines.core)
-    implementation(libs.androidx.datastore.preferences)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.core.model)
+            api(libs.kotlinx.coroutines.core)
+            // DataStore<Preferences> is in the repository's constructor; Path is in the factory's signature.
+            api(libs.androidx.datastore.preferences.core)
+            api(libs.okio)
+        }
+    }
 }
