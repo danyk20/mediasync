@@ -11,5 +11,5 @@
     <string name="onboarding_how_receive">Choose one phone to receive. A phone that stays at home on a charger works best, such as an older Pixel.</string>
     <string name="onboarding_how_pair">Pair each sending phone with it once, by scanning a code.</string>
     <string name="onboarding_how_sync">New photos and videos go over every night while the phones charge, or right away with Sync now. They go straight from phone to phone, encrypted, with no account.</string>
-    <string name="onboarding_change_later">To change this phone\'s role later, choose Reset MediaSync in the ⋮ menu.</string>
+    <string name="onboarding_change_later">To change this phone's role later, choose Reset MediaSync in the ⋮ menu.</string>
 </resources>
