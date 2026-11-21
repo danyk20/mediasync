@@ -149,6 +149,7 @@ detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
@@ -164,3 +165,4 @@ mediasync-android-feature = { id = "mediasync.android.feature" }
 mediasync-android-library = { id = "mediasync.android.library" }
 mediasync-hilt = { id = "mediasync.hilt" }
 mediasync-jvm-library = { id = "mediasync.jvm.library" }
+mediasync-kmp-library = { id = "mediasync.kmp.library" }

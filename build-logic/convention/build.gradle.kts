@@ -56,6 +56,10 @@ gradlePlugin {
             id = libs.plugins.mediasync.hilt.get().pluginId
             implementationClass = "HiltConventionPlugin"
         }
+        register("kmpLibrary") {
+            id = libs.plugins.mediasync.kmp.library.get().pluginId
+            implementationClass = "KmpLibraryConventionPlugin"
+        }
         register("jvmLibrary") {
             id = libs.plugins.mediasync.jvm.library.get().pluginId
             implementationClass = "JvmLibraryConventionPlugin"

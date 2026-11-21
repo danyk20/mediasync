@@ -5,9 +5,9 @@
 package io.github.danyk20.mediasync.transport
 
 import io.github.danyk20.mediasync.core.model.DeviceId
-import java.io.Closeable
 import okio.BufferedSink
 import okio.BufferedSource
+import okio.Closeable
 
 /**
  * An ordered, reliable, encrypted byte stream to a peer whose identity has already been authenticated.

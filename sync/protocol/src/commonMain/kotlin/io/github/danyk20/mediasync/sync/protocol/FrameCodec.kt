@@ -4,10 +4,10 @@
  */
 package io.github.danyk20.mediasync.sync.protocol
 
-import java.io.IOException
 import okio.BufferedSink
 import okio.BufferedSource
 import okio.EOFException
+import okio.IOException
 
 /** The peer sent bytes that are not a valid MediaSync frame. The session must be closed. */
 open class ProtocolException(message: String, cause: Throwable? = null) : IOException(message, cause)
