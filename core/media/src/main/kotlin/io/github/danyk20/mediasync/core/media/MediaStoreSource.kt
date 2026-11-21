@@ -213,7 +213,7 @@ class MediaStoreSource internal constructor(
         original: Boolean,
     ): Pair<ByteString, Long>? {
         val key = uri.toString()
-        fingerprints.get(key)
+        runBlocking { fingerprints.get(key) }
             ?.takeIf {
                 it.mediaStoreSize == mediaStoreSize && it.modifiedAtMillis == modifiedAtMillis &&
                     it.original == original
@@ -226,16 +226,18 @@ class MediaStoreSource internal constructor(
                     val fingerprint = Fingerprints.of(byteCount) { offset, count ->
                         ByteArray(count).also { bytes -> channel.readFully(ByteBuffer.wrap(bytes), offset) }
                     }
-                    fingerprints.upsert(
-                        MediaFingerprintEntity(
-                            key,
-                            mediaStoreSize,
-                            modifiedAtMillis,
-                            byteCount,
-                            original,
-                            fingerprint.hex(),
-                        ),
-                    )
+                    runBlocking {
+                        fingerprints.upsert(
+                            MediaFingerprintEntity(
+                                key,
+                                mediaStoreSize,
+                                modifiedAtMillis,
+                                byteCount,
+                                original,
+                                fingerprint.hex(),
+                            ),
+                        )
+                    }
                     fingerprint to byteCount
                 }
             }

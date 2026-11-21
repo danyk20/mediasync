@@ -11,7 +11,8 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
-// Blocking methods are called by the sync engine on I/O threads; Flow methods feed the UI.
+// Suspend methods are called by the sync engine on I/O threads, through runBlocking in the ledgers;
+// Flow methods feed the UI.
 
 @Dao
 interface PeerDao {
@@ -19,25 +20,25 @@ interface PeerDao {
     fun observeAll(): Flow<List<PeerEntity>>
 
     @Query("SELECT * FROM peers WHERE deviceId = :deviceId")
-    fun get(deviceId: String): PeerEntity?
+    suspend fun get(deviceId: String): PeerEntity?
 
     @Query("SELECT * FROM peers WHERE role = :role ORDER BY pairedAtMillis DESC")
-    fun withRole(role: String): List<PeerEntity>
+    suspend fun withRole(role: String): List<PeerEntity>
 
     @Query("SELECT * FROM peers WHERE role = :role ORDER BY pairedAtMillis DESC")
     fun observeWithRole(role: String): Flow<List<PeerEntity>>
 
     @Query("DELETE FROM peers WHERE role = :role AND deviceId != :keep")
-    fun deleteOthersWithRole(role: String, keep: String)
+    suspend fun deleteOthersWithRole(role: String, keep: String)
 
     @Upsert
-    fun upsert(peer: PeerEntity)
+    suspend fun upsert(peer: PeerEntity)
 
     @Query("UPDATE peers SET lastAddress = :address, lastSeenMillis = :seenAtMillis WHERE deviceId = :deviceId")
-    fun recordAddress(deviceId: String, address: String, seenAtMillis: Long)
+    suspend fun recordAddress(deviceId: String, address: String, seenAtMillis: Long)
 
     @Query("UPDATE peers SET schedule = :schedule WHERE deviceId = :deviceId")
-    fun recordSchedule(deviceId: String, schedule: String?)
+    suspend fun recordSchedule(deviceId: String, schedule: String?)
 
     /** Keeps what's given; a `null` leaves what's stored. */
     @Query(
@@ -45,7 +46,7 @@ interface PeerDao {
             "rendezvousUrl = COALESCE(:rendezvousUrl, rendezvousUrl), " +
             "wifiAddresses = COALESCE(:wifiAddresses, wifiAddresses) WHERE deviceId = :deviceId",
     )
-    fun recordFacts(
+    suspend fun recordFacts(
         deviceId: String,
         turboKey: String?,
         pairSecret: String?,
@@ -54,16 +55,16 @@ interface PeerDao {
     )
 
     @Query("DELETE FROM peers WHERE deviceId = :deviceId")
-    fun delete(deviceId: String)
+    suspend fun delete(deviceId: String)
 }
 
 @Dao
 interface SentItemDao {
     @Query("SELECT fingerprint FROM sent_items WHERE consumerId = :consumerId")
-    fun fingerprintsFor(consumerId: String): List<String>
+    suspend fun fingerprintsFor(consumerId: String): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(item: SentItemEntity)
+    suspend fun insert(item: SentItemEntity)
 
     @Query("SELECT MAX(sentAtMillis) FROM sent_items WHERE consumerId = :consumerId")
     fun observeLastSentAt(consumerId: String): Flow<Long?>
@@ -72,10 +73,10 @@ interface SentItemDao {
 @Dao
 interface ReceivedItemDao {
     @Query("SELECT contentId FROM received_items WHERE fingerprint = :fingerprint LIMIT 1")
-    fun contentIdOf(fingerprint: String): String?
+    suspend fun contentIdOf(fingerprint: String): String?
 
     @Insert
-    fun insert(item: ReceivedItemEntity)
+    suspend fun insert(item: ReceivedItemEntity)
 
     @Query("SELECT COUNT(*) FROM received_items")
     fun observeCount(): Flow<Int>
@@ -87,28 +88,28 @@ interface ReceivedItemDao {
 @Dao
 interface PartialTransferDao {
     @Query("SELECT * FROM partial_transfers WHERE producerId = :producerId AND fingerprint = :fingerprint")
-    fun get(producerId: String, fingerprint: String): PartialTransferEntity?
+    suspend fun get(producerId: String, fingerprint: String): PartialTransferEntity?
 
     @Upsert
-    fun upsert(partial: PartialTransferEntity)
+    suspend fun upsert(partial: PartialTransferEntity)
 
     @Query("DELETE FROM partial_transfers WHERE producerId = :producerId AND fingerprint = :fingerprint")
-    fun delete(producerId: String, fingerprint: String)
+    suspend fun delete(producerId: String, fingerprint: String)
 }
 
 @Dao
 interface MediaFingerprintDao {
     @Query("SELECT * FROM media_fingerprints WHERE mediaStoreUri = :uri")
-    fun get(uri: String): MediaFingerprintEntity?
+    suspend fun get(uri: String): MediaFingerprintEntity?
 
     @Upsert
-    fun upsert(entry: MediaFingerprintEntity)
+    suspend fun upsert(entry: MediaFingerprintEntity)
 }
 
 @Dao
 interface LeftOutItemDao {
     @Query("SELECT fingerprint FROM left_out_items")
-    fun fingerprints(): List<String>
+    suspend fun fingerprints(): List<String>
 
     @Query("SELECT fingerprint FROM left_out_items")
     fun observeFingerprints(): Flow<List<String>>
