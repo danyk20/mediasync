@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performClick
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.danyk20.mediasync.feature.consumer.R as ConsumerR
-import io.github.danyk20.mediasync.feature.pairing.R as PairingR
 import io.github.danyk20.mediasync.feature.producer.R as ProducerR
 import org.junit.Rule
 import org.junit.Test
@@ -52,7 +51,7 @@ class MainActivityTest {
             Intent(Intent.ACTION_VIEW, link.toUri()).setPackage(composeRule.activity.packageName),
         )
 
-        awaitText(PairingR.string.pairing_confirm_title, "Test phone").assertIsDisplayed()
+        awaitNode(PAIRING_CONFIRM_TITLE).assertIsDisplayed()
     }
 
     /**
@@ -70,8 +69,9 @@ class MainActivityTest {
     }
 
     private companion object {
-        // The onboarding strings are Compose resources now, which the Android `R` class no longer has.
+        // The onboarding and pairing strings are Compose resources now, which the Android `R` class no longer has.
         const val ONBOARDING_SENDS = "This phone sends"
+        const val PAIRING_CONFIRM_TITLE = "Pair with Test phone?"
         const val ONBOARDING_RECEIVES = "This phone receives"
         const val SCREEN_TIMEOUT_MILLIS = 10_000L
     }
