@@ -142,7 +142,7 @@ class CloudBackupTest {
         injected.deviceApps shouldBe listOf(apps)
     }
 
-    private fun receive(n: Int) = database.receivedItemDao().insert(
+    private suspend fun receive(n: Int) = database.receivedItemDao().insert(
         ReceivedItemEntity(
             producerId = "producer",
             fingerprint = "fingerprint-$n",

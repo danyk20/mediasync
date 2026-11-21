@@ -281,7 +281,7 @@ class MediaStoreTest {
         item.descriptor.fingerprint shouldBe Fingerprints.of(photo)
         item.descriptor.meta.album shouldBe "Camera"
         source.open(item).buffer().use { it.readByteArray() }.toList() shouldBe photo.toList()
-        database.mediaFingerprintDao().get(item.key)?.fingerprint shouldBe Fingerprints.of(photo).hex()
+        runBlocking { database.mediaFingerprintDao().get(item.key) }?.fingerprint shouldBe Fingerprints.of(photo).hex()
         // Listing again finds the same file with the same fingerprint (MediaStore may have finished
         // scanning in between, so details like the modification time can legitimately change).
         source.items().single { it.key == item.key }.descriptor.fingerprint shouldBe item.descriptor.fingerprint

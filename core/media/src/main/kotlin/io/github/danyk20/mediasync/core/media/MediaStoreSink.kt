@@ -30,6 +30,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import kotlinx.coroutines.runBlocking
 import okio.ByteString
 import okio.Source
 import okio.source
@@ -63,23 +64,27 @@ class MediaStoreSink internal constructor(
         (StatFs(Environment.getExternalStorageDirectory().path).availableBytes - reserveBytes).coerceAtLeast(0)
 
     override fun partialSize(producer: DeviceId, fingerprint: ByteString): Long {
-        val partial = partials.get(producer.hex, fingerprint.hex()) ?: return 0
+        val partial = runBlocking { partials.get(producer.hex, fingerprint.hex()) } ?: return 0
         val size = sizeOf(partial.location.toUri())
-        if (size == null) partials.delete(producer.hex, fingerprint.hex()) // MediaStore expired it.
+        if (size == null) {
+            runBlocking { partials.delete(producer.hex, fingerprint.hex()) } // MediaStore expired it.
+        }
         return size ?: 0
     }
 
     override fun open(producer: DeviceId, descriptor: MediaDescriptor, offset: Long): IncomingFile {
         val fingerprint = descriptor.fingerprint.hex()
-        val existing = partials.get(producer.hex, fingerprint)
+        val existing = runBlocking { partials.get(producer.hex, fingerprint) }
         val uri = if (existing != null && offset > 0) {
             existing.location.toUri()
         } else {
             existing?.let { removeQuietly(it.location.toUri()) }
             insertPending(descriptor).also { uri ->
-                partials.upsert(
-                    PartialTransferEntity(producer.hex, fingerprint, uri.toString(), System.currentTimeMillis()),
-                )
+                runBlocking {
+                    partials.upsert(
+                        PartialTransferEntity(producer.hex, fingerprint, uri.toString(), System.currentTimeMillis()),
+                    )
+                }
             }
         }
         val file = resolver.openFileDescriptor(uri, "rw") ?: throw FileNotFoundException("Can't open $uri")
@@ -168,7 +173,7 @@ class MediaStoreSink internal constructor(
                 if (meta.capturedAtMillis == null) dateWritten?.let { put(MediaStore.MediaColumns.DATE_TAKEN, it) }
             }
             if (resolver.update(uri, values, null, null) != 1) throw IOException("Couldn't publish $uri")
-            partials.delete(producer.hex, fingerprint)
+            runBlocking { partials.delete(producer.hex, fingerprint) }
             return uri.toString()
         }
 
@@ -191,7 +196,7 @@ class MediaStoreSink internal constructor(
         override fun discard() {
             close()
             removeQuietly(uri)
-            partials.delete(producer.hex, fingerprint)
+            runBlocking { partials.delete(producer.hex, fingerprint) }
         }
 
         override fun close() {
