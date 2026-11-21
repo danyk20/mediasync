@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    api(projects.sync.runtime)
     api(projects.sync.engine)
     api(projects.core.diagnostics)
     api(projects.core.database)

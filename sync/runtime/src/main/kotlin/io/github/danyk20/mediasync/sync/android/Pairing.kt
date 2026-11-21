@@ -93,7 +93,7 @@ class PairingApprovals(private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS)
 }
 
 /** The consumer's [PairingGate]: a valid, unused token *and* the user's approval. */
-internal fun pairingGate(window: PairingWindow, approvals: PairingApprovals) = PairingGate { request ->
+fun pairingGate(window: PairingWindow, approvals: PairingApprovals) = PairingGate { request ->
     if (!window.redeem(request.token)) return@PairingGate PairingDecision.INVALID_TOKEN
     when (approvals.ask(request.peerName)) {
         true -> PairingDecision.ACCEPTED

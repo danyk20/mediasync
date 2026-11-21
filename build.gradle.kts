@@ -53,6 +53,7 @@ dependencies {
     kover(projects.sync.android)
     kover(projects.sync.engine)
     kover(projects.sync.protocol)
+    kover(projects.sync.runtime)
     kover(projects.transport.lan)
     kover(projects.transport.rendezvous)
 }

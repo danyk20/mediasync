@@ -11,7 +11,7 @@ import io.kotest.matchers.shouldBe
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import okio.ByteString.Companion.encodeUtf8
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
 class PairingWindowTest {
 

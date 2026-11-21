@@ -50,6 +50,7 @@ core/testing        Test fakes and helpers
 feature/*           One module per screen group (onboarding, producer, consumer)
 sync/protocol       Wire protocol: frames and messages (pure Kotlin)
 sync/engine         Producer/consumer sessions, ledgers, pairing (pure Kotlin)
+sync/runtime        Platform ports, pairing window, progress throttle shared with the desktop app (pure Kotlin)
 transport/api       The authenticated-connection interface
 transport/lan       TLS 1.3 with certificate pinning over the local network
 build-logic/        Gradle convention plugins shared by all modules
