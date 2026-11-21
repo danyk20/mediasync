@@ -5,7 +5,6 @@
 package io.github.danyk20.mediasync.core.datastore
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -18,20 +17,20 @@ import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import java.io.File
+import java.nio.file.Path
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
-import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.TemporaryFolder
+import okio.Path.Companion.toPath
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 
 class DataStoreSettingsRepositoryTest {
 
-    @get:Rule
-    val tempFolder = TemporaryFolder()
+    @TempDir
+    lateinit var tempFolder: Path
 
     @Test
     fun roleIsNullUntilChosen() = runTest {
@@ -249,8 +248,15 @@ class DataStoreSettingsRepositoryTest {
         DataStoreSettingsRepository(dataStore).dismissedPrompts.first() shouldBe setOf(SetupPrompt.BATTERY)
     }
 
-    private fun TestScope.dataStore(): DataStore<Preferences> = PreferenceDataStoreFactory.create(
-        scope = backgroundScope,
-        produceFile = { File(tempFolder.root, "settings.preferences_pb") },
-    )
+    @Test
+    fun storesUnderTheSameKeyNamesAsBefore() = runTest {
+        val dataStore = dataStore()
+        DataStoreSettingsRepository(dataStore).setRole(DeviceRole.CONSUMER)
+
+        dataStore.data.first().asMap().mapKeys { it.key.name } shouldBe mapOf("device_role" to "CONSUMER")
+    }
+
+    private fun TestScope.dataStore(): DataStore<Preferences> = createSettingsDataStore(scope = backgroundScope) {
+        tempFolder.resolve("settings.preferences_pb").toString().toPath()
+    }
 }
