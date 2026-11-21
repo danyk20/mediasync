@@ -5,6 +5,7 @@
 import com.android.build.api.dsl.Lint
 import io.github.danyk20.mediasync.buildlogic.MediaSyncKmpExtension
 import io.github.danyk20.mediasync.buildlogic.configureCodeQuality
+import io.github.danyk20.mediasync.buildlogic.configureDetektAllSourceSets
 import io.github.danyk20.mediasync.buildlogic.configureKotlin
 import io.github.danyk20.mediasync.buildlogic.configureLint
 import io.github.danyk20.mediasync.buildlogic.configureTestLogging
@@ -68,5 +69,6 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
             }
         }
         configureCodeQuality(koverSourceVariant = "jvm")
+        configureDetektAllSourceSets()
     }
 }

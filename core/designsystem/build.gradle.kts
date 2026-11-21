@@ -1,13 +1,22 @@
 plugins {
-    alias(libs.plugins.mediasync.android.library)
-    alias(libs.plugins.mediasync.android.compose)
+    alias(libs.plugins.mediasync.kmp.compose)
 }
 
-android {
-    namespace = "io.github.danyk20.mediasync.core.designsystem"
+kotlin {
+    android {
+        namespace = "io.github.danyk20.mediasync.core.designsystem"
+    }
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.core.model)
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(projects.core.testing)
+        }
+    }
 }
 
-dependencies {
-    api(projects.core.model)
-    testImplementation(projects.core.testing)
+compose.resources {
+    packageOfResClass = "io.github.danyk20.mediasync.core.designsystem.generated.resources"
+    publicResClass = true
 }

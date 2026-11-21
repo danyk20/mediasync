@@ -48,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -83,6 +82,7 @@ import io.github.danyk20.mediasync.sync.android.TurboPermissions
 import io.github.danyk20.mediasync.sync.android.level
 import java.text.NumberFormat
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ConsumerHomeRoute(

@@ -26,7 +26,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -39,6 +38,7 @@ import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.sync.android.SetupFailure
 import io.github.danyk20.mediasync.sync.android.SetupResult
 import io.github.danyk20.mediasync.sync.android.SetupStep
+import org.jetbrains.compose.resources.painterResource
 
 /** Setting up internet sync with the user's own Cloudflare account (docs/PLAN.md §8.4), as the screen shows it. */
 sealed interface CloudflareSetup {
