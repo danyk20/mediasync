@@ -12,13 +12,14 @@ import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.long
 import io.kotest.property.checkAll
-import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
 import org.junit.jupiter.api.Test
 
 class SyncScheduleTest {
@@ -27,11 +28,19 @@ class SyncScheduleTest {
 
     private fun at(text: String) = ZonedDateTime.parse("$text[Europe/Zurich]")
 
-    private val threeAm = LocalTime.of(3, 0)
+    private val threeAm = LocalTime(3, 0)
 
     @Test
     fun theDefaultIsDailyAtThreeInTheMorning() {
         SyncSchedule.Default shouldBe SyncSchedule.Daily(threeAm)
+    }
+
+    @Test
+    fun theKotlinxAnswersAreTheSameMoments() {
+        SyncSchedule.Daily(
+            threeAm,
+        ).nextDue(kotlin.time.Instant.parse("2026-10-14T19:30:00Z"), TimeZone.of("Europe/Zurich")) shouldBe
+            kotlin.time.Instant.parse("2026-10-15T01:00:00Z")
     }
 
     @Test
@@ -46,7 +55,7 @@ class SyncScheduleTest {
 
     @Test
     fun everyFewHoursIsCountedFromItsStartTimeAndWrapsPastMidnight() {
-        val everySix = SyncSchedule.EveryHours(6, LocalTime.of(21, 0))
+        val everySix = SyncSchedule.EveryHours(6, LocalTime(21, 0))
 
         everySix.nextDue(at("2026-10-14T21:30+02:00")) shouldBe at("2026-10-15T03:00+02:00")
         everySix.nextDue(at("2026-10-15T03:00+02:00")) shouldBe at("2026-10-15T09:00+02:00")
@@ -63,7 +72,7 @@ class SyncScheduleTest {
 
     @Test
     fun weeklyIsDueOnItsDay() {
-        val sundays = SyncSchedule.Weekly(DayOfWeek.SUNDAY, LocalTime.of(20, 0))
+        val sundays = SyncSchedule.Weekly(DayOfWeek.SUNDAY, LocalTime(20, 0))
 
         sundays.nextDue(at("2026-10-14T12:00+02:00")) shouldBe at("2026-10-18T20:00+02:00")
         sundays.previousDue(at("2026-10-14T12:00+02:00")) shouldBe at("2026-10-11T20:00+02:00")
@@ -72,7 +81,7 @@ class SyncScheduleTest {
     @Test
     fun aTimeSkippedBySpringDaylightSavingRunsWhenTheClocksJump() {
         // On 2026-03-29 Zurich jumps from 02:00 to 03:00; 02:30 doesn't exist that night.
-        SyncSchedule.Daily(LocalTime.of(2, 30)).nextDue(at("2026-03-28T12:00+01:00")) shouldBe
+        SyncSchedule.Daily(LocalTime(2, 30)).nextDue(at("2026-03-28T12:00+01:00")) shouldBe
             at("2026-03-29T03:00+02:00")
         // 03:00 itself exists on both switch days, so the default never moves.
         SyncSchedule.Default.nextDue(at("2026-03-28T12:00+01:00")) shouldBe at("2026-03-29T03:00+02:00")
@@ -82,7 +91,7 @@ class SyncScheduleTest {
     @Test
     fun aTimeRepeatedByAutumnDaylightSavingRunsOnce() {
         // On 2026-10-25 Zurich goes back from 03:00 to 02:00; 02:30 happens twice.
-        val daily = SyncSchedule.Daily(LocalTime.of(2, 30))
+        val daily = SyncSchedule.Daily(LocalTime(2, 30))
         val first = daily.nextDue(at("2026-10-24T12:00+02:00"))
 
         first shouldBe at("2026-10-25T02:30+02:00")
@@ -101,9 +110,9 @@ class SyncScheduleTest {
     fun theTextFormIsReadBack() {
         listOf(
             "daily@03:00" to SyncSchedule.Default,
-            "hours:4@01:30" to SyncSchedule.EveryHours(4, LocalTime.of(1, 30)),
-            "days:3@22:00" to SyncSchedule.EveryDays(3, LocalTime.of(22, 0)),
-            "weekly:SATURDAY@09:15" to SyncSchedule.Weekly(DayOfWeek.SATURDAY, LocalTime.of(9, 15)),
+            "hours:4@01:30" to SyncSchedule.EveryHours(4, LocalTime(1, 30)),
+            "days:3@22:00" to SyncSchedule.EveryDays(3, LocalTime(22, 0)),
+            "weekly:SATURDAY@09:15" to SyncSchedule.Weekly(DayOfWeek.SATURDAY, LocalTime(9, 15)),
             "charging" to SyncSchedule.WhileCharging,
             "manual" to SyncSchedule.Manual,
         ).forEach { (text, schedule) ->
@@ -138,7 +147,7 @@ class SyncScheduleTest {
         }
     }
 
-    private val times = arbitrary { LocalTime.of(Arb.int(0..23).bind(), Arb.element(0, 15, 30, 45).bind()) }
+    private val times = arbitrary { LocalTime(Arb.int(0..23).bind(), Arb.element(0, 15, 30, 45).bind()) }
 
     private val timedSchedules = arbitrary<SyncSchedule> {
         when (Arb.int(0..3).bind()) {

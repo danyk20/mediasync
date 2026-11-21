@@ -46,7 +46,8 @@ class SourceFoldersScreenTest {
         FolderChoice(MediaFolder("Pictures/Instagram/", 1, 2_400_000, null), included = false),
     )
     private val cameraOnly = SourceFoldersUiState.Ready(SourceSelection.Default, folders)
-    private val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
+    private val firstQuarter =
+        SendRange(kotlinx.datetime.LocalDate(2025, 1, 1), kotlinx.datetime.LocalDate(2025, 3, 31))
     private val events = mutableListOf<String>()
 
     @Test
@@ -117,7 +118,7 @@ class SourceFoldersScreenTest {
 
     @Test
     fun onlyAFirstDaySendsThatDayAndLater() {
-        show(cameraOnly.copy(range = SendRange(from = LocalDate.of(2025, 1, 1))))
+        show(cameraOnly.copy(range = SendRange(from = kotlinx.datetime.LocalDate(2025, 1, 1))))
 
         composeRule.onNodeWithText("Sent: photos and videos taken on Jan 1, 2025 or later.").assertIsDisplayed()
     }

@@ -4,9 +4,6 @@
  */
 package io.github.danyk20.mediasync.core.model
 
-import java.math.BigDecimal
-import java.math.RoundingMode
-
 /**
  * A size the user types in megabytes (MB, 1024 × 1024 bytes), from [minBytes] to [maxBytes]: such as `0.5`, `20` or
  * `1,5`.
@@ -18,21 +15,37 @@ abstract class MegabyteSize(val minBytes: Long, val maxBytes: Long) {
     /** The size in [text], in megabytes; `null` if it isn't a number or isn't from [minBytes] to [maxBytes]. */
     fun parseMegabytes(text: String): Long? {
         val number = text.trim().replace(',', '.').takeIf { NUMBER.matches(it) } ?: return null
-        val bytes = BigDecimal(number).multiply(BigDecimal.valueOf(MEGABYTE)).setScale(0, RoundingMode.DOWN)
-        // A tenth of a megabyte is 104857.6 bytes: rounded down, 0.1 MB is still the smallest allowed.
-        if (bytes < BigDecimal.valueOf(minBytes) || bytes > BigDecimal.valueOf(maxBytes)) return null
-        return bytes.toLong()
+        val whole = number.substringBefore('.').ifEmpty { "0" }.toLong()
+        val fraction = number.substringAfter('.', missingDelimiterValue = "")
+        // Exact, rounded down: at most 9 digits on each side, so nothing overflows a Long. A tenth of a megabyte is
+        // 104857.6 bytes: rounded down, 0.1 MB is still the smallest allowed.
+        val fractionBytes = if (fraction.isEmpty()) 0L else fraction.toLong() * MEGABYTE / tenTo(fraction.length)
+        val bytes = whole * MEGABYTE + fractionBytes
+        return bytes.takeIf { it in minBytes..maxBytes }
     }
 
     /** [bytes] in megabytes, with no more decimals than needed: `1`, `0.5`, `20.25`. */
-    fun megabytes(bytes: Long): String = BigDecimal.valueOf(bytes)
-        .divide(BigDecimal.valueOf(MEGABYTE), 2, RoundingMode.HALF_UP)
-        .stripTrailingZeros()
-        .toPlainString()
+    fun megabytes(bytes: Long): String {
+        // Hundredths of a megabyte, rounded half up; split so nothing overflows.
+        val whole = bytes / MEGABYTE
+        val rest = bytes % MEGABYTE
+        val hundredths = whole * HUNDRED + (rest * HUNDRED * 2 + MEGABYTE) / (2 * MEGABYTE)
+        val units = hundredths / HUNDRED
+        val cents = hundredths % HUNDRED
+        return when {
+            cents == 0L -> "$units"
+            cents % TEN == 0L -> "$units.${cents / TEN}"
+            else -> "$units.${cents.toString().padStart(2, '0')}"
+        }
+    }
 
     companion object {
         const val MEGABYTE = 1024L * 1024
         private val NUMBER = Regex("""\d{1,9}(\.\d{1,9})?|\.\d{1,9}""")
+        private const val TEN = 10L
+        private const val HUNDRED = 100L
+
+        private fun tenTo(power: Int): Long = (1..power).fold(1L) { result, _ -> result * TEN }
     }
 }
 

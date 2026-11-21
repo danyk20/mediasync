@@ -19,6 +19,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import java.util.Date
+import kotlinx.datetime.toJavaDayOfWeek
+import kotlinx.datetime.toJavaLocalTime
 
 /** A time of day the way the phone shows times: "3:00 AM" or "03:00", following the user's 12/24-hour choice. */
 @Composable
@@ -28,6 +30,9 @@ fun formatTime(time: LocalTime): String {
     val today = LocalDate.now().atTime(time).atZone(ZoneId.systemDefault()).toInstant()
     return DateFormat.getTimeFormat(context).format(Date.from(today))
 }
+
+@Composable
+fun formatTime(time: kotlinx.datetime.LocalTime): String = formatTime(time.toJavaLocalTime())
 
 /** "Every day at 3:00 AM", "Every 6 hours from 3:00 AM", "Whenever charging"… */
 @Composable
@@ -40,7 +45,11 @@ fun scheduleSummary(schedule: SyncSchedule): String = when (schedule) {
     is SyncSchedule.EveryDays ->
         pluralStringResource(R.plurals.schedule_every_days, schedule.days, schedule.days, formatTime(schedule.at))
 
-    is SyncSchedule.Weekly -> stringResource(R.string.schedule_weekly, dayName(schedule.day), formatTime(schedule.at))
+    is SyncSchedule.Weekly -> stringResource(
+        R.string.schedule_weekly,
+        dayName(schedule.day.toJavaDayOfWeek()),
+        formatTime(schedule.at),
+    )
 
     SyncSchedule.WhileCharging -> stringResource(R.string.schedule_while_charging)
 

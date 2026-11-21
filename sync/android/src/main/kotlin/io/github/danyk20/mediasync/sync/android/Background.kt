@@ -29,6 +29,8 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.core.model.nextDue
+import io.github.danyk20.mediasync.core.model.previousDue
 import java.time.Clock
 import java.time.Duration
 import java.time.ZonedDateTime

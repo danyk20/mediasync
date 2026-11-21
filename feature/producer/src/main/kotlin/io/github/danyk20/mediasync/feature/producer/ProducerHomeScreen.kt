@@ -95,6 +95,7 @@ import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import java.time.Instant
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.datetime.toJavaLocalDate
 
 @Composable
 fun ProducerHomeRoute(
@@ -812,8 +813,8 @@ private val SENDABLE_TEST_FILE = setOf(null, TestFileHeld.STOPPED)
 /** The [folders] summary, with the days sent when they're limited. */
 @Composable
 private fun rangeSummary(folders: String, range: SendRange): String {
-    val from = range.from?.format(DAY_SHOWN)
-    val until = range.until?.format(DAY_SHOWN)
+    val from = range.from?.toJavaLocalDate()?.format(DAY_SHOWN)
+    val until = range.until?.toJavaLocalDate()?.format(DAY_SHOWN)
     return when {
         from != null && until != null -> stringResource(R.string.producer_sources_between, folders, from, until)
         from != null -> stringResource(R.string.producer_sources_from, folders, from)

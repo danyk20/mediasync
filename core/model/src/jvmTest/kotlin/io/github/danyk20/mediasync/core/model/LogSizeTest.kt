@@ -24,13 +24,31 @@ class LogSizeTest {
         LogSize.parseMegabytes("20") shouldBe 20 * LogSize.MEGABYTE
         LogSize.parseMegabytes("0.1") shouldBe LogSize.MIN_BYTES
         LogSize.parseMegabytes("1024") shouldBe LogSize.MAX_BYTES
+        LogSize.parseMegabytes(".5") shouldBe 524_288
+        LogSize.parseMegabytes("0,5") shouldBe 524_288
     }
 
     @Test
     fun sizesOutsideTheRangeOrNotNumbersAreRefused() {
-        listOf("", "abc", "0", "0.09", "-1", "1024.5", "5000", "1e3", "1.2.3").forEach {
+        listOf(
+            "", "abc", "0", "0.09", "-1", "1024.5", "5000", "1e3", "1.2.3", "0.0999", "1025", "1234567890", "1.", " ",
+        ).forEach {
             LogSize.parseMegabytes(it).shouldBeNull()
         }
+    }
+
+    @Test
+    fun roundingIsHalfUpToHundredths() {
+        LogSize.megabytes(131_072) shouldBe "0.13"
+        LogSize.megabytes(393_216) shouldBe "0.38"
+        LogSize.megabytes(5_243) shouldBe "0.01"
+        LogSize.megabytes(5_242) shouldBe "0"
+        LogSize.megabytes(0) shouldBe "0"
+        LogSize.megabytes(1_048_577) shouldBe "1"
+        LogSize.megabytes(1_572_864) shouldBe "1.5"
+        LogSize.megabytes(10 * LogSize.MEGABYTE) shouldBe "10"
+        LogSize.megabytes(1_024 * LogSize.MEGABYTE) shouldBe "1024"
+        LogSize.megabytes(Long.MAX_VALUE).isNotEmpty() shouldBe true
     }
 
     @Test

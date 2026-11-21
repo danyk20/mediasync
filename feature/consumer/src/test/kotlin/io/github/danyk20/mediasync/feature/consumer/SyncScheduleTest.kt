@@ -16,8 +16,8 @@ import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.kotest.matchers.shouldBe
-import java.time.DayOfWeek
-import java.time.LocalTime
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,21 +47,21 @@ class SyncScheduleTest {
 
     @Test
     fun switchingKeepsTheChosenTime() {
-        viewModel.setTime(LocalTime.of(22, 30))
+        viewModel.setTime(LocalTime(22, 30))
 
         viewModel.choose(ScheduleOption.EVERY_HOURS)
-        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(6, LocalTime.of(22, 30))
+        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(6, LocalTime(22, 30))
 
         viewModel.setHours(2)
-        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(2, LocalTime.of(22, 30))
+        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(2, LocalTime(22, 30))
 
         viewModel.choose(ScheduleOption.WEEKLY)
         viewModel.setDay(DayOfWeek.MONDAY)
-        settings.syncSchedule.value shouldBe SyncSchedule.Weekly(DayOfWeek.MONDAY, LocalTime.of(22, 30))
+        settings.syncSchedule.value shouldBe SyncSchedule.Weekly(DayOfWeek.MONDAY, LocalTime(22, 30))
 
         viewModel.choose(ScheduleOption.EVERY_DAYS)
         viewModel.setDays(3)
-        settings.syncSchedule.value shouldBe SyncSchedule.EveryDays(3, LocalTime.of(22, 30))
+        settings.syncSchedule.value shouldBe SyncSchedule.EveryDays(3, LocalTime(22, 30))
     }
 
     @Test
@@ -71,13 +71,13 @@ class SyncScheduleTest {
 
         viewModel.choose(ScheduleOption.EVERY_HOURS)
 
-        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(12, LocalTime.of(3, 0))
+        settings.syncSchedule.value shouldBe SyncSchedule.EveryHours(12, LocalTime(3, 0))
     }
 
     @Test
     fun withoutATimeNothingIsTimed() {
         viewModel.choose(ScheduleOption.WHILE_CHARGING)
-        viewModel.setTime(LocalTime.NOON)
+        viewModel.setTime(LocalTime(12, 0))
         settings.syncSchedule.value shouldBe SyncSchedule.WhileCharging
 
         viewModel.choose(ScheduleOption.DAILY)
@@ -86,7 +86,7 @@ class SyncScheduleTest {
 
     @Test
     fun theScreenShowsTheChoiceAndItsDetails() {
-        show(SyncSchedule.EveryHours(6, LocalTime.of(3, 0)))
+        show(SyncSchedule.EveryHours(6, LocalTime(3, 0)))
 
         composeRule.onNodeWithText("Every few hours").assertIsSelected()
         composeRule.onNodeWithText("6 hours").assertIsSelected()
@@ -114,7 +114,7 @@ class SyncScheduleTest {
 
     @Test
     fun screenshot_weekly_dark() = screenshot(
-        SyncSchedule.Weekly(DayOfWeek.SUNDAY, LocalTime.of(20, 0)),
+        SyncSchedule.Weekly(DayOfWeek.SUNDAY, LocalTime(20, 0)),
         "consumer_schedule_weekly_dark",
         darkTheme = true,
     )

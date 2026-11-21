@@ -19,7 +19,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.shouldBe
-import java.time.LocalTime
+import kotlinx.datetime.LocalTime
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
@@ -73,7 +73,7 @@ class PairingTest {
 
     @Test
     fun `the producer learns the consumer's schedule when pairing and in every sync`() {
-        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime(3, 0))
 
         pair(FakePairingGate(token)).first.consumerSchedule shouldBe consumerSchedule
 

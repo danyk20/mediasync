@@ -19,11 +19,11 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.io.File
-import java.time.LocalDate
-import java.time.LocalTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -113,8 +113,8 @@ class DataStoreSettingsRepositoryTest {
 
         repository.syncSchedule.first() shouldBe SyncSchedule.Default
 
-        repository.setSyncSchedule(SyncSchedule.EveryHours(4, LocalTime.of(1, 0)))
-        repository.syncSchedule.first() shouldBe SyncSchedule.EveryHours(4, LocalTime.of(1, 0))
+        repository.setSyncSchedule(SyncSchedule.EveryHours(4, LocalTime(1, 0)))
+        repository.syncSchedule.first() shouldBe SyncSchedule.EveryHours(4, LocalTime(1, 0))
     }
 
     @Test
@@ -143,12 +143,12 @@ class DataStoreSettingsRepositoryTest {
         val repository = DataStoreSettingsRepository(dataStore())
         repository.sendRange.first() shouldBe SendRange.Everything
 
-        val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
+        val firstQuarter = SendRange(LocalDate(2025, 1, 1), LocalDate(2025, 3, 31))
         repository.setSendRange(firstQuarter)
         repository.sendRange.first() shouldBe firstQuarter
 
         repository.setSendRange(firstQuarter.copy(from = null))
-        repository.sendRange.first() shouldBe SendRange(until = LocalDate.of(2025, 3, 31))
+        repository.sendRange.first() shouldBe SendRange(until = LocalDate(2025, 3, 31))
 
         repository.setSendRange(SendRange.Everything)
         repository.sendRange.first().isEverything shouldBe true
