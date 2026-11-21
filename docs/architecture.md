@@ -21,6 +21,7 @@ flowchart TB
 | `:feature:*` | Android library | Screens and their ViewModels, one module per screen group |
 | `:core:designsystem` | Android library | Theme, colours, icons, shared components |
 | `:core:datastore` | Kotlin Multiplatform | Persistent settings (DataStore); the Android file location is chosen in `:app` |
+| `:core:database` | Kotlin Multiplatform | Room database (`jvm` target; Android uses the framework SQLite and builds it in `:app`, the desktop app uses the bundled SQLite), ledgers and the peer book |
 | `:core:model` | Kotlin Multiplatform | Domain types shared everywhere |
 | `:core:testing` | Android library | Fakes, test rules, screenshot helper |
 | `:sync:protocol` | Kotlin Multiplatform | Wire protocol: frame encoding and decoding |
@@ -31,7 +32,7 @@ The plan adds `sync:engine`, `transport:*`, `connector:*`, `core:metadata`, `cor
 ## Rules
 
 1. **Features never depend on other features.** Navigation between them happens in `:app`.
-2. **Sync logic stays pure Kotlin** (`sync:*`, `core:model`, later `core:metadata`, `transport:api`, `connector:api`). These modules have no Android dependency and their tests run on the JVM in milliseconds. They are moving to Kotlin Multiplatform for the desktop and iOS apps ([ADR 0010](adr/0010-multiplatform-desktop-and-ios.md)): a module on the `mediasync.kmp.library` convention keeps its code in `src/commonMain` (JVM-only code in `src/jvmMain`) and its tests in `src/jvmTest`; Android uses its `jvm` target. Done so far: `sync:protocol`, `transport:api`, `core:model` (kotlinx-datetime in `commonMain`; `jvmMain` bridges to java.time for Android code), `core:datastore` (the Android `Context` provider lives in `:app`).
+2. **Sync logic stays pure Kotlin** (`sync:*`, `core:model`, later `core:metadata`, `transport:api`, `connector:api`). These modules have no Android dependency and their tests run on the JVM in milliseconds. They are moving to Kotlin Multiplatform for the desktop and iOS apps ([ADR 0010](adr/0010-multiplatform-desktop-and-ios.md)): a module on the `mediasync.kmp.library` convention keeps its code in `src/commonMain` (JVM-only code in `src/jvmMain`) and its tests in `src/jvmTest`; Android uses its `jvm` target. Done so far: `sync:protocol`, `transport:api`, `core:model` (kotlinx-datetime in `commonMain`; `jvmMain` bridges to java.time for Android code), `core:datastore` and `core:database` (the Android `Context` providers live in `:app`; entities, DAOs and the database in `commonMain`, the ledgers in `jvmMain`; Room's tests run on Android's SQLite in `:sync:android` and on the bundled SQLite in `:core:database:jvmTest`).
 3. **Android-specific code stays at the edges:** MediaStore, the keystore, WorkManager and Wi-Fi P2P each live behind an interface.
 4. **One-way data flow in the UI:** a ViewModel exposes a `StateFlow` of UI state, and screens send events up as callbacks. Screens are stateless composables, wrapped by a thin `…Route` that obtains the ViewModel. This keeps every screen testable without the graph.
 5. **Build configuration lives in convention plugins** (`build-logic/`). Module build files only declare their namespace and dependencies.

@@ -1,19 +1,30 @@
 plugins {
-    alias(libs.plugins.mediasync.android.library)
+    alias(libs.plugins.mediasync.kmp.library)
     alias(libs.plugins.mediasync.di)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
 
-android {
-    namespace = "io.github.danyk20.mediasync.core.database"
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(libs.kotlinx.coroutines.core)
+            api(libs.androidx.room.runtime)
+        }
+        jvmMain.dependencies {
+            api(projects.sync.engine)
+            api(projects.sync.runtime)
+        }
+        jvmTest.dependencies {
+            implementation(libs.androidx.room.testing)
+            implementation(libs.androidx.sqlite.bundled)
+            implementation(project.dependencies.testFixtures(projects.sync.engine))
+        }
+    }
 }
 
-// The migration tests read the exported schemas as assets, on the JVM too.
-androidComponents {
-    onVariants { variant ->
-        variant.hostTests.values.forEach { it.sources.assets?.addStaticSourceDirectory("schemas") }
-    }
+dependencies {
+    add("kspJvm", libs.androidx.room.compiler)
 }
 
 room {
@@ -21,16 +32,7 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
-dependencies {
-    api(projects.sync.engine)
-    api(projects.sync.runtime)
-    api(libs.kotlinx.coroutines.core)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.androidx.room.testing)
-    testImplementation(testFixtures(projects.sync.engine))
+// Room's generated DAO implementations call Room's own restricted API, as they do in every Room module.
+extensions.configure<com.android.build.api.dsl.Lint> {
+    disable += "RestrictedApi"
 }
