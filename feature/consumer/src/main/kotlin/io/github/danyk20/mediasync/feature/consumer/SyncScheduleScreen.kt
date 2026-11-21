@@ -53,14 +53,15 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.designsystem.component.formatTime
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SyncSchedule
-import java.time.DayOfWeek
-import java.time.LocalTime
 import java.time.format.TextStyle
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.toJavaDayOfWeek
 
 /** The choices on the schedule screen, one per kind of [SyncSchedule]. */
 enum class ScheduleOption {
@@ -130,7 +131,7 @@ class SyncScheduleViewModel @Inject constructor(private val settings: SettingsRe
     }
 
     private companion object {
-        val DEFAULT_TIME: LocalTime = LocalTime.of(3, 0)
+        val DEFAULT_TIME: LocalTime = LocalTime(3, 0)
         const val DEFAULT_HOURS = 6
     }
 }
@@ -279,7 +280,14 @@ private fun Details(schedule: SyncSchedule, actions: ScheduleActions) {
                     FilterChip(
                         selected = schedule.day == day,
                         onClick = { actions.setDay(day) },
-                        label = { Text(day.getDisplayName(TextStyle.SHORT, LocalConfiguration.current.locales[0])) },
+                        label = {
+                            Text(
+                                day.toJavaDayOfWeek().getDisplayName(
+                                    TextStyle.SHORT,
+                                    LocalConfiguration.current.locales[0],
+                                ),
+                            )
+                        },
                     )
                 }
 
@@ -315,7 +323,7 @@ private fun TimeButton(label: String, time: LocalTime, onTime: (LocalTime) -> Un
         confirmButton = {
             TextButton(
                 onClick = {
-                    onTime(LocalTime.of(state.hour, state.minute))
+                    onTime(LocalTime(state.hour, state.minute))
                     picking = false
                 },
             ) { Text(stringResource(R.string.consumer_schedule_time_ok)) }
@@ -361,7 +369,7 @@ private val DETAILS_INDENT = 72.dp
 private fun SyncScheduleScreenPreview() {
     MediaSyncTheme(dynamicColor = false) {
         SyncScheduleScreen(
-            schedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0)),
+            schedule = SyncSchedule.EveryHours(6, LocalTime(3, 0)),
             actions = ScheduleActions(),
             onDone = {},
         )

@@ -19,11 +19,11 @@ import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.core.model.SyncSchedule
-import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.LocalDate
 
 @Suppress("TooManyFunctions") // One setter per setting.
 internal class DataStoreSettingsRepository @Inject constructor(private val dataStore: DataStore<Preferences>) :
@@ -79,16 +79,16 @@ internal class DataStoreSettingsRepository @Inject constructor(private val dataS
     override val sendRange: Flow<SendRange> = dataStore.data
         .map { preferences ->
             SendRange(
-                from = preferences[SendFromKey]?.let(LocalDate::ofEpochDay),
-                until = preferences[SendUntilKey]?.let(LocalDate::ofEpochDay),
+                from = preferences[SendFromKey]?.let(LocalDate::fromEpochDays),
+                until = preferences[SendUntilKey]?.let(LocalDate::fromEpochDays),
             )
         }
         .distinctUntilChanged()
 
     override suspend fun setSendRange(range: SendRange) {
         dataStore.edit { preferences ->
-            range.from?.let { preferences[SendFromKey] = it.toEpochDay() } ?: preferences.remove(SendFromKey)
-            range.until?.let { preferences[SendUntilKey] = it.toEpochDay() } ?: preferences.remove(SendUntilKey)
+            range.from?.let { preferences[SendFromKey] = it.toEpochDays() } ?: preferences.remove(SendFromKey)
+            range.until?.let { preferences[SendUntilKey] = it.toEpochDays() } ?: preferences.remove(SendUntilKey)
         }
     }
 

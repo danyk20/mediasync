@@ -13,9 +13,9 @@ import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import java.time.LocalTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalTime
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
 import org.junit.Rule
@@ -61,7 +61,7 @@ class MigrationTest {
             paired.schedule.shouldBeNull()
             RoomSentLedger(database.sentItemDao()).sentFingerprints(consumer) shouldBe setOf(fingerprint)
 
-            val everySix = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+            val everySix = SyncSchedule.EveryHours(6, LocalTime(3, 0))
             peers.recordConsumer(consumer, ConsumerFacts(schedule = everySix))
             peers.consumer()!!.schedule shouldBe everySix
         } finally {

@@ -33,8 +33,8 @@ import io.github.danyk20.mediasync.sync.engine.TestFileHeld
 import io.github.danyk20.mediasync.sync.engine.TransferEstimate
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.kotest.matchers.shouldBe
-import java.time.LocalDate
 import java.time.ZonedDateTime
+import kotlinx.datetime.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -330,7 +330,7 @@ class ProducerHomeScreenTest {
 
     @Test
     fun limitedDays_areShownWithTheFolders() {
-        show(paired.copy(pendingCount = 0, sendRange = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))))
+        show(paired.copy(pendingCount = 0, sendRange = SendRange(LocalDate(2025, 1, 1), LocalDate(2025, 3, 31))))
         composeRule.onNodeWithText("Camera only, Jan 1, 2025 – Mar 31, 2025").assertIsDisplayed()
     }
 

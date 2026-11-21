@@ -4,14 +4,20 @@
  */
 package io.github.danyk20.mediasync.core.model
 
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format
+import kotlinx.datetime.format.char
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * When scheduled syncs happen (docs/PLAN.md §10.1). The receiving phone owns the schedule and tells its sending
@@ -23,11 +29,11 @@ import java.time.format.DateTimeParseException
  */
 sealed interface SyncSchedule {
 
-    /** The latest due moment at or before [now]; `null` if this schedule has no due times. */
-    fun previousDue(now: ZonedDateTime): ZonedDateTime?
+    /** The latest due moment at or before [now] in [zone]; `null` if this schedule has no due times. */
+    fun previousDue(now: Instant, zone: TimeZone): Instant?
 
-    /** The first due moment after [now]; `null` if this schedule has no due times. */
-    fun nextDue(now: ZonedDateTime): ZonedDateTime?
+    /** The first due moment after [now] in [zone]; `null` if this schedule has no due times. */
+    fun nextDue(now: Instant, zone: TimeZone): Instant?
 
     /** Compact text for storage and the wire, read back by [decode]. */
     fun encode(): String
@@ -37,15 +43,21 @@ sealed interface SyncSchedule {
         /** The local due times on [date], earliest first. */
         internal abstract fun timesOn(date: LocalDate): List<LocalTime>
 
-        override fun previousDue(now: ZonedDateTime): ZonedDateTime? = (0..LOOKAROUND_DAYS).asSequence()
-            .map { now.toLocalDate().minusDays(it.toLong()) }
-            .flatMap { date -> timesOn(date).asReversed().asSequence().map { at(date, it, now.zone) } }
-            .firstOrNull { !it.isAfter(now) }
+        override fun previousDue(now: Instant, zone: TimeZone): Instant? {
+            val today = now.toLocalDateTime(zone).date
+            return (0..LOOKAROUND_DAYS).asSequence()
+                .map { today.minus(it, DateTimeUnit.DAY) }
+                .flatMap { date -> timesOn(date).asReversed().asSequence().map { at(date, it, zone) } }
+                .firstOrNull { it <= now }
+        }
 
-        override fun nextDue(now: ZonedDateTime): ZonedDateTime? = (-1..LOOKAROUND_DAYS).asSequence()
-            .map { now.toLocalDate().plusDays(it.toLong()) }
-            .flatMap { date -> timesOn(date).asSequence().map { at(date, it, now.zone) } }
-            .firstOrNull { it.isAfter(now) }
+        override fun nextDue(now: Instant, zone: TimeZone): Instant? {
+            val today = now.toLocalDateTime(zone).date
+            return (-1..LOOKAROUND_DAYS).asSequence()
+                .map { today.plus(it, DateTimeUnit.DAY) }
+                .flatMap { date -> timesOn(date).asSequence().map { at(date, it, zone) } }
+                .firstOrNull { it > now }
+        }
     }
 
     /** Once a day at [at]. The default, at 03:00. */
@@ -61,8 +73,9 @@ sealed interface SyncSchedule {
             require(hours in HOURS) { "Every $hours hours isn't offered" }
         }
 
-        override fun timesOn(date: LocalDate) =
-            (0 until HOURS_PER_DAY / hours).map { from.plusHours((it * hours).toLong()) }.sorted()
+        override fun timesOn(date: LocalDate) = (0 until HOURS_PER_DAY / hours)
+            .map { LocalTime.fromSecondOfDay((from.toSecondOfDay() + it * hours * SECONDS_PER_HOUR) % SECONDS_PER_DAY) }
+            .sorted()
 
         override fun encode() = "hours:$hours@${from.format(TIME)}"
     }
@@ -76,7 +89,7 @@ sealed interface SyncSchedule {
             require(days in DAYS) { "Every $days days isn't offered" }
         }
 
-        override fun timesOn(date: LocalDate) = if (Math.floorMod(date.toEpochDay(), days.toLong()) == 0L) {
+        override fun timesOn(date: LocalDate) = if (date.toEpochDays().mod(days.toLong()) == 0L) {
             listOf(at)
         } else {
             emptyList()
@@ -97,24 +110,24 @@ sealed interface SyncSchedule {
      * charging.
      */
     data object WhileCharging : SyncSchedule {
-        override fun previousDue(now: ZonedDateTime): ZonedDateTime? = null
+        override fun previousDue(now: Instant, zone: TimeZone): Instant? = null
 
-        override fun nextDue(now: ZonedDateTime): ZonedDateTime? = null
+        override fun nextDue(now: Instant, zone: TimeZone): Instant? = null
 
         override fun encode() = "charging"
     }
 
     /** Only *Sync now*. */
     data object Manual : SyncSchedule {
-        override fun previousDue(now: ZonedDateTime): ZonedDateTime? = null
+        override fun previousDue(now: Instant, zone: TimeZone): Instant? = null
 
-        override fun nextDue(now: ZonedDateTime): ZonedDateTime? = null
+        override fun nextDue(now: Instant, zone: TimeZone): Instant? = null
 
         override fun encode() = "manual"
     }
 
     companion object {
-        val Default: SyncSchedule = Daily(LocalTime.of(3, 0))
+        val Default: SyncSchedule = Daily(LocalTime(3, 0))
 
         /** The intervals offered for [EveryHours]: each divides a day evenly. */
         val HOURS = listOf(2, 4, 6, 12)
@@ -137,14 +150,20 @@ sealed interface SyncSchedule {
                 kind.startsWith("weekly:") -> Weekly(DayOfWeek.valueOf(kind.removePrefix("weekly:")), time)
                 else -> null
             }
-        } catch (_: DateTimeParseException) {
-            null
         } catch (_: IllegalArgumentException) {
-            null // A bad number or day name, or an interval this version doesn't offer.
+            // An unreadable time (DateTimeFormatException is one), a bad number or day name, or an interval this
+            // version doesn't offer.
+            null
         }
 
-        private val TIME = DateTimeFormatter.ofPattern("HH:mm")
+        private val TIME = LocalTime.Format {
+            hour()
+            char(':')
+            minute()
+        }
         private const val HOURS_PER_DAY = 24
+        private const val SECONDS_PER_HOUR = 3600
+        private const val SECONDS_PER_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR
 
         /** Far enough to reach any due time: weekly is the longest gap. */
         private const val LOOKAROUND_DAYS = 8
@@ -155,12 +174,13 @@ sealed interface SyncSchedule {
  * [time] on [date] in [zone]. A time daylight saving skips becomes the moment the clocks jump; a time that
  * occurs twice uses its first occurrence, so it runs once.
  */
-private fun at(date: LocalDate, time: LocalTime, zone: ZoneId): ZonedDateTime {
-    val local = LocalDateTime.of(date, time)
-    val offsets = zone.rules.getValidOffsets(local)
-    return if (offsets.isEmpty()) {
-        zone.rules.getTransition(local).instant.atZone(zone)
-    } else {
-        ZonedDateTime.ofLocal(local, zone, offsets.first())
-    }
+private fun at(date: LocalDate, time: LocalTime, zone: TimeZone): Instant {
+    val local = LocalDateTime(date, time)
+    val instant = local.toInstant(zone)
+    if (instant.toLocalDateTime(zone) == local) return instant
+    // Skipped by daylight saving: the instant returned is past the jump. Walk back to the jump itself, the first
+    // moment whose local time is after [local]. Clocks jump on whole minutes.
+    var jump = instant
+    while ((jump - 1.minutes).toLocalDateTime(zone) > local) jump -= 1.minutes
+    return jump
 }

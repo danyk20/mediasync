@@ -91,6 +91,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /** A folder on the list, and whether it's sent. */
 data class FolderChoice(val folder: MediaFolder, val included: Boolean)
@@ -253,14 +255,14 @@ private fun RangeChoice(range: SendRange, onChooseRange: (SendRange) -> Unit) {
     RangeEndRow(
         label = stringResource(R.string.producer_range_from),
         open = stringResource(R.string.producer_range_no_start),
-        day = range.from,
+        day = range.from?.toJavaLocalDate(),
         onOpen = { onChooseRange(range.copy(from = null)) },
         onPick = { picking = RangeEnd.FROM },
     )
     RangeEndRow(
         label = stringResource(R.string.producer_range_until),
         open = stringResource(R.string.producer_range_no_end),
-        day = range.until,
+        day = range.until?.toJavaLocalDate(),
         onOpen = { onChooseRange(range.copy(until = null)) },
         onPick = { picking = RangeEnd.UNTIL },
     )
@@ -272,7 +274,8 @@ private fun RangeChoice(range: SendRange, onChooseRange: (SendRange) -> Unit) {
             range = range,
             onPick = { day ->
                 picking = null
-                onChooseRange(if (end == RangeEnd.FROM) range.copy(from = day) else range.copy(until = day))
+                val picked = day.toKotlinLocalDate()
+                onChooseRange(if (end == RangeEnd.FROM) range.copy(from = picked) else range.copy(until = picked))
             },
             onDismiss = { picking = null },
         )
@@ -303,8 +306,8 @@ private fun RangeEndRow(label: String, open: String, day: LocalDate?, onOpen: ()
 /** What's sent, in words that say whether the chosen days themselves are: they always are. */
 @Composable
 private fun rangeNote(range: SendRange): String {
-    val from = range.from?.format(DAY_SHOWN)
-    val until = range.until?.format(DAY_SHOWN)
+    val from = range.from?.toJavaLocalDate()?.format(DAY_SHOWN)
+    val until = range.until?.toJavaLocalDate()?.format(DAY_SHOWN)
     return when {
         from != null && until != null -> stringResource(R.string.producer_range_note_between, from, until)
         from != null -> stringResource(R.string.producer_range_note_from, from)
@@ -320,10 +323,12 @@ private fun rangeNote(range: SendRange): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DayDialog(end: RangeEnd, range: SendRange, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val rangeFrom = range.from?.toJavaLocalDate()
+    val rangeUntil = range.until?.toJavaLocalDate()
     val today = LocalDate.now()
-    val earliest = if (end == RangeEnd.UNTIL) range.from else null
-    val latest = if (end == RangeEnd.FROM) listOfNotNull(today, range.until).min() else null
-    val shown = (if (end == RangeEnd.FROM) range.from else range.until) ?: latest?.takeIf { it < today } ?: today
+    val earliest = if (end == RangeEnd.UNTIL) rangeFrom else null
+    val latest = if (end == RangeEnd.FROM) listOfNotNull(today, rangeUntil).min() else null
+    val shown = (if (end == RangeEnd.FROM) rangeFrom else rangeUntil) ?: latest?.takeIf { it < today } ?: today
     val state = rememberDatePickerState(
         initialSelectedDateMillis = shown.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         selectableDates = object : SelectableDates {

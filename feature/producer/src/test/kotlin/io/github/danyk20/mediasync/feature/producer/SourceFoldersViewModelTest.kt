@@ -12,9 +12,9 @@ import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
 import org.junit.Rule
 import org.junit.Test
 
@@ -49,7 +49,7 @@ class SourceFoldersViewModelTest {
     @Test
     fun everythingIsSentUntilDaysAreChosenAndThoseAreSaved() = runTest {
         ready().range shouldBe SendRange.Everything
-        val firstQuarter = SendRange(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 3, 31))
+        val firstQuarter = SendRange(LocalDate(2025, 1, 1), LocalDate(2025, 3, 31))
 
         viewModel.choose(firstQuarter)
 

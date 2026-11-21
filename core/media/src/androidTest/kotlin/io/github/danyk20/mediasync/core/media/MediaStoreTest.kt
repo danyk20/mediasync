@@ -51,6 +51,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import okio.buffer
 import org.junit.After
 import org.junit.Rule
@@ -326,7 +329,7 @@ class MediaStoreTest {
         // Taken on a fixed day, with its time zone as a camera records it: without one, Android keeps no date taken
         // for a photo whose file is much newer. Neither the test's clock nor its time zone decides what "today" is.
         insertInto(TEST_FOLDER, jpeg(Color.CYAN, "2025:03:15 12:00:00", exifOffset = "+01:00"), "march-range.jpg")
-        val day = LocalDate.of(2025, 3, 15)
+        val day = kotlinx.datetime.LocalDate(2025, 3, 15)
         fun sentWithin(range: SendRange) =
             MediaStoreSource(context, database.mediaFingerprintDao(), range = { range }) {
                 SourceSelection.of(setOf(TEST_FOLDER))
@@ -338,8 +341,8 @@ class MediaStoreTest {
         sentWithin(SendRange(from = day)) shouldBe listOf("march-range.jpg")
         sentWithin(SendRange(until = day)) shouldBe listOf("march-range.jpg")
         sentWithin(SendRange(day, day)) shouldBe listOf("march-range.jpg")
-        sentWithin(SendRange(from = day.plusDays(1))) shouldBe emptyList()
-        sentWithin(SendRange(until = day.minusDays(1))) shouldBe emptyList()
+        sentWithin(SendRange(from = day.plus(1, DateTimeUnit.DAY))) shouldBe emptyList()
+        sentWithin(SendRange(until = day.minus(1, DateTimeUnit.DAY))) shouldBe emptyList()
     }
 
     @Test

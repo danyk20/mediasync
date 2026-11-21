@@ -96,7 +96,7 @@ class DiagnosticsReportTest {
         settings.setRole(DeviceRole.PRODUCER)
         settings.setPhotoDetails(PhotoDetails.REMOVE_LOCATION)
         peers.register(PairedPeer(deviceId(7), "Anna's Pixel 2 XL", DeviceRole.CONSUMER), "192.168.1.20:47420")
-        val everySix = SyncSchedule.EveryHours(6, java.time.LocalTime.of(3, 0))
+        val everySix = SyncSchedule.EveryHours(6, kotlinx.datetime.LocalTime(3, 0))
         peers.recordConsumer(
             deviceId(7),
             ConsumerFacts(schedule = everySix, wifiAddresses = listOf("10.128.0.57:47420")),

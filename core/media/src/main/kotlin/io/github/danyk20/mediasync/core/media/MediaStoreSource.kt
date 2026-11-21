@@ -22,6 +22,8 @@ import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.SourceSelection
+import io.github.danyk20.mediasync.core.model.endMillis
+import io.github.danyk20.mediasync.core.model.startMillis
 import io.github.danyk20.mediasync.sync.engine.Fingerprints
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import io.github.danyk20.mediasync.sync.engine.MediaMeta

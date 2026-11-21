@@ -43,7 +43,6 @@ import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.io.Closeable
 import java.net.InetAddress
-import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -60,6 +59,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.LocalTime
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.junit.After
@@ -379,10 +379,10 @@ class RuntimeEndToEndTest {
     @Test
     fun theSendingPhoneFollowsTheReceivingPhonesSchedule() = runBlocking<Unit> {
         receiver.start()
-        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+        consumerSchedule = SyncSchedule.EveryHours(6, LocalTime(3, 0))
 
         pairWithApproval()
-        producerPeers.consumer()?.schedule shouldBe SyncSchedule.EveryHours(6, LocalTime.of(3, 0))
+        producerPeers.consumer()?.schedule shouldBe SyncSchedule.EveryHours(6, LocalTime(3, 0))
 
         // Changed on the receiving phone: the next sync, as background work runs it, brings it along.
         consumerSchedule = SyncSchedule.WhileCharging

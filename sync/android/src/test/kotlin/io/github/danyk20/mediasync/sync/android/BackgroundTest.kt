@@ -44,7 +44,6 @@ import java.net.InetAddress
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -54,6 +53,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalTime
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -151,7 +151,7 @@ class BackgroundTest {
     @Test
     fun aSendingPhoneFollowsItsReceivingPhonesScheduleWithAStaggeredStart() = runTest {
         settings.setRole(DeviceRole.PRODUCER)
-        pairWithConsumer(SyncSchedule.EveryHours(6, LocalTime.of(3, 0)))
+        pairWithConsumer(SyncSchedule.EveryHours(6, LocalTime(3, 0)))
 
         scheduler().applyCurrentPlan()
 
@@ -216,7 +216,7 @@ class BackgroundTest {
         }
 
         // A new schedule meanwhile replaces it.
-        peers.recordConsumer(consumer, ConsumerFacts(schedule = SyncSchedule.EveryHours(6, LocalTime.of(3, 0))))
+        peers.recordConsumer(consumer, ConsumerFacts(schedule = SyncSchedule.EveryHours(6, LocalTime(3, 0))))
         scheduler.applyCurrentPlan()
 
         pending(DeviceRole.PRODUCER).single().runAttemptCount shouldBe 0

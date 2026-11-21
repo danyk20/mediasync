@@ -23,7 +23,7 @@ import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.android.TurboAvailability
 import io.kotest.matchers.shouldBe
-import java.time.LocalTime
+import kotlinx.datetime.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -121,7 +121,7 @@ class ConsumerHomeScreenTest {
 
     @Test
     fun theScheduleIsShownAndCanBeChanged() {
-        show(ConsumerHomeUiState(listening = true, schedule = SyncSchedule.EveryHours(4, LocalTime.of(1, 0))))
+        show(ConsumerHomeUiState(listening = true, schedule = SyncSchedule.EveryHours(4, LocalTime(1, 0))))
 
         composeRule.onNodeWithText("Every 4 hours from 1:00 AM").assertIsDisplayed()
         composeRule.onNodeWithText("Sync schedule").performClick()

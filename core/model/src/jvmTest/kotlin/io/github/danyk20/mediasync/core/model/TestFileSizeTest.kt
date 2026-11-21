@@ -23,6 +23,8 @@ class TestFileSizeTest {
         TestFileSize.parseMegabytes("2,5") shouldBe 2_621_440
         TestFileSize.parseMegabytes("10240") shouldBe TestFileSize.MAX_BYTES
         TestFileSize.MAX_BYTES shouldBe 10L * 1024 * 1024 * 1024
+        TestFileSize.parseMegabytes("10241") shouldBe null
+        TestFileSize.megabytes(TestFileSize.MAX_BYTES) shouldBe "10240"
     }
 
     @Test
