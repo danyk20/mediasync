@@ -40,8 +40,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -83,7 +85,9 @@ class FolderBackupServiceTest {
 
     @AfterEach
     fun stop() {
-        scope.cancel()
+        // Wait for the scope's work to end, not just cancel it: closing the database under a running query crashes
+        // the test process inside SQLite.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         database.close()
     }
 

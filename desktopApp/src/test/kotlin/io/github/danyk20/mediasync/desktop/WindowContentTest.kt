@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
-import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.feature.diagnostics.SettingsRoute
@@ -23,6 +22,7 @@ import io.github.danyk20.mediasync.feature.diagnostics.StartAtLoginState
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -36,9 +36,14 @@ class WindowContentTest {
     @TempDir
     lateinit var directory: Path
 
+    private val graphs = TestGraphs()
+
+    @AfterEach
+    fun shutDownGraphs() = graphs.shutDown()
+
     @Test
     fun showsTheReceivingScreen() {
-        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val graph = graphs.create(directory)
 
         runComposeUiTest {
             setContent { DesktopRoot(graph) }
@@ -51,7 +56,7 @@ class WindowContentTest {
 
     @Test
     fun theBackupScreenShowsTheChosenFolder() {
-        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val graph = graphs.create(directory)
         val folder = directory.resolve("My Backup").toString()
         runBlocking { graph.settings.setBackupFolder(folder) }
 
@@ -69,7 +74,7 @@ class WindowContentTest {
 
     @Test
     fun theBackupScreenOffersToChooseAFolderWhenThereIsNone() {
-        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val graph = graphs.create(directory)
 
         runComposeUiTest {
             setContent { DesktopRoot(graph) }
@@ -86,7 +91,7 @@ class WindowContentTest {
 
     @Test
     fun showsTheWaitingStateWhileTheKeychainIsLocked() {
-        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val graph = graphs.create(directory)
 
         runComposeUiTest {
             setContent { DesktopRoot(graph, waitingForKeychain = true) }
@@ -148,7 +153,7 @@ class WindowContentTest {
 
     @Test
     fun settingsInTheWindowShowsTheRowDisabledWhenNotInstalled() {
-        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val graph = graphs.create(directory)
 
         runComposeUiTest {
             setContent {

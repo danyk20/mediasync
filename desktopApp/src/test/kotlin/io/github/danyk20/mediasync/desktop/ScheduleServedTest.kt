@@ -4,13 +4,13 @@
  */
 package io.github.danyk20.mediasync.desktop
 
-import dev.zacsweers.metro.createGraphFactory
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -24,8 +24,13 @@ class ScheduleServedTest {
     @TempDir
     lateinit var directory: Path
 
+    private val graphs = TestGraphs()
+
+    @AfterEach
+    fun shutDownGraphs() = graphs.shutDown()
+
     private val graph by lazy {
-        createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        graphs.create(directory)
     }
 
     @Test

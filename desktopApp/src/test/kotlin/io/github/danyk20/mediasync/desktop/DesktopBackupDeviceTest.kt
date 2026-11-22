@@ -4,12 +4,12 @@
  */
 package io.github.danyk20.mediasync.desktop
 
-import dev.zacsweers.metro.createGraphFactory
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -19,8 +19,13 @@ class DesktopBackupDeviceTest {
     @TempDir
     lateinit var directory: Path
 
+    private val graphs = TestGraphs()
+
+    @AfterEach
+    fun shutDownGraphs() = graphs.shutDown()
+
     private val graph by lazy {
-        createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        graphs.create(directory)
     }
 
     private fun device(picks: Path?, seen: MutableList<Path?> = mutableListOf()) = DesktopBackupDevice(

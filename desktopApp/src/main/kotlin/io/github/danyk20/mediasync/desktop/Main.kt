@@ -52,14 +52,7 @@ fun main(arguments: Array<String>) {
     graph.folderBackup.start()
     scope.launch(Dispatchers.IO) { runCatching { graph.startAtLogin.refreshEntry() } }
     scope.launch(Dispatchers.IO) { graph.startAtLogin.watchProducers(sendingPhonesPaired(graph)) }
-    val shutdown = AppShutdown(
-        listOf(
-            { runBlocking { graph.folderBackup.stop() } }, // before the database closes: a copy finishes first
-            { scope.cancel() },
-            { graph.receiver.stop() }, // closes the servers and the mDNS advertisement
-            { graph.database.close() },
-        ),
-    )
+    val shutdown = AppShutdown(graph.shutdownSteps(scope))
     application {
         val trayAvailable = remember { trayAvailable() }
         var visible by remember { mutableStateOf(!startsHidden(arguments, trayAvailable)) }

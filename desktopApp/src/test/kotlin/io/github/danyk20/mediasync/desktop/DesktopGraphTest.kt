@@ -4,13 +4,13 @@
  */
 package io.github.danyk20.mediasync.desktop
 
-import dev.zacsweers.metro.createGraphFactory
 import io.github.danyk20.mediasync.feature.consumer.ConsumerHomeViewModel
 import io.github.danyk20.mediasync.feature.pairing.ConsumerPairingViewModel
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import java.nio.file.Files
 import java.nio.file.Path
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -20,7 +20,12 @@ class DesktopGraphTest {
     @TempDir
     lateinit var directory: Path
 
-    private fun graph() = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+    private val graphs = TestGraphs()
+
+    @AfterEach
+    fun shutDownGraphs() = graphs.shutDown()
+
+    private fun graph() = graphs.create(directory)
 
     @Test
     fun knowsTheReceivingScreensViewModels() {

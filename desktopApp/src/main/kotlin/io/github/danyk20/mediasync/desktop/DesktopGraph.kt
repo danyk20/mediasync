@@ -18,6 +18,7 @@ import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
 import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
+import kotlinx.coroutines.CoroutineScope
 
 /** The desktop app's dependency graph: everything contributed to [AppScope] plus the desktop's own bindings. */
 @DependencyGraph(AppScope::class)
@@ -35,6 +36,10 @@ interface DesktopGraph : ViewModelGraph {
     val peerStore: PeerStore
     val startAtLogin: DesktopStartAtLogin
     val viewModelFactory: MetroViewModelFactory
+
+    /** Where the receiver, the sync and the backup copier run; cancelled at shutdown before the database closes. */
+    @ApplicationScope
+    val applicationScope: CoroutineScope
 
     @DependencyGraph.Factory
     fun interface Factory {
