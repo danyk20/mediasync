@@ -33,6 +33,7 @@ import io.github.danyk20.mediasync.core.datastore.createSettingsDataStore
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.feature.consumer.CloudflareOAuthClient
 import io.github.danyk20.mediasync.platform.desktop.DesktopDeviceConditions
 import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
@@ -70,6 +71,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toOkioPath
 
@@ -184,8 +186,36 @@ interface DesktopModule {
 
         @Provides
         @SingleIn(AppScope::class)
-        fun provideSendingPart(sync: ProducerSync, identity: IdentityProvider): SendingPart =
-            SendingPart(sync, identity, ::logStartProblem)
+        fun provideSendingPart(
+            sync: ProducerSync,
+            identity: IdentityProvider,
+            scheduler: SenderScheduler,
+        ): SendingPart = SendingPart(sync::cancel, identity, scheduler, ::logStartProblem)
+
+        /** The schedule the paired receiver told this computer; see [SenderScheduler]. */
+        @Provides
+        @SingleIn(AppScope::class)
+        @Suppress("LongParameterList") // Collaborators, one each.
+        fun provideSenderScheduler(
+            peers: PeerStore,
+            library: MediaLibrary,
+            recorder: DesktopSyncRecorder,
+            conditions: DeviceConditions,
+            sync: ProducerSync,
+            clock: Clock,
+        ): SenderScheduler = SenderScheduler(
+            consumerSchedule = peers.observeConsumer().map { consumer ->
+                consumer?.let { it.schedule ?: SyncSchedule.Default }
+            },
+            folderChanges = library.changes(),
+            lastSyncMillis = { recorder.record.value.lastSyncMillis },
+            lastHandledMillis = recorder::handledMillis,
+            saveHandledMillis = recorder::markHandled,
+            conditions = conditions,
+            sync = { pauseWhen -> sync.syncAndWait(pauseWhen = pauseWhen) },
+            clock = clock,
+            log = ::logStartProblem,
+        )
 
         @Provides
         @SingleIn(AppScope::class)

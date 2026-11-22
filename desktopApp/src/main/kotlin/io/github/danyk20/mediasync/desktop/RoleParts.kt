@@ -9,7 +9,6 @@ import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
 import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
-import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.transport.lan.IdentityProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The receiving role: listens for phones and announces itself over mDNS (also with the window closed), copies what
@@ -80,12 +80,15 @@ class ReceivingPart(
 
 /**
  * The sending role: no receiver, no open port, no announcement, no backup copying. A sync runs when the user asks
- * (*Sync now*) through [ProducerSync]; the schedule comes with M9.2b. A sync signs with the device identity, so the
- * part first waits for it like the receiving part does ([RoleStarter]): the identity is not used until it can be read.
+ * (*Sync now*) through `ProducerSync`, and on the receiver's schedule ([SenderScheduler]). A sync signs with the device
+ * identity, so the part first waits for it like the receiving part does ([RoleStarter]): the identity is not used
+ * until it can be read.
  */
 class SendingPart(
-    private val sync: ProducerSync,
+    /** Stops the sync running now, after the file it is sending: the user's sync, or the scheduler's. */
+    private val cancelSync: () -> Unit,
     private val identity: IdentityProvider,
+    private val scheduler: SenderScheduler,
     private val log: (String) -> Unit,
 ) : RolePart {
     private val _state = MutableStateFlow<StartState?>(null)
@@ -96,19 +99,35 @@ class SendingPart(
     private var job: Job? = null
 
     override fun start(scope: CoroutineScope) {
-        log("Sending: syncs run when you press Sync now")
+        log("Sending: syncs follow the receiver's schedule, or run when you press Sync now")
         val starter = RoleStarter(start = { identity.identity() }, log = log)
         job = scope.launch {
             launch { starter.state.collect { _state.value = it } }
             starter.run()
+            if (starter.state.value == StartState.RUNNING) scheduler.run()
         }
     }
 
-    /** Stops the wait and any sync, after the file it is sending. */
+    /**
+     * Cancels the scheduler first, so it cannot see the sync's cancelled result and mark the due time handled, then
+     * stops the sync and waits for the part to end, for [STOP_MILLIS] at most: a sync that ignores the cancellation is
+     * logged and left behind, so quitting never hangs.
+     */
     override suspend fun stop() {
-        job?.cancelAndJoin()
+        val running = job
+        running?.cancel()
+        cancelSync()
+        running?.let { part ->
+            if (withTimeoutOrNull(STOP_MILLIS) { part.join() } == null) {
+                log("Sending: the sync did not stop within ${STOP_MILLIS / MILLIS_PER_SECOND} s; left behind")
+            }
+        }
         job = null
-        sync.cancel()
         _state.value = null
+    }
+
+    private companion object {
+        const val STOP_MILLIS = 5_000L
+        const val MILLIS_PER_SECOND = 1_000L
     }
 }

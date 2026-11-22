@@ -41,6 +41,7 @@ interface DesktopGraph : ViewModelGraph {
     val roles: RoleLifecycle
     val receiving: ReceivingPart
     val sending: SendingPart
+    val senderScheduler: SenderScheduler
     val mediaSource: MediaSource
     val mediaLibrary: MediaLibrary
     val folders: DesktopFolders
