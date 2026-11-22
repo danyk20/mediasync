@@ -39,6 +39,10 @@ The APK is written to `app/build/outputs/apk/debug/`.
 | Coverage report | `./gradlew koverXmlReportCi` (`build/reports/kover/`) |
 | Re-record screenshots after an intended UI change | `./gradlew testDebugUnitTest -Proborazzi.test.verify=false -Proborazzi.test.record=true` |
 
+## Desktop app
+
+MediaSync also runs on macOS, Windows and Linux, to receive your phones' photos and videos and back them up on the computer. The installers are on the [releases page](https://github.com/danyk20/mediasync/releases/latest), unsigned; see [docs/desktop.md](docs/desktop.md) for installing and for the first-start warnings.
+
 ## Project layout
 
 ```
