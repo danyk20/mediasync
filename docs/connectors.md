@@ -8,6 +8,7 @@ A connector backs up what the receiving phone received to one kind of place: a c
 |---|---|
 | `:connector:api` | The interfaces (`BackupConnectorFactory`, `BackupConnector`, `DeviceAppConnector`), descriptors and limits, the settings schema, the registry, the shared decorators, and the pipeline (`BackupOrchestrator`, `BackupCoordinator`). Pure Kotlin. Its `testFixtures` have in-memory fakes. |
 | `:connector:contract-tests` | `BackupConnectorContractTest`: the checks every connector passes. |
+| `:connector:folder` | The folder connector for the desktop app: backs up into a folder on the computer, a mounted NAS share, or a folder another app syncs. Pure Kotlin/JVM, no Metro: the desktop app registers its factory. |
 | `:connector:android` | The Metro registration (`@ConnectorKey`), the backup ledger in the app's database, the accounts, and `CloudBackup`, which starts backups as items arrive. |
 
 ## Checklist
@@ -48,3 +49,14 @@ A connector backs up what the receiving phone received to one kind of place: a c
 | Module | Connector | Kind |
 |---|---|---|
 | `:connector:google-photos-app` | `google-photos-app`: the Google Photos app on the receiving phone (PLAN.md §9.3.1) | Another app on the phone (`DeviceAppConnector`) |
+| `:connector:folder` | `folder`: a folder on the computer (docs/PLAN.md §15, M8) | Uploading (`BackupConnector`) |
+
+### The folder connector
+
+Settings (`FolderSettings`): `folder`, an absolute path (required), and `layout`, `year-month` (default: `2025/05/IMG_1.jpg`, by capture date in the computer's time zone, `Undated` for items without one) or `flat`.
+
+- **Bytes as received:** each item is copied unchanged, so its date and place survive; the file's modification time is set to the capture date. A copy is written under a hidden `.mediasync-*.part` name, flushed, and moved into place.
+- **Same item twice, one file:** a file with the same name and the same bytes counts as the item already stored. The same name with other bytes gets `IMG_1 (1).jpg`. File names from the sending phone are made safe for macOS, Windows and Linux (no path parts, no `<>:"/\|?*`, no reserved names like `CON`).
+- **The folder is never created:** if it isn't there (an unplugged disk, an unmounted share) the run fails as retryable and `verify()` answers `UNKNOWN`, so nothing is written into an empty mount point and no copy is called missing because a share is offline.
+- **`verify()`:** `PRESENT` if the file the receipt names is still there, `MISSING` if not. It checks the file exists, not its bytes: the content id is the hash of the file as the phone stored it, which can differ from what a connector receives after preprocessing.
+- **Receipt:** the remote id is the path below the folder, always with `/`.

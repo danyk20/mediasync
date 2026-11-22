@@ -39,6 +39,7 @@ dependencies {
     kover(projects.connector.android)
     kover(projects.connector.api)
     kover(projects.connector.contractTests)
+    kover(projects.connector.folder)
     kover(projects.core.crypto)
     kover(projects.core.database)
     kover(projects.core.datastore)
