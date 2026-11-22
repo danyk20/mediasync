@@ -53,6 +53,7 @@ dependencies {
     kover(projects.feature.onboarding)
     kover(projects.feature.pairing)
     kover(projects.feature.producer)
+    kover(projects.platform.desktop)
     kover(projects.sync.android)
     kover(projects.sync.engine)
     kover(projects.sync.protocol)
