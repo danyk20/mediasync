@@ -54,21 +54,6 @@ class PackageManagerApps(private val context: Context) : InstalledApps {
     }
 }
 
-/** How one account's backups stand, for the receiving phone's screens. */
-data class BackupOverview(
-    val account: ConnectorAccount,
-    /** Handed to another app on this phone, and still here. */
-    val handedOver: Int = 0,
-    /** Backed up by another app, which then removed them from this phone (docs/PLAN.md §9.3.1). */
-    val removedByApp: Int = 0,
-    /** Uploaded by MediaSync. */
-    val backedUp: Int = 0,
-    /** Backed up or handed over since midnight. */
-    val today: Int = 0,
-    /** Received, and not backed up yet. */
-    val waiting: Int = 0,
-)
-
 /**
  * Cloud backup on the receiving phone (docs/PLAN.md §9): the connectors this app has, the accounts the user set up,
  * and the backups themselves, which start as soon as items arrive (§9.6).

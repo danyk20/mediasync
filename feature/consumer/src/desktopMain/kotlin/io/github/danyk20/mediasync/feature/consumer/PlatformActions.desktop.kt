@@ -50,6 +50,3 @@ internal actual fun rememberIs24HourFormat(): Boolean {
     )
     return 'a' !in pattern
 }
-
-@Composable
-internal actual fun rememberDisplayLocale(): Locale = Locale.getDefault()
