@@ -14,14 +14,17 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.feature.diagnostics.DiagnosticsScreen
+import io.github.danyk20.mediasync.feature.diagnostics.DiagnosticsUiState
 import io.github.danyk20.mediasync.feature.diagnostics.LocalResetMediaSync
 import io.github.danyk20.mediasync.feature.diagnostics.SettingsRoute
 import io.github.danyk20.mediasync.feature.diagnostics.SettingsScreen
 import io.github.danyk20.mediasync.feature.diagnostics.SettingsUiState
 import io.github.danyk20.mediasync.feature.diagnostics.StartAtLoginState
-import io.github.danyk20.mediasync.feature.onboarding.LocalIsComputer
+import io.github.danyk20.mediasync.feature.diagnostics.TestFileUi
 import io.github.danyk20.mediasync.feature.producer.SourceFoldersRoute
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
@@ -278,16 +281,84 @@ class WindowContentTest {
                 onAllNodesWithText("Reset MediaSync").fetchSemanticsNodes().isNotEmpty()
             }
             onNodeWithText("Reset MediaSync").performScrollTo().performClick()
+            onNodeWithText("MediaSync then closes", substring = true).assertIsDisplayed()
             resets shouldBe 0
             onNodeWithText("Reset").performClick()
         }
         resets shouldBe 1
     }
 
+    @Test
+    fun theReceivingHomeSaysComputerAndHasNoInternetSyncOrSimpleFileNames() {
+        val graph = graphs.create(directory)
+        runBlocking { graph.settings.setRole(DeviceRole.CONSUMER) }
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph) }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("This computer receives").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("This computer receives").assertIsDisplayed()
+            onNodeWithText(BACKUP_ROW).assertIsDisplayed()
+            onAllNodesWithText("This phone receives").fetchSemanticsNodes().isEmpty() shouldBe true
+            onAllNodesWithText("Simple file names").fetchSemanticsNodes().isEmpty() shouldBe true
+            onAllNodesWithText("Internet sync").fetchSemanticsNodes().isEmpty() shouldBe true
+        }
+    }
+
+    @Test
+    fun theReceivingHomeOnAComputerHasNoTurboRow() {
+        val graph = graphs.create(directory)
+        runBlocking { graph.settings.setRole(DeviceRole.CONSUMER) }
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph) }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText(READY_TEXT).fetchSemanticsNodes().isNotEmpty()
+            }
+            onAllNodesWithText("Turbo receive", substring = true).fetchSemanticsNodes().isEmpty() shouldBe true
+        }
+    }
+
+    @Test
+    fun theDiagnosticsOnAComputerHasNoTestFile() {
+        runComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalIsComputer provides true) {
+                    MediaSyncTheme {
+                        DiagnosticsScreen(state = testFileState(), onTestLink = {
+                        }, onShare = {}, onSave = {}, onClear = {}, onDone = {})
+                    }
+                }
+            }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("If MediaSync doesn't work", substring = true).fetchSemanticsNodes().isNotEmpty()
+            }
+            onAllNodesWithText("Test file").fetchSemanticsNodes().isEmpty() shouldBe true
+        }
+    }
+
+    @Test
+    fun theDiagnosticsOnAPhoneHasTheTestFile() {
+        runComposeUiTest {
+            setContent {
+                MediaSyncTheme {
+                    DiagnosticsScreen(state = testFileState(), onTestLink = {
+                    }, onShare = {}, onSave = {}, onClear = {}, onDone = {})
+                }
+            }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("Test file").fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+    }
+
+    private fun testFileState() = DiagnosticsUiState(testFile = TestFileUi(consumerName = "Anna's Mac"))
+
     private companion object {
-        const val BACKUP_ROW = "Cloud backup"
+        const val BACKUP_ROW = "Backup folder"
         const val READY_TEXT = "Ready to receive"
-        const val SENDING_HOME_TEXT = "This phone sends" // The shared home still says phone (M9.3 wording pass).
+        const val SENDING_HOME_TEXT = "Not paired yet"
         const val WAIT_MILLIS = 15_000L
     }
 }

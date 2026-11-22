@@ -40,6 +40,8 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
@@ -50,6 +52,7 @@ import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagn
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_done
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_empty
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_intro_computer
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_failed
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_four
@@ -261,7 +264,7 @@ fun DiagnosticsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = stringResource(Res.string.diagnostics_intro),
+                text = stringResource(deviceText(Res.string.diagnostics_intro, Res.string.diagnostics_intro_computer)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -272,7 +275,8 @@ fun DiagnosticsScreen(
                 Text(stringResource(Res.string.diagnostics_save))
             }
             state.linkTest?.let { LinkTestSection(it, onTestLink) }
-            state.testFile?.let { TestFileSection(it, testFileActions) }
+            // Not on a computer: the test file goes to a phone, and a computer has nothing to send it to.
+            if (!LocalIsComputer.current) state.testFile?.let { TestFileSection(it, testFileActions) }
             Facts(state.facts)
             Recent(state.recent)
             TextButton(onClick = onClear) { Text(stringResource(Res.string.diagnostics_clear)) }

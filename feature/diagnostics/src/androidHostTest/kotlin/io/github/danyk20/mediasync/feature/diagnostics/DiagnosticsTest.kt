@@ -4,6 +4,10 @@
  */
 package io.github.danyk20.mediasync.feature.diagnostics
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -14,6 +18,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -204,6 +209,24 @@ class DiagnosticsTest {
     }
 
     @Test
+    fun aComputerSaysComputerInTheIntroAndAPhoneKeepsItsWords() {
+        show(DiagnosticsUiState(facts, recent), computer = true)
+        composeRule.onNodeWithText(
+            "If MediaSync doesn't work as expected, share this log with whoever helps you. " +
+                "It stays on this computer until you share it. It lists what MediaSync did and how this computer " +
+                "is set up, without photos, file names or places.",
+        ).assertIsDisplayed()
+
+        onComputer = false
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(
+            "If MediaSync doesn't work as expected, share this log with whoever helps you. " +
+                "It stays on this phone until you share it. It lists what MediaSync did and how this phone " +
+                "is set up, without photos, file names or places.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
     fun theLogCanBeSharedOrSaved() {
         show(DiagnosticsUiState(facts, recent))
 
@@ -248,22 +271,27 @@ class DiagnosticsTest {
         composeRule.onRoot().captureScreenshot(name)
     }
 
-    private fun show(state: DiagnosticsUiState, darkTheme: Boolean = false) {
+    private var onComputer by mutableStateOf(false)
+
+    private fun show(state: DiagnosticsUiState, darkTheme: Boolean = false, computer: Boolean = false) {
+        onComputer = computer
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                DiagnosticsScreen(
-                    state = state,
-                    onTestLink = { events += "link test" },
-                    onShare = { events += "share" },
-                    onSave = { events += "save" },
-                    onClear = { events += "clear" },
-                    onDone = { events += "done" },
-                    testFileActions = TestFileActions(
-                        onSizeChange = { events += "size $it" },
-                        onAdd = { events += "add test file" },
-                        onRemove = { events += "remove test file" },
-                    ),
-                )
+                CompositionLocalProvider(LocalIsComputer provides onComputer) {
+                    DiagnosticsScreen(
+                        state = state,
+                        onTestLink = { events += "link test" },
+                        onShare = { events += "share" },
+                        onSave = { events += "save" },
+                        onClear = { events += "clear" },
+                        onDone = { events += "done" },
+                        testFileActions = TestFileActions(
+                            onSizeChange = { events += "size $it" },
+                            onAdd = { events += "add test file" },
+                            onRemove = { events += "remove test file" },
+                        ),
+                    )
+                }
             }
         }
     }

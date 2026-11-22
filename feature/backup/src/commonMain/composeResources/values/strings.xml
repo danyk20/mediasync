@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="backup_title">Cloud backup</string>
+    <!-- The same screen on a computer (English only for now). -->
+    <string name="backup_title_computer">Backup</string>
     <string name="backup_done">Done</string>
     <string name="backup_intro">Everything this phone receives is kept in its MediaSync folder. A backup app on this phone can upload it from there.</string>
     <string name="backup_none">This version of MediaSync has no backup to set up.</string>

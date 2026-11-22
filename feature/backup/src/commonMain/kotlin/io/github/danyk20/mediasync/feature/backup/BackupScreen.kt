@@ -39,6 +39,7 @@ import io.github.danyk20.mediasync.connector.CleanupShortcut
 import io.github.danyk20.mediasync.connector.ConnectorId
 import io.github.danyk20.mediasync.connector.DeviceAppProfile
 import io.github.danyk20.mediasync.connector.SetupStep
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.feature.backup.generated.resources.Res
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_done
@@ -77,6 +78,7 @@ import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_ste
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_steps_heading
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_stop
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_title
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_title_computer
 import java.text.NumberFormat
 import org.jetbrains.compose.resources.stringResource
 
@@ -113,7 +115,7 @@ fun BackupScreen(state: BackupUiState?, actions: BackupActions, onDone: () -> Un
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(Res.string.backup_title)) },
+                title = { Text(stringResource(deviceText(Res.string.backup_title, Res.string.backup_title_computer))) },
                 actions = { TextButton(onClick = onDone) { Text(stringResource(Res.string.backup_done)) } },
             )
         },

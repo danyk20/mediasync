@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
@@ -55,6 +56,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.SpeedSheet
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
 import io.github.danyk20.mediasync.core.designsystem.component.transferRate
@@ -64,14 +66,19 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.Res
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_add_producer
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_add_producer_computer
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_choose
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_folder
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_folder_unreachable
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_off
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_off_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_on
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_open
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_title_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_cancel
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_home_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_home_title_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_off
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_on
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_relay
@@ -82,22 +89,29 @@ import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_names_row_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_body_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_described
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producers_heading
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producers_heading_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_received_count
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_received_count_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_change
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_row_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_offline_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_offline_body_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_offline_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_ready_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_ready_body_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_ready_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_receiving_body
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_receiving_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_waiting_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_waiting_body_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_didnt_fit_body
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_didnt_fit_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_full_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_full_body_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_full_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_open
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_allow
@@ -211,6 +225,7 @@ private fun SpeedHistorySheet(
 
 /** Home screen of the phone that receives. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod") // The rows of the home screen, in order: one function reads best.
 @Composable
 fun ConsumerHomeScreen(
     state: ConsumerHomeUiState,
@@ -238,7 +253,13 @@ fun ConsumerHomeScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(Res.string.consumer_home_title)) },
+                title = {
+                    Text(
+                        stringResource(
+                            deviceText(Res.string.consumer_home_title, Res.string.consumer_home_title_computer),
+                        ),
+                    )
+                },
                 actions = { MoreMenu(onOpenSettings = onOpenMediaSyncSettings, onOpenDiagnostics = onOpenDiagnostics) },
             )
         },
@@ -258,7 +279,11 @@ fun ConsumerHomeScreen(
                 }
             }
             Button(onClick = onAddProducer, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Res.string.consumer_add_producer))
+                Text(
+                    stringResource(
+                        deviceText(Res.string.consumer_add_producer, Res.string.consumer_add_producer_computer),
+                    ),
+                )
             }
             StorageNotice(state, onOpenStorage)
             TurboNotice(state, onAllowTurbo, onDismissTurbo)
@@ -273,14 +298,20 @@ fun ConsumerHomeScreen(
             )
             ScheduleRow(state.schedule, onChangeSchedule)
             WakeUpNotice(state.wakeUpProblem, onSetUpInternet)
-            InternetRow(state.internetSync, state.relay, onSetUpInternet)
+            // Not on a computer: its internet sync is not built yet, and its set-up is the phone's Cloudflare flow.
+            if (!LocalIsComputer.current) InternetRow(state.internetSync, state.relay, onSetUpInternet)
             state.backup?.let { BackupRow(it, onOpenBackup) }
-            FileNamesRow(state.simpleFileNames, onSimpleFileNames)
+            // Not on a computer: the switch is for Google Photos, which a computer doesn't use.
+            if (!LocalIsComputer.current) FileNamesRow(state.simpleFileNames, onSimpleFileNames)
             TurboReceiveRow(state, onStartTurboReceive)
             if (state.producers.isNotEmpty()) Producers(state.producers, onRemoveProducer)
             Text(
                 text = pluralStringResource(
-                    Res.plurals.consumer_received_count,
+                    if (LocalIsComputer.current) {
+                        Res.plurals.consumer_received_count_computer
+                    } else {
+                        Res.plurals.consumer_received_count
+                    },
                     state.receivedCount,
                     state.receivedCount,
                 ),
@@ -393,19 +424,25 @@ private fun Status(state: ConsumerHomeUiState, onShowSpeeds: (DeviceId) -> Unit)
 
         !state.listening -> StatusCard(
             title = stringResource(Res.string.consumer_status_offline_title),
-            body = stringResource(Res.string.consumer_status_offline_body),
+            body = stringResource(
+                deviceText(Res.string.consumer_status_offline_body, Res.string.consumer_status_offline_body_computer),
+            ),
             icon = MediaSyncIcons.Info,
         )
 
         state.producers.isEmpty() -> StatusCard(
             title = stringResource(Res.string.consumer_status_ready_title),
-            body = stringResource(Res.string.consumer_status_ready_body),
+            body = stringResource(
+                deviceText(Res.string.consumer_status_ready_body, Res.string.consumer_status_ready_body_computer),
+            ),
             icon = MediaSyncIcons.Receive,
         )
 
         else -> StatusCard(
             title = stringResource(Res.string.consumer_status_ready_title),
-            body = stringResource(Res.string.consumer_status_waiting_body),
+            body = stringResource(
+                deviceText(Res.string.consumer_status_waiting_body, Res.string.consumer_status_waiting_body_computer),
+            ),
             icon = MediaSyncIcons.Receive,
             tone = StatusTone.Positive,
         )
@@ -456,8 +493,11 @@ private fun StorageNotice(state: ConsumerHomeUiState, onOpenStorage: () -> Unit)
     when {
         state.storageFull -> NoticeCard(
             title = stringResource(Res.string.consumer_storage_full_title),
-            body = stringResource(Res.string.consumer_storage_full_body) +
-                if (waiting > 0) " " + pluralStringResource(Res.plurals.consumer_waiting, waiting, waiting) else "",
+            body =
+                stringResource(
+                    deviceText(Res.string.consumer_storage_full_body, Res.string.consumer_storage_full_body_computer),
+                ) +
+                    if (waiting > 0) " " + pluralStringResource(Res.plurals.consumer_waiting, waiting, waiting) else "",
             icon = MediaSyncIcons.Warning,
             action = stringResource(Res.string.consumer_storage_open),
             onAction = onOpenStorage,
@@ -519,11 +559,19 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         ListItem(
             modifier = Modifier.clickable(onClick = onOpen),
-            headlineContent = { Text(stringResource(Res.string.consumer_backup_row_title)) },
+            headlineContent = {
+                Text(
+                    stringResource(
+                        deviceText(Res.string.consumer_backup_row_title, Res.string.consumer_backup_row_title_computer),
+                    ),
+                )
+            },
             supportingContent = {
                 Text(
                     when (backup) {
-                        BackupLine.Off -> stringResource(Res.string.consumer_backup_row_off)
+                        BackupLine.Off -> stringResource(
+                            deviceText(Res.string.consumer_backup_row_off, Res.string.consumer_backup_row_off_computer),
+                        )
 
                         is BackupLine.Folder -> if (backup.reachable) {
                             stringResource(
@@ -544,10 +592,10 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
                 )
             },
             trailingContent = {
-                val action = if (backup !is BackupLine.Off) {
-                    Res.string.consumer_backup_row_open
-                } else {
-                    Res.string.consumer_internet_set_up
+                val action = when {
+                    backup !is BackupLine.Off -> Res.string.consumer_backup_row_open
+                    LocalIsComputer.current -> Res.string.consumer_backup_row_choose
+                    else -> Res.string.consumer_internet_set_up
                 }
                 Text(
                     text = stringResource(action),
@@ -628,7 +676,9 @@ private fun Producers(phones: List<PairedPhone>, onRemove: (PairedPhone) -> Unit
     var removing by remember { mutableStateOf<PairedPhone?>(null) }
     Column {
         Text(
-            text = stringResource(Res.string.consumer_producers_heading),
+            text = stringResource(
+                deviceText(Res.string.consumer_producers_heading, Res.string.consumer_producers_heading_computer),
+            ),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
                 .padding(vertical = 8.dp)
@@ -653,7 +703,16 @@ private fun Producers(phones: List<PairedPhone>, onRemove: (PairedPhone) -> Unit
         AlertDialog(
             onDismissRequest = { removing = null },
             title = { Text(stringResource(Res.string.consumer_producer_remove_title, phone.name)) },
-            text = { Text(stringResource(Res.string.consumer_producer_remove_body)) },
+            text = {
+                Text(
+                    stringResource(
+                        deviceText(
+                            Res.string.consumer_producer_remove_body,
+                            Res.string.consumer_producer_remove_body_computer,
+                        ),
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     removing = null

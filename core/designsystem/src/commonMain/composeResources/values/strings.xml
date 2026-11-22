@@ -28,6 +28,8 @@
     <string name="reset_mediasync">Reset MediaSync</string>
     <string name="reset_title">Reset MediaSync?</string>
     <string name="reset_body">This phone forgets its role, its paired phones, its settings and its history, and MediaSync starts over as if just installed. Photos and videos stay where they are. A Cloudflare Worker you set up stays in your Cloudflare account.</string>
+    <!-- The same dialog on a computer (English only for now). -->
+    <string name="reset_body_computer">This computer forgets its role, its paired devices, its settings and its history. MediaSync then closes, and asks again when you open it. Photos and videos already received stay where they are, in the inbox and in your backup folder.</string>
     <string name="reset_confirm">Reset</string>
     <string name="reset_cancel">Cancel</string>
 

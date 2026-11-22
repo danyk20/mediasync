@@ -21,12 +21,12 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.feature.diagnostics.LocalResetMediaSync
-import io.github.danyk20.mediasync.feature.onboarding.LocalIsComputer
 import io.github.danyk20.mediasync.navigation.MediaSyncNavigation
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
