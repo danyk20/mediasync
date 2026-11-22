@@ -1,11 +1,13 @@
-# Dependabot's PRs merge once everything required passed on the updated dependencies (docs/RELEASING.md).
+# Dependabot's PRs merge by themselves once every required check passed on the updated dependencies
+# (docs/RELEASING.md). No person needs to approve them; branch protection still decides.
 #
-# Not run by Dependabot's own events: those can't read the repository's secrets, and a merge with GITHUB_TOKEN
-# wouldn't start CI or release-please on main. So it looks every half hour, and after each push to main, with the
-# token release-please uses:
-#   - a Dependabot PR whose required checks all passed, up to date with main: squash-merged;
-#   - one behind main (another merged first): Dependabot is asked to rebase it, and CI runs again on it.
-# Branch protection still decides: a PR that isn't mergeable (a check failed, a conflict) is left for a person.
+# Not run by Dependabot's own events: those can't read the repository's secrets, and anything done with
+# GITHUB_TOKEN wouldn't start CI or release-please. So it looks every half hour, and after each push to main, with
+# the token release-please uses. For each open Dependabot PR:
+#   - auto-merge (squash) is switched on: GitHub merges it as soon as all required checks pass;
+#   - one behind main (another merged first) is brought up to date, so CI runs again on it.
+# A PR with a failed check or a conflict is left alone: it never merges until that's fixed (Dependabot rebases
+# conflicts by itself; a failed check needs a person).
 name: Dependabot merge
 
 on:
@@ -27,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Merge or rebase Dependabot's PRs
+      - name: Auto-merge Dependabot's PRs
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -36,31 +38,23 @@ jobs:
             echo "::warning::RELEASE_PLEASE_TOKEN isn't set: Dependabot's PRs aren't merged automatically."
             exit 0
           fi
-          # One at a time: once one merges, the others are behind main and rebase first.
-          merged=false
-          gh pr list --author "app/dependabot" --state open --json number,title \
-            --jq '.[] | "\(.number)\t\(.title)"' |
-          while IFS=$'\t' read -r number title; do
-            state=$(gh pr view "$number" --json mergeStateStatus --jq .mergeStateStatus)
-            echo "#$number $title: $state"
+          # The numbers first, then one PR at a time. (A `gh` call inside a `while read` loop reads the loop's
+          # input too: the old version only ever saw the first PR.)
+          numbers=$(gh pr list --author "app/dependabot" --state open --json number --jq '.[].number')
+          for number in $numbers; do
+            info=$(gh pr view "$number" --json title,mergeStateStatus,autoMergeRequest \
+              --jq '"\(.mergeStateStatus)\t\(.autoMergeRequest != null)\t\(.title)"' < /dev/null)
+            IFS=$'\t' read -r state auto title <<< "$info"
+            echo "#$number $title: $state (auto-merge: $auto)"
+            if [ "$auto" != true ]; then
+              gh pr merge "$number" --squash --auto < /dev/null || echo "::warning::#$number: couldn't switch on auto-merge"
+            fi
             case "$state" in
-              CLEAN)
-                if [ "$merged" = false ]; then
-                  gh pr merge "$number" --squash
-                  merged=true
-                fi
-                ;;
               BEHIND)
-                # Asked again only once it rebased since: meanwhile, the rebase asked for is under way.
-                pushed=$(gh pr view "$number" --json commits --jq '.commits[-1].committedDate')
-                asked=$(gh pr view "$number" --json comments \
-                  --jq '[.comments[] | select(.body == "@dependabot rebase") | .createdAt] | max // ""')
-                if [[ "$asked" < "$pushed" ]]; then
-                  gh pr comment "$number" --body "@dependabot rebase"
-                fi
+                gh pr update-branch "$number" < /dev/null || echo "::warning::#$number: couldn't update the branch"
                 ;;
               *)
-                # BLOCKED (checks running or failed), DIRTY (conflict: Dependabot rebases it itself), UNKNOWN.
+                # CLEAN merges by itself now; BLOCKED waits for checks (or a fix); DIRTY waits for Dependabot's rebase.
                 ;;
             esac
           done
