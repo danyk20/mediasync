@@ -5,7 +5,6 @@
 package io.github.danyk20.mediasync
 
 import android.content.Intent
-import androidx.annotation.StringRes
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -14,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.github.danyk20.mediasync.feature.consumer.R as ConsumerR
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,7 +35,7 @@ class MainActivityTest {
     fun firstLaunch_choosingReceives_opensConsumerHome() {
         awaitNode(ONBOARDING_RECEIVES).performClick()
 
-        awaitText(ConsumerR.string.consumer_status_ready_title).assertIsDisplayed()
+        awaitNode(CONSUMER_READY_TITLE).assertIsDisplayed()
     }
 
     @Test
@@ -57,9 +55,6 @@ class MainActivityTest {
      * Settings are read from and written to disk asynchronously, which Compose's idling doesn't track.
      * Waits until the text appears; on slow emulators the first DataStore read can take seconds.
      */
-    private fun awaitText(@StringRes id: Int, vararg args: Any): SemanticsNodeInteraction =
-        awaitNode(composeRule.activity.getString(id, *args))
-
     private fun awaitNode(text: String): SemanticsNodeInteraction {
         composeRule.waitUntil(timeoutMillis = SCREEN_TIMEOUT_MILLIS) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
@@ -68,11 +63,12 @@ class MainActivityTest {
     }
 
     private companion object {
-        // The onboarding and pairing strings are Compose resources now, which the Android `R` class no longer has.
+        // The onboarding, pairing, producer and consumer strings are Compose resources now, which the Android `R` class no longer has.
         const val PRODUCER_NOT_PAIRED_TITLE = "Not paired yet"
         const val ONBOARDING_SENDS = "This phone sends"
         const val PAIRING_CONFIRM_TITLE = "Pair with Test phone?"
         const val ONBOARDING_RECEIVES = "This phone receives"
+        const val CONSUMER_READY_TITLE = "Ready to receive"
         const val SCREEN_TIMEOUT_MILLIS = 10_000L
     }
 }

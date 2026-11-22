@@ -1,64 +1,39 @@
-import java.net.URI
-
 plugins {
-    alias(libs.plugins.mediasync.android.feature)
+    alias(libs.plugins.mediasync.kmp.feature)
 }
 
-// Signing in with Cloudflare (infra/rendezvous/README.md, "Sign in with Cloudflare"): MediaSync's OAuth client, from a
-// Gradle property or the environment. Without both settings, internet sync is set up with a pasted token only.
-fun buildSetting(name: String): String =
-    providers.gradleProperty(name).orElse(providers.environmentVariable(name)).getOrElse("").trim()
-
-val cloudflareClientId = buildSetting("CLOUDFLARE_OAUTH_CLIENT_ID")
-val cloudflareRedirect = buildSetting("CLOUDFLARE_OAUTH_REDIRECT_URI")
-val cloudflareSignIn = cloudflareClientId.isNotEmpty() && cloudflareRedirect.isNotEmpty()
-val redirect: URI? = if (cloudflareSignIn) URI(cloudflareRedirect) else null
-if (redirect != null) {
-    require(cloudflareClientId.all { it.isLetterOrDigit() || it in "-_.~" }) {
-        "CLOUDFLARE_OAUTH_CLIENT_ID isn't an OAuth client ID: $cloudflareClientId"
+kotlin {
+    android {
+        namespace = "io.github.danyk20.mediasync.feature.consumer"
     }
-    // The browser comes back through an App Link: https, on the client's verified domain, without a query.
-    require(redirect.scheme == "https" && !redirect.host.isNullOrEmpty() && redirect.rawQuery == null) {
-        "CLOUDFLARE_OAUTH_REDIRECT_URI must be an https address without a query: $cloudflareRedirect"
-    }
-}
-
-android {
-    namespace = "io.github.danyk20.mediasync.feature.consumer"
-
-    buildFeatures {
-        buildConfig = true
-    }
-
-    defaultConfig {
-        buildConfigField(
-            "String",
-            "CLOUDFLARE_OAUTH_CLIENT_ID",
-            "\"${if (cloudflareSignIn) cloudflareClientId else ""}\"",
-        )
-        buildConfigField("String", "CLOUDFLARE_OAUTH_REDIRECT_URI", "\"${redirect ?: ""}\"")
-        manifestPlaceholders["cloudflareRedirectHost"] = redirect?.host.orEmpty()
-        manifestPlaceholders["cloudflareRedirectPath"] = redirect?.path.orEmpty().ifEmpty { "/" }
-    }
-}
-
-// The redirect address's App Link, only in a build that can sign in.
-if (cloudflareSignIn) {
-    androidComponents {
-        onVariants { variant ->
-            variant.sources.manifests.addStaticManifestFile("src/cloudflareSignIn/AndroidManifest.xml")
+    sourceSets {
+        commonMain.dependencies {
+            // ConsumerReceiver, RelayUsage, SetupResult, ... live here, in package sync.android.
+            implementation(projects.sync.runtime)
+            implementation(projects.core.datastore)
+            implementation(projects.core.database)
+            implementation(projects.core.diagnostics)
+            implementation(projects.transport.rendezvous)
+        }
+        androidMain.dependencies {
+            // The Android side of ConsumerDevice and InternetSetup, and the Cloudflare sign-in's redirect activity.
+            implementation(projects.sync.android)
+            implementation(projects.connector.android)
+            implementation(projects.core.media)
+            implementation(libs.metrox.android)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.browser)
+            implementation(libs.androidx.core.ktx)
+        }
+        androidHostTest.dependencies {
+            implementation(projects.sync.android)
+            implementation(projects.connector.android)
+            implementation(projects.core.media)
+            implementation(project.dependencies.testFixtures(projects.connector.api))
         }
     }
 }
 
-dependencies {
-    implementation(libs.metrox.android)
-    implementation(projects.connector.android)
-    implementation(projects.core.datastore)
-    implementation(projects.core.media)
-    implementation(projects.sync.android)
-    implementation(projects.transport.rendezvous)
-    implementation(libs.androidx.browser)
-
-    testImplementation(testFixtures(projects.connector.api))
+compose.resources {
+    packageOfResClass = "io.github.danyk20.mediasync.feature.consumer.generated.resources"
 }

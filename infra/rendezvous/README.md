@@ -141,7 +141,7 @@ The app asks for these scopes (`CloudflareOAuth.SCOPES`, names from `GET /client
 5. **Build with it.** Set `CLOUDFLARE_OAUTH_CLIENT_ID` and `CLOUDFLARE_OAUTH_REDIRECT_URI` as Gradle properties
    (`~/.gradle/gradle.properties`, or `-P`) or environment variables. Release builds take them from the repository
    variables of the same names (*Settings → Secrets and variables → Actions → Variables*). The build checks that the redirect is an https address without a query, and adds the App Link
-   (`feature/consumer/src/cloudflareSignIn/AndroidManifest.xml`) only then.
+   (`app/src/cloudflareSignIn/AndroidManifest.xml`) only then.
 6. **Try it while the client is private.** Until it's public, only members of the developer's Cloudflare account can
    authorize it, which is enough for a test sign-in from a debug build.
 7. **Make it public** in the dashboard, or with `PATCH .../oauth_clients/{client_id}` and `{"visibility":"public"}`.

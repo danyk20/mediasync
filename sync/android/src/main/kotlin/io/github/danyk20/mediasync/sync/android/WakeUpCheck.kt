@@ -27,11 +27,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** What the last check of this phone's wake-ups found, at [checkedAtMillis]; [problem]: why they don't work. */
-data class WakeUpStatus(val checkedAtMillis: Long, val problem: String? = null) {
-    val working: Boolean get() = problem == null
-}
-
 /**
  * Checks that sending phones can wake this receiving phone over the internet (docs/PLAN.md §10.4): its Worker sends
  * it a check the way a sending phone's wake-up goes, through FCM or the developer's wake relay. It runs when internet
