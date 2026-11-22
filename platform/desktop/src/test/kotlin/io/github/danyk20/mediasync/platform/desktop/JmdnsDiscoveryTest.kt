@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.platform.desktop
 
+import io.kotest.matchers.collections.shouldBeIn
 import io.kotest.matchers.shouldBe
 import java.net.Inet4Address
 import java.util.UUID
@@ -33,7 +34,8 @@ class JmdnsDiscoveryTest {
             if (found == null && System.getenv("CI") != null) {
                 assumeTrue(false, "This CI runner does not loop multicast back; run it on a real network.")
             }
-            found shouldBe "${address!!.hostAddress}:$port"
+            // Another interface's address can come back too: any of this computer's LAN addresses is right.
+            found shouldBeIn network.localAddresses().map { "${it.hostAddress}:$port" }
         } finally {
             advertised.close()
         }

@@ -9,9 +9,12 @@ import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
+import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
+import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
+import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 
@@ -25,6 +28,9 @@ interface DesktopGraph : ViewModelGraph {
     val settings: SettingsRepository
     val folderBackup: FolderBackupService
     val receivedLedger: ReceivedLedger
+    val discovery: DesktopServiceDiscovery
+    val network: DesktopLocalNetwork
+    val database: MediaSyncDatabase
     val viewModelFactory: MetroViewModelFactory
 
     @DependencyGraph.Factory

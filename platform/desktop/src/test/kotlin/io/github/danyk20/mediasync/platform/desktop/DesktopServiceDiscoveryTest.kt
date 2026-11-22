@@ -114,6 +114,35 @@ class DesktopServiceDiscoveryTest {
     }
 
     @Test
+    fun `reannouncing closes the old sessions and registers on the current addresses`() {
+        val opener = FakeOpener()
+        var addresses = listOf("192.168.1.20")
+        val discovery = DesktopServiceDiscovery(AddressProvider { addresses.map(::ip) }, opener, 2_000)
+        val handle = discovery.advertise(4242, "abc123")
+        // The first announcement reads the addresses in the background: let it finish before the network "changes".
+        while (opener.sessions.isEmpty()) Thread.sleep(10)
+
+        addresses = listOf("10.0.0.5")
+        discovery.reannounce()
+        handle.close() // waits for the second announcement
+
+        opener.sessions.map { it.address } shouldContainExactly listOf(ip("192.168.1.20"), ip("10.0.0.5"))
+        opener.sessions.forEach { it.closed shouldBe 1 }
+        opener.sessions.last().registered.single().port shouldBe 4242
+    }
+
+    @Test
+    fun `reannouncing after the advertisement was closed does nothing`() {
+        val opener = FakeOpener()
+        val discovery = discovery(opener, "192.168.1.20")
+        discovery.advertise(1, "x").close()
+
+        discovery.reannounce()
+
+        opener.sessions.size shouldBe 1
+    }
+
+    @Test
     fun `closing gives up on a session that hangs`() {
         val opener = FakeOpener(hang = true)
         val handle = discovery(opener, "192.168.1.20", closeTimeout = 300).advertise(1, "x")

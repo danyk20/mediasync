@@ -131,10 +131,15 @@ interface DesktopModule {
         /** The folder connector is the computer's only backup connector. */
         @Provides
         @SingleIn(AppScope::class)
-        fun provideConnectorRegistry(clock: Clock): ConnectorRegistry = ConnectorRegistry(
-            mapOf("folder" to AbsoluteFolderConnectorFactory(FolderConnectorFactory())),
+        fun provideConnectorRegistry(clock: Clock, copies: CopyGate): ConnectorRegistry = ConnectorRegistry(
+            mapOf("folder" to GatedCopyFactory(AbsoluteFolderConnectorFactory(FolderConnectorFactory()), copies)),
             ConnectorDecorators(clock),
         )
+
+        /** The copies in progress: quitting waits for them ([FolderBackupService.stop]). */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideCopyGate(): CopyGate = CopyGate()
 
         @Provides
         fun provideBackupLedger(dao: BackupDao, clock: Clock): BackupLedger = DesktopBackupLedger(dao, clock)
@@ -159,8 +164,10 @@ interface DesktopModule {
             paths: AppPaths,
             clock: Clock,
             @ApplicationScope scope: CoroutineScope,
-        ): FolderBackupService =
-            FolderBackupService(settings, registry, orchestrator, ledger, backups, received, paths.inbox, clock, scope)
+            copies: CopyGate,
+        ): FolderBackupService = FolderBackupService(
+            settings, registry, orchestrator, ledger, backups, received, paths.inbox, clock, scope, copies,
+        )
 
         @Provides
         fun provideClock(): Clock = Clock.systemDefaultZone()
