@@ -69,6 +69,10 @@ gradlePlugin {
             id = libs.plugins.mediasync.kmp.compose.get().pluginId
             implementationClass = "KmpComposeConventionPlugin"
         }
+        register("desktopApplication") {
+            id = libs.plugins.mediasync.desktop.application.get().pluginId
+            implementationClass = "DesktopApplicationConventionPlugin"
+        }
         register("jvmLibrary") {
             id = libs.plugins.mediasync.jvm.library.get().pluginId
             implementationClass = "JvmLibraryConventionPlugin"
