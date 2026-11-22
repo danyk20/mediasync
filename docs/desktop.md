@@ -1,6 +1,6 @@
 # MediaSync on a computer
 
-The desktop app runs on macOS, Windows and Linux. It receives the photos and videos your phones send, keeps them in its own folder and copies them into a backup folder you choose, such as an external disk or a network share. Sending from a computer is not part of it.
+The desktop app runs on macOS, Windows and Linux. It receives the photos and videos your phones send, keeps them in its own folder and copies them into a backup folder you choose, such as an external disk or a network share. A computer can also send its own photo folders: see [Sending from a computer](#sending-from-a-computer).
 
 The installers are **not signed**: signing costs a yearly fee per platform, which this project doesn't pay. Your system warns about that the first time (see below). To make sure the file is the one the project built, check its checksum.
 
@@ -69,6 +69,21 @@ Use your own network's address range. The identity is kept in the desktop's secr
 
 Pair each phone once. You can unpair a phone in the app.
 
+## Sending from a computer
+
+A computer can also send its photos and videos to a receiving phone or to another computer running MediaSync. A computer either receives or sends: it doesn't do both.
+
+1. On first start choose **This computer sends**. To change it later, choose **Reset MediaSync** in the settings: the app closes and asks again.
+2. Choose **Add folder…** and pick the folders to send. Everything in a folder and below it is sent, once. You can also choose which days to send.
+3. Pair the computer with the receiving device, which accepts it once:
+   - On the receiving phone, open MediaSync, choose **Add sending phone**, then **Share pairing link** and send the link to this computer (a message, an email or a notes app).
+   - On a receiving computer, choose **Add sending device**, then **Copy link**.
+   - On this computer, choose **Pair with receiving device**, then **Paste the receiver's link**. On the receiving device, tap **Allow**.
+
+   The link works once, for 5 minutes. Both devices must be on the same network.
+4. The computer syncs on the schedule the receiving device set, or when you choose **Sync now**. A timed schedule syncs at each due time while the computer is plugged in. A scheduled time the computer missed (asleep, switched off or on battery) is caught up once, as soon as it's on and plugged in again. When the last one is more than an hour overdue, the sending screen shows a missed-sync note. *Whenever charging* syncs when MediaSync starts and again after the folders have been quiet for 30 seconds, while plugged in. *Manual* syncs only when you choose **Sync now**. A computer that isn't paired never syncs by itself.
+5. A photo or video that was sent isn't sent again: a sync after the first one sends nothing new, and renaming a file doesn't send it again.
+
 ## Backup folder
 
 In the app's settings, **Choose folder** picks where received photos and videos are copied: a disk, or a network share you have mounted. If the folder isn't reachable, MediaSync keeps the files in its own folder and tries again every few minutes.
@@ -76,6 +91,8 @@ In the app's settings, **Choose folder** picks where received photos and videos 
 ## Start at login
 
 The first time a phone pairs, MediaSync starts at login, hidden in the menu bar or tray, so phones can send without you opening the app. Click the tray icon to show the window; **Quit** from the tray menu stops it. You can turn *Start at login* off in the settings, and it stays off.
+
+A computer that sends doesn't turn *Start at login* on by itself: its syncs run while MediaSync is open. To have them run without you opening the app, turn *Start at login* on in the settings.
 
 ## Where the data lives
 

@@ -65,8 +65,11 @@ private class SystemInterface(private val nic: NetworkInterface) : LocalInterfac
  * are down, loopback, point-to-point (VPNs), virtual or known to be tunnels and virtual switches (Docker, VMs,
  * AirDrop's `awdl`), and addresses that are loopback, link-local or multicast. IPv4 comes first.
  */
-class DesktopLocalNetwork(private val interfaces: () -> List<LocalInterface> = LocalInterface::system) :
-    AddressProvider,
+class DesktopLocalNetwork(
+    private val interfaces: () -> List<LocalInterface> = LocalInterface::system,
+    /** Tests only: the loopback interface and 127.0.0.1 count as the local network, so two apps in one JVM can pair. */
+    private val allowLoopback: Boolean = false,
+) : AddressProvider,
     LanSockets {
 
     override fun localAddresses(): List<InetAddress> =
@@ -84,11 +87,15 @@ class DesktopLocalNetwork(private val interfaces: () -> List<LocalInterface> = L
     override fun <T> keepingAwake(session: () -> T): T = session()
 
     private fun usable(): List<LocalInterface> = interfaces().filter { nic ->
-        nic.isUp && !nic.isLoopback && !nic.isPointToPoint && !nic.isVirtual && !isVirtualName(nic)
+        nic.isUp && if (nic.isLoopback) {
+            allowLoopback // Its name ("lo", "lo0") would count as virtual below.
+        } else {
+            !nic.isPointToPoint && !nic.isVirtual && !isVirtualName(nic)
+        }
     }
 
     private fun worthAdvertising(address: InetAddress) = !(
-        address.isLoopbackAddress || address.isLinkLocalAddress || address.isAnyLocalAddress ||
+        (address.isLoopbackAddress && !allowLoopback) || address.isLinkLocalAddress || address.isAnyLocalAddress ||
             address.isMulticastAddress
         )
 
