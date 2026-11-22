@@ -36,6 +36,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.SendingOrder
 import io.github.danyk20.mediasync.feature.producer.generated.resources.Res
@@ -46,6 +47,7 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_newest_first
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_newest_first_description
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_note
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_note_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_oldest_first
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_oldest_first_description
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_photos_first
@@ -53,6 +55,7 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_videos_first
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_videos_first_description
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_videos_first_description_computer
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -117,7 +120,9 @@ fun SendingOrderScreen(
                     Option(option, selected = order == option, onSelect = { onChoose(option) })
                 }
             }
-            Explanation(stringResource(Res.string.producer_order_note))
+            Explanation(
+                stringResource(deviceText(Res.string.producer_order_note, Res.string.producer_order_note_computer)),
+            )
         }
     }
 }
@@ -163,12 +168,19 @@ internal val SendingOrder.title: StringResource
     }
 
 private val SendingOrder.description: StringResource
-    get() = when (this) {
+    @Composable get() = when (this) {
         SendingOrder.AUTOMATIC -> Res.string.producer_order_automatic_description
+
         SendingOrder.NEWEST_FIRST -> Res.string.producer_order_newest_first_description
+
         SendingOrder.OLDEST_FIRST -> Res.string.producer_order_oldest_first_description
+
         SendingOrder.PHOTOS_FIRST -> Res.string.producer_order_photos_first_description
-        SendingOrder.VIDEOS_FIRST -> Res.string.producer_order_videos_first_description
+
+        SendingOrder.VIDEOS_FIRST -> deviceText(
+            Res.string.producer_order_videos_first_description,
+            Res.string.producer_order_videos_first_description_computer,
+        )
     }
 
 @Preview

@@ -184,6 +184,7 @@
     <string name="producer_sources_until">%1$s, until %2$s</string>
     <string name="producer_sources_between">%1$s, %2$s – %3$s</string>
     <string name="producer_folders_empty">No photos or videos on this phone yet.</string>
+    <string name="producer_folders_empty_computer">No folders added yet. Add a folder with your photos and videos.</string>
     <!-- The count is already formatted for the locale: "2,814". -->
     <plurals name="producer_folders_items">
         <item quantity="one">%1$s item</item>
@@ -240,4 +241,31 @@
     <string name="producer_status_sending_test_file">Test file first · %1$s of %2$s</string>
     <string name="producer_folders_intro_computer">Choose the folders to send. Everything in a folder and below it is sent, once.</string>
     <string name="producer_folders_add">Add folder…</string>
+    <!-- The sending screens on a computer (English only for now). -->
+    <string name="producer_home_title_computer">This computer sends</string>
+    <string name="producer_status_not_paired_body_computer">On the receiving device, open MediaSync and choose Add sending device, then Copy link. Choose Pair with receiving device here and paste the link.</string>
+    <string name="producer_pair_computer">Pair with receiving device</string>
+    <string name="producer_status_connecting_body_computer">Both devices need to be on the same network, with MediaSync open.</string>
+    <string name="producer_failure_unreachable_computer">Couldn't find %1$s. Check that both devices are on the same network and MediaSync is open on it.</string>
+    <string name="producer_failure_not_allowed_computer">%1$s no longer recognises this computer: it was removed there. Unpair it here, then pair them again.</string>
+    <string name="producer_failure_incompatible_computer">%1$s runs a different MediaSync version. Update the app on both devices.</string>
+    <string name="producer_receiving_phone_title_computer">Receiving device</string>
+    <string name="producer_unpair_body_computer">This computer stops sending to %1$s. You can then pair it with another receiving device, or with this one again. Photos and videos already sent stay on %1$s.</string>
+    <string name="producer_missed_no_wifi_computer">This computer wasn't on a network. It tries again soon.</string>
+    <string name="producer_missed_unreachable_computer">%1$s couldn't be found on the network. This computer tries again soon.</string>
+    <string name="producer_missed_connection_lost_computer">The connection to %1$s dropped. This computer tries again soon and continues where it stopped.</string>
+    <string name="producer_missed_unknown_computer">Syncs run while this computer is on and plugged in. If it was asleep or off at that time, MediaSync syncs once it is awake again.</string>
+    <string name="producer_next_sync_computer">Next sync %1$s, while plugged in.</string>
+    <string name="producer_sync_while_charging_computer">Syncs whenever this computer is plugged in and has new photos.</string>
+    <string name="producer_sync_manual_computer">Syncs only when you choose Sync now.</string>
+    <string name="producer_keep_open_hint_computer">Sync now reaches %1$s while MediaSync is open on it, or during its scheduled sync.</string>
+    <string name="producer_details_intro_computer">Photos and videos carry details: where they were taken, which camera took them, captions. Choose what this computer sends to %1$s.</string>
+    <string name="producer_details_intro_unpaired_computer">Photos and videos carry details: where they were taken, which camera took them, captions. Choose what this computer sends.</string>
+    <string name="producer_details_keep_all_description_computer">Photos and videos arrive exactly as they are on this computer.</string>
+    <string name="producer_details_remove_all_description_computer">Location, camera, captions, album and favorite are removed. The date, orientation and colours stay.</string>
+    <string name="producer_order_videos_first_description_computer">All videos, then all photos. If the receiving device is almost full, fewer items fit.</string>
+    <string name="producer_order_note_computer">The receiving device and Google Photos sort everything by date anyway.</string>
+    <string name="producer_range_backup_note_computer">What's outside these days isn't backed up through MediaSync. What was already sent stays on the receiving device.</string>
+    <string name="producer_waiting_left_out_hint_computer">You chose not to sync these: they stay on this computer only. Touch and hold the ones to sync after all.</string>
+    <string name="producer_waiting_no_viewer_computer">No program on this computer can open it.</string>
 </resources>

@@ -37,15 +37,20 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.feature.producer.generated.resources.Res
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_intro
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_intro_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_intro_unpaired
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_intro_unpaired_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_keep_all
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_keep_all_description
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_keep_all_description_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_all
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_all_description
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_all_description_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_all_note
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_location
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_remove_location_description
@@ -120,8 +125,17 @@ fun PhotoDetailsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Explanation(
-                state.consumerName?.let { stringResource(Res.string.producer_details_intro, it) }
-                    ?: stringResource(Res.string.producer_details_intro_unpaired),
+                state.consumerName?.let {
+                    stringResource(
+                        deviceText(Res.string.producer_details_intro, Res.string.producer_details_intro_computer),
+                        it,
+                    )
+                } ?: stringResource(
+                    deviceText(
+                        Res.string.producer_details_intro_unpaired,
+                        Res.string.producer_details_intro_unpaired_computer,
+                    ),
+                ),
             )
             Column(Modifier.selectableGroup()) {
                 PhotoDetails.entries.forEach { details ->
@@ -177,10 +191,18 @@ internal val PhotoDetails.title: StringResource
     }
 
 private val PhotoDetails.description: StringResource
-    get() = when (this) {
-        PhotoDetails.KEEP_ALL -> Res.string.producer_details_keep_all_description
+    @Composable get() = when (this) {
+        PhotoDetails.KEEP_ALL -> deviceText(
+            Res.string.producer_details_keep_all_description,
+            Res.string.producer_details_keep_all_description_computer,
+        )
+
         PhotoDetails.REMOVE_LOCATION -> Res.string.producer_details_remove_location_description
-        PhotoDetails.REMOVE_ALL -> Res.string.producer_details_remove_all_description
+
+        PhotoDetails.REMOVE_ALL -> deviceText(
+            Res.string.producer_details_remove_all_description,
+            Res.string.producer_details_remove_all_description_computer,
+        )
     }
 
 @Preview

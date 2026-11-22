@@ -41,29 +41,41 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.Res
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_camera_needed
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_confirm_body
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_confirm_body_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_confirm_cancel
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_confirm_pair
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_confirm_title
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_done
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_failed_title
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_not_a_code
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_not_a_link_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paired_producer_body
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paired_title
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paste_link
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paste_link_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_connection_lost
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_declined
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_declined_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_expired
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_expired_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_incompatible
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_incompatible_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_no_answer
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_no_answer_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_unreachable
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_problem_unreachable_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_producer_instructions
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_producer_instructions_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_producer_title
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_producer_title_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_try_again
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_waiting_for_approval
 import io.github.danyk20.mediasync.sync.android.PairingResult
@@ -211,7 +223,14 @@ fun ProducerPairingScreen(
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { PairingTopBar(stringResource(Res.string.pairing_producer_title), onDone) },
+        topBar = {
+            PairingTopBar(
+                stringResource(
+                    deviceText(Res.string.pairing_producer_title, Res.string.pairing_producer_title_computer),
+                ),
+                onDone,
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -268,7 +287,10 @@ fun ProducerPairingScreen(
 private fun Confirm(consumerName: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
     StatusCard(
         title = stringResource(Res.string.pairing_confirm_title, consumerName),
-        body = stringResource(Res.string.pairing_confirm_body, consumerName),
+        body = stringResource(
+            deviceText(Res.string.pairing_confirm_body, Res.string.pairing_confirm_body_computer),
+            consumerName,
+        ),
         icon = MediaSyncIcons.Info,
     )
     Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
@@ -285,48 +307,76 @@ private fun Scanning(
     camera: (@Composable () -> Unit)?,
     onPasteLink: () -> Unit,
 ) {
+    // A computer has no camera: it only pastes the receiver's link, so there is no scanner square.
+    val computer = LocalIsComputer.current
     Text(
-        text = stringResource(Res.string.pairing_producer_instructions),
+        text = stringResource(
+            deviceText(Res.string.pairing_producer_instructions, Res.string.pairing_producer_instructions_computer),
+        ),
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
     )
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp)),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (camera != null) {
-                camera()
-            } else {
-                Text(
-                    text = stringResource(Res.string.pairing_camera_needed),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(24.dp),
-                )
+    if (!computer) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp)),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (camera != null) {
+                    camera()
+                } else {
+                    Text(
+                        text = stringResource(Res.string.pairing_camera_needed),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(24.dp),
+                    )
+                }
             }
         }
     }
     if (state.notAPairingCode) {
         Text(
-            text = stringResource(Res.string.pairing_not_a_code),
+            text = stringResource(deviceText(Res.string.pairing_not_a_code, Res.string.pairing_not_a_link_computer)),
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center,
         )
     }
-    OutlinedButton(onClick = onPasteLink) { Text(stringResource(Res.string.pairing_paste_link)) }
+    if (computer) {
+        Button(onClick = onPasteLink, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(Res.string.pairing_paste_link_computer))
+        }
+    } else {
+        OutlinedButton(onClick = onPasteLink) { Text(stringResource(Res.string.pairing_paste_link)) }
+    }
 }
 
 @Composable
 private fun problemMessage(problem: PairingProblem): String = stringResource(
     when (problem) {
-        PairingProblem.DECLINED -> Res.string.pairing_problem_declined
-        PairingProblem.EXPIRED -> Res.string.pairing_problem_expired
-        PairingProblem.NO_ANSWER -> Res.string.pairing_problem_no_answer
-        PairingProblem.UNREACHABLE -> Res.string.pairing_problem_unreachable
+        PairingProblem.DECLINED -> deviceText(
+            Res.string.pairing_problem_declined,
+            Res.string.pairing_problem_declined_computer,
+        )
+
+        PairingProblem.EXPIRED -> deviceText(
+            Res.string.pairing_problem_expired,
+            Res.string.pairing_problem_expired_computer,
+        )
+
+        PairingProblem.NO_ANSWER -> deviceText(
+            Res.string.pairing_problem_no_answer,
+            Res.string.pairing_problem_no_answer_computer,
+        )
+
+        PairingProblem.UNREACHABLE ->
+            deviceText(Res.string.pairing_problem_unreachable, Res.string.pairing_problem_unreachable_computer)
+
         PairingProblem.CONNECTION_LOST -> Res.string.pairing_problem_connection_lost
-        PairingProblem.INCOMPATIBLE -> Res.string.pairing_problem_incompatible
+
+        PairingProblem.INCOMPATIBLE ->
+            deviceText(Res.string.pairing_problem_incompatible, Res.string.pairing_problem_incompatible_computer)
     },
 )

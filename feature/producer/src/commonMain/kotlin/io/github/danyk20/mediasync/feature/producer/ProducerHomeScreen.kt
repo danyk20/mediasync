@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SetupPrompt
 import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
 import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
 import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
@@ -59,6 +60,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.SpeedSheet
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
 import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.component.formatMegabytes
 import io.github.danyk20.mediasync.core.designsystem.component.pastMoment
@@ -78,16 +80,21 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_details_row_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_connection_lost
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_incompatible
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_incompatible_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_not_allowed
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_not_allowed_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_turbo_not_set_up
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_turbo_unreachable
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_unreachable
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_unreachable_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_failure_unreachable_internet
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_held_back_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_held_back_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_home_title
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_home_title_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_internet_sending_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_keep_open_hint
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_keep_open_hint_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_last_sync
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_left_out_row_summary
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_left_out_row_title
@@ -95,12 +102,16 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_location_missing
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_battery_restricted
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_connection_lost
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_connection_lost_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_hot
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_low_battery
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_no_wifi
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_no_wifi_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_unknown
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_unknown_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_unreachable
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_missed_unreachable_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_mobile_data_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_mobile_data_cap_cancel
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_mobile_data_cap_none
@@ -111,9 +122,12 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_mobile_data_cap_used
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_mobile_data_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_next_sync
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_next_sync_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_order_row_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_pair
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_pair_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_receiving_phone_title
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_receiving_phone_title_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_relay_videos_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_relay_videos_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sources_between
@@ -126,11 +140,13 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_checking_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_checking_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_connecting_body
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_connecting_body_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_connecting_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_failed_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_no_folders_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_no_folders_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_not_paired_body
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_not_paired_body_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_not_paired_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_pending_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_pending_see
@@ -143,8 +159,10 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_status_up_to_date_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_stop
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sync_manual
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sync_manual_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sync_now
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sync_while_charging
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_sync_while_charging_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_test_file_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_test_file_no_space
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_test_file_not_writable
@@ -171,6 +189,7 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_turbo_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_unpair
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_unpair_body
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_unpair_body_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_unpair_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_for_space_body
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_for_space_title
@@ -285,11 +304,12 @@ fun ProducerHomeScreen(
     onSeeWaiting: (leftOut: Boolean) -> Unit = {},
     onRemoveTestFile: () -> Unit = {},
 ) {
+    val heading = stringResource(deviceText(Res.string.producer_home_title, Res.string.producer_home_title_computer))
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(Res.string.producer_home_title)) },
+                title = { Text(heading) },
                 actions = { MoreMenu(onOpenSettings = onOpenMediaSyncSettings, onOpenDiagnostics = onOpenDiagnostics) },
             )
         },
@@ -316,7 +336,7 @@ fun ProducerHomeScreen(
                             onSeeWaiting(false)
                         },
                     )
-                    TestFileNotice(state, consumer, onRemoveTestFile)
+                    if (!LocalIsComputer.current) TestFileNotice(state, consumer, onRemoveTestFile)
                     Notices(state, consumer, onOpenSettings)
                     BackgroundSetupNotices(
                         askNotifications = state.askNotifications,
@@ -389,7 +409,16 @@ private fun WhatIsSent(
 @Composable
 private fun ReceivingPhoneRow(consumer: String, onUnpair: () -> Unit) {
     ListItem(
-        headlineContent = { Text(stringResource(Res.string.producer_receiving_phone_title)) },
+        headlineContent = {
+            Text(
+                stringResource(
+                    deviceText(
+                        Res.string.producer_receiving_phone_title,
+                        Res.string.producer_receiving_phone_title_computer,
+                    ),
+                ),
+            )
+        },
         supportingContent = { Text(consumer) },
         trailingContent = {
             AskingToUnpair(consumer, onUnpair) { ask ->
@@ -422,7 +451,14 @@ private fun UnpairDialog(consumer: String, onUnpair: () -> Unit, onCancel: () ->
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(Res.string.producer_unpair_title, consumer)) },
-        text = { Text(stringResource(Res.string.producer_unpair_body, consumer)) },
+        text = {
+            Text(
+                stringResource(
+                    deviceText(Res.string.producer_unpair_body, Res.string.producer_unpair_body_computer),
+                    consumer,
+                ),
+            )
+        },
         confirmButton = {
             TextButton(onClick = onUnpair) {
                 Text(stringResource(Res.string.producer_unpair), color = MaterialTheme.colorScheme.error)
@@ -436,10 +472,14 @@ private fun UnpairDialog(consumer: String, onUnpair: () -> Unit, onCancel: () ->
 private fun NotPaired(onPair: () -> Unit) {
     StatusCard(
         title = stringResource(Res.string.producer_status_not_paired_title),
-        body = stringResource(Res.string.producer_status_not_paired_body),
+        body = stringResource(
+            deviceText(Res.string.producer_status_not_paired_body, Res.string.producer_status_not_paired_body_computer),
+        ),
         icon = MediaSyncIcons.Info,
     )
-    Button(onClick = onPair, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.producer_pair)) }
+    Button(onClick = onPair, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(deviceText(Res.string.producer_pair, Res.string.producer_pair_computer)))
+    }
 }
 
 @Composable
@@ -467,6 +507,17 @@ private data class PairedActions(
 )
 
 @Composable
+private fun Connecting(consumer: String) {
+    StatusCard(
+        title = stringResource(Res.string.producer_status_connecting_title, consumer),
+        body = stringResource(
+            deviceText(Res.string.producer_status_connecting_body, Res.string.producer_status_connecting_body_computer),
+        ),
+        icon = MediaSyncIcons.Send,
+    )
+}
+
+@Composable
 private fun Paired(consumer: String, state: ProducerHomeUiState, actions: PairedActions) {
     when (val sync = state.sync) {
         is ProducerState.Syncing -> {
@@ -476,11 +527,7 @@ private fun Paired(consumer: String, state: ProducerHomeUiState, actions: Paired
             }
         }
 
-        ProducerState.Connecting -> StatusCard(
-            title = stringResource(Res.string.producer_status_connecting_title, consumer),
-            body = stringResource(Res.string.producer_status_connecting_body),
-            icon = MediaSyncIcons.Send,
-        )
+        ProducerState.Connecting -> Connecting(consumer)
 
         ProducerState.SettingUpTurbo -> StatusCard(
             title = stringResource(Res.string.producer_turbo_setting_up_title, consumer),
@@ -603,18 +650,33 @@ private fun MissedSyncNotice(missed: MissedSync, consumer: String, now: ZonedDat
     NoticeCard(
         title = stringResource(Res.string.producer_missed_title, relativeMoment(missed.due, now)),
         body = when (missed.problem) {
-            SyncProblem.NO_WIFI -> stringResource(Res.string.producer_missed_no_wifi)
+            SyncProblem.NO_WIFI -> stringResource(
+                deviceText(Res.string.producer_missed_no_wifi, Res.string.producer_missed_no_wifi_computer),
+            )
 
-            SyncProblem.UNREACHABLE -> stringResource(Res.string.producer_missed_unreachable, consumer)
+            SyncProblem.UNREACHABLE -> stringResource(
+                deviceText(Res.string.producer_missed_unreachable, Res.string.producer_missed_unreachable_computer),
+                consumer,
+            )
 
-            SyncProblem.CONNECTION_LOST -> stringResource(Res.string.producer_missed_connection_lost, consumer)
+            SyncProblem.CONNECTION_LOST -> stringResource(
+                deviceText(
+                    Res.string.producer_missed_connection_lost,
+                    Res.string.producer_missed_connection_lost_computer,
+                ),
+                consumer,
+            )
 
             SyncProblem.HOT -> stringResource(Res.string.producer_missed_hot)
 
             SyncProblem.LOW_BATTERY -> stringResource(Res.string.producer_missed_low_battery)
 
             null -> stringResource(
-                if (restricted) Res.string.producer_missed_battery_restricted else Res.string.producer_missed_unknown,
+                if (restricted) {
+                    Res.string.producer_missed_battery_restricted
+                } else {
+                    deviceText(Res.string.producer_missed_unknown, Res.string.producer_missed_unknown_computer)
+                },
             )
         },
         icon = MediaSyncIcons.Warning,
@@ -632,12 +694,19 @@ private fun NextSync(state: ProducerHomeUiState) {
 
         is SyncSchedule.Timed -> {
             val at = state.nextSyncAt ?: return
-            stringResource(Res.string.producer_next_sync, relativeMoment(at, state.now ?: at))
+            stringResource(
+                deviceText(Res.string.producer_next_sync, Res.string.producer_next_sync_computer),
+                relativeMoment(at, state.now ?: at),
+            )
         }
 
-        SyncSchedule.WhileCharging -> stringResource(Res.string.producer_sync_while_charging)
+        SyncSchedule.WhileCharging -> stringResource(
+            deviceText(Res.string.producer_sync_while_charging, Res.string.producer_sync_while_charging_computer),
+        )
 
-        SyncSchedule.Manual -> stringResource(Res.string.producer_sync_manual)
+        SyncSchedule.Manual -> stringResource(
+            deviceText(Res.string.producer_sync_manual, Res.string.producer_sync_manual_computer),
+        )
     }
     Text(text = text, style = MaterialTheme.typography.bodyMedium)
 }
@@ -942,7 +1011,10 @@ private fun Hints(state: ProducerHomeUiState, consumer: String, onGrantAccess: (
         TextButton(onClick = onGrantAccess) { Text(stringResource(Res.string.producer_location_grant)) }
     }
     Text(
-        text = stringResource(Res.string.producer_keep_open_hint, consumer),
+        text = stringResource(
+            deviceText(Res.string.producer_keep_open_hint, Res.string.producer_keep_open_hint_computer),
+            consumer,
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -1053,19 +1125,31 @@ private fun IdleStatus(
 
 @Composable
 private fun failureMessage(reason: SyncFailure, consumer: String, internetSync: Boolean): String = when (reason) {
-    SyncFailure.NOT_PAIRED -> stringResource(Res.string.producer_status_not_paired_body)
+    SyncFailure.NOT_PAIRED -> stringResource(
+        deviceText(Res.string.producer_status_not_paired_body, Res.string.producer_status_not_paired_body_computer),
+    )
 
     // With internet sync, the same Wi-Fi isn't needed: the other phone must be listening.
     SyncFailure.UNREACHABLE -> stringResource(
-        if (internetSync) Res.string.producer_failure_unreachable_internet else Res.string.producer_failure_unreachable,
+        if (internetSync) {
+            Res.string.producer_failure_unreachable_internet
+        } else {
+            deviceText(Res.string.producer_failure_unreachable, Res.string.producer_failure_unreachable_computer)
+        },
         consumer,
     )
 
     SyncFailure.CONNECTION_LOST -> stringResource(Res.string.producer_failure_connection_lost, consumer)
 
-    SyncFailure.NOT_ALLOWED -> stringResource(Res.string.producer_failure_not_allowed, consumer)
+    SyncFailure.NOT_ALLOWED -> stringResource(
+        deviceText(Res.string.producer_failure_not_allowed, Res.string.producer_failure_not_allowed_computer),
+        consumer,
+    )
 
-    SyncFailure.INCOMPATIBLE -> stringResource(Res.string.producer_failure_incompatible, consumer)
+    SyncFailure.INCOMPATIBLE -> stringResource(
+        deviceText(Res.string.producer_failure_incompatible, Res.string.producer_failure_incompatible_computer),
+        consumer,
+    )
 
     SyncFailure.TURBO_UNREACHABLE -> stringResource(Res.string.producer_failure_turbo_unreachable, consumer)
 

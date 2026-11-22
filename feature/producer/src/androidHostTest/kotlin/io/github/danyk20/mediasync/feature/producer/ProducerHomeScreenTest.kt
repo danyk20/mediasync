@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.producer
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange
@@ -43,7 +45,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 // Test names are sentences; a test class has many tests and magic numbers.
-@Suppress("FunctionNaming", "MagicNumber", "TooManyFunctions")
+// One class for the whole home screen: each of its many states is a test.
+@Suppress("FunctionNaming", "MagicNumber", "TooManyFunctions", "LargeClass")
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h891dp-xxhdpi")
@@ -112,6 +115,41 @@ class ProducerHomeScreenTest {
         composeRule.onNodeWithText("Not paired yet").assertIsDisplayed()
         composeRule.onNodeWithText("Pair with receiving phone").performClick()
         events shouldBe listOf("pair")
+    }
+
+    @Test
+    fun phone_isUnchanged() {
+        show(ProducerHomeUiState())
+
+        composeRule.onNodeWithText("This phone sends").assertIsDisplayed()
+        composeRule.onNodeWithText("Pair with receiving phone").assertIsDisplayed()
+        composeRule.onNodeWithText("This computer sends").assertDoesNotExist()
+    }
+
+    @Test
+    fun computer_notPairedSaysPasteTheLink() {
+        show(ProducerHomeUiState(), computer = true)
+
+        composeRule.onNodeWithText("This computer sends").assertIsDisplayed()
+        composeRule.onNodeWithText("paste the link", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("This phone sends").assertDoesNotExist()
+        composeRule.onNodeWithText("Pair with receiving device").performClick()
+        events shouldBe listOf("pair")
+    }
+
+    @Test
+    fun computer_nextSyncSaysPluggedIn() {
+        show(paired.copy(pendingCount = 0), computer = true)
+
+        composeRule.onNodeWithText("Next sync tomorrow at 3:00 AM, while plugged in.").assertIsDisplayed()
+        composeRule.onNodeWithText("while charging", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun computer_hasNoTestFileSection() {
+        show(paired.copy(pendingCount = 0, testFileBytes = 25L * 1024 * 1024), computer = true)
+
+        composeRule.onNodeWithText("Test file waiting").assertDoesNotExist()
     }
 
     @Test
@@ -729,33 +767,35 @@ class ProducerHomeScreenTest {
         composeRule.onRoot().captureScreenshot(name)
     }
 
-    private fun show(state: ProducerHomeUiState, darkTheme: Boolean = false) {
+    private fun show(state: ProducerHomeUiState, darkTheme: Boolean = false, computer: Boolean = false) {
         composeRule.setContent {
-            MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ProducerHomeScreen(
-                    state = state,
-                    onPair = { events += "pair" },
-                    onChooseFolders = { events += "folders" },
-                    onSyncNow = { events += "sync" },
-                    onStop = { events += "stop" },
-                    onGrantAccess = { events += "grant" },
-                    onOpenSettings = { events += "settings" },
-                    onAllowNotifications = { events += "notifications" },
-                    onDismiss = { events += "dismiss $it" },
-                    onChooseDetails = { events += "details" },
-                    onChooseOrder = { events += "order" },
-                    onInternetOverMobileData = { events += "mobile data $it" },
-                    onVideosOverRelay = { events += "relay videos $it" },
-                    onMobileDataCap = { events += "cap $it" },
-                    onOpenMediaSyncSettings = { events += "mediasync settings" },
-                    onOpenDiagnostics = { events += "diagnostics" },
-                    onStartTurbo = { events += "turbo" },
-                    onOpenLocationSettings = { events += "location" },
-                    onUnpair = { events += "unpair" },
-                    onShowSpeeds = { events += "speeds" },
-                    onSeeWaiting = { leftOut -> events += "waiting $leftOut" },
-                    onRemoveTestFile = { events += "remove test file" },
-                )
+            CompositionLocalProvider(LocalIsComputer provides computer) {
+                MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
+                    ProducerHomeScreen(
+                        state = state,
+                        onPair = { events += "pair" },
+                        onChooseFolders = { events += "folders" },
+                        onSyncNow = { events += "sync" },
+                        onStop = { events += "stop" },
+                        onGrantAccess = { events += "grant" },
+                        onOpenSettings = { events += "settings" },
+                        onAllowNotifications = { events += "notifications" },
+                        onDismiss = { events += "dismiss $it" },
+                        onChooseDetails = { events += "details" },
+                        onChooseOrder = { events += "order" },
+                        onInternetOverMobileData = { events += "mobile data $it" },
+                        onVideosOverRelay = { events += "relay videos $it" },
+                        onMobileDataCap = { events += "cap $it" },
+                        onOpenMediaSyncSettings = { events += "mediasync settings" },
+                        onOpenDiagnostics = { events += "diagnostics" },
+                        onStartTurbo = { events += "turbo" },
+                        onOpenLocationSettings = { events += "location" },
+                        onUnpair = { events += "unpair" },
+                        onShowSpeeds = { events += "speeds" },
+                        onSeeWaiting = { leftOut -> events += "waiting $leftOut" },
+                        onRemoveTestFile = { events += "remove test file" },
+                    )
+                }
             }
         }
     }
