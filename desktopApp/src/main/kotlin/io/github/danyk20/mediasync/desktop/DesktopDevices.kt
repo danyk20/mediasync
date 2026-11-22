@@ -12,8 +12,10 @@ import io.github.danyk20.mediasync.connector.AccountId
 import io.github.danyk20.mediasync.connector.BackupConnectorFactory
 import io.github.danyk20.mediasync.connector.DeviceAppConnectorFactory
 import io.github.danyk20.mediasync.connector.android.BackupOverview
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.feature.backup.BackupDevice
+import io.github.danyk20.mediasync.feature.backup.FolderBackup
 import io.github.danyk20.mediasync.feature.consumer.BackupLine
 import io.github.danyk20.mediasync.feature.consumer.ConsumerDevice
 import io.github.danyk20.mediasync.feature.consumer.InternetSetup
@@ -26,17 +28,20 @@ import io.github.danyk20.mediasync.sync.android.SetupResult
 import io.github.danyk20.mediasync.sync.android.SetupStep
 import io.github.danyk20.mediasync.sync.android.TestFileState
 import io.github.danyk20.mediasync.sync.android.WakeUpStatus
+import java.nio.file.Paths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-/** [ConsumerDevice] on a computer: nothing to ask the system for, no wake-ups, and no cloud backup yet. */
+/** [ConsumerDevice] on a computer: nothing to ask the system for and no wake-ups; its backup is the chosen folder. */
 @ContributesBinding(AppScope::class)
 @Inject
-class DesktopConsumerDevice : ConsumerDevice {
+class DesktopConsumerDevice(private val folder: FolderBackupService) : ConsumerDevice {
     override fun canNotify() = true
 
     override fun batteryRestricted() = false
@@ -47,7 +52,12 @@ class DesktopConsumerDevice : ConsumerDevice {
 
     override val wakeUpStatus: Flow<WakeUpStatus?> = flowOf(null)
 
-    override fun backupLine(): Flow<BackupLine?> = flowOf(null)
+    override fun backupLine(): Flow<BackupLine?> = folder.overview().map { overview ->
+        val path = overview.path
+        if (path == null) BackupLine.Off else BackupLine.Folder(folderName(path), overview.today, overview.reachable)
+    }
+
+    private fun folderName(path: String): String = Paths.get(path).fileName?.toString() ?: path
 }
 
 /** [InternetSetup] on a computer: not in this version. */
@@ -62,10 +72,17 @@ class DesktopInternetSetup : InternetSetup {
     override val tokenUrl: String = ""
 }
 
-/** [BackupDevice] on a computer: no other apps to back up through; the folder connector comes with the picker. */
+/**
+ * [BackupDevice] on a computer: no other apps to back up through; the backup is a folder the user chooses, which
+ * [FolderBackupService] copies into.
+ */
 @ContributesBinding(AppScope::class)
 @Inject
-class DesktopBackupDevice : BackupDevice {
+class DesktopBackupDevice(
+    private val service: FolderBackupService,
+    private val picker: FolderPicker,
+    private val settings: SettingsRepository,
+) : BackupDevice {
     override val deviceApps: List<DeviceAppConnectorFactory> = emptyList()
 
     override fun isInstalled(packageName: String) = false
@@ -75,6 +92,15 @@ class DesktopBackupDevice : BackupDevice {
     override suspend fun connect(factory: BackupConnectorFactory) = Unit
 
     override suspend fun disconnect(account: AccountId) = Unit
+
+    override fun folderBackup(): Flow<FolderBackup?> = service.overview()
+
+    override suspend fun chooseFolder() {
+        val current = settings.backupFolder.first()?.let(::fileOf)
+        picker.pick(current)?.let { settings.setBackupFolder(it.toAbsolutePath().toString()) }
+    }
+
+    override suspend fun stopFolder() = settings.setBackupFolder(null)
 }
 
 /** [DiagnosticsDevice] on a computer: where it keeps things, and its log. */

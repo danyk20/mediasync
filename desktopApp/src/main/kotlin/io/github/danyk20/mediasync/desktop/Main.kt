@@ -30,6 +30,7 @@ fun main() {
     Diagnostics.logCrashes(graph.diagnosticLog::flush)
     println("MediaSync ${AppVersion.current}: data in ${graph.paths.root}")
     startReceiving(graph)
+    graph.folderBackup.start()
     application {
         Window(onCloseRequest = ::exitApplication, title = WINDOW_TITLE) {
             DesktopRoot(graph)

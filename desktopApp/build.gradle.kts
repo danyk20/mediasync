@@ -12,6 +12,7 @@ compose.desktop {
 
 dependencies {
     implementation(projects.connector.api)
+    implementation(projects.connector.folder)
     implementation(projects.core.database)
     implementation(projects.core.datastore)
     implementation(projects.core.designsystem)

@@ -41,6 +41,8 @@
     <string name="consumer_backup_row_off">Off: received photos stay on this phone only</string>
     <string name="consumer_backup_row_on">Backed up by the %1$s app · %2$s handed over today</string>
     <string name="consumer_backup_row_open">Open</string>
+    <string name="consumer_backup_row_folder">Copied to %1$s · %2$s today</string>
+    <string name="consumer_backup_row_folder_unreachable">Can't reach %1$s: copying waits until it is back</string>
     <string name="consumer_names_row_title">Simple file names</string>
     <string name="consumer_names_row_on">On: a name keeps only its last dot, so Google Photos shows the file. VID_1234.LS.mp4 is saved as VID_1234_LS.mp4</string>
     <string name="consumer_names_row_off">Off: names stay as sent. Google Photos may not show files such as VID_1234.LS.mp4</string>

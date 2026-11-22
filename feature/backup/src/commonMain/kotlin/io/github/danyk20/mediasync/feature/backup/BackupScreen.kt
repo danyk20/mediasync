@@ -42,6 +42,16 @@ import io.github.danyk20.mediasync.connector.SetupStep
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.feature.backup.generated.resources.Res
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_done
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_change
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_choose
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_copied
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_intro
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_none
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_stop
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_title
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_today
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_unreachable
+import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_folder_waiting
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_free_up_app
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_free_up_open
 import io.github.danyk20.mediasync.feature.backup.generated.resources.backup_free_up_smart_storage
@@ -87,6 +97,8 @@ fun BackupRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: Ba
             openStorageSettings = { system.openStorageSettings() },
             connect = viewModel::connect,
             disconnect = viewModel::disconnect,
+            chooseFolder = viewModel::chooseFolder,
+            stopFolder = viewModel::stopFolder,
         ),
         onDone = onDone,
         modifier = modifier,
@@ -118,10 +130,53 @@ fun BackupScreen(state: BackupUiState?, actions: BackupActions, onDone: () -> Un
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(Res.string.backup_intro), style = MaterialTheme.typography.bodyLarge)
-            if (state.apps.isEmpty()) Text(stringResource(Res.string.backup_none))
+            val intro = if (state.folder != null) Res.string.backup_folder_intro else Res.string.backup_intro
+            Text(stringResource(intro), style = MaterialTheme.typography.bodyLarge)
+            state.folder?.let { FolderStatus(it, actions) }
+            if (state.apps.isEmpty() && state.folder == null) Text(stringResource(Res.string.backup_none))
             state.apps.forEach { app ->
                 if (app.overview == null) AppSetup(app, actions) else AppStatus(app, actions)
+            }
+        }
+    }
+}
+
+/** A computer's backup folder: where it is, whether it can be reached, and how much has been copied. */
+@Composable
+private fun FolderStatus(folder: FolderBackup, actions: BackupActions) {
+    val count = NumberFormat.getIntegerInstance()
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(Res.string.backup_folder_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+            if (folder.path == null) {
+                Text(stringResource(Res.string.backup_folder_none))
+            } else {
+                Text(folder.path)
+                if (!folder.reachable) {
+                    Text(stringResource(Res.string.backup_folder_unreachable), color = MaterialTheme.colorScheme.error)
+                }
+                Text(stringResource(Res.string.backup_folder_today, count.format(folder.today)))
+                Text(stringResource(Res.string.backup_folder_copied, count.format(folder.copied)))
+                if (folder.waiting > 0) {
+                    Text(stringResource(Res.string.backup_folder_waiting, count.format(folder.waiting)))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val choose = if (folder.path ==
+                    null
+                ) {
+                    Res.string.backup_folder_choose
+                } else {
+                    Res.string.backup_folder_change
+                }
+                Button(onClick = actions.chooseFolder) { Text(stringResource(choose)) }
+                if (folder.path != null) {
+                    TextButton(onClick = actions.stopFolder) { Text(stringResource(Res.string.backup_folder_stop)) }
+                }
             }
         }
     }

@@ -29,4 +29,14 @@
     <string name="backup_free_up_storage_settings">Storage settings</string>
     <string name="backup_never_deletes">MediaSync never deletes these files itself.</string>
     <string name="backup_stop">Stop backing up</string>
+    <string name="backup_folder_intro">Everything this computer receives is first kept in MediaSync's own folder, then copied into the folder you choose, such as a disk or a network share.</string>
+    <string name="backup_folder_title">Backup folder</string>
+    <string name="backup_folder_none">No folder chosen yet: received photos and videos wait in MediaSync's own folder.</string>
+    <string name="backup_folder_choose">Choose folder</string>
+    <string name="backup_folder_change">Change folder</string>
+    <string name="backup_folder_stop">Stop copying</string>
+    <string name="backup_folder_unreachable">The folder can't be reached. Is the disk or network share connected? MediaSync tries again every few minutes.</string>
+    <string name="backup_folder_today">%1$s copied today</string>
+    <string name="backup_folder_copied">%1$s copied in all</string>
+    <string name="backup_folder_waiting">%1$s received, not copied yet</string>
 </resources>

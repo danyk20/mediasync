@@ -31,8 +31,21 @@ data class AppBackup(
     val overview: BackupOverview? = null,
 )
 
-/** What the backup screen shows. */
-data class BackupUiState(val apps: List<AppBackup> = emptyList())
+/** A computer's backup into a folder (docs/PLAN.md §9, M8): `path` is `null` until the user has chosen one. */
+data class FolderBackup(
+    val path: String? = null,
+    /** The folder can be reached now: a disk or share that is unplugged or unmounted can't. */
+    val reachable: Boolean = true,
+    /** Copied since midnight. */
+    val today: Int = 0,
+    /** Copied, in all. */
+    val copied: Int = 0,
+    /** Received, and not copied yet. */
+    val waiting: Int = 0,
+)
+
+/** What the backup screen shows; [folder] is `null` on a device that has no folder backup. */
+data class BackupUiState(val apps: List<AppBackup> = emptyList(), val folder: FolderBackup? = null)
 
 /** What the backup screen can do; the defaults do nothing, for previews and tests. */
 data class BackupActions(
@@ -41,6 +54,8 @@ data class BackupActions(
     val openStorageSettings: () -> Unit = {},
     val connect: (ConnectorId) -> Unit = {},
     val disconnect: (AppBackup) -> Unit = {},
+    val chooseFolder: () -> Unit = {},
+    val stopFolder: () -> Unit = {},
 )
 
 /** Cloud backup on the receiving phone (docs/PLAN.md §9): the apps that can back it up, and how that stands. */
@@ -52,9 +67,14 @@ class BackupViewModel(private val backup: BackupDevice) : ViewModel() {
     private val checks = MutableStateFlow(0)
 
     /** `null` while loading. */
-    val uiState: StateFlow<BackupUiState?> = combine(backup.overviews(), checks) { overviews, _ ->
+    val uiState: StateFlow<BackupUiState?> = combine(
+        backup.overviews(),
+        backup.folderBackup(),
+        checks,
+    ) { overviews, folder, _ ->
         BackupUiState(
-            backup.deviceApps.map { factory ->
+            folder = folder,
+            apps = backup.deviceApps.map { factory ->
                 AppBackup(
                     connector = factory.descriptor.id,
                     profile = factory.profile,
@@ -78,5 +98,15 @@ class BackupViewModel(private val backup: BackupDevice) : ViewModel() {
     fun disconnect(app: AppBackup) {
         val account = app.overview?.account ?: return
         viewModelScope.launch { backup.disconnect(account.id) }
+    }
+
+    /** Opens the folder dialog; copying into the chosen folder starts at once. */
+    fun chooseFolder() {
+        viewModelScope.launch { backup.chooseFolder() }
+    }
+
+    /** Stops copying into the folder. What was copied stays there. */
+    fun stopFolder() {
+        viewModelScope.launch { backup.stopFolder() }
     }
 }

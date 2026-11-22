@@ -110,6 +110,14 @@ class FakeSettingsRepository(
         simpleFileNamesState.value = on
     }
 
+    private val backupFolderState = MutableStateFlow<String?>(null)
+
+    override val backupFolder: StateFlow<String?> = backupFolderState
+
+    override suspend fun setBackupFolder(path: String?) {
+        backupFolderState.value = path?.takeIf { it.isNotBlank() }
+    }
+
     private val sendAnimationState = MutableStateFlow(true)
 
     override val sendAnimation: StateFlow<Boolean> = sendAnimationState

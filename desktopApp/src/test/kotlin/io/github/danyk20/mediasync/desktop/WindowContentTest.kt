@@ -8,9 +8,11 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.zacsweers.metro.createGraphFactory
 import java.nio.file.Path
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -37,7 +39,43 @@ class WindowContentTest {
         }
     }
 
+    @Test
+    fun theBackupScreenShowsTheChosenFolder() {
+        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+        val folder = directory.resolve("My Backup").toString()
+        runBlocking { graph.settings.setBackupFolder(folder) }
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph) }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText(BACKUP_ROW).fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText(BACKUP_ROW).performClick()
+            waitUntil(timeoutMillis = WAIT_MILLIS) { onAllNodesWithText(folder).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText(folder).assertIsDisplayed()
+            onNodeWithText("Change folder").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun theBackupScreenOffersToChooseAFolderWhenThereIsNone() {
+        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph) }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText(BACKUP_ROW).fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText(BACKUP_ROW).performClick()
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("Choose folder").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("Choose folder").assertIsDisplayed()
+        }
+    }
+
     private companion object {
+        const val BACKUP_ROW = "Cloud backup"
         const val READY_TEXT = "Ready to receive"
         const val WAIT_MILLIS = 15_000L
     }
