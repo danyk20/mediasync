@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.feature.diagnostics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -53,7 +55,7 @@ class SettingsTest {
     private val releases = FakeReleases()
     private val events = mutableListOf<String>()
 
-    private fun viewModel() = SettingsViewModel(settings, releases)
+    private fun viewModel() = SettingsViewModel(settings, releases, NoLoginStartup())
 
     @Test
     fun theLogKeepsOneMegabyteUntilTheUserTypesAnotherSize() {
@@ -211,6 +213,13 @@ class SettingsTest {
         composeRule.onNodeWithText("Reset MediaSync").performScrollTo().performClick()
         composeRule.onNode(hasText("Reset") and hasAnyAncestor(isDialog())).performClick()
         events shouldBe listOf("reset")
+    }
+
+    @Test
+    fun aPhoneShowsNoStartAtLoginRow() {
+        show(SettingsUiState("1", "1"))
+
+        composeRule.onAllNodesWithText("Start MediaSync when you log in").assertCountEquals(0)
     }
 
     @Test

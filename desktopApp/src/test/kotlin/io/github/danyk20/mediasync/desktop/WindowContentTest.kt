@@ -4,13 +4,22 @@
  */
 package io.github.danyk20.mediasync.desktop
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.zacsweers.metro.createGraphFactory
+import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
+import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.feature.diagnostics.SettingsRoute
+import io.github.danyk20.mediasync.feature.diagnostics.SettingsScreen
+import io.github.danyk20.mediasync.feature.diagnostics.SettingsUiState
+import io.github.danyk20.mediasync.feature.diagnostics.StartAtLoginState
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
@@ -83,6 +92,74 @@ class WindowContentTest {
             setContent { DesktopRoot(graph, waitingForKeychain = true) }
             onNodeWithText(WAITING_TEXT).assertIsDisplayed()
             onAllNodesWithText(READY_TEXT).fetchSemanticsNodes().isEmpty() shouldBe true
+        }
+    }
+
+    @Test
+    fun settingsOffersStartAtLoginAndTurnsItOnWithOneClick() {
+        val events = mutableListOf<Boolean>()
+        runComposeUiTest {
+            setContent {
+                MediaSyncTheme {
+                    SettingsScreen(
+                        state = SettingsUiState(
+                            "1",
+                            "1",
+                            startAtLogin = StartAtLoginState(on = false, canChange = true),
+                        ),
+                        onLogSizeChange = {},
+                        onSaveLogSize = {},
+                        onReset = {},
+                        onDone = {},
+                        onStartAtLogin = { events += it },
+                    )
+                }
+            }
+            onNodeWithText("Start MediaSync when you log in").performScrollTo().assertIsOff().performClick()
+        }
+        events shouldBe listOf(true)
+    }
+
+    @Test
+    fun settingsSaysWhyStartAtLoginIsOffForACopyThatIsNotInstalled() {
+        val events = mutableListOf<Boolean>()
+        runComposeUiTest {
+            setContent {
+                MediaSyncTheme {
+                    SettingsScreen(
+                        state = SettingsUiState(
+                            "1",
+                            "1",
+                            startAtLogin = StartAtLoginState(on = false, canChange = false),
+                        ),
+                        onLogSizeChange = {},
+                        onSaveLogSize = {},
+                        onReset = {},
+                        onDone = {},
+                        onStartAtLogin = { events += it },
+                    )
+                }
+            }
+            onNodeWithText("Only an installed MediaSync", substring = true).performScrollTo().assertIsDisplayed()
+            onNodeWithText("Start MediaSync when you log in").performClick()
+        }
+        events shouldBe emptyList()
+    }
+
+    @Test
+    fun settingsInTheWindowShowsTheRowDisabledWhenNotInstalled() {
+        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+
+        runComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalMetroViewModelFactory provides graph.viewModelFactory) {
+                    MediaSyncTheme { SettingsRoute(onDone = {}) }
+                }
+            }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("Start MediaSync when you log in").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("Only an installed MediaSync", substring = true).performScrollTo().assertIsDisplayed()
         }
     }
 

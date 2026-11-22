@@ -131,6 +131,11 @@
     <string name="consumer_schedule_time_cancel">Cancel</string>
     <string name="consumer_schedule_window_hint">While it's charging, this phone gets ready to receive 5 minutes before each time and stays ready until your phones are done.</string>
     <string name="consumer_schedule_open_hint">While MediaSync is open, your phones can sync with this phone at any time.</string>
+    <!-- The same screen on a computer, which receives whenever MediaSync runs (English only for now). -->
+    <string name="consumer_schedule_intro_computer">Your sending phones sync with this computer at these times while they're charging. A phone that isn't charging then syncs as soon as it's plugged in.</string>
+    <string name="consumer_schedule_while_charging_description_computer">Phones sync as soon as they're charging and have new photos. This computer receives whenever MediaSync is running.</string>
+    <string name="consumer_schedule_window_hint_computer">This computer receives whenever MediaSync is running, so it is ready at each of these times.</string>
+    <string name="consumer_schedule_open_hint_computer">While MediaSync is open, your phones can sync with this computer at any time.</string>
 
     <!-- Turbo transfer (docs/PLAN.md §8.3): a direct Wi-Fi link between the two phones. -->
     <string name="consumer_turbo_title">A sending phone asked for Turbo transfer</string>

@@ -63,16 +63,20 @@ import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_from
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_hours
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_intro
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_intro_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_manual
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_manual_description
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_open_hint
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_open_hint_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_time_cancel
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_time_ok
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_title
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_weekly
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_while_charging
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_while_charging_description
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_while_charging_description_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_window_hint
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_window_hint_computer
 import java.time.format.TextStyle
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -111,10 +115,13 @@ enum class ScheduleOption {
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
 @Inject
-class SyncScheduleViewModel(private val settings: SettingsRepository) : ViewModel() {
+class SyncScheduleViewModel(private val settings: SettingsRepository, device: ConsumerDevice) : ViewModel() {
 
     /** `null` while loading. */
     val schedule: StateFlow<SyncSchedule?> = settings.syncSchedule.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** A computer receives all the time: the screen words what it says about this device for that. */
+    val listensContinuously: Boolean = device.listensContinuously
 
     /** Switches to [option], keeping the time and interval already chosen where they apply. */
     fun choose(option: ScheduleOption) {
@@ -187,6 +194,7 @@ fun SyncScheduleRoute(
         ),
         onDone = onDone,
         modifier = modifier,
+        listensContinuously = viewModel.listensContinuously,
     )
 }
 
@@ -199,7 +207,10 @@ class ScheduleActions(
     val setDay: (DayOfWeek) -> Unit = {},
 )
 
-/** When the sending phones sync with this phone. [schedule] `null`: still loading. */
+/**
+ * When the sending phones sync with this device. [schedule] `null`: still loading. [listensContinuously] words the
+ * screen for a computer, which receives whenever the app runs, instead of a phone that listens while charging.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyncScheduleScreen(
@@ -207,6 +218,7 @@ fun SyncScheduleScreen(
     actions: ScheduleActions,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    listensContinuously: Boolean = false,
 ) {
     Scaffold(
         modifier = modifier,
@@ -228,30 +240,38 @@ fun SyncScheduleScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 8.dp),
         ) {
-            Explanation(stringResource(Res.string.consumer_schedule_intro))
+            val intro = if (listensContinuously) {
+                Res.string.consumer_schedule_intro_computer
+            } else {
+                Res.string.consumer_schedule_intro
+            }
+            Explanation(stringResource(intro))
             Column(Modifier.selectableGroup()) {
                 ScheduleOption.entries.forEach { option ->
-                    OptionRow(option, selected = ScheduleOption.of(schedule) == option, onSelect = {
-                        actions.choose(option)
-                    })
+                    OptionRow(
+                        option,
+                        selected = ScheduleOption.of(schedule) == option,
+                        listensContinuously = listensContinuously,
+                        onSelect = { actions.choose(option) },
+                    )
                     if (ScheduleOption.of(schedule) == option) Details(schedule, actions)
                 }
             }
-            Explanation(
-                stringResource(
-                    if (schedule is SyncSchedule.Timed) {
-                        Res.string.consumer_schedule_window_hint
-                    } else {
-                        Res.string.consumer_schedule_open_hint
-                    },
-                ),
-            )
+            Explanation(stringResource(hintFor(schedule, listensContinuously)))
         }
     }
 }
 
+/** The hint under the choices: what a timed schedule or an open app means for this device. */
+private fun hintFor(schedule: SyncSchedule, listensContinuously: Boolean): StringResource = when {
+    listensContinuously && schedule is SyncSchedule.Timed -> Res.string.consumer_schedule_window_hint_computer
+    listensContinuously -> Res.string.consumer_schedule_open_hint_computer
+    schedule is SyncSchedule.Timed -> Res.string.consumer_schedule_window_hint
+    else -> Res.string.consumer_schedule_open_hint
+}
+
 @Composable
-private fun OptionRow(option: ScheduleOption, selected: Boolean, onSelect: () -> Unit) {
+private fun OptionRow(option: ScheduleOption, selected: Boolean, listensContinuously: Boolean, onSelect: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -262,7 +282,7 @@ private fun OptionRow(option: ScheduleOption, selected: Boolean, onSelect: () ->
         RadioButton(selected = selected, onClick = null)
         Column(Modifier.padding(start = 16.dp)) {
             Text(stringResource(option.title), style = MaterialTheme.typography.bodyLarge)
-            option.description?.let {
+            option.description(listensContinuously)?.let {
                 Text(
                     text = stringResource(it),
                     style = MaterialTheme.typography.bodyMedium,
@@ -379,12 +399,18 @@ private val ScheduleOption.title: StringResource
         ScheduleOption.MANUAL -> Res.string.consumer_schedule_manual
     }
 
-private val ScheduleOption.description: StringResource?
-    get() = when (this) {
-        ScheduleOption.WHILE_CHARGING -> Res.string.consumer_schedule_while_charging_description
-        ScheduleOption.MANUAL -> Res.string.consumer_schedule_manual_description
-        else -> null
-    }
+private fun ScheduleOption.description(listensContinuously: Boolean): StringResource? = when (this) {
+    ScheduleOption.WHILE_CHARGING ->
+        if (listensContinuously) {
+            Res.string.consumer_schedule_while_charging_description_computer
+        } else {
+            Res.string.consumer_schedule_while_charging_description
+        }
+
+    ScheduleOption.MANUAL -> Res.string.consumer_schedule_manual_description
+
+    else -> null
+}
 
 private val DETAILS_INDENT = 72.dp
 
