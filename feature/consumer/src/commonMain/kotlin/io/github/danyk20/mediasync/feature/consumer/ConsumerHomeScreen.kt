@@ -64,6 +64,8 @@ import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.Res
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_add_producer
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_folder
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_folder_unreachable
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_off
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_on
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_open
@@ -523,6 +525,16 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
                     when (backup) {
                         BackupLine.Off -> stringResource(Res.string.consumer_backup_row_off)
 
+                        is BackupLine.Folder -> if (backup.reachable) {
+                            stringResource(
+                                Res.string.consumer_backup_row_folder,
+                                backup.folder,
+                                NumberFormat.getIntegerInstance().format(backup.today),
+                            )
+                        } else {
+                            stringResource(Res.string.consumer_backup_row_folder_unreachable, backup.folder)
+                        }
+
                         is BackupLine.On -> stringResource(
                             Res.string.consumer_backup_row_on,
                             backup.app,
@@ -532,7 +544,7 @@ private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
                 )
             },
             trailingContent = {
-                val action = if (backup is BackupLine.On) {
+                val action = if (backup !is BackupLine.Off) {
                     Res.string.consumer_backup_row_open
                 } else {
                     Res.string.consumer_internet_set_up

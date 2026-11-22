@@ -78,6 +78,10 @@ interface ReceivedItemDao {
     @Insert
     suspend fun insert(item: ReceivedItemEntity)
 
+    /** Where each received copy of [contentId] was stored (the same content can arrive more than once). */
+    @Query("SELECT location FROM received_items WHERE contentId = :contentId")
+    suspend fun locationsOf(contentId: String): List<String>
+
     @Query("SELECT COUNT(*) FROM received_items")
     fun observeCount(): Flow<Int>
 

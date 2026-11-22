@@ -177,6 +177,30 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun theBackupFolderIsNullAtFirstAndCanBeChosenAndCleared() = runTest {
+        val repository = DataStoreSettingsRepository(dataStore())
+        repository.backupFolder.first().shouldBeNull()
+
+        repository.setBackupFolder("/Volumes/Photos")
+        repository.backupFolder.first() shouldBe "/Volumes/Photos"
+
+        repository.setBackupFolder(null)
+        repository.backupFolder.first().shouldBeNull()
+    }
+
+    @Test
+    fun aBlankBackupFolderCountsAsNone() = runTest {
+        val dataStore = dataStore()
+        val repository = DataStoreSettingsRepository(dataStore)
+        repository.setBackupFolder("/Volumes/Photos")
+
+        repository.setBackupFolder("  ")
+
+        repository.backupFolder.first().shouldBeNull()
+        dataStore.data.first()[DataStoreSettingsRepository.BackupFolderKey].shouldBeNull()
+    }
+
+    @Test
     fun theSendAnimationIsOnAtFirstAndCanBeTurnedOff() = runTest {
         val dataStore = dataStore()
         DataStoreSettingsRepository(dataStore).sendAnimation.first() shouldBe true

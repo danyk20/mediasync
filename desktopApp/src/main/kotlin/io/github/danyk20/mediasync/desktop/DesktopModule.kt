@@ -15,11 +15,19 @@ import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.Qualifier
 import dev.zacsweers.metro.SingleIn
+import io.github.danyk20.mediasync.connector.BackupLedger
+import io.github.danyk20.mediasync.connector.BackupOrchestrator
+import io.github.danyk20.mediasync.connector.ConnectorDecorators
+import io.github.danyk20.mediasync.connector.ConnectorRegistry
+import io.github.danyk20.mediasync.connector.folder.FolderConnectorFactory
+import io.github.danyk20.mediasync.core.database.BackupDao
 import io.github.danyk20.mediasync.core.database.LeftOutStore
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.database.ReceivedItemDao
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
 import io.github.danyk20.mediasync.core.database.RoomSentLedger
+import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.createSettingsDataStore
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.feature.consumer.CloudflareOAuthClient
@@ -119,6 +127,40 @@ interface DesktopModule {
         /** No sign-in with Cloudflare on a computer yet: an empty client turns it off. */
         @Provides
         fun provideCloudflareOAuthClient(): CloudflareOAuthClient = CloudflareOAuthClient("", "")
+
+        /** The folder connector is the computer's only backup connector. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideConnectorRegistry(clock: Clock): ConnectorRegistry = ConnectorRegistry(
+            mapOf("folder" to AbsoluteFolderConnectorFactory(FolderConnectorFactory())),
+            ConnectorDecorators(clock),
+        )
+
+        @Provides
+        fun provideBackupLedger(dao: BackupDao, clock: Clock): BackupLedger = DesktopBackupLedger(dao, clock)
+
+        @Provides
+        fun provideBackupOrchestrator(ledger: BackupLedger, clock: Clock): BackupOrchestrator =
+            BackupOrchestrator(ledger, clock)
+
+        @Provides
+        fun provideFolderPicker(): FolderPicker = AwtFolderPicker()
+
+        @Provides
+        @SingleIn(AppScope::class)
+        @Suppress("LongParameterList") // Collaborators, one each, as the constructor takes them.
+        fun provideFolderBackupService(
+            settings: SettingsRepository,
+            registry: ConnectorRegistry,
+            orchestrator: BackupOrchestrator,
+            ledger: BackupLedger,
+            backups: BackupDao,
+            received: ReceivedItemDao,
+            paths: AppPaths,
+            clock: Clock,
+            @ApplicationScope scope: CoroutineScope,
+        ): FolderBackupService =
+            FolderBackupService(settings, registry, orchestrator, ledger, backups, received, paths.inbox, clock, scope)
 
         @Provides
         fun provideClock(): Clock = Clock.systemDefaultZone()

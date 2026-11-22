@@ -152,6 +152,13 @@ class DataStoreSettingsRepository(private val dataStore: DataStore<Preferences>)
         dataStore.edit { it[DiagnosticsLogBytesKey] = LogSize.clamp(bytes) }
     }
 
+    override val backupFolder: Flow<String?> =
+        dataStore.data.map { it[BackupFolderKey]?.takeIf(String::isNotBlank) }.distinctUntilChanged()
+
+    override suspend fun setBackupFolder(path: String?) {
+        dataStore.edit { if (path.isNullOrBlank()) it.remove(BackupFolderKey) else it[BackupFolderKey] = path }
+    }
+
     override val dismissedPrompts: Flow<Set<SetupPrompt>> = dataStore.data
         .map { preferences ->
             preferences[DismissedPromptsKey].orEmpty().mapNotNullTo(mutableSetOf()) { name ->
@@ -179,6 +186,7 @@ class DataStoreSettingsRepository(private val dataStore: DataStore<Preferences>)
         val VideosOverRelayKey = booleanPreferencesKey("videos_over_relay")
         val SimpleFileNamesKey = booleanPreferencesKey("simple_file_names")
         val SendAnimationKey = booleanPreferencesKey("send_animation")
+        val BackupFolderKey = stringPreferencesKey("backup_folder")
         val MobileDataCapKey = longPreferencesKey("mobile_data_cap_bytes")
         val DiagnosticsLogBytesKey = longPreferencesKey("diagnostics_log_bytes")
 

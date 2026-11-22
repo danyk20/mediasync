@@ -94,6 +94,15 @@ interface SettingsRepository {
     /** Stores [bytes], brought within what [LogSize] allows. */
     suspend fun setDiagnosticsLogBytes(bytes: Long)
 
+    /**
+     * A computer that receives: the folder (an absolute path) the received files are copied into, or `null` until the
+     * user chooses one.
+     */
+    val backupFolder: Flow<String?>
+
+    /** Stores [path]; `null` stops copying. */
+    suspend fun setBackupFolder(path: String?)
+
     /** The setup cards the user answered with *Not now*; they don't come back. */
     val dismissedPrompts: Flow<Set<SetupPrompt>>
 

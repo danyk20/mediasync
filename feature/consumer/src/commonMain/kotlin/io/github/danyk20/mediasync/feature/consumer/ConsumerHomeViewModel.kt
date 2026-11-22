@@ -98,6 +98,9 @@ sealed interface BackupLine {
 
     /** [app] on this phone backs up what's received; [today] were handed to it since midnight. */
     data class On(val app: String, val today: Int) : BackupLine
+
+    /** A computer copies what's received into the folder named [folder]; [today] were copied since midnight. */
+    data class Folder(val folder: String, val today: Int, val reachable: Boolean = true) : BackupLine
 }
 
 /** Internet sync as set up: its Worker, the relay meter and whether wake-ups get through. */
