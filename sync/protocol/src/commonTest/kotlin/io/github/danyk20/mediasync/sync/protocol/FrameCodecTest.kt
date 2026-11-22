@@ -14,20 +14,18 @@ import io.kotest.property.arbitrary.byteArray
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.checkAll
+import kotlin.test.Test
 import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 
 class FrameCodecTest {
 
     @Test
-    fun `encodes type, LEB128 length and payload`() {
+    fun `encodes type and LEB128 length and payload`() {
         val buffer = Buffer()
 
         FrameCodec.write(Frame(FrameType.HELLO, "hi".encodeUtf8()), buffer)
@@ -44,14 +42,13 @@ class FrameCodecTest {
         buffer.readByteString() shouldBe "07ac02".decodeHex()
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = [0, 1, 127, 128, 16_383, 16_384, 2_097_151, FrameCodec.MAX_PAYLOAD_SIZE])
-    fun `round-trips payload lengths at every varint boundary`(length: Int) {
-        val frame = Frame(FrameType.DATA, ByteArray(length) { it.toByte() }.toByteString())
+    @Test
+    fun `round-trips payload lengths at every varint boundary`() {
+        for (length in listOf(0, 1, 127, 128, 16_383, 16_384, 2_097_151, FrameCodec.MAX_PAYLOAD_SIZE)) {
+            val frame = Frame(FrameType.DATA, ByteArray(length) { it.toByte() }.toByteString())
 
-        val decoded = roundTrip(frame)
-
-        decoded shouldBe frame
+            roundTrip(frame) shouldBe frame
+        }
     }
 
     @Test
@@ -64,7 +61,7 @@ class FrameCodecTest {
     }
 
     @Test
-    fun `reads consecutive frames in order, then reports a clean end`() = runTest {
+    fun `reads consecutive frames in order then reports a clean end`() = runTest {
         val frameArb = Arb.byteArray(Arb.int(0..512), Arb.byte())
         checkAll(Arb.list(frameArb, 0..20)) { payloads ->
             val frames = payloads.mapIndexed { i, p -> Frame(FrameType(i % 256), p.toByteString()) }

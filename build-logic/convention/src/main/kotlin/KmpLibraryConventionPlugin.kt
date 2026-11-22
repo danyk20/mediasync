@@ -27,7 +27,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
  * A Kotlin Multiplatform module without Android code: shared by the Android app, the desktop app and (once a module
  * switches on [MediaSyncKmpExtension.iosTargets]) the iOS app.
  *
- * Code lives in `src/commonMain`, JVM-only code in `src/jvmMain`, tests in `src/jvmTest` (JUnit 6 and Kotest).
+ * Code lives in `src/commonMain`, JVM-only code in `src/jvmMain`. Tests that use no JVM API live in `src/commonTest`
+ * (`kotlin.test`, Kotest; they run on every target), the rest in `src/jvmTest` (JUnit 6 and Kotest). Test names must
+ * not contain `,` or `.`: Kotlin/Native rejects them.
  * Android modules use the `jvm` target, the same way they used the plain JVM modules before.
  */
 class KmpLibraryConventionPlugin : Plugin<Project> {
@@ -41,6 +43,14 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
         extensions.create<MediaSyncKmpExtension>("mediasync", kotlin)
         kotlin.apply {
             jvm()
+            sourceSets.named("commonTest") {
+                dependencies {
+                    implementation(libs.library("kotlin-test"))
+                    implementation(libs.library("kotest-assertions"))
+                    implementation(libs.library("kotest-property"))
+                    implementation(libs.library("kotlinx-coroutines-test"))
+                }
+            }
             sourceSets.named("jvmTest") {
                 dependencies {
                     implementation(project.dependencies.platform(libs.library("junit-bom")))

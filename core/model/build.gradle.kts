@@ -9,3 +9,5 @@ kotlin {
         }
     }
 }
+
+mediasync { iosTargets() }

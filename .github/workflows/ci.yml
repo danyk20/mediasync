@@ -26,6 +26,7 @@ jobs:
     outputs:
       android: ${{ steps.filter.outputs.android }}
       desktop: ${{ steps.filter.outputs.desktop }}
+      ios: ${{ steps.filter.outputs.ios }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,13 +36,15 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "android=true" >> "$GITHUB_OUTPUT"
-            echo "desktop=true" >> "$GITHUB_OUTPUT"
+            { echo "android=true"; echo "desktop=true"; echo "ios=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The desktop installer is built only when what goes into it changes: the app, its platform code, the build.
           desktop=$(git diff --name-only "$BASE"...HEAD | grep -E '^(desktopApp/|platform/desktop/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^(version\.txt|LICENSE)$|^\.github/workflows/ci\.yml$' || true)
           if [ -n "$desktop" ]; then echo "desktop=true"; else echo "desktop=false"; fi >> "$GITHUB_OUTPUT"
+          # The iOS job builds and tests the modules that have iOS targets, and the build that decides how.
+          ios=$(git diff --name-only "$BASE"...HEAD | grep -E '^(core/model/|sync/protocol/|transport/api/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^\.github/workflows/ci\.yml$' || true)
+          if [ -n "$ios" ]; then echo "ios=true"; else echo "ios=false"; fi >> "$GITHUB_OUTPUT"
           others=$(git diff --name-only "$BASE"...HEAD | grep -vE '^(docs/|infra/rendezvous/)|\.md$' || true)
           echo "Changes outside docs and the Worker:"
           echo "${others:-none}"
@@ -240,6 +243,43 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build the .deb
         run: scripts/gradlew-retrying.sh :desktopApp:packageDeb
+
+  # Kotlin/Native for iPhones (docs/PLAN.md §15, M10): the modules with iOS targets compile for a device and run
+  # their tests on the iOS Simulator. Apple's compilers only run on a Mac. The first run downloads Kotlin/Native
+  # (about 1.6 GB): it is not cached, because an entry that size would push the Gradle caches out of the 10 GB budget.
+  # Not a required check: a skipped job counts as passed, and branch protection is unchanged by this job.
+  # If the default Xcode on macos-latest stops matching Kotlin, pin it with maxim-lobanov/setup-xcode as a step
+  # before the build (look up the current SHA; do not guess). Not active.
+  ios:
+    name: iOS
+    needs: changes
+    # Skipped only on an explicit "nothing iOS changed": if the filter failed, it runs.
+    if: ${{ !cancelled() && needs.changes.outputs.ios != 'false' }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Xcode and simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available | head -n 20
+      - name: Build for iPhones, test on the iOS Simulator
+        run: >
+          scripts/gradlew-retrying.sh
+          :core:model:compileKotlinIosArm64 :sync:protocol:compileKotlinIosArm64 :transport:api:compileKotlinIosArm64
+          :core:model:iosSimulatorArm64Test :sync:protocol:iosSimulatorArm64Test :transport:api:iosSimulatorArm64Test
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-test-reports
+          path: "**/build/reports/tests/"
+          if-no-files-found: ignore
 
   rendezvous:
     name: Rendezvous Worker

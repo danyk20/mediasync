@@ -17,11 +17,11 @@ import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.orNull
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
+import kotlin.test.Test
 import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.decodeHex
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
-import org.junit.jupiter.api.Test
 
 class MessageCodecTest {
 
@@ -127,7 +127,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `unknown frame types are skipped, not rejected`() {
+    fun `unknown frame types are skipped and not rejected`() {
         MessageCodec.decode(Frame(FrameType(0x7F), "anything".encodeUtf8())).shouldBeNull()
     }
 

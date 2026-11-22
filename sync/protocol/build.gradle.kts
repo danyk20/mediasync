@@ -24,3 +24,5 @@ kover {
         }
     }
 }
+
+mediasync { iosTargets() }
