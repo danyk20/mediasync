@@ -31,7 +31,8 @@ compose.desktop {
             vendor = "The MediaSync Authors"
             description = "Receives photos and videos from your phones and backs them up on this computer."
             copyright = "Copyright 2026 The MediaSync Authors"
-            licenseFile.set(rootProject.file("LICENSE"))
+            // No licenseFile: jpackage turns it into a license agreement inside the DMG, which current macOS can no
+            // longer show — Finder then calls the disk image "corrupted". Apache-2.0 needs no click-through.
             modules("java.instrument", "java.sql", "jdk.security.auth", "jdk.unsupported")
             modules("java.naming", "jdk.crypto.ec", "java.management")
 
