@@ -18,6 +18,7 @@ import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
 import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
 import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.android.ProducerSync
 import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,7 @@ interface DesktopGraph : ViewModelGraph {
     val folders: DesktopFolders
     val reset: DesktopReset
     val syncRecorder: DesktopSyncRecorder
+    val producerSync: ProducerSync
 
     /** Where the receiver, the sync and the backup copier run; cancelled at shutdown before the database closes. */
     @ApplicationScope

@@ -327,7 +327,8 @@ interface DesktopModule {
 
         @Provides
         @SingleIn(AppScope::class)
-        fun provideLocalNetwork(): DesktopLocalNetwork = DesktopLocalNetwork()
+        fun provideLocalNetwork(paths: AppPaths): DesktopLocalNetwork =
+            DesktopLocalNetwork(allowLoopback = paths.loopback)
 
         @Provides
         @SingleIn(AppScope::class)
