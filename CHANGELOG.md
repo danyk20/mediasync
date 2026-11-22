@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.0](https://github.com/danyk20/mediasync/compare/v0.10.2...v0.11.0) (2026-11-22)
+
+
+### Features
+
+* a backup connector that copies received photos into a folder ([#161](https://github.com/danyk20/mediasync/issues/161)) ([ef5cf9c](https://github.com/danyk20/mediasync/commit/ef5cf9c0d1e60078e1c97b7b9d85dd0ef08af120))
+* desktop installers on GitHub Releases ([#170](https://github.com/danyk20/mediasync/issues/170)) ([148a2f1](https://github.com/danyk20/mediasync/commit/148a2f1e9b3f06bdc2b1d7c33dcc27ef48e7729c))
+* the desktop app lives in the tray ([#168](https://github.com/danyk20/mediasync/issues/168)) ([18cd743](https://github.com/danyk20/mediasync/commit/18cd7436bad03ba4b793dc5f53a1f8d762a3d2d6))
+* the desktop app starts and receives ([#166](https://github.com/danyk20/mediasync/issues/166)) ([1d866bb](https://github.com/danyk20/mediasync/commit/1d866bbeba99a69f23bf610327ca0106c22567b3))
+* the desktop app starts when you log in ([#169](https://github.com/danyk20/mediasync/issues/169)) ([c799a3b](https://github.com/danyk20/mediasync/commit/c799a3b6c806abf04fd6b1cae78dac83370d78e0))
+* the desktop copies received photos into a backup folder ([#167](https://github.com/danyk20/mediasync/issues/167)) ([9f56895](https://github.com/danyk20/mediasync/commit/9f568950860c1a1c2d19064534afbd0e01732bc9))
+* the desktop finds phones and is found over mDNS ([#165](https://github.com/danyk20/mediasync/issues/165)) ([356ae02](https://github.com/danyk20/mediasync/commit/356ae028566f3de5921780b4b37ffcad6769bf5a))
+* the desktop's device identity ([#163](https://github.com/danyk20/mediasync/issues/163)) ([92a6b92](https://github.com/danyk20/mediasync/commit/92a6b926fd1c862661b364a022575c3dd62a49c3))
+* the desktop's network, conditions and inbox ([#164](https://github.com/danyk20/mediasync/issues/164)) ([39c022a](https://github.com/danyk20/mediasync/commit/39c022ad28eafafc927ffb1b5e611666d04125db))
+
 ## [0.10.2](https://github.com/danyk20/mediasync/compare/v0.10.1...v0.10.2) (2026-11-20)
 
 
