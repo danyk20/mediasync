@@ -54,8 +54,40 @@ class DesktopServiceDiscovery(
     private val closeTimeoutMillis: Long = DEFAULT_CLOSE_TIMEOUT_MILLIS,
 ) : ServiceDiscovery {
 
+    private val advertisements = CopyOnWriteArrayList<Advertisement>()
+
     override fun advertise(port: Int, serviceId: String): Closeable {
         val service = MdnsService(SERVICE_TYPE, SERVICE_NAME, port, mapOf(ID_ATTRIBUTE to serviceId))
+        return Advertisement(service).also { advertisements += it }
+    }
+
+    /**
+     * Announces every active advertisement again on the addresses the computer has now: after the network changed
+     * or the computer woke up, the old sessions are bound to addresses that may be gone. Blocks until the old
+     * sessions are closed (at most [closeTimeoutMillis] each round); call it off the UI thread.
+     */
+    fun reannounce() {
+        advertisements.forEach { it.restart() }
+    }
+
+    /** One advertisement the caller holds; [restart] swaps its sessions for new ones without the caller noticing. */
+    private inner class Advertisement(private val service: MdnsService) : Closeable {
+        private var current: Closeable = announce(service)
+
+        @Synchronized
+        fun restart() {
+            current.close()
+            current = announce(service)
+        }
+
+        @Synchronized
+        override fun close() {
+            advertisements.remove(this)
+            current.close()
+        }
+    }
+
+    private fun announce(service: MdnsService): Closeable {
         val executor = Executors.newSingleThreadExecutor(daemonThreads("mediasync-advertise"))
         val sessions = CopyOnWriteArrayList<MdnsSession>()
         // Probing blocks for seconds, and the caller needs to go on: announce in the background.

@@ -30,6 +30,7 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
     implementation(libs.androidx.datastore.preferences.core)
+    implementation(libs.compose.multiplatform.material3)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.sqlite.bundled)
     implementation(libs.kotlinx.coroutines.core)

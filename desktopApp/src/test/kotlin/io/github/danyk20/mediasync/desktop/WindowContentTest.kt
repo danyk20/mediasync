@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import dev.zacsweers.metro.createGraphFactory
+import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
@@ -71,6 +72,17 @@ class WindowContentTest {
                 onAllNodesWithText("Choose folder").fetchSemanticsNodes().isNotEmpty()
             }
             onNodeWithText("Choose folder").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun showsTheWaitingStateWhileTheKeychainIsLocked() {
+        val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true))
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph, waitingForKeychain = true) }
+            onNodeWithText(WAITING_TEXT).assertIsDisplayed()
+            onAllNodesWithText(READY_TEXT).fetchSemanticsNodes().isEmpty() shouldBe true
         }
     }
 

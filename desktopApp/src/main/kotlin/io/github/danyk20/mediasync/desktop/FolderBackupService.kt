@@ -34,6 +34,9 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -46,6 +49,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -67,26 +71,40 @@ class FolderBackupService(
     inbox: Path,
     private val clock: Clock,
     private val scope: CoroutineScope,
+    private val copies: CopyGate,
     private val retryEvery: KDuration = 5.minutes,
     private val checkEvery: KDuration = 30.seconds,
 ) {
     private val cleaner = InboxCleaner(ledger, received, inbox, clock)
     private val started = AtomicBoolean()
+    private val arrivals = Channel<Unit>(Channel.CONFLATED)
+    private var feed: Job? = null
+    private var copying: Job? = null
+    private var cleanup: Job? = null
 
     /** Starts copying while [scope] lives; later calls do nothing. */
     fun start() {
         if (!started.compareAndSet(false, true)) return
+        feed = scope.launch {
+            merge(received.observeCount().map { }, ticks()).collect { arrivals.trySend(Unit) }
+        }
         val accounts = settings.backupFolder.map { listOfNotNull(accountFor(it)) }
-        BackupCoordinator(registry, orchestrator).start(
-            scope,
-            accounts,
-            merge(
-                received.observeCount().map {
-                },
-                ticks(),
-            ),
-        )
-        scope.launch { cleanUpAfterCopies() }
+        copying = BackupCoordinator(registry, orchestrator).start(scope, accounts, arrivals.receiveAsFlow())
+        cleanup = scope.launch { cleanUpAfterCopies() }
+    }
+
+    /**
+     * Stops copying for quitting. Nothing new starts; a copy in progress finishes, for up to [STOP_WAIT_MILLIS]; then
+     * the periodic checks and the copying end. Safe before [start] and when called twice.
+     */
+    suspend fun stop() {
+        copies.close()
+        feed?.cancel()
+        cleanup?.cancel()
+        if (!copies.awaitIdle(STOP_WAIT_MILLIS)) {
+            Diagnostics.log(Area.BACKUP, "A copy was still running at quit; stopping it")
+        }
+        copying?.cancelAndJoin()
     }
 
     /** How the copying stands, as the backup screen and the home screen show it. */
@@ -181,5 +199,8 @@ class FolderBackupService(
     private companion object {
         /** One account for the folder, whichever folder it is: changing the folder only changes where new items go. */
         val ACCOUNT_ID = AccountId("folder")
+
+        /** How long quitting waits for a copy in progress to finish. */
+        const val STOP_WAIT_MILLIS = 4_000L
     }
 }

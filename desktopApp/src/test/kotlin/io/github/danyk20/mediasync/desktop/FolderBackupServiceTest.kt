@@ -6,10 +6,16 @@ package io.github.danyk20.mediasync.desktop
 
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import io.github.danyk20.mediasync.connector.BackupConnector
+import io.github.danyk20.mediasync.connector.BackupConnectorFactory
+import io.github.danyk20.mediasync.connector.BackupItem
 import io.github.danyk20.mediasync.connector.BackupOrchestrator
 import io.github.danyk20.mediasync.connector.BackupState
+import io.github.danyk20.mediasync.connector.ConnectorAccount
 import io.github.danyk20.mediasync.connector.ConnectorDecorators
 import io.github.danyk20.mediasync.connector.ConnectorRegistry
+import io.github.danyk20.mediasync.connector.ProgressSink
+import io.github.danyk20.mediasync.connector.UploadResult
 import io.github.danyk20.mediasync.connector.folder.FolderConnectorFactory
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.RoomReceivedLedger
@@ -26,14 +32,18 @@ import java.nio.file.Path
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.ByteString.Companion.toByteString
 import okio.Path.Companion.toOkioPath
@@ -77,10 +87,14 @@ class FolderBackupServiceTest {
         database.close()
     }
 
-    private fun service(): FolderBackupService {
+    private val uploads = AtomicInteger()
+    private val copies = CopyGate()
+
+    private fun service(hold: CountDownLatch? = null): FolderBackupService {
         val clock = Clock.systemUTC()
         val backupLedger = DesktopBackupLedger(database.backupDao(), clock)
-        val factory = AbsoluteFolderConnectorFactory(FolderConnectorFactory(ZoneOffset.UTC))
+        val folder = CountingFolder(FolderConnectorFactory(ZoneOffset.UTC), uploads, hold)
+        val factory = GatedCopyFactory(AbsoluteFolderConnectorFactory(folder), copies)
         return FolderBackupService(
             settings = settings,
             registry = ConnectorRegistry(mapOf("folder" to factory), ConnectorDecorators(clock, sleep = {})),
@@ -91,9 +105,28 @@ class FolderBackupServiceTest {
             inbox = inbox,
             clock = clock,
             scope = scope,
+            copies = copies,
             retryEvery = RETRY.milliseconds,
             checkEvery = RETRY.milliseconds,
         )
+    }
+
+    /** The folder connector, counting each upload and holding it until [hold] counts down, if given. */
+    private class CountingFolder(
+        private val inner: BackupConnectorFactory,
+        private val uploads: AtomicInteger,
+        private val hold: CountDownLatch?,
+    ) : BackupConnectorFactory by inner {
+        override fun create(account: ConnectorAccount): BackupConnector {
+            val connector = inner.create(account)
+            return object : BackupConnector by connector {
+                override suspend fun upload(item: BackupItem, progress: ProgressSink): UploadResult {
+                    uploads.incrementAndGet()
+                    hold?.let { withContext(Dispatchers.IO) { it.await() } }
+                    return connector.upload(item, progress)
+                }
+            }
+        }
     }
 
     /** What the receiver does: the sink writes the file into the inbox, the ledger records where it went. */
@@ -209,6 +242,46 @@ class FolderBackupServiceTest {
         }
         eventually("the inbox file to go") { !Files.exists(kept) }
         receipts(BackupState.SKIPPED).size shouldBe 1
+    }
+
+    @Test
+    fun stopLeavesNothingToRunAfterIt() = runBlocking<Unit> {
+        val folder = directory.resolve("nas") // Not there yet: each try fails, so the copy keeps waiting.
+        settings.setBackupFolder(folder.toString())
+        val service = service()
+        service.start()
+        val inboxFile = receive("IMG_5.jpg", byteArrayOf(3))
+        eventually("a try while the folder is missing") { uploads.get() > 0 }
+        delay(RETRY * 4L) // Several periodic checks go by.
+
+        service.stop()
+        val afterStop = uploads.get()
+        Files.createDirectory(folder)
+        delay(RETRY * 4L) // Periodic checks would have copied it by now, if they still ran.
+
+        uploads.get() shouldBe afterStop
+        Files.exists(folder.resolve("2025").resolve("05").resolve("IMG_5.jpg")) shouldBe false
+        Files.exists(inboxFile) shouldBe true
+    }
+
+    @Test
+    fun stopWaitsForTheCopyInProgressToFinish() = runBlocking<Unit> {
+        val folder = Files.createDirectory(directory.resolve("backup"))
+        settings.setBackupFolder(folder.toString())
+        val release = CountDownLatch(1)
+        val service = service(hold = release)
+        service.start()
+        receive("IMG_6.jpg", byteArrayOf(6))
+        eventually("the copy to start") { uploads.get() > 0 }
+
+        val stopping = async(Dispatchers.Default) { service.stop() }
+        delay(RETRY * 2L)
+        stopping.isCompleted shouldBe false // Still waiting for the copy, which the latch holds.
+
+        release.countDown()
+        stopping.await()
+        Files.readAllBytes(folder.resolve("2025").resolve("05").resolve("IMG_6.jpg")).toList() shouldBe
+            listOf<Byte>(6)
     }
 
     @Test
