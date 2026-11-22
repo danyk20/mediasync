@@ -13,13 +13,19 @@ Until the Play Store launch (M6, docs/PLAN.md §15) versions stay below 1.0: the
    - writes SHA-256 checksums;
    - creates a build provenance attestation;
    - attaches everything to the release.
+
+   In parallel, the `desktop` jobs build the desktop installers on an Apple Silicon macOS, an Intel macOS, a Windows and a Linux runner: `MediaSync-x.y.z-macos-arm64.dmg`, `-macos-x64.dmg`, `-windows-x64.msi`, `-linux-amd64.deb` and `-linux-x86_64.rpm`, each system with its own checksum file (`SHA256SUMS-desktop-…`) and a build provenance attestation, attached to the same release. They are unsigned (no Apple or Windows certificate; the macOS app is ad-hoc signed): [docs/desktop.md](desktop.md) tells users how to open them. They need no secrets, so no approval. The installer version comes from `version.txt` (macOS gets `1.x.y` for `0.x.y`, which macOS requires).
 4. If the `release` environment has a Google Play key, the App Bundle also goes to a Play testing track, internal testing by default. Setup: [docs/play/README.md §7](play/README.md#7-uploading-each-release-from-github-optional).
 
 `versionCode` is derived from the version: `1.2.3` → `1002003`.
 
+## Trying the desktop installers without a release
+
+**Actions → Release → Run workflow**, with an existing tag and **Dry run** ticked (the default): only the desktop installers are built, and kept as workflow artifacts for 7 days. Nothing is attached to the release, attested or signed. With **Dry run** unticked, a manual run builds and attaches everything again, as below.
+
 ## If the build fails after the release was created
 
-The tag and the GitHub Release already exist then, without files. Fix the workflow on `main`, then build that release again: **Actions → Release → Run workflow**, with the tag (e.g. `v0.2.0`). It builds the tagged code, waits for your approval like a normal release, and attaches the files to the existing release.
+The tag and the GitHub Release already exist then, without files. Fix the workflow on `main`, then build that release again: **Actions → Release → Run workflow**, with the tag (e.g. `v0.2.0`) and **Dry run** unticked. It builds the tagged code, waits for your approval like a normal release, and attaches the files to the existing release.
 
 ## One-time setup: signing key
 
