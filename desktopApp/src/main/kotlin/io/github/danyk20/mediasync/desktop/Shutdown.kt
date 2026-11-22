@@ -11,17 +11,18 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * How the app stops, in order: the backup copier (a copy in progress finishes), [scopes] the caller started, the
- * receiver (servers and the mDNS advertisement), everything still running in the graph's application scope — waited
- * for, not just cancelled — and only then the database. Closing the database while a query still runs crashes the
- * process inside SQLite.
+ * How the app stops, whichever role runs: the role's part first ([shutdownSteps] — a copy in progress finishes, the
+ * sender's sync stops), then the receiver for good (a screen may still hold it), then everything still running in
+ * [scopes] and the graph's application scope — waited for, not just cancelled — and only then the database. Closing
+ * the database while a query still runs crashes the process inside SQLite.
  */
-internal fun DesktopGraph.shutdownSteps(vararg scopes: CoroutineScope): List<() -> Unit> = listOf(
-    { runBlocking { folderBackup.stop() } },
-    { stopAndWait(*scopes) },
-    { receiver.stop() },
-    { stopAndWait(applicationScope) },
-    { database.close() },
+internal fun DesktopGraph.shutdownSteps(vararg scopes: CoroutineScope): List<() -> Unit> = shutdownSteps(
+    roles,
+    cancelScope = {
+        receiver.stop()
+        stopAndWait(*scopes, applicationScope)
+    },
+    closeDatabase = { database.close() },
 )
 
 private fun stopAndWait(vararg scopes: CoroutineScope) = runBlocking {

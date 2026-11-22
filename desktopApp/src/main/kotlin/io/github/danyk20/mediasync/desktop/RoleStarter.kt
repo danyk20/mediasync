@@ -11,15 +11,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Whether the app is listening for phones yet. */
-enum class StartState { STARTING, WAITING_FOR_KEYCHAIN, RECEIVING, FAILED }
+enum class StartState { STARTING, WAITING_FOR_KEYCHAIN, RUNNING, FAILED }
 
 /**
- * Starts receiving, and waits if it can't yet: right after login the OS keychain may still be locked, and the device
- * identity's password is in it ([IdentityLockedException]). That is not an error and must never lead to a new
- * identity (every phone would have to pair again): try again every [retryMillis] until it works.
- * [start] is `receiver.hold("app")`; [pause] is injected so tests need no real time.
+ * Starts a role's part (receiving, or sending, which needs the identity too), and waits if it can't yet: right after
+ * login the OS keychain may still be locked, and the device identity's password is in it ([IdentityLockedException]).
+ * That is not an error and must never lead to a new identity (every phone would have to pair again): try again every
+ * [retryMillis] until it works. [start] is `receiver.hold("app")` or reading the identity; [pause] is injected so
+ * tests need no real time.
  */
-class ReceiverStarter(
+class RoleStarter(
     private val start: () -> Unit,
     private val log: (String) -> Unit = {},
     private val retryMillis: Long = RETRY_MILLIS,
@@ -34,14 +35,14 @@ class ReceiverStarter(
         while (true) {
             try {
                 start()
-                _state.value = StartState.RECEIVING
+                _state.value = StartState.RUNNING
                 return
             } catch (e: IdentityLockedException) {
                 if (_state.value != StartState.WAITING_FOR_KEYCHAIN) log("Waiting for the keychain: ${e.message}")
                 _state.value = StartState.WAITING_FOR_KEYCHAIN
                 pause(retryMillis)
             } catch (e: Exception) {
-                log("Not receiving: ${e.message}")
+                log("Not started: ${e.message}")
                 _state.value = StartState.FAILED
                 return
             }

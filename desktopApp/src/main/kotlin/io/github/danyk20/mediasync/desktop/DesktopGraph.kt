@@ -13,10 +13,12 @@ import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
+import io.github.danyk20.mediasync.core.media.MediaLibrary
 import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
 import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
 import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
+import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import kotlinx.coroutines.CoroutineScope
 
@@ -36,6 +38,14 @@ interface DesktopGraph : ViewModelGraph {
     val peerStore: PeerStore
     val startAtLogin: DesktopStartAtLogin
     val viewModelFactory: MetroViewModelFactory
+    val roles: RoleLifecycle
+    val receiving: ReceivingPart
+    val sending: SendingPart
+    val mediaSource: MediaSource
+    val mediaLibrary: MediaLibrary
+    val folders: DesktopFolders
+    val reset: DesktopReset
+    val syncRecorder: DesktopSyncRecorder
 
     /** Where the receiver, the sync and the backup copier run; cancelled at shutdown before the database closes. */
     @ApplicationScope

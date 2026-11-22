@@ -21,6 +21,9 @@ interface SettingsRepository {
 
     suspend fun setRole(role: DeviceRole)
 
+    /** Forgets the role: the next start asks again. A computer's *Reset MediaSync* uses it. */
+    suspend fun clearRole()
+
     /** Which folders a sending phone sends; [SourceSelection.Default] until the user chooses. */
     val sourceSelection: Flow<SourceSelection>
 

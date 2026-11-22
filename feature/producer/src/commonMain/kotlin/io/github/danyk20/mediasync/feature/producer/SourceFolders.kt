@@ -28,6 +28,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
@@ -69,12 +70,14 @@ import io.github.danyk20.mediasync.core.model.SourcePreset
 import io.github.danyk20.mediasync.core.model.SourceSelection
 import io.github.danyk20.mediasync.feature.producer.generated.resources.Res
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_cancel
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_add
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_details
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_done
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_empty
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_hint_chosen
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_hint_preset
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_intro
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_intro_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_items
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_preset_camera
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_preset_camera_screenshots
@@ -125,6 +128,8 @@ sealed interface SourceFoldersUiState {
         val folders: List<FolderChoice>,
         /** The days whose photos and videos are sent. */
         val range: SendRange = SendRange.Everything,
+        /** Folders are added by the user ([ProducerDevice.addsFolders]): no presets, an *Add folder* button. */
+        val addsFolders: Boolean = false,
     ) : SourceFoldersUiState
 }
 
@@ -132,8 +137,11 @@ sealed interface SourceFoldersUiState {
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
 @Inject
-class SourceFoldersViewModel(private val library: MediaLibrary, private val settings: SettingsRepository) :
-    ViewModel() {
+class SourceFoldersViewModel(
+    private val library: MediaLibrary,
+    private val settings: SettingsRepository,
+    private val device: ProducerDevice,
+) : ViewModel() {
 
     @OptIn(FlowPreview::class)
     private val folders = flow {
@@ -146,8 +154,18 @@ class SourceFoldersViewModel(private val library: MediaLibrary, private val sett
         settings.sourceSelection,
         settings.sendRange,
     ) { folders, selection, range ->
-        SourceFoldersUiState.Ready(selection, folders.map { FolderChoice(it, selection.includes(it.path)) }, range)
+        SourceFoldersUiState.Ready(
+            selection,
+            folders.map { FolderChoice(it, selection.includes(it.path)) },
+            range,
+            device.addsFolders,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SourceFoldersUiState.Loading)
+
+    /** Asks the user for a folder to send (a computer); it appears on the list, chosen. */
+    fun addFolder() {
+        viewModelScope.launch { device.addFolder() }
+    }
 
     fun choose(preset: SourcePreset) {
         viewModelScope.launch { settings.setSourceSelection(SourceSelection(preset)) }
@@ -192,6 +210,7 @@ fun SourceFoldersRoute(
         onDone = onDone,
         modifier = modifier,
         onChooseRange = viewModel::choose,
+        onAddFolder = viewModel::addFolder,
     )
 }
 
@@ -205,6 +224,7 @@ fun SourceFoldersScreen(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     onChooseRange: (SendRange) -> Unit = {},
+    onAddFolder: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -221,7 +241,11 @@ fun SourceFoldersScreen(
             }
 
             is SourceFoldersUiState.Ready -> LazyColumn(contentPadding = padding) {
-                item { Presets(state.selection, onChoosePreset) }
+                if (state.addsFolders) {
+                    item { AddFolder(onAddFolder) }
+                } else {
+                    item { Presets(state.selection, onChoosePreset) }
+                }
                 item { RangeChoice(state.range, onChooseRange) }
                 if (state.folders.isEmpty()) {
                     item { Explanation(stringResource(Res.string.producer_folders_empty)) }
@@ -229,6 +253,15 @@ fun SourceFoldersScreen(
                 items(state.folders, key = { it.folder.path }) { choice -> FolderRow(choice, onToggle) }
             }
         }
+    }
+}
+
+/** On a computer: the folders are the ones the user adds. */
+@Composable
+private fun AddFolder(onAddFolder: () -> Unit) {
+    Explanation(stringResource(Res.string.producer_folders_intro_computer))
+    OutlinedButton(onClick = onAddFolder, modifier = Modifier.padding(horizontal = 16.dp)) {
+        Text(stringResource(Res.string.producer_folders_add))
     }
 }
 

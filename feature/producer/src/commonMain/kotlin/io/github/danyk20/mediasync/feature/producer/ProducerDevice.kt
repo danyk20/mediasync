@@ -45,4 +45,13 @@ interface ProducerDevice {
 
     /** Removes the test file waiting, before it's sent. */
     fun removeTestFile()
+
+    /**
+     * Whether the folders sent are ones the user adds one by one ([addFolder]), as on a computer, instead of the
+     * presets of a phone's library. The folder list then offers *Add folder* and no presets.
+     */
+    val addsFolders: Boolean get() = false
+
+    /** Lets the user choose a folder and adds it to the folders sent; does nothing unless [addsFolders]. */
+    suspend fun addFolder() = Unit
 }

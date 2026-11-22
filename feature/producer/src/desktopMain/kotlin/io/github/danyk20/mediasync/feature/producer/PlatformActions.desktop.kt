@@ -6,6 +6,8 @@ package io.github.danyk20.mediasync.feature.producer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
+import java.awt.Desktop
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -20,9 +22,23 @@ internal actual fun rememberHomeSystemActions(
     onNotificationsDeclined: () -> Unit,
 ): HomeSystemActions = NothingToAsk
 
-// The desktop app (PLAN M8) opens files with the system's viewer.
+// Opens the file (its key is the absolute path, see FolderMediaSource) with the system's viewer.
 @Composable
-internal actual fun rememberMediaOpener(): (WaitingMedia) -> Boolean = { false }
+internal actual fun rememberMediaOpener(): (WaitingMedia) -> Boolean = { media -> openWithSystemViewer(media.key) }
+
+@Suppress("TooGenericExceptionCaught") // Whatever stops the system from opening it: no viewer.
+private fun openWithSystemViewer(path: String): Boolean = try {
+    val file = File(path)
+    val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
+    if (desktop != null && file.isFile && desktop.isSupported(Desktop.Action.OPEN)) {
+        desktop.open(file)
+        true
+    } else {
+        false
+    }
+} catch (_: Exception) {
+    false
+}
 
 @Composable
 internal actual fun localizedDay(day: LocalDate, withYear: Boolean): String =

@@ -17,7 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,10 +30,14 @@ import kotlinx.coroutines.withContext
  * videos in it and below it (by extension; the first bytes are checked when sending). A folder's path is absolute, with
  * `/` between names and at its end, as the selection stores it. The cover is the newest file's `file:` URI.
  *
- * [changes] watches the candidates and every folder below them. Where the system has no instant file notification
+ * [changes] watches the candidates and every folder below them, and starts over when [candidateChanges] emits (the
+ * candidates are read again then). Where the system has no instant file notification
  * (macOS), changes are noticed within about ten seconds.
  */
-class FolderMediaLibrary(private val candidates: () -> Set<Path>) : MediaLibrary {
+class FolderMediaLibrary(
+    private val candidateChanges: Flow<Unit> = emptyFlow(),
+    private val candidates: () -> Set<Path>,
+) : MediaLibrary {
 
     override suspend fun folders(): List<MediaFolder> = withContext(Dispatchers.IO) {
         candidates().mapNotNull { folder ->
@@ -45,7 +53,17 @@ class FolderMediaLibrary(private val candidates: () -> Set<Path>) : MediaLibrary
         }.sortedWith(compareByDescending<MediaFolder> { it.itemCount }.thenBy { it.path })
     }
 
-    override fun changes(): Flow<Unit> = callbackFlow {
+    override fun changes(): Flow<Unit> = channelFlow {
+        var first = true
+        // Each change of the candidates watches the new ones, and tells the list to look again.
+        candidateChanges.onStart { emit(Unit) }.collectLatest {
+            if (!first) send(Unit)
+            first = false
+            watch().collect { send(Unit) }
+        }
+    }.conflate()
+
+    private fun watch(): Flow<Unit> = callbackFlow {
         val watcher = FileSystems.getDefault().newWatchService()
         candidates().forEach { watchAll(watcher, it.toAbsolutePath().normalize()) }
         val job = launch(Dispatchers.IO) {

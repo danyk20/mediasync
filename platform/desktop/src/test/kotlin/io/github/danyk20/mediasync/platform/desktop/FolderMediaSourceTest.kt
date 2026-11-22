@@ -318,4 +318,39 @@ class FolderMediaSourceTest {
         Files.exists(file) shouldBe true // Files in the user's folders are never touched.
         source.items().size shouldBe 1
     }
+
+    /** A cache in memory that counts what was asked and told. */
+    private class RecordingCache : FingerprintCache {
+        val known = HashMap<String, okio.ByteString>()
+        var puts = 0
+
+        override fun get(path: String, size: Long, modifiedAtMillis: Long) = known["$path|$size|$modifiedAtMillis"]
+
+        override fun put(path: String, size: Long, modifiedAtMillis: Long, fingerprint: okio.ByteString) {
+            puts++
+            known["$path|$size|$modifiedAtMillis"] = fingerprint
+        }
+    }
+
+    @Test
+    fun `a fingerprint kept in the cache is not computed again by a new source`() {
+        val file = put("a.jpg", golden("pixel.jpg"))
+        folders = setOf(root)
+        val cache = RecordingCache()
+        fun sourceWith() = FolderMediaSource({ folders }, zone = { ZoneOffset.UTC }, clock = { now }, cache = cache)
+
+        val first = sourceWith().items().single().descriptor.fingerprint
+        cache.puts shouldBe 1
+        // Forged value under the same key: a new source (a restart) must take it from the cache without reading.
+        val forged = okio.ByteString.of(*ByteArray(first.size) { 7 })
+        cache.known.keys.forEach { cache.known[it] = forged }
+
+        sourceWith().items().single().descriptor.fingerprint shouldBe forged
+        cache.puts shouldBe 1
+
+        // A changed file (new size or time) is read again.
+        Files.setLastModifiedTime(file, FileTime.from(longAgo.plusSeconds(60)))
+        sourceWith().items().single().descriptor.fingerprint shouldBe first
+        cache.puts shouldBe 2
+    }
 }

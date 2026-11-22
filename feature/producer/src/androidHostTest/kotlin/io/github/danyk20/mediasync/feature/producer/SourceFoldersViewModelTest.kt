@@ -12,6 +12,9 @@ import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -31,7 +34,8 @@ class SourceFoldersViewModelTest {
         MediaFolder("Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/", 3_020, 1_200_000_000, null)
     private val library = FakeMediaLibrary(listOf(whatsApp, camera, screenshots))
     private val settings = FakeSettingsRepository()
-    private val viewModel by lazy { SourceFoldersViewModel(library, settings) }
+    private val device = mockk<ProducerDevice>(relaxed = true)
+    private val viewModel by lazy { SourceFoldersViewModel(library, settings, device) }
 
     private suspend fun ready() = viewModel.uiState.first {
         it is SourceFoldersUiState.Ready
@@ -106,5 +110,24 @@ class SourceFoldersViewModelTest {
         val state = viewModel.uiState.first { (it as SourceFoldersUiState.Ready).folders.size == 4 }
         state.shouldBeInstanceOf<SourceFoldersUiState.Ready>().folders.last() shouldBe
             FolderChoice(instagram, included = false)
+    }
+
+    @Test
+    fun aPhoneOffersNoAddFolderButton() {
+        runTest {
+            ready().addsFolders shouldBe false
+        }
+    }
+
+    @Test
+    fun aComputerOffersAddFolderAndAsksTheDeviceForTheFolder() {
+        runTest {
+            every { device.addsFolders } returns true
+            ready().addsFolders shouldBe true
+
+            viewModel.addFolder()
+
+            coVerify { device.addFolder() }
+        }
     }
 }

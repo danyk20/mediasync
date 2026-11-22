@@ -20,6 +20,9 @@ class AppPaths(val root: Path, val isolated: Boolean = false) {
     val database: Path = root.resolve("mediasync.db")
     val settings: Path = root.resolve("settings.preferences_pb")
 
+    /** The last sync, as the sending computer's home screen shows it. */
+    val lastSync: Path = root.resolve("last-sync.properties")
+
     /** Received files wait here until a backup connector has copied them (docs/adr M8: the inbox). */
     val inbox: Path = root.resolve("inbox")
     val logs: Path = root.resolve("logs")
