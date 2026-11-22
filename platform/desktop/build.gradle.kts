@@ -7,6 +7,8 @@ plugins {
 // registers these classes in its own graph.
 dependencies {
     api(projects.transport.lan)
+    api(projects.sync.runtime) // the ports this module implements: AddressProvider, LanSockets, DeviceConditions
+    implementation(projects.core.metadata)
 
     implementation(libs.bouncycastle.bcpkix)
     implementation(libs.java.keyring)
