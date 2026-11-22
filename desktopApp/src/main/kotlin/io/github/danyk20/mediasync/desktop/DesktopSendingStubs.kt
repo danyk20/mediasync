@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.flowOf
 /**
  * [ProducerDevice] on a computer that sends: nothing to ask the system for (a computer reads its folders freely, and
  * a photo's location is whatever the file holds), *Sync now* runs [ProducerSync], and folders are added with the
- * folder dialog. Left out until M9.2b: scheduled syncs, hence [missedSync] is `null`. Not on a computer: Turbo
+ * folder dialog. Scheduled syncs run in [SenderScheduler], which also tells [missedSync]. Not on a computer: Turbo
  * transfer (no direct links), mobile data, the test file.
  */
 @ContributesBinding(AppScope::class)
@@ -37,6 +37,7 @@ class DesktopProducerDevice(
     private val sync: ProducerSync,
     private val folders: DesktopFolders,
     private val picker: FolderPicker,
+    private val scheduler: SenderScheduler,
     recorder: DesktopSyncRecorder,
 ) : ProducerDevice {
     override fun canReadLibrary() = true
@@ -49,7 +50,7 @@ class DesktopProducerDevice(
 
     override fun syncNow(turbo: Boolean) = sync.syncNow()
 
-    override fun missedSync(schedule: SyncSchedule): ZonedDateTime? = null
+    override fun missedSync(schedule: SyncSchedule): ZonedDateTime? = scheduler.missedSync(schedule)
 
     override val syncRecord: Flow<SyncRecord> = recorder.record
 
@@ -68,47 +69,74 @@ class DesktopProducerDevice(
 
 /**
  * Keeps the last sync across restarts, in [AppPaths.lastSync] (Android keeps it in preferences): the sending home
- * screen shows it, and the next start shows it again. A file that cannot be read counts as no sync; a sync is never
- * lost from the screen because its file could not be written.
+ * screen shows it, and the next start shows it again. It also keeps the due time the scheduler handled last
+ * ([markHandled]), in the same file, so a restart neither repeats nor skips a scheduled sync. A file that cannot be
+ * read counts as no sync; a sync is never lost from the screen because its file could not be written.
  */
 @SingleIn(AppScope::class)
 @Inject
 class DesktopSyncRecorder(paths: AppPaths) : SyncRecorder {
     private val file = paths.lastSync
-    private val _record = MutableStateFlow(read())
+    private val stored = read()
+    private val _record = MutableStateFlow(stored.record)
+
+    @Volatile
+    private var handled: Long? = stored.handled
 
     val record: StateFlow<SyncRecord> = _record.asStateFlow()
 
+    /** The due time handled last, in millis; `null` when none. */
+    fun handledMillis(): Long? = handled
+
+    @Synchronized
     override fun recordSync(atMillis: Long, waitingForSpace: Int) {
         val next = SyncRecord(lastSyncMillis = atMillis, waitingForSpace = waitingForSpace)
         try {
-            write(next)
+            write(next, handled)
         } catch (_: IOException) {
             // Shown until the app quits; the next sync writes the file again.
         }
         _record.value = next
     }
 
-    /** Forgets the last sync, as *Reset MediaSync* does. */
+    /** Keeps [dueMillis] as handled, in the file; never moves back. Unwritable, it is kept until quit. */
+    @Synchronized
+    fun markHandled(dueMillis: Long) {
+        if (dueMillis <= (handled ?: Long.MIN_VALUE)) return
+        handled = dueMillis
+        try {
+            write(_record.value, dueMillis)
+        } catch (_: IOException) {
+            // Kept in memory: the next save writes the file again.
+        }
+    }
+
+    /** Forgets the last sync and the handled due time, as *Reset MediaSync* does. */
+    @Synchronized
     fun forget() {
         Files.deleteIfExists(file)
+        handled = null
         _record.value = SyncRecord()
     }
 
-    private fun read(): SyncRecord = runCatching {
-        if (!Files.isRegularFile(file)) return@runCatching SyncRecord()
+    private fun read(): Stored = runCatching {
+        if (!Files.isRegularFile(file)) return@runCatching Stored(SyncRecord(), null)
         val properties = Properties().apply { Files.newBufferedReader(file).use(::load) }
-        SyncRecord(
-            lastSyncMillis = properties.getProperty(LAST_SYNC)?.toLongOrNull(),
-            waitingForSpace = properties.getProperty(WAITING_FOR_SPACE)?.toIntOrNull() ?: 0,
+        Stored(
+            record = SyncRecord(
+                lastSyncMillis = properties.getProperty(LAST_SYNC)?.toLongOrNull(),
+                waitingForSpace = properties.getProperty(WAITING_FOR_SPACE)?.toIntOrNull() ?: 0,
+            ),
+            handled = properties.getProperty(HANDLED)?.toLongOrNull(),
         )
-    }.getOrDefault(SyncRecord())
+    }.getOrDefault(Stored(SyncRecord(), null))
 
-    private fun write(record: SyncRecord) {
+    private fun write(record: SyncRecord, handled: Long?) {
         Files.createDirectories(file.parent)
         val properties = Properties().apply {
             record.lastSyncMillis?.let { setProperty(LAST_SYNC, it.toString()) }
             setProperty(WAITING_FOR_SPACE, record.waitingForSpace.toString())
+            handled?.let { setProperty(HANDLED, it.toString()) }
         }
         val temporary = Files.createTempFile(file.parent, file.fileName.toString(), ".tmp")
         try {
@@ -119,8 +147,12 @@ class DesktopSyncRecorder(paths: AppPaths) : SyncRecorder {
         }
     }
 
+    /** What the file holds: the last sync, and the due time handled last. */
+    private class Stored(val record: SyncRecord, val handled: Long?)
+
     private companion object {
         const val LAST_SYNC = "last_sync_millis"
         const val WAITING_FOR_SPACE = "waiting_for_space"
+        const val HANDLED = "handled_due_millis"
     }
 }
