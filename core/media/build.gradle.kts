@@ -9,6 +9,7 @@ android {
 
 dependencies {
     api(projects.sync.engine)
+    api(projects.sync.runtime)
     implementation(projects.core.database)
     implementation(projects.core.metadata)
     implementation(projects.core.datastore)
