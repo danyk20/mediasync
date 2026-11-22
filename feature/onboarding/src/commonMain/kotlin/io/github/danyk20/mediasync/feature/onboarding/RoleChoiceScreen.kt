@@ -17,7 +17,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -25,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.designsystem.component.ChoiceCard
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -52,9 +52,6 @@ import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboar
 import io.github.danyk20.mediasync.feature.onboarding.generated.resources.onboarding_title
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-
-/** `true` where the app runs on a computer (the desktop app sets it): the screen then says "computer", not "phone". */
-val LocalIsComputer = staticCompositionLocalOf { false }
 
 @Composable
 fun RoleChoiceRoute(modifier: Modifier = Modifier, viewModel: RoleChoiceViewModel = metroViewModel()) {

@@ -23,6 +23,7 @@ import io.github.danyk20.mediasync.core.designsystem.generated.resources.menu_di
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.menu_settings
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.more_options
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_body
+import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_body_computer
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_cancel
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_confirm
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_title
@@ -63,7 +64,7 @@ fun ResetDialog(onReset: () -> Unit, onCancel: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(Res.string.reset_title)) },
-        text = { Text(stringResource(Res.string.reset_body)) },
+        text = { Text(stringResource(deviceText(Res.string.reset_body, Res.string.reset_body_computer))) },
         confirmButton = {
             TextButton(onClick = onReset) {
                 Text(stringResource(Res.string.reset_confirm), color = MaterialTheme.colorScheme.error)

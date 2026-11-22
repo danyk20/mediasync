@@ -52,12 +52,15 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.component.ResetDialog
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.Res as DesignSystemRes
 import io.github.danyk20.mediasync.core.designsystem.generated.resources.reset_mediasync
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.Res
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_animation_intro
@@ -65,16 +68,20 @@ import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.setti
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_animation_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_done
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_intro_computer
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size_hint
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size_invalid
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size_save
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_intro_computer
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_intro_sender
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_not_installed
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_switch
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_reset_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_reset_intro_computer
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_reset_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_updates_check
@@ -106,6 +113,8 @@ data class SettingsUiState(
     val updates: UpdatesUi? = null,
     /** A computer only: whether MediaSync starts at login. `null` where there is no such setting. */
     val startAtLogin: StartAtLoginState? = null,
+    /** This device sends (producer role): the start-at-login text says what it sends. */
+    val sends: Boolean = false,
 ) {
     /** A valid size that isn't the one kept now. */
     val canSaveLogSize: Boolean get() = !logSizeInvalid && logSize.isNotBlank() && logSize != savedLogSize
@@ -155,6 +164,9 @@ class SettingsViewModel(
             settings.sendAnimation.collect { on -> state.update { it.copy(sendAnimation = on) } }
         }
         viewModelScope.launch { state.update { it.copy(startAtLogin = startup.state()) } }
+        viewModelScope.launch {
+            settings.role.collect { role -> state.update { it.copy(sends = role == DeviceRole.PRODUCER) } }
+        }
     }
 
     fun onStartAtLoginChange(on: Boolean) {
@@ -261,7 +273,7 @@ fun SettingsScreen(
             SendAnimationSection(state.sendAnimation, onSendAnimation)
             state.startAtLogin?.let {
                 HorizontalDivider()
-                StartAtLoginSection(it, onStartAtLogin)
+                StartAtLoginSection(it, state.sends, onStartAtLogin)
             }
             state.updates?.let {
                 HorizontalDivider()
@@ -283,7 +295,7 @@ private fun LogSizeSection(state: SettingsUiState, onChange: (String) -> Unit, o
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = stringResource(Res.string.settings_log_intro),
+            text = stringResource(deviceText(Res.string.settings_log_intro, Res.string.settings_log_intro_computer)),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -332,7 +344,7 @@ private fun SendAnimationSection(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** A computer's *Start at login*: on by default once installed; a copy that is not installed says why it cannot. */
 @Composable
-private fun StartAtLoginSection(login: StartAtLoginState, onChange: (Boolean) -> Unit) {
+private fun StartAtLoginSection(login: StartAtLoginState, sends: Boolean, onChange: (Boolean) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = stringResource(Res.string.settings_login_title),
@@ -347,7 +359,11 @@ private fun StartAtLoginSection(login: StartAtLoginState, onChange: (Boolean) ->
             },
             headlineContent = { Text(stringResource(Res.string.settings_login_switch)) },
             supportingContent = {
-                val intro = Res.string.settings_login_intro
+                val intro = if (sends) {
+                    Res.string.settings_login_intro_sender
+                } else {
+                    deviceText(Res.string.settings_login_intro, Res.string.settings_login_intro_computer)
+                }
                 val why = Res.string.settings_login_not_installed
                 Text(stringResource(if (login.canChange) intro else why))
             },
@@ -407,7 +423,9 @@ private fun ResetSection(onReset: () -> Unit) {
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = stringResource(Res.string.settings_reset_intro),
+            text = stringResource(
+                deviceText(Res.string.settings_reset_intro, Res.string.settings_reset_intro_computer),
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

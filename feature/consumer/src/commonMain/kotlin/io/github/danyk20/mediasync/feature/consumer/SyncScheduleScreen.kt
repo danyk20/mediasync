@@ -66,6 +66,7 @@ import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_intro_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_manual
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_manual_description
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_manual_description_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_open_hint
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_open_hint_computer
 import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_time_cancel
@@ -407,7 +408,12 @@ private fun ScheduleOption.description(listensContinuously: Boolean): StringReso
             Res.string.consumer_schedule_while_charging_description
         }
 
-    ScheduleOption.MANUAL -> Res.string.consumer_schedule_manual_description
+    ScheduleOption.MANUAL ->
+        if (listensContinuously) {
+            Res.string.consumer_schedule_manual_description_computer
+        } else {
+            Res.string.consumer_schedule_manual_description
+        }
 
     else -> null
 }

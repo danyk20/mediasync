@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.diagnostics
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,7 +25,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.LogSize
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
@@ -98,6 +101,16 @@ class SettingsTest {
 
         viewModel.uiState.value.logSize shouldBe "3"
         viewModel.uiState.value.savedLogSize shouldBe "1"
+    }
+
+    @Test
+    fun aSendingDeviceIsToldWhatItSendsAtLogin() = runTest {
+        val viewModel = viewModel()
+        viewModel.uiState.value.sends shouldBe false
+
+        settings.setRole(DeviceRole.PRODUCER)
+
+        viewModel.uiState.value.sends shouldBe true
     }
 
     @Test
@@ -223,6 +236,44 @@ class SettingsTest {
     }
 
     @Test
+    fun aComputerSaysComputerAndAPhoneKeepsItsWords() {
+        val login = StartAtLoginState(on = true, canChange = true)
+        show(SettingsUiState("1", "1", startAtLogin = login), computer = true)
+        composeRule.onNodeWithText(
+            "How much of the log MediaSync keeps on this computer. " +
+                "When it's full, the oldest entries make room for new ones.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "MediaSync starts hidden in the tray, so the phones and computers that send to it " +
+                "can always reach this computer.",
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "This computer forgets its role, paired devices, settings and history, and MediaSync closes. " +
+                "Photos and videos stay.",
+        ).performScrollTo().assertIsDisplayed()
+
+        show(SettingsUiState("1", "1", startAtLogin = login, sends = true), computer = true)
+        composeRule.onNodeWithText(
+            "On: MediaSync starts hidden in the tray at login, so your photos are sent on the schedule " +
+                "without you opening it. " +
+                "A sending computer doesn't turn this on by itself.",
+        ).performScrollTo().assertIsDisplayed()
+
+        show(SettingsUiState("1", "1", startAtLogin = login), computer = false)
+        composeRule.onNodeWithText(
+            "How much of the log MediaSync keeps on this phone. " +
+                "When it's full, the oldest entries make room for new ones.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "MediaSync starts hidden in the tray, so your phones can always send to this computer.",
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "This phone forgets its role, paired phones, settings and history. " +
+                "Photos and videos stay.",
+        ).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun doneCloses() {
         show(SettingsUiState("1", "1"))
 
@@ -267,8 +318,10 @@ class SettingsTest {
     }
 
     private var content by mutableStateOf<SettingsUiState?>(null)
+    private var onComputer by mutableStateOf(false)
 
-    private fun show(state: SettingsUiState, darkTheme: Boolean = false) {
+    private fun show(state: SettingsUiState, darkTheme: Boolean = false, computer: Boolean = false) {
+        onComputer = computer
         if (content != null) {
             content = state
             composeRule.waitForIdle()
@@ -277,16 +330,19 @@ class SettingsTest {
         content = state
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                SettingsScreen(
-                    state = content ?: return@MediaSyncTheme,
-                    onLogSizeChange = { events += "size $it" },
-                    onSaveLogSize = { events += "save" },
-                    onReset = { events += "reset" },
-                    onDone = { events += "done" },
-                    onCheckUpdates = { events += "check" },
-                    onOpenRelease = { events += "open $it" },
-                    onSendAnimation = { events += "animation $it" },
-                )
+                val shown = content ?: return@MediaSyncTheme
+                CompositionLocalProvider(LocalIsComputer provides onComputer) {
+                    SettingsScreen(
+                        state = shown,
+                        onLogSizeChange = { events += "size $it" },
+                        onSaveLogSize = { events += "save" },
+                        onReset = { events += "reset" },
+                        onDone = { events += "done" },
+                        onCheckUpdates = { events += "check" },
+                        onOpenRelease = { events += "open $it" },
+                        onSendAnimation = { events += "animation $it" },
+                    )
+                }
             }
         }
     }

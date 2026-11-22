@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.consumer
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.SyncSchedule
@@ -364,29 +366,86 @@ class ConsumerHomeScreenTest {
         composeRule.onRoot().captureScreenshot("consumer_home_turbo_request_light")
     }
 
-    private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false) {
+    @Test
+    fun computer_titleSaysComputerAndTheSendersAreDevices() {
+        show(ConsumerHomeUiState(listening = true), computer = true)
+
+        composeRule.onNodeWithText("This computer receives").assertIsDisplayed()
+        composeRule.onNodeWithText("Add sending device").performClick()
+        events shouldBe listOf("add")
+        composeRule.onAllNodesWithText("This phone receives").fetchSemanticsNodes().isEmpty() shouldBe true
+    }
+
+    @Test
+    fun computer_backupCardIsTheBackupFolderAndInternetAndFileNamesAreNotShown() {
+        show(ConsumerHomeUiState(listening = true, backup = BackupLine.Off), computer = true)
+
+        composeRule.onNodeWithText("Backup folder").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Not chosen: received photos stay in MediaSync's inbox",
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Choose").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Cloud backup").fetchSemanticsNodes().isEmpty() shouldBe true
+        composeRule.onAllNodesWithText("Simple file names").fetchSemanticsNodes().isEmpty() shouldBe true
+        composeRule.onAllNodesWithText("Internet sync").fetchSemanticsNodes().isEmpty() shouldBe true
+    }
+
+    @Test
+    fun computer_withAFolderSaysWhatWasCopiedWhere() {
+        show(
+            ConsumerHomeUiState(listening = true, backup = BackupLine.Folder("Photos backup", 3, true)),
+            computer = true,
+        )
+
+        composeRule.onNodeWithText("Copied to Photos backup · 3 today").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun computer_receivedCountNamesTheInbox() {
+        show(ConsumerHomeUiState(listening = true, receivedCount = 1), computer = true)
+
+        composeRule.onNodeWithText(
+            "photo or video received so far",
+            substring = true,
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("MediaSync's inbox", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun phone_isUnchanged() {
+        show(ConsumerHomeUiState(listening = true, backup = BackupLine.Off))
+
+        composeRule.onNodeWithText("This phone receives").assertIsDisplayed()
+        composeRule.onNodeWithText("Cloud backup").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Simple file names").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Internet sync").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun show(state: ConsumerHomeUiState, darkTheme: Boolean = false, computer: Boolean = false) {
         composeRule.setContent {
             MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ConsumerHomeScreen(
-                    state = state,
-                    onAddProducer = { events += "add" },
-                    onRemoveProducer = { events += "remove ${it.name}" },
-                    onShowSpeeds = { events += "speeds of ${it.hex.take(4)}" },
-                    onSimpleFileNames = { events += "simple names $it" },
-                    onOpenBackup = { events += "backup" },
-                    onChangeSchedule = { events += "schedule" },
-                    onAllowNotifications = { events += "notifications" },
-                    onOpenSettings = { events += "settings" },
-                    onOpenStorage = { events += "storage" },
-                    onDismiss = { events += "dismiss $it" },
-                    onOpenMediaSyncSettings = { events += "mediasync settings" },
-                    onOpenDiagnostics = { events += "diagnostics" },
-                    onAllowTurbo = { events += "allow turbo" },
-                    onDismissTurbo = { events += "dismiss turbo" },
-                    onStartTurboReceive = { events += "turbo receive" },
-                    onStopTurboReceive = { events += "stop turbo receive" },
-                    onSetUpInternet = { events += "internet" },
-                )
+                CompositionLocalProvider(LocalIsComputer provides computer) {
+                    ConsumerHomeScreen(
+                        state = state,
+                        onAddProducer = { events += "add" },
+                        onRemoveProducer = { events += "remove ${it.name}" },
+                        onShowSpeeds = { events += "speeds of ${it.hex.take(4)}" },
+                        onSimpleFileNames = { events += "simple names $it" },
+                        onOpenBackup = { events += "backup" },
+                        onChangeSchedule = { events += "schedule" },
+                        onAllowNotifications = { events += "notifications" },
+                        onOpenSettings = { events += "settings" },
+                        onOpenStorage = { events += "storage" },
+                        onDismiss = { events += "dismiss $it" },
+                        onOpenMediaSyncSettings = { events += "mediasync settings" },
+                        onOpenDiagnostics = { events += "diagnostics" },
+                        onAllowTurbo = { events += "allow turbo" },
+                        onDismissTurbo = { events += "dismiss turbo" },
+                        onStartTurboReceive = { events += "turbo receive" },
+                        onStopTurboReceive = { events += "stop turbo receive" },
+                        onSetUpInternet = { events += "internet" },
+                    )
+                }
             }
         }
     }

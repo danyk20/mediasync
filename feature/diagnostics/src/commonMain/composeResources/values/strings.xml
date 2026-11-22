@@ -64,4 +64,11 @@
     <string name="diagnostics_test_file_over_turbo">Turbo</string>
     <string name="diagnostics_test_file_over_internet">the internet</string>
     <string name="diagnostics_test_file_over_relay">the internet, through the relay</string>
+    <!-- The same screens on a computer (English only for now). -->
+    <string name="diagnostics_intro_computer">If MediaSync doesn't work as expected, share this log with whoever helps you. It stays on this computer until you share it. It lists what MediaSync did and how this computer is set up, without photos, file names or places.</string>
+    <string name="settings_log_intro_computer">How much of the log MediaSync keeps on this computer. When it's full, the oldest entries make room for new ones.</string>
+    <string name="settings_reset_intro_computer">This computer forgets its role, paired devices, settings and history, and MediaSync closes. Photos and videos stay.</string>
+    <string name="settings_login_intro_computer">MediaSync starts hidden in the tray, so the phones and computers that send to it can always reach this computer.</string>
+    <!-- Start at login on a sending computer: the switch starts MediaSync hidden, but turning it on is up to the user. -->
+    <string name="settings_login_intro_sender">On: MediaSync starts hidden in the tray at login, so your photos are sent on the schedule without you opening it. A sending computer doesn't turn this on by itself.</string>
 </resources>
