@@ -7,7 +7,7 @@ package io.github.danyk20.mediasync.core.model
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 class DeviceIdTest {
 

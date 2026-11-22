@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.protocol
 
+import kotlin.jvm.JvmInline
 import okio.ByteString
 
 /**

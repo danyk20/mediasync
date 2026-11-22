@@ -4,6 +4,8 @@
  */
 package io.github.danyk20.mediasync.core.model
 
+import kotlin.jvm.JvmInline
+
 /**
  * A device's identity: the SHA-256 of its identity certificate, as 64 lowercase hex characters.
  *
@@ -26,10 +28,11 @@ value class DeviceId(val hex: String) {
     companion object {
         private const val HEX_LENGTH = 64
         private const val SHORT_LENGTH = 8
+        private const val HEX_RADIX = 16
 
         fun of(sha256: ByteArray): DeviceId {
             require(sha256.size == HEX_LENGTH / 2) { "Expected a 32-byte SHA-256, got ${sha256.size} bytes" }
-            return DeviceId(sha256.joinToString("") { "%02x".format(it) })
+            return DeviceId(sha256.joinToString("") { it.toUByte().toString(HEX_RADIX).padStart(2, '0') })
         }
     }
 }

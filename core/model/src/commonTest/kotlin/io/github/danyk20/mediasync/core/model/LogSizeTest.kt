@@ -6,7 +6,7 @@ package io.github.danyk20.mediasync.core.model
 
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 class LogSizeTest {
 
