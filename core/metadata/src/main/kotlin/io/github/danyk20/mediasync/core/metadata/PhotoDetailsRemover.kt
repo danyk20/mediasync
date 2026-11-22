@@ -86,7 +86,7 @@ internal interface Editor {
 }
 
 /** File formats by their first bytes. */
-private enum class Format {
+internal enum class Format {
     JPEG,
     PNG,
     WEBP,

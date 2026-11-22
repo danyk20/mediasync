@@ -6,6 +6,12 @@ package io.github.danyk20.mediasync.core.metadata
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.time.DateTimeException
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 /** The file isn't what its header says, or is damaged: its details can't be removed with certainty. */
 internal class MalformedMediaException(message: String) : RuntimeException(message)
@@ -123,6 +129,45 @@ internal class Tiff(private val reader: ByteReader, private val base: Long, priv
         }.toByteArray()
     }
 
+    /**
+     * When the photo was taken: the EXIF original date, else the digitized one, else the file's date, with the UTC
+     * offset the camera wrote, if any; otherwise [zone]'s at that moment. `null` if there is no readable date.
+     */
+    fun capturedAt(zone: ZoneId): CapturedAt? {
+        val ifd0 = ifd0()
+        val exif = child(ifd0, EXIF_IFD)
+        val (date, offset) = listOf(
+            exif to (DATE_TIME_ORIGINAL to OFFSET_TIME_ORIGINAL),
+            exif to (DATE_TIME_DIGITIZED to OFFSET_TIME_DIGITIZED),
+            ifd0 to (DATE_TIME to OFFSET_TIME),
+        ).firstNotNullOfOrNull { (ifd, tags) ->
+            ifd?.find(tags.first)?.let { text(it) }?.takeIf { it.isNotBlank() }?.let { it to ifd.find(tags.second) }
+        } ?: return null
+        val local = try {
+            LocalDateTime.parse(date, EXIF_DATE)
+        } catch (_: DateTimeParseException) {
+            return null // Cameras without a clock write zeros.
+        }
+        val explicit = offset?.let { text(it) }?.let {
+            try {
+                ZoneOffset.of(it)
+            } catch (_: DateTimeException) {
+                null
+            }
+        }
+        val instant = local.atZone(explicit ?: zone).toInstant()
+        val used = explicit ?: zone.rules.getOffset(instant)
+        return CapturedAt(instant.toEpochMilli(), used.totalSeconds / SECONDS_PER_MINUTE, explicit != null)
+    }
+
+    private fun text(entry: Entry): String? = if (entry.type ==
+        ASCII
+    ) {
+        String(bytes(entry), Charsets.ISO_8859_1).trim { it == '\u0000' || it == ' ' }
+    } else {
+        null
+    }
+
     private fun buffer(offset: Long, length: Int): ByteBuffer =
         ByteBuffer.wrap(reader.read(base + offset, length)).order(order)
 
@@ -133,6 +178,14 @@ internal class Tiff(private val reader: ByteReader, private val base: Long, priv
         const val ORIENTATION = 0x0112
         const val DATE_TIME_ORIGINAL = 0x9003
         const val COLOR_SPACE = 0xA001
+        const val DATE_TIME = 0x0132
+        const val OFFSET_TIME = 0x9010
+        const val OFFSET_TIME_ORIGINAL = 0x9011
+        const val DATE_TIME_DIGITIZED = 0x9004
+        const val OFFSET_TIME_DIGITIZED = 0x9012
+        private const val ASCII = 2
+        private const val SECONDS_PER_MINUTE = 60
+        private val EXIF_DATE = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")
         val CAPTURE_DATE_TAGS = listOf(DATE_TIME_ORIGINAL, 0x9011, 0x9291) // Date, its UTC offset, sub-seconds.
         val DIGITIZED_TAGS = listOf(0x9004, 0x9012, 0x9292)
 

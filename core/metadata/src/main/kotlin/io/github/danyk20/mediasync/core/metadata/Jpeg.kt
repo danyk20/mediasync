@@ -115,6 +115,9 @@ internal class Jpeg(private val reader: ByteReader, private val start: Long, pri
         PhotoshopResources.withoutLocation(reader.read(segment.payloadAt, segment.payloadSize))
             ?.let { kept -> Edit(segment.at, segment.totalLength.toLong(), segmentBytes(APP13, kept)) }
 
+    /** The photo's EXIF, or `null` if it has none. */
+    fun exifTiff(): Tiff? = segments.firstOrNull { it.isApp1(EXIF_ID) }?.let(::exif)
+
     private fun exif(segment: Segment) =
         Tiff(reader, segment.payloadAt + EXIF_ID.size, (segment.payloadSize - EXIF_ID.size).toLong())
 

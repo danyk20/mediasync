@@ -160,6 +160,20 @@ internal class Isobmff(
     /** HEIC and AVIF: the EXIF and XMP items, rewritten in place, and a Motion Photo's video after the photo. */
     private fun heifEdits(remove: Remove): List<Edit> = mergeZeros(itemEdits(remove) + motionVideoEdits(remove))
 
+    /** A HEIC or AVIF photo's EXIF, or `null` if it has none. */
+    fun exifTiff(): Tiff? {
+        val meta = top.firstOrNull { it.type == "meta" } ?: return null
+        val boxes = children(meta.payloadAt + 4, meta.end)
+        val idat = boxes.firstOrNull { it.type == "idat" }
+        val locations = boxes.firstOrNull { it.type == "iloc" }?.let(::itemLocations).orEmpty()
+        val infos = boxes.firstOrNull { it.type == "iinf" }?.let(::itemInfos).orEmpty()
+        val id = infos.entries.firstOrNull { it.value.type == "Exif" }?.key ?: return null
+        val item = locations[id]?.let { Item(it, idat) } ?: return null
+        if (item.size < 4) malformed("EXIF item of ${item.size} bytes")
+        val tiffAt = 4 + (ByteBuffer.wrap(item.read(0, 4)).int.toLong() and UINT)
+        return Tiff(item::read, tiffAt, item.size - tiffAt)
+    }
+
     private fun itemEdits(remove: Remove): List<Edit> {
         val meta = top.firstOrNull { it.type == "meta" } ?: return emptyList()
         val boxes = children(meta.payloadAt + 4, meta.end)
