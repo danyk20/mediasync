@@ -209,6 +209,16 @@ jobs:
           app=desktopApp/build/compose/binaries/main/app/MediaSync.app
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
+      # Finder must open the DMG with no prompt: an embedded license agreement makes current macOS call it
+      # "corrupted". Mounting it without input (stdin closed) fails if anything asks.
+      - name: Check the DMG opens without a prompt
+        if: runner.os == 'macOS'
+        run: |
+          dmg=$(find desktopApp/build/compose/binaries -name '*.dmg' | head -n 1)
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "$dmg" < /dev/null
+          test -d "$mnt/MediaSync.app"
+          hdiutil detach "$mnt"
       - name: Collect installers and checksums
         shell: bash
         run: |
