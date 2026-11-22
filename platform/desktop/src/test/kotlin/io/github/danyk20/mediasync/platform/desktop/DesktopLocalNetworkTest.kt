@@ -31,7 +31,7 @@ class DesktopLocalNetworkTest {
         override val addresses = addresses.map { (text, prefix) -> InetAddress.getByName(text) to prefix }
     }
 
-    private fun network(vararg nics: LocalInterface) = DesktopLocalNetwork { nics.toList() }
+    private fun network(vararg nics: LocalInterface) = DesktopLocalNetwork(interfaces = { nics.toList() })
 
     private fun ip(text: String) = InetAddress.getByName(text)
 
@@ -90,6 +90,15 @@ class DesktopLocalNetworkTest {
         net.isOnLocalNetwork(ip("fd00::77")) shouldBe true
         net.isOnLocalNetwork(ip("fd01::77")) shouldBe false
         net.isOnLocalNetwork(ip("10.8.0.9")) shouldBe false // Behind the VPN, not on the local network.
+    }
+
+    @Test
+    fun `with loopback allowed, 127_0_0_1 is a local address and on the local network`() {
+        val lo = Fake("lo0", "127.0.0.1" to 8, isLoopback = true)
+        val net = DesktopLocalNetwork(interfaces = { listOf(lo) }, allowLoopback = true)
+
+        net.localAddresses() shouldBe listOf(ip("127.0.0.1"))
+        net.isOnLocalNetwork(ip("127.0.0.1")) shouldBe true
     }
 
     @Test

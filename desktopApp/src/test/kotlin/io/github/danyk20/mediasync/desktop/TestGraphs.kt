@@ -14,8 +14,10 @@ import java.nio.file.Path
 internal class TestGraphs {
     private val graphs = mutableListOf<DesktopGraph>()
 
-    fun create(directory: Path): DesktopGraph =
-        createGraphFactory<DesktopGraph.Factory>().create(AppPaths(directory, isolated = true)).also { graphs += it }
+    /** [loopback]: the computer's local network is 127.0.0.1 too, so graphs in this JVM can pair and sync. */
+    fun create(directory: Path, loopback: Boolean = false): DesktopGraph = createGraphFactory<DesktopGraph.Factory>()
+        .create(AppPaths(directory, isolated = true, loopback = loopback))
+        .also { graphs += it }
 
     fun shutDown() {
         graphs.forEach { AppShutdown(it.shutdownSteps()).run() }

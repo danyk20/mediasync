@@ -13,8 +13,11 @@ import java.nio.file.Paths
  * With the environment variable [OVERRIDE] (or the system property of the same name) set, everything lives in that
  * folder and the identity's password goes in a file instead of the operating system's credential store: tests and
  * checks never touch the real folders or the keychain.
+ *
+ * [loopback]: tests only, the computer's local network includes 127.0.0.1 (see `DesktopLocalNetwork`).
+ * Never set by the app.
  */
-class AppPaths(val root: Path, val isolated: Boolean = false) {
+class AppPaths(val root: Path, val isolated: Boolean = false, val loopback: Boolean = false) {
     /** The PKCS#12 identity file and, without a credential store, its password. */
     val identity: Path = root.resolve("identity")
     val database: Path = root.resolve("mediasync.db")

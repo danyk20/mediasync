@@ -41,7 +41,7 @@ The APK is written to `app/build/outputs/apk/debug/`.
 
 ## Desktop app
 
-MediaSync also runs on macOS, Windows and Linux, to receive your phones' photos and videos and back them up on the computer. The installers are on the [releases page](https://github.com/danyk20/mediasync/releases/latest), unsigned; see [docs/desktop.md](docs/desktop.md) for installing and for the first-start warnings.
+MediaSync also runs on macOS, Windows and Linux, to receive your phones' photos and videos and back them up on the computer, or to send a computer's photo folders to a receiving phone or computer (a computer pairs by pasting the receiver's link). The installers are on the [releases page](https://github.com/danyk20/mediasync/releases/latest), unsigned; see [docs/desktop.md](docs/desktop.md) for installing and for the first-start warnings.
 
 ## Project layout
 
