@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performClick
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.danyk20.mediasync.feature.consumer.R as ConsumerR
-import io.github.danyk20.mediasync.feature.producer.R as ProducerR
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,7 +30,7 @@ class MainActivityTest {
     fun firstLaunch_choosingSends_opensProducerHome() {
         awaitNode(ONBOARDING_SENDS).performClick()
 
-        awaitText(ProducerR.string.producer_status_not_paired_title).assertIsDisplayed()
+        awaitNode(PRODUCER_NOT_PAIRED_TITLE).assertIsDisplayed()
     }
 
     @Test
@@ -44,7 +43,7 @@ class MainActivityTest {
     @Test
     fun sendingPhone_openingAPairingLink_asksBeforePairing() {
         awaitNode(ONBOARDING_SENDS).performClick()
-        awaitText(ProducerR.string.producer_status_not_paired_title)
+        awaitNode(PRODUCER_NOT_PAIRED_TITLE)
 
         val link = "mediasync://pair?v=1&id=${"a".repeat(64)}&t=AAAAAAAAAAAAAAAAAAAAAA&a=127.0.0.1%3A9&n=Test+phone"
         composeRule.activity.startActivity(
@@ -70,6 +69,7 @@ class MainActivityTest {
 
     private companion object {
         // The onboarding and pairing strings are Compose resources now, which the Android `R` class no longer has.
+        const val PRODUCER_NOT_PAIRED_TITLE = "Not paired yet"
         const val ONBOARDING_SENDS = "This phone sends"
         const val PAIRING_CONFIRM_TITLE = "Pair with Test phone?"
         const val ONBOARDING_RECEIVES = "This phone receives"
