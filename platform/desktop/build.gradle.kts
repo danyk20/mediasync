@@ -12,8 +12,10 @@ dependencies {
 
     implementation(libs.bouncycastle.bcpkix)
     implementation(libs.java.keyring)
+    implementation(libs.jmdns)
 
     testImplementation(testFixtures(projects.transport.lan))
+    testImplementation(libs.mockk) // fakes JmDNS, which is abstract, for the mDNS session tests
 }
 
 // Every license on this module's runtime classpath must be explicitly allowed (the app's check does not see this module).
