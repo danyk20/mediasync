@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/danyk20/mediasync/compare/v0.11.0...v0.12.0) (2026-11-22)
+
+
+### Features
+
+* the desktop chooses to send or receive ([#173](https://github.com/danyk20/mediasync/issues/173)) ([5426fee](https://github.com/danyk20/mediasync/commit/5426fee9931473eba35fb8f6a5792524f4517906))
+* the desktop reads photos and videos from folders to send ([#171](https://github.com/danyk20/mediasync/issues/171)) ([5c39296](https://github.com/danyk20/mediasync/commit/5c39296ed4e69cbd218997361973d29be9cbf946))
+
+
+### Bug Fixes
+
+* the macOS disk image opens again ([#174](https://github.com/danyk20/mediasync/issues/174)) ([af1befe](https://github.com/danyk20/mediasync/commit/af1befe9ccf1a34ec0ca504fa3b8405aa01eb48d))
+
 ## [0.11.0](https://github.com/danyk20/mediasync/compare/v0.10.2...v0.11.0) (2026-11-22)
 
 
