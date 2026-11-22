@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.mediasync.android.application)
     alias(libs.plugins.mediasync.android.compose)
     alias(libs.plugins.mediasync.di)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 // Firebase, for waking the receiving phone over the internet (docs/PLAN.md §10.4), when the project's
@@ -90,7 +89,9 @@ android {
     }
 
     // The languages MediaSync is translated into (docs/TRANSLATING.md). Android 13+ lists them under the app's own
-    // language setting; other languages that libraries bring are left out.
+    // language setting; other languages that libraries bring are left out. The list is generated from this app's own
+    // res/values-*/strings.xml (app_name) within these filters: the screens' strings are Compose resources, which
+    // don't count, so a new language needs its res/values-xx here too.
     androidResources {
         generateLocaleConfig = true
         localeFilters += listOf("en", "cs", "de", "es", "fr", "it", "pt-rBR", "ru", "sk", "uk", "en-rXA", "ar-rXB")
@@ -137,6 +138,7 @@ dependencies {
     implementation(projects.feature.backup)
     implementation(projects.feature.consumer)
     implementation(projects.feature.diagnostics)
+    implementation(projects.feature.navigation)
     implementation(projects.feature.onboarding)
     implementation(projects.feature.pairing)
     implementation(projects.feature.producer)
@@ -154,12 +156,9 @@ dependencies {
     implementation(libs.metrox.android)
     implementation(libs.metrox.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.navigation3.ui)
-    implementation(libs.kotlinx.serialization.core)
 
     testImplementation(projects.core.testing)
+    testImplementation(libs.compose.multiplatform.resources)
     testImplementation(libs.kotest.assertions)
     testImplementation(libs.turbine)
 
