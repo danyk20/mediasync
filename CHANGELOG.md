@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.0](https://github.com/danyk20/mediasync/compare/v0.12.0...v0.13.0) (2026-11-22)
+
+
+### Features
+
+* a receiving computer says computer ([#178](https://github.com/danyk20/mediasync/issues/178)) ([1550a25](https://github.com/danyk20/mediasync/commit/1550a25734ae36fac82102bc17b55cb111557eee))
+* a sending computer says computer and pairs by pasting a link ([#179](https://github.com/danyk20/mediasync/issues/179)) ([f3967f3](https://github.com/danyk20/mediasync/commit/f3967f34e1a801e1b754d77089aaa0afe3d2a7be))
+* a sending computer syncs on the household's schedule ([#176](https://github.com/danyk20/mediasync/issues/176)) ([2735e93](https://github.com/danyk20/mediasync/commit/2735e93ff7086cc57232b5904c8c3542688ca664))
+
 ## [0.12.0](https://github.com/danyk20/mediasync/compare/v0.11.0...v0.12.0) (2026-11-22)
 
 
