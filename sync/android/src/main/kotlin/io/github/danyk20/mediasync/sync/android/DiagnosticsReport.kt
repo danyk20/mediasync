@@ -37,9 +37,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** One line of the report: what, and how it is. */
-data class Fact(val label: String, val value: String)
-
 /**
  * What someone helping with a problem needs to know besides the log (docs/PLAN.md §3.3, *Diagnostics*): this phone,
  * how MediaSync is set up on it, what Android allows it, and the state of its background work. Like the log, it

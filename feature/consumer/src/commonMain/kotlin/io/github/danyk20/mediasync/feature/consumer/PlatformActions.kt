@@ -7,7 +7,6 @@
 package io.github.danyk20.mediasync.feature.consumer
 
 import androidx.compose.runtime.Composable
-import java.util.Locale
 
 /** The system's side of the home screen: what it asks the user to allow, and which settings pages it opens. */
 internal class ConsumerSystemActions(
@@ -49,7 +48,3 @@ internal expect fun rememberSignInBrowser(onUnavailable: () -> Unit): (url: Stri
 /** Whether the user's clock shows 24 hours, for the time picker. */
 @Composable
 internal expect fun rememberIs24HourFormat(): Boolean
-
-/** The language the user's weekday names are in. */
-@Composable
-internal expect fun rememberDisplayLocale(): Locale
