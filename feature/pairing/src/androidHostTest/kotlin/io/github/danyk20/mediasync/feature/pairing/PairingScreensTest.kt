@@ -4,12 +4,14 @@
  */
 package io.github.danyk20.mediasync.feature.pairing
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
 import io.kotest.matchers.shouldBe
@@ -49,6 +51,58 @@ class PairingScreensTest {
     }
 
     @Test
+    fun consumer_onAComputer_copiesTheLinkAndSaysSo() {
+        composeRule.mainClock.autoAdvance = false
+        consumer(code, computer = true)
+
+        composeRule.onNodeWithContentDescription("Pairing code").assertIsDisplayed()
+        composeRule.onNodeWithText("Share pairing link").assertDoesNotExist()
+        tap("Copy link")
+        events shouldBe listOf("share:${code.link}")
+        composeRule.onNodeWithText("Link copied").assertIsDisplayed()
+    }
+
+    @Test
+    fun consumer_onAComputer_linkCopiedGoesBackToCopyLinkAfterThreeSeconds() {
+        composeRule.mainClock.autoAdvance = false
+        consumer(code, computer = true)
+
+        tap("Copy link")
+        composeRule.onNodeWithText("Link copied").assertIsDisplayed()
+        composeRule.mainClock.advanceTimeBy(2_999)
+        composeRule.onNodeWithText("Link copied").assertIsDisplayed()
+        composeRule.mainClock.advanceTimeBy(1)
+        composeRule.onNodeWithText("Copy link").assertIsDisplayed()
+        composeRule.onNodeWithText("Link copied").assertDoesNotExist()
+    }
+
+    @Test
+    fun consumer_onAComputer_aSecondCopyRestartsTheThreeSeconds() {
+        composeRule.mainClock.autoAdvance = false
+        consumer(code, computer = true)
+
+        tap("Copy link")
+        composeRule.mainClock.advanceTimeBy(2_000)
+        tap("Link copied")
+        // The first copy's three seconds would have ended by now; the second copy's are still running.
+        composeRule.mainClock.advanceTimeBy(2_000)
+        composeRule.onNodeWithText("Link copied").assertIsDisplayed()
+        composeRule.mainClock.advanceTimeBy(1_500)
+        composeRule.onNodeWithText("Copy link").assertIsDisplayed()
+    }
+
+    @Test
+    fun consumer_onAPhone_neverSaysLinkCopied() {
+        composeRule.mainClock.autoAdvance = false
+        consumer(code)
+
+        tap("Share pairing link")
+        composeRule.mainClock.advanceTimeBy(3_000)
+        composeRule.onNodeWithText("Share pairing link").assertIsDisplayed()
+        composeRule.onNodeWithText("Link copied").assertDoesNotExist()
+    }
+
+    @Test
     fun consumer_asksBeforeAllowingAPhone() {
         consumer(code.copy(approvalFrom = "Anna's Pixel"))
 
@@ -83,6 +137,26 @@ class PairingScreensTest {
         ).assertIsDisplayed()
         composeRule.onNodeWithText("Paste pairing link").performClick()
         events shouldBe listOf("paste")
+    }
+
+    @Test
+    fun producer_onAComputer_showsNoCameraAndPastes() {
+        producer(ProducerPairingUiState.Scanning(), computer = true)
+
+        composeRule.onNodeWithText("Pair with receiving device").assertIsDisplayed()
+        composeRule.onNodeWithText("Allow the camera", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Paste the receiver's link").performClick()
+        events shouldBe listOf("paste")
+    }
+
+    @Test
+    fun producer_onAComputer_saysWhenTheClipboardHoldsNoLink() {
+        producer(ProducerPairingUiState.Scanning(notAPairingCode = true), computer = true)
+
+        composeRule.onNodeWithText(
+            "The clipboard holds no MediaSync pairing link. Copy it on the receiving device first.",
+        )
+            .assertIsDisplayed()
     }
 
     @Test
@@ -143,32 +217,42 @@ class PairingScreensTest {
         composeRule.onRoot().captureScreenshot("pairing_producer_paired_light")
     }
 
-    private fun consumer(state: ConsumerPairingUiState, darkTheme: Boolean = false) {
+    /** Clicks, then runs one frame: with the test clock paused, the click's recomposition waits for a frame. */
+    private fun tap(text: String) {
+        composeRule.onNodeWithText(text).performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+    }
+
+    private fun consumer(state: ConsumerPairingUiState, darkTheme: Boolean = false, computer: Boolean = false) {
         composeRule.setContent {
-            MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                ConsumerPairingScreen(
-                    state = state,
-                    onShareLink = { events += "share:$it" },
-                    onAccept = { events += "accept" },
-                    onDecline = { events += "decline" },
-                    onRetry = { events += "retry" },
-                    onDone = { events += "done" },
-                )
+            CompositionLocalProvider(LocalIsComputer provides computer) {
+                MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
+                    ConsumerPairingScreen(
+                        state = state,
+                        onShareLink = { events += "share:$it" },
+                        onAccept = { events += "accept" },
+                        onDecline = { events += "decline" },
+                        onRetry = { events += "retry" },
+                        onDone = { events += "done" },
+                    )
+                }
             }
         }
     }
 
-    private fun producer(state: ProducerPairingUiState) {
+    private fun producer(state: ProducerPairingUiState, computer: Boolean = false) {
         composeRule.setContent {
-            MediaSyncTheme(dynamicColor = false) {
-                ProducerPairingScreen(
-                    state = state,
-                    camera = null,
-                    onPasteLink = { events += "paste" },
-                    onConfirm = { events += "confirm" },
-                    onRetry = { events += "retry" },
-                    onDone = { events += "done" },
-                )
+            CompositionLocalProvider(LocalIsComputer provides computer) {
+                MediaSyncTheme(dynamicColor = false) {
+                    ProducerPairingScreen(
+                        state = state,
+                        camera = null,
+                        onPasteLink = { events += "paste" },
+                        onConfirm = { events += "confirm" },
+                        onRetry = { events += "retry" },
+                        onDone = { events += "done" },
+                    )
+                }
             }
         }
     }

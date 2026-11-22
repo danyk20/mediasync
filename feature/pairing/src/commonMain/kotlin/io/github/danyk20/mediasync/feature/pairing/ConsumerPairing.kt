@@ -23,7 +23,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,19 +42,28 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
 import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.Res
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_approve_allow
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_approve_body
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_approve_body_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_approve_deny
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_approve_title
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_instructions
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_instructions_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_title
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_title_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_validity
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_consumer_validity_computer
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_copy_link
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_done
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_link_copied
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_no_network_body
+import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_no_network_body_computer
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_no_network_title
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paired_consumer_body
 import io.github.danyk20.mediasync.feature.pairing.generated.resources.pairing_paired_title
@@ -60,6 +74,7 @@ import io.github.danyk20.mediasync.sync.android.ConsumerReceiver
 import io.github.danyk20.mediasync.sync.android.PendingApproval
 import io.github.danyk20.mediasync.sync.android.ReceiverState
 import io.github.danyk20.mediasync.sync.engine.PairingLink
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -162,7 +177,14 @@ fun ConsumerPairingScreen(
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = { PairingTopBar(stringResource(Res.string.pairing_consumer_title), onDone) },
+        topBar = {
+            PairingTopBar(
+                stringResource(
+                    deviceText(Res.string.pairing_consumer_title, Res.string.pairing_consumer_title_computer),
+                ),
+                onDone,
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -177,7 +199,9 @@ fun ConsumerPairingScreen(
                 ConsumerPairingUiState.NoNetwork -> {
                     StatusCard(
                         title = stringResource(Res.string.pairing_no_network_title),
-                        body = stringResource(Res.string.pairing_no_network_body),
+                        body = stringResource(
+                            deviceText(Res.string.pairing_no_network_body, Res.string.pairing_no_network_body_computer),
+                        ),
                         icon = MediaSyncIcons.Info,
                     )
                     Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
@@ -203,6 +227,40 @@ fun ConsumerPairingScreen(
     }
 }
 
+/** How long "Link copied" stays before the button says "Copy link" again. */
+private const val LINK_COPIED_MILLIS = 3_000L
+
+/** On a computer the button copies the link and says so; on a phone it shares the link. */
+@Composable
+private fun ShareLinkButton(link: String, onShareLink: (String) -> Unit) {
+    val computer = LocalIsComputer.current
+    // A counter, not a flag: a second click restarts the three seconds.
+    var copies by remember(link) { mutableIntStateOf(0) }
+    val copied = copies > 0
+    LaunchedEffect(copies) {
+        if (copies > 0) {
+            delay(LINK_COPIED_MILLIS)
+            copies = 0
+        }
+    }
+    OutlinedButton(
+        onClick = {
+            onShareLink(link)
+            copies++
+        },
+    ) {
+        Text(
+            stringResource(
+                when {
+                    !computer -> Res.string.pairing_share_link
+                    copied -> Res.string.pairing_link_copied
+                    else -> Res.string.pairing_copy_link
+                },
+            ),
+        )
+    }
+}
+
 @Composable
 private fun ShowingCode(
     state: ConsumerPairingUiState.Showing,
@@ -211,7 +269,9 @@ private fun ShowingCode(
     onDecline: () -> Unit,
 ) {
     Text(
-        text = stringResource(Res.string.pairing_consumer_instructions),
+        text = stringResource(
+            deviceText(Res.string.pairing_consumer_instructions, Res.string.pairing_consumer_instructions_computer),
+        ),
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
     )
@@ -227,18 +287,26 @@ private fun ShowingCode(
     }
     Text(text = state.deviceName, style = MaterialTheme.typography.titleMedium)
     Text(
-        text = stringResource(Res.string.pairing_consumer_validity),
+        text = stringResource(
+            deviceText(Res.string.pairing_consumer_validity, Res.string.pairing_consumer_validity_computer),
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
-    OutlinedButton(onClick = { onShareLink(state.link) }) { Text(stringResource(Res.string.pairing_share_link)) }
+    ShareLinkButton(state.link, onShareLink)
 
     state.approvalFrom?.let { producer ->
         AlertDialog(
             onDismissRequest = onDecline,
             title = { Text(stringResource(Res.string.pairing_approve_title, producer)) },
-            text = { Text(stringResource(Res.string.pairing_approve_body)) },
+            text = {
+                Text(
+                    stringResource(
+                        deviceText(Res.string.pairing_approve_body, Res.string.pairing_approve_body_computer),
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = onAccept) { Text(stringResource(Res.string.pairing_approve_allow)) }
             },

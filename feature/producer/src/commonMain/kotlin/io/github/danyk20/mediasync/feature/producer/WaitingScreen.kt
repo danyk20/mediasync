@@ -69,6 +69,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaLibrary
@@ -83,7 +84,9 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_left_out_done
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_left_out_empty
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_left_out_hint
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_left_out_hint_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_no_viewer
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_no_viewer_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_open
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_photo
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_waiting_synced_done
@@ -265,7 +268,10 @@ fun WaitingRoute(
             if (result == SnackbarResult.ActionPerformed) viewModel.undo()
         }
     }
-    val noViewer = stringResource(Res.string.producer_waiting_no_viewer)
+    val noViewer =
+        stringResource(
+            deviceText(Res.string.producer_waiting_no_viewer, Res.string.producer_waiting_no_viewer_computer),
+        )
     WaitingScreen(
         state = state,
         onDone = onDone,
@@ -413,9 +419,15 @@ private fun Gallery(
                 text = stringResource(
                     when {
                         shown.isEmpty() && list == WaitingList.TO_SYNC -> Res.string.producer_waiting_to_sync_empty
+
                         shown.isEmpty() -> Res.string.producer_waiting_left_out_empty
+
                         list == WaitingList.TO_SYNC -> Res.string.producer_waiting_to_sync_hint
-                        else -> Res.string.producer_waiting_left_out_hint
+
+                        else -> deviceText(
+                            Res.string.producer_waiting_left_out_hint,
+                            Res.string.producer_waiting_left_out_hint_computer,
+                        )
                     },
                 ),
                 style = MaterialTheme.typography.bodyMedium,

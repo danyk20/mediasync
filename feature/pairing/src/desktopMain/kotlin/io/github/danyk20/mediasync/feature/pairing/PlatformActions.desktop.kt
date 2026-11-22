@@ -36,6 +36,6 @@ internal actual fun rememberClipboardReader(): suspend () -> String {
     }
 }
 
-// No camera on the desktop: it pairs by pasting the link (the full desktop flow is PLAN M9).
+// No camera on the desktop: it pairs by pasting the link.
 @Composable
 internal actual fun rememberQrScanner(active: Boolean, onCode: (String) -> Unit): (@Composable () -> Unit)? = null

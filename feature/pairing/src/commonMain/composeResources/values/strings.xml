@@ -39,4 +39,22 @@
     <string name="pairing_problem_unreachable">Couldn't reach the receiving phone. Check that both phones are on the same Wi-Fi.</string>
     <string name="pairing_problem_connection_lost">The connection dropped. Please try again.</string>
     <string name="pairing_problem_incompatible">The phones run different MediaSync versions. Update the app on both.</string>
+    <!-- The pairing screens on a computer (English only for now). A computer has no camera: it shows its code and link, and pastes a link. -->
+    <string name="pairing_consumer_title_computer">Add sending device</string>
+    <string name="pairing_consumer_instructions_computer">On the device that will send photos, open MediaSync and scan this code. A computer without a camera: copy the link below and paste it there.</string>
+    <string name="pairing_consumer_validity_computer">The code and the link work once, for 5 minutes. Both devices need to be on the same network.</string>
+    <string name="pairing_copy_link">Copy link</string>
+    <string name="pairing_link_copied">Link copied</string>
+    <string name="pairing_no_network_body_computer">This computer needs to be on a network to show a pairing code.</string>
+    <string name="pairing_approve_body_computer">It will be able to send its photos and videos to this computer.</string>
+    <string name="pairing_producer_title_computer">Pair with receiving device</string>
+    <string name="pairing_producer_instructions_computer">On the receiving device, open MediaSync, choose Add sending device, then Copy link (on a phone: Share pairing link, and send it to this computer). Then paste the link here.</string>
+    <string name="pairing_paste_link_computer">Paste the receiver's link</string>
+    <string name="pairing_not_a_link_computer">The clipboard holds no MediaSync pairing link. Copy it on the receiving device first.</string>
+    <string name="pairing_confirm_body_computer">Only continue if %1$s is your own receiving device: this computer will send its photos and videos to it.</string>
+    <string name="pairing_problem_declined_computer">The receiving device didn't allow this computer.</string>
+    <string name="pairing_problem_expired_computer">This link has expired or was already used. Copy a new one on the receiving device.</string>
+    <string name="pairing_problem_no_answer_computer">Nobody tapped Allow on the receiving device in time.</string>
+    <string name="pairing_problem_unreachable_computer">Couldn't reach the receiving device. Check that both devices are on the same network.</string>
+    <string name="pairing_problem_incompatible_computer">The devices run different MediaSync versions. Update the app on both.</string>
 </resources>

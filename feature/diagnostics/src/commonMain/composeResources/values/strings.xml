@@ -71,4 +71,6 @@
     <string name="settings_login_intro_computer">MediaSync starts hidden in the tray, so the phones and computers that send to it can always reach this computer.</string>
     <!-- Start at login on a sending computer: the switch starts MediaSync hidden, but turning it on is up to the user. -->
     <string name="settings_login_intro_sender">On: MediaSync starts hidden in the tray at login, so your photos are sent on the schedule without you opening it. A sending computer doesn't turn this on by itself.</string>
+    <!-- The same link test on a computer (English only for now). -->
+    <string name="diagnostics_link_test_intro_computer">Measures how fast this computer can send to %1$s, with MediaSync open on it. Takes about 10 seconds.</string>
 </resources>

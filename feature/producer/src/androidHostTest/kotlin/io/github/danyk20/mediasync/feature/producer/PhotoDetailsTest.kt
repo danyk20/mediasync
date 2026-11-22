@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.producer
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import io.github.danyk20.mediasync.core.database.Peer
 import io.github.danyk20.mediasync.core.database.PeerStore
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
@@ -74,6 +76,24 @@ class PhotoDetailsTest {
         composeRule.onNodeWithText("Remove all details").performClick()
         chosen shouldBe listOf(PhotoDetails.REMOVE_ALL)
         composeRule.onAllNodesWithText("RAW photos", substring = true).fetchSemanticsNodes().size shouldBe 0
+    }
+
+    @Test
+    fun onAComputerTheDescriptionsSayComputer() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalIsComputer provides true) {
+                MediaSyncTheme(dynamicColor = false) {
+                    PhotoDetailsScreen(
+                        state = PhotoDetailsUiState(PhotoDetails.KEEP_ALL, "Pixel 2 XL"),
+                        onChoose = { chosen += it },
+                        onDone = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Photos and videos arrive exactly as they are on this computer.").assertIsDisplayed()
+        composeRule.onNodeWithText("Photos and videos arrive exactly as they are on this phone.").assertDoesNotExist()
     }
 
     @Test

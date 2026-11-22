@@ -240,7 +240,27 @@ class WindowContentTest {
             waitUntil(timeoutMillis = WAIT_MILLIS) {
                 onAllNodesWithText(SENDING_HOME_TEXT).fetchSemanticsNodes().isNotEmpty()
             }
-            onAllNodesWithText("This computer sends").fetchSemanticsNodes().isEmpty() shouldBe true
+            onAllNodesWithText("This computer receives").fetchSemanticsNodes().isEmpty() shouldBe true
+        }
+    }
+
+    @Test
+    fun aSendingComputerPairsByPastingNotByScanning() {
+        val graph = graphs.create(directory)
+        runBlocking { graph.settings.setRole(DeviceRole.PRODUCER) }
+
+        runComposeUiTest {
+            setContent { DesktopRoot(graph) }
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("Pair with receiving device").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("Pair with receiving device").performClick()
+            waitUntil(timeoutMillis = WAIT_MILLIS) {
+                onAllNodesWithText("Paste the receiver's link").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("Paste the receiver's link").assertIsDisplayed()
+            onAllNodesWithText("camera", substring = true, ignoreCase = true).fetchSemanticsNodes().isEmpty() shouldBe
+                true
         }
     }
 

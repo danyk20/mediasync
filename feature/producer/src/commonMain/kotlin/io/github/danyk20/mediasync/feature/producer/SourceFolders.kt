@@ -60,6 +60,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
+import io.github.danyk20.mediasync.core.designsystem.component.deviceText
 import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
 import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
@@ -74,6 +75,7 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_details
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_done
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_empty
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_empty_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_hint_chosen
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_hint_preset
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_intro
@@ -85,6 +87,7 @@ import io.github.danyk20.mediasync.feature.producer.generated.resources.producer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_folders_title
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_ok
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_range_backup_note
+import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_range_backup_note_computer
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_range_choose_day
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_range_from
 import io.github.danyk20.mediasync.feature.producer.generated.resources.producer_range_no_end
@@ -248,7 +251,16 @@ fun SourceFoldersScreen(
                 }
                 item { RangeChoice(state.range, onChooseRange) }
                 if (state.folders.isEmpty()) {
-                    item { Explanation(stringResource(Res.string.producer_folders_empty)) }
+                    item {
+                        Explanation(
+                            stringResource(
+                                deviceText(
+                                    Res.string.producer_folders_empty,
+                                    Res.string.producer_folders_empty_computer,
+                                ),
+                            ),
+                        )
+                    }
                 }
                 items(state.folders, key = { it.folder.path }) { choice -> FolderRow(choice, onToggle) }
             }
@@ -320,7 +332,13 @@ private fun RangeChoice(range: SendRange, onChooseRange: (SendRange) -> Unit) {
         onPick = { picking = RangeEnd.UNTIL },
     )
     Explanation(rangeNote(range))
-    if (!range.isEverything) Explanation(stringResource(Res.string.producer_range_backup_note))
+    if (!range.isEverything) {
+        Explanation(
+            stringResource(
+                deviceText(Res.string.producer_range_backup_note, Res.string.producer_range_backup_note_computer),
+            ),
+        )
+    }
     picking?.let { end ->
         DayDialog(
             end = end,

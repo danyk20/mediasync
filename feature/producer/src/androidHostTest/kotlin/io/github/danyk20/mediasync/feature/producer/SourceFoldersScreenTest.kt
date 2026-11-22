@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.feature.producer
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.media.MediaFolder
 import io.github.danyk20.mediasync.core.model.SendRange
@@ -97,6 +99,15 @@ class SourceFoldersScreenTest {
     }
 
     @Test
+    fun anEmptyComputerSaysNoFoldersAreAddedYet() {
+        show(SourceFoldersUiState.Ready(SourceSelection.Default, emptyList()), computer = true)
+
+        composeRule.onNodeWithText("No folders added yet. Add a folder with your photos and videos.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("No photos or videos on this phone yet.").assertDoesNotExist()
+    }
+
+    @Test
     fun everythingIsSentAtFirst() {
         show(cameraOnly)
         composeRule.onNodeWithText("whenever it was taken", substring = true).assertIsDisplayed()
@@ -169,16 +180,18 @@ class SourceFoldersScreenTest {
         composeRule.onRoot().captureScreenshot(name)
     }
 
-    private fun show(state: SourceFoldersUiState, darkTheme: Boolean = false) {
+    private fun show(state: SourceFoldersUiState, darkTheme: Boolean = false, computer: Boolean = false) {
         composeRule.setContent {
-            MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
-                SourceFoldersScreen(
-                    state = state,
-                    onChoosePreset = { events += "preset $it" },
-                    onToggle = { events += "toggle $it" },
-                    onDone = { events += "done" },
-                    onChooseRange = { events += "range ${it.from} ${it.until}" },
-                )
+            CompositionLocalProvider(LocalIsComputer provides computer) {
+                MediaSyncTheme(darkTheme = darkTheme, dynamicColor = false) {
+                    SourceFoldersScreen(
+                        state = state,
+                        onChoosePreset = { events += "preset $it" },
+                        onToggle = { events += "toggle $it" },
+                        onDone = { events += "done" },
+                        onChooseRange = { events += "range ${it.from} ${it.until}" },
+                    )
+                }
             }
         }
     }

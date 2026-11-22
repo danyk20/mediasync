@@ -57,6 +57,7 @@ import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagn
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_failed
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_four
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_intro_computer
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_one
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_running
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.diagnostics_link_test_start
@@ -293,7 +294,10 @@ private fun LinkTestSection(test: LinkTestUi, onTestLink: () -> Unit) {
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = stringResource(Res.string.diagnostics_link_test_intro, test.consumerName),
+            text = stringResource(
+                deviceText(Res.string.diagnostics_link_test_intro, Res.string.diagnostics_link_test_intro_computer),
+                test.consumerName,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
