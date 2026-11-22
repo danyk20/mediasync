@@ -15,7 +15,10 @@ import io.github.danyk20.mediasync.core.model.SyncSchedule
 import io.github.danyk20.mediasync.core.testing.FakeSettingsRepository
 import io.github.danyk20.mediasync.core.testing.MainDispatcherRule
 import io.github.danyk20.mediasync.core.testing.captureScreenshot
+import io.github.danyk20.mediasync.sync.android.WakeUpStatus
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 import org.junit.Rule
@@ -24,6 +27,21 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+
+/** A phone, as the schedule screen sees its device: it listens while charging, so the phone wording stays. */
+private object PhoneDevice : ConsumerDevice {
+    override fun canNotify() = true
+
+    override fun batteryRestricted() = false
+
+    override fun renewTurboKey() = Unit
+
+    override suspend fun simplifyStoredNames() = 0
+
+    override val wakeUpStatus: Flow<WakeUpStatus?> = flowOf(null)
+
+    override fun backupLine(): Flow<BackupLine?> = flowOf(null)
+}
 
 // Test names are sentences; a test class has many tests and magic numbers.
 @Suppress("FunctionNaming", "MagicNumber", "TooManyFunctions")
@@ -39,7 +57,7 @@ class SyncScheduleTest {
     val composeRule = createComposeRule()
 
     private val settings = FakeSettingsRepository()
-    private val viewModel by lazy { SyncScheduleViewModel(settings) }
+    private val viewModel by lazy { SyncScheduleViewModel(settings, PhoneDevice) }
     private val events = mutableListOf<String>()
 
     @Test

@@ -32,14 +32,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 private const val WINDOW_TITLE = "MediaSync"
 
 /** The desktop app: always the receiving role (docs/PLAN.md §9, M8). */
-fun main() {
+fun main(arguments: Array<String>) {
     val graph = createGraphFactory<DesktopGraph.Factory>().create(AppPaths.resolve())
     Diagnostics.install(graph.diagnosticLog)
     Diagnostics.logCrashes(graph.diagnosticLog::flush)
@@ -48,6 +50,8 @@ fun main() {
     val starter = startReceiving(graph, scope)
     watchNetwork(graph, scope)
     graph.folderBackup.start()
+    scope.launch(Dispatchers.IO) { runCatching { graph.startAtLogin.refreshEntry() } }
+    scope.launch(Dispatchers.IO) { graph.startAtLogin.watchProducers(sendingPhonesPaired(graph)) }
     val shutdown = AppShutdown(
         listOf(
             { runBlocking { graph.folderBackup.stop() } }, // before the database closes: a copy finishes first
@@ -58,7 +62,7 @@ fun main() {
     )
     application {
         val trayAvailable = remember { trayAvailable() }
-        var visible by remember { mutableStateOf(true) }
+        var visible by remember { mutableStateOf(!startsHidden(arguments, trayAvailable)) }
         val state by starter.state.collectAsState()
         val quit: () -> Unit = {
             visible = false // Gone at once; the shutdown runs behind it, off the UI thread.
@@ -120,6 +124,10 @@ private fun logStartProblem(message: String) {
     println("MediaSync: $message")
     Diagnostics.log(Area.APP, message)
 }
+
+/** How many sending phones are paired with this computer, as it changes. */
+private fun sendingPhonesPaired(graph: DesktopGraph): Flow<Int> =
+    graph.peerStore.observeAll().map { peers -> peers.count { it.role == DeviceRole.PRODUCER } }
 
 /** Announces again over mDNS when the computer's addresses change or it wakes up. */
 private fun watchNetwork(graph: DesktopGraph, scope: CoroutineScope) {

@@ -46,6 +46,8 @@ class DesktopConsumerDevice(private val folder: FolderBackupService) : ConsumerD
 
     override fun batteryRestricted() = false
 
+    override val listensContinuously: Boolean = true
+
     override fun renewTurboKey() = Unit
 
     override suspend fun simplifyStoredNames() = 0

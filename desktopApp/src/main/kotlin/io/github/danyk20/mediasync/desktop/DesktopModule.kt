@@ -59,6 +59,7 @@ import io.github.danyk20.mediasync.sync.engine.MediaSource
 import io.github.danyk20.mediasync.sync.engine.ReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.SentLedger
 import io.github.danyk20.mediasync.transport.lan.IdentityProvider
+import java.nio.file.Paths
 import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -147,6 +148,18 @@ interface DesktopModule {
         @Provides
         fun provideBackupOrchestrator(ledger: BackupLedger, clock: Clock): BackupOrchestrator =
             BackupOrchestrator(ledger, clock)
+
+        /** The operating system's login entries; none for a copy with its own data folder (checks and tests). */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideLoginItem(paths: AppPaths): LoginItem = if (paths.isolated) {
+            NoLoginItem
+        } else {
+            loginItemFor(System.getProperty("os.name").orEmpty(), Paths.get(System.getProperty("user.home").orEmpty()))
+        }
+
+        @Provides
+        fun provideLauncher(): Launcher = Launcher { installedLauncher() }
 
         @Provides
         fun provideFolderPicker(): FolderPicker = AwtFolderPicker()

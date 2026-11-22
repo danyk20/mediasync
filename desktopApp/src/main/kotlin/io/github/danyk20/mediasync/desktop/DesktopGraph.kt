@@ -10,6 +10,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
+import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
 import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
@@ -31,6 +32,8 @@ interface DesktopGraph : ViewModelGraph {
     val discovery: DesktopServiceDiscovery
     val network: DesktopLocalNetwork
     val database: MediaSyncDatabase
+    val peerStore: PeerStore
+    val startAtLogin: DesktopStartAtLogin
     val viewModelFactory: MetroViewModelFactory
 
     @DependencyGraph.Factory

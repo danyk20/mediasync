@@ -20,6 +20,9 @@ interface ConsumerDevice {
     /** Whether battery use is restricted for MediaSync, which receive windows at night can't have. */
     fun batteryRestricted(): Boolean
 
+    /** Whether this device receives whenever the app runs, not only in the windows a schedule gives (a computer). */
+    val listensContinuously: Boolean get() = false
+
     /** Replaces the *Turbo receive* key after a sending phone was removed, so it can't find this phone any more. */
     fun renewTurboKey()
 

@@ -70,6 +70,10 @@ import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.setti
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size_invalid
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_size_save
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_log_title
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_intro
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_not_installed
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_switch
+import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_login_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_reset_intro
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_reset_title
 import io.github.danyk20.mediasync.feature.diagnostics.generated.resources.settings_title
@@ -100,6 +104,8 @@ data class SettingsUiState(
     val sendAnimation: Boolean = true,
     /** Installed from GitHub only: from Google Play, Play updates it. */
     val updates: UpdatesUi? = null,
+    /** A computer only: whether MediaSync starts at login. `null` where there is no such setting. */
+    val startAtLogin: StartAtLoginState? = null,
 ) {
     /** A valid size that isn't the one kept now. */
     val canSaveLogSize: Boolean get() = !logSizeInvalid && logSize.isNotBlank() && logSize != savedLogSize
@@ -123,7 +129,11 @@ sealed interface UpdateCheck {
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
 @Inject
-class SettingsViewModel(private val settings: SettingsRepository, private val releases: Releases) : ViewModel() {
+class SettingsViewModel(
+    private val settings: SettingsRepository,
+    private val releases: Releases,
+    private val startup: LoginStartup,
+) : ViewModel() {
     private val state = MutableStateFlow(
         SettingsUiState(updates = UpdatesUi(releases.installed()).takeUnless { releases.fromPlay() }),
     )
@@ -144,6 +154,11 @@ class SettingsViewModel(private val settings: SettingsRepository, private val re
         viewModelScope.launch {
             settings.sendAnimation.collect { on -> state.update { it.copy(sendAnimation = on) } }
         }
+        viewModelScope.launch { state.update { it.copy(startAtLogin = startup.state()) } }
+    }
+
+    fun onStartAtLoginChange(on: Boolean) {
+        viewModelScope.launch { state.update { it.copy(startAtLogin = startup.set(on)) } }
     }
 
     fun onSendAnimationChange(on: Boolean) {
@@ -197,6 +212,7 @@ fun SettingsRoute(onDone: () -> Unit, modifier: Modifier = Modifier, viewModel: 
         onLogSizeChange = viewModel::onLogSizeChange,
         onSaveLogSize = viewModel::saveLogSize,
         onSendAnimation = viewModel::onSendAnimationChange,
+        onStartAtLogin = viewModel::onStartAtLoginChange,
         onCheckUpdates = viewModel::checkForUpdates,
         onOpenRelease = { links.openUri(it) },
         onReset = reset,
@@ -221,6 +237,7 @@ fun SettingsScreen(
     onCheckUpdates: () -> Unit = {},
     onOpenRelease: (String) -> Unit = {},
     onSendAnimation: (Boolean) -> Unit = {},
+    onStartAtLogin: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -242,6 +259,10 @@ fun SettingsScreen(
             LogSizeSection(state, onLogSizeChange, onSaveLogSize)
             HorizontalDivider()
             SendAnimationSection(state.sendAnimation, onSendAnimation)
+            state.startAtLogin?.let {
+                HorizontalDivider()
+                StartAtLoginSection(it, onStartAtLogin)
+            }
             state.updates?.let {
                 HorizontalDivider()
                 UpdatesSection(it, onCheckUpdates, onOpenRelease)
@@ -304,6 +325,33 @@ private fun SendAnimationSection(on: Boolean, onChange: (Boolean) -> Unit) {
             headlineContent = { Text(stringResource(Res.string.settings_animation_switch)) },
             supportingContent = { Text(stringResource(Res.string.settings_animation_intro)) },
             trailingContent = { Switch(checked = on, onCheckedChange = null) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** A computer's *Start at login*: on by default once installed; a copy that is not installed says why it cannot. */
+@Composable
+private fun StartAtLoginSection(login: StartAtLoginState, onChange: (Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(Res.string.settings_login_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        ListItem(
+            modifier = if (login.canChange) {
+                Modifier.toggleable(value = login.on, role = Role.Switch, onValueChange = onChange)
+            } else {
+                Modifier
+            },
+            headlineContent = { Text(stringResource(Res.string.settings_login_switch)) },
+            supportingContent = {
+                val intro = Res.string.settings_login_intro
+                val why = Res.string.settings_login_not_installed
+                Text(stringResource(if (login.canChange) intro else why))
+            },
+            trailingContent = { Switch(checked = login.on, onCheckedChange = null, enabled = login.canChange) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
