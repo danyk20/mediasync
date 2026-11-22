@@ -1,0 +1,675 @@
+/*
+ * Copyright 2026 The MediaSync Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.danyk20.mediasync.feature.consumer
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.danyk20.mediasync.core.datastore.SetupPrompt
+import io.github.danyk20.mediasync.core.designsystem.component.BackgroundSetupNotices
+import io.github.danyk20.mediasync.core.designsystem.component.MoreMenu
+import io.github.danyk20.mediasync.core.designsystem.component.NoticeCard
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedPoint
+import io.github.danyk20.mediasync.core.designsystem.component.SpeedSheet
+import io.github.danyk20.mediasync.core.designsystem.component.StatusCard
+import io.github.danyk20.mediasync.core.designsystem.component.StatusTone
+import io.github.danyk20.mediasync.core.designsystem.component.TransferRateRow
+import io.github.danyk20.mediasync.core.designsystem.component.formatBytes
+import io.github.danyk20.mediasync.core.designsystem.component.scheduleSummary
+import io.github.danyk20.mediasync.core.designsystem.component.transferRate
+import io.github.danyk20.mediasync.core.designsystem.icon.MediaSyncIcons
+import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
+import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.SyncSchedule
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.Res
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_add_producer
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_off
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_on
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_open
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_backup_row_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_cancel
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_home_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_off
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_on
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_relay
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_row_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_internet_set_up
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_names_row_off
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_names_row_on
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_names_row_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_described
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producer_remove_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_producers_heading
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_received_count
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_change
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_schedule_row_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_offline_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_offline_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_ready_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_ready_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_receiving_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_receiving_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_status_waiting_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_didnt_fit_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_didnt_fit_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_full_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_full_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_storage_open
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_allow
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_location_off
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_location_settings
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_open_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_open_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_start
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_stop
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_waiting_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receive_waiting_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_receiving_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_screen_allow
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_screen_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_screen_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_turbo_title
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_waiting
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_wake_ups_failing_body
+import io.github.danyk20.mediasync.feature.consumer.generated.resources.consumer_wake_ups_failing_title
+import io.github.danyk20.mediasync.sync.android.RelayLevel
+import io.github.danyk20.mediasync.sync.android.RelayUsage
+import io.github.danyk20.mediasync.sync.android.TurboAvailability
+import io.github.danyk20.mediasync.sync.android.level
+import java.text.NumberFormat
+import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ConsumerHomeRoute(
+    onAddProducer: () -> Unit,
+    onChangeSchedule: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSetUpInternet: () -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
+    viewModel: ConsumerHomeViewModel = metroViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val system = rememberConsumerSystemActions(
+        onNotificationsAnswer = { granted ->
+            if (!granted) viewModel.dismiss(SetupPrompt.NOTIFICATIONS) // Declined: don't ask again.
+            viewModel.refresh()
+        },
+        onTurboAnswer = viewModel::onTurboAnswered,
+        onTurboReceiveAnswer = { allGranted ->
+            viewModel.refresh()
+            if (allGranted) viewModel.startTurboReceive()
+        },
+    )
+    // Back from settings, or space freed up meanwhile.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose {}
+    }
+    // The chart of the sending phone shown, until dismissed.
+    var showSpeedsOf by rememberSaveable { mutableStateOf<String?>(null) }
+    showSpeedsOf?.let { SpeedHistorySheet(viewModel.speedHistory, it, onDismiss = { showSpeedsOf = null }) }
+    ConsumerHomeScreen(
+        state = state,
+        onAddProducer = onAddProducer,
+        onShowSpeeds = { showSpeedsOf = it.hex },
+        onChangeSchedule = onChangeSchedule,
+        modifier = modifier,
+        onSetUpInternet = onSetUpInternet,
+        onOpenBackup = onOpenBackup,
+        onRemoveProducer = { viewModel.removeProducer(it.id) },
+        onSimpleFileNames = viewModel::setSimpleFileNames,
+        onAllowNotifications = system.requestNotifications,
+        onOpenSettings = system.openAppSettings,
+        onOpenStorage = system.openStorageSettings,
+        onDismiss = viewModel::dismiss,
+        onOpenMediaSyncSettings = onOpenMediaSyncSettings,
+        onOpenDiagnostics = onOpenDiagnostics,
+        onAllowTurbo = {
+            if (state.turbo == TurboAvailability.LOCATION_OFF) {
+                system.openLocationSettings()
+                viewModel.onTurboAnswered()
+            } else {
+                system.requestTurbo()
+            }
+        },
+        onDismissTurbo = viewModel::onTurboAnswered,
+        onStartTurboReceive = {
+            when (state.turbo) {
+                TurboAvailability.NOT_ALLOWED -> system.requestTurboReceive()
+                TurboAvailability.LOCATION_OFF -> system.openLocationSettings()
+                else -> viewModel.startTurboReceive()
+            }
+        },
+        onStopTurboReceive = viewModel::stopTurboReceive,
+        onAllowTurboScreen = system.openDisplayOverOtherApps,
+    )
+}
+
+/** The chart of the sending phone [producer] (its id in hex), followed while it's open. */
+@Composable
+private fun SpeedHistorySheet(
+    history: StateFlow<Map<DeviceId, List<SpeedPoint>>>,
+    producer: String,
+    onDismiss: () -> Unit,
+) {
+    val speeds by history.collectAsStateWithLifecycle()
+    SpeedSheet(speeds.entries.firstOrNull { it.key.hex == producer }?.value.orEmpty(), onDismiss = onDismiss)
+}
+
+/** Home screen of the phone that receives. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConsumerHomeScreen(
+    state: ConsumerHomeUiState,
+    onAddProducer: () -> Unit,
+    onChangeSchedule: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSetUpInternet: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
+    onRemoveProducer: (PairedPhone) -> Unit = {},
+    onSimpleFileNames: (Boolean) -> Unit = {},
+    onShowSpeeds: (DeviceId) -> Unit = {},
+    onAllowNotifications: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenStorage: () -> Unit = {},
+    onDismiss: (SetupPrompt) -> Unit = {},
+    onOpenMediaSyncSettings: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
+    onAllowTurbo: () -> Unit = {},
+    onDismissTurbo: () -> Unit = {},
+    onStartTurboReceive: () -> Unit = {},
+    onStopTurboReceive: () -> Unit = {},
+    onAllowTurboScreen: () -> Unit = {},
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(Res.string.consumer_home_title)) },
+                actions = { MoreMenu(onOpenSettings = onOpenMediaSyncSettings, onOpenDiagnostics = onOpenDiagnostics) },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Status(state, onShowSpeeds)
+            if (state.turboReceiving && state.transfer == null) {
+                OutlinedButton(onClick = onStopTurboReceive, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(Res.string.consumer_turbo_receive_stop))
+                }
+            }
+            Button(onClick = onAddProducer, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.consumer_add_producer))
+            }
+            StorageNotice(state, onOpenStorage)
+            TurboNotice(state, onAllowTurbo, onDismissTurbo)
+            TurboScreenNotice(state.askTurboScreen, onAllowTurboScreen) { onDismiss(SetupPrompt.TURBO_SCREEN) }
+            BackgroundSetupNotices(
+                askNotifications = state.askNotifications,
+                askBattery = state.askBattery,
+                onAllowNotifications = onAllowNotifications,
+                onOpenBatterySettings = onOpenSettings,
+                onDismissNotifications = { onDismiss(SetupPrompt.NOTIFICATIONS) },
+                onDismissBattery = { onDismiss(SetupPrompt.BATTERY) },
+            )
+            ScheduleRow(state.schedule, onChangeSchedule)
+            WakeUpNotice(state.wakeUpProblem, onSetUpInternet)
+            InternetRow(state.internetSync, state.relay, onSetUpInternet)
+            state.backup?.let { BackupRow(it, onOpenBackup) }
+            FileNamesRow(state.simpleFileNames, onSimpleFileNames)
+            TurboReceiveRow(state, onStartTurboReceive)
+            if (state.producers.isNotEmpty()) Producers(state.producers, onRemoveProducer)
+            Text(
+                text = pluralStringResource(
+                    Res.plurals.consumer_received_count,
+                    state.receivedCount,
+                    state.receivedCount,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** A sending phone asked for Turbo transfer (docs/PLAN.md §8.3), which needs something allowed here first. */
+@Composable
+private fun TurboNotice(state: ConsumerHomeUiState, onAllowTurbo: () -> Unit, onDismissTurbo: () -> Unit) {
+    if (!state.askTurbo) return
+    val locationOff = state.turbo == TurboAvailability.LOCATION_OFF
+    NoticeCard(
+        title = stringResource(Res.string.consumer_turbo_title),
+        body = stringResource(
+            if (locationOff) Res.string.consumer_turbo_location_off else Res.string.consumer_turbo_body,
+        ),
+        icon = MediaSyncIcons.Turbo,
+        action = stringResource(
+            if (locationOff) Res.string.consumer_turbo_location_settings else Res.string.consumer_turbo_allow,
+        ),
+        onAction = onAllowTurbo,
+        onDismiss = onDismissTurbo,
+    )
+}
+
+/**
+ * Before Android 13, a Turbo link needs MediaSync on screen (docs/PLAN.md §8.3): allowed to display over other apps, it
+ * shows itself when a sending phone asks, even with the screen off.
+ */
+@Composable
+private fun TurboScreenNotice(ask: Boolean, onAllow: () -> Unit, onDismiss: () -> Unit) {
+    if (!ask) return
+    NoticeCard(
+        title = stringResource(Res.string.consumer_turbo_screen_title),
+        body = stringResource(Res.string.consumer_turbo_screen_body),
+        icon = MediaSyncIcons.Turbo,
+        action = stringResource(Res.string.consumer_turbo_screen_allow),
+        onAction = onAllow,
+        onDismiss = onDismiss,
+    )
+}
+
+/**
+ * *Turbo receive* (docs/PLAN.md §8.3): for a sending phone that isn't on this Wi-Fi. Offered while there are sending
+ * phones, nothing is coming in, and this phone has Wi-Fi Direct.
+ */
+@Composable
+private fun TurboReceiveRow(state: ConsumerHomeUiState, onStart: () -> Unit) {
+    val offered = state.producers.isNotEmpty() && state.transfer == null && !state.directLinkOpen &&
+        !state.askTurbo && state.turbo != TurboAvailability.UNSUPPORTED
+    if (!offered) return
+    val locationOff = state.turbo == TurboAvailability.LOCATION_OFF
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            modifier = Modifier.clickable(onClick = onStart),
+            headlineContent = { Text(stringResource(Res.string.consumer_turbo_receive_title)) },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        if (locationOff) {
+                            Res.string.consumer_turbo_location_off
+                        } else {
+                            Res.string.consumer_turbo_receive_body
+                        },
+                    ),
+                )
+            },
+            leadingContent = { Icon(painterResource(MediaSyncIcons.Turbo), contentDescription = null) },
+            trailingContent = {
+                Text(
+                    text = stringResource(
+                        if (locationOff) {
+                            Res.string.consumer_turbo_location_settings
+                        } else {
+                            Res.string.consumer_turbo_receive_start
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun Status(state: ConsumerHomeUiState, onShowSpeeds: (DeviceId) -> Unit) {
+    val transfer = state.transfer
+    when {
+        transfer != null -> Receiving(transfer, overTurbo = state.directLinkOpen, onShowSpeeds = onShowSpeeds)
+
+        state.turboReceiving -> StatusCard(
+            title = stringResource(Res.string.consumer_turbo_receive_waiting_title),
+            body = stringResource(Res.string.consumer_turbo_receive_waiting_body),
+            icon = MediaSyncIcons.Turbo,
+            tone = StatusTone.Positive,
+        )
+
+        state.directLinkOpen -> StatusCard(
+            title = stringResource(Res.string.consumer_turbo_open_title),
+            body = stringResource(Res.string.consumer_turbo_open_body),
+            icon = MediaSyncIcons.Turbo,
+        )
+
+        !state.listening -> StatusCard(
+            title = stringResource(Res.string.consumer_status_offline_title),
+            body = stringResource(Res.string.consumer_status_offline_body),
+            icon = MediaSyncIcons.Info,
+        )
+
+        state.producers.isEmpty() -> StatusCard(
+            title = stringResource(Res.string.consumer_status_ready_title),
+            body = stringResource(Res.string.consumer_status_ready_body),
+            icon = MediaSyncIcons.Receive,
+        )
+
+        else -> StatusCard(
+            title = stringResource(Res.string.consumer_status_ready_title),
+            body = stringResource(Res.string.consumer_status_waiting_body),
+            icon = MediaSyncIcons.Receive,
+            tone = StatusTone.Positive,
+        )
+    }
+}
+
+/** Who is sending, and how far it got; [overTurbo] while a direct link is open. */
+@Composable
+private fun Receiving(transfer: IncomingTransfer, overTurbo: Boolean, onShowSpeeds: (DeviceId) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatusCard(
+            title = stringResource(
+                if (overTurbo) {
+                    Res.string.consumer_turbo_receiving_title
+                } else {
+                    Res.string.consumer_status_receiving_title
+                },
+                transfer.producerName,
+            ),
+            body = stringResource(
+                Res.string.consumer_status_receiving_body,
+                transfer.itemsDone,
+                transfer.itemsTotal,
+                formatBytes(transfer.bytesDone),
+                formatBytes(transfer.bytesTotal),
+            ),
+            icon = if (overTurbo) MediaSyncIcons.Turbo else MediaSyncIcons.Receive,
+            tone = StatusTone.Positive,
+        )
+        LinearProgressIndicator(
+            progress = {
+                if (transfer.bytesTotal == 0L) 0f else transfer.bytesDone.toFloat() / transfer.bytesTotal
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // The speed only: this phone learns how much is coming batch by batch, so it can't tell the time left.
+        TransferRateRow(
+            text = transferRate(transfer.bytesPerSecond, secondsLeft = null),
+            onShowSpeeds = { transfer.producerId?.let(onShowSpeeds) },
+        )
+    }
+}
+
+/** The storage guard (docs/PLAN.md §2.2): receiving stops when this phone runs out of space. */
+@Composable
+private fun StorageNotice(state: ConsumerHomeUiState, onOpenStorage: () -> Unit) {
+    val waiting = state.waitingForSpace
+    when {
+        state.storageFull -> NoticeCard(
+            title = stringResource(Res.string.consumer_storage_full_title),
+            body = stringResource(Res.string.consumer_storage_full_body) +
+                if (waiting > 0) " " + pluralStringResource(Res.plurals.consumer_waiting, waiting, waiting) else "",
+            icon = MediaSyncIcons.Warning,
+            action = stringResource(Res.string.consumer_storage_open),
+            onAction = onOpenStorage,
+            warning = true,
+        )
+
+        waiting > 0 -> NoticeCard(
+            title = stringResource(Res.string.consumer_storage_didnt_fit_title),
+            body = pluralStringResource(Res.plurals.consumer_storage_didnt_fit_body, waiting, waiting),
+            icon = MediaSyncIcons.Warning,
+            action = stringResource(Res.string.consumer_storage_open),
+            onAction = onOpenStorage,
+        )
+    }
+}
+
+/**
+ * Sending phones can't wake this phone over the internet (docs/PLAN.md §10.4): they reach it only while MediaSync is
+ * open here. Setting up internet sync again deploys the Worker anew, which fixes what a Worker can.
+ */
+@Composable
+private fun WakeUpNotice(problem: String?, onSetUpInternet: () -> Unit) {
+    if (problem == null) return
+    NoticeCard(
+        title = stringResource(Res.string.consumer_wake_ups_failing_title),
+        body = stringResource(Res.string.consumer_wake_ups_failing_body, problem),
+        icon = MediaSyncIcons.Warning,
+        action = stringResource(Res.string.consumer_internet_row_title),
+        onAction = onSetUpInternet,
+        warning = true,
+    )
+}
+
+/** When the sending phones sync, and the way to change it. */
+@Composable
+private fun ScheduleRow(schedule: SyncSchedule, onChangeSchedule: () -> Unit) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            modifier = Modifier.clickable(onClick = onChangeSchedule),
+            headlineContent = { Text(stringResource(Res.string.consumer_schedule_row_title)) },
+            supportingContent = { Text(scheduleSummary(schedule)) },
+            trailingContent = {
+                Text(
+                    text = stringResource(Res.string.consumer_schedule_change),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** Cloud backup (docs/PLAN.md §9.3.1): whether, and by what, what's received is backed up. */
+@Composable
+private fun BackupRow(backup: BackupLine, onOpen: () -> Unit) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            modifier = Modifier.clickable(onClick = onOpen),
+            headlineContent = { Text(stringResource(Res.string.consumer_backup_row_title)) },
+            supportingContent = {
+                Text(
+                    when (backup) {
+                        BackupLine.Off -> stringResource(Res.string.consumer_backup_row_off)
+
+                        is BackupLine.On -> stringResource(
+                            Res.string.consumer_backup_row_on,
+                            backup.app,
+                            NumberFormat.getIntegerInstance().format(backup.today),
+                        )
+                    },
+                )
+            },
+            trailingContent = {
+                val action = if (backup is BackupLine.On) {
+                    Res.string.consumer_backup_row_open
+                } else {
+                    Res.string.consumer_internet_set_up
+                }
+                Text(
+                    text = stringResource(action),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** *Simple file names* (docs/PLAN.md §9.3.1): a received file's name keeps only its last dot. */
+@Composable
+private fun FileNamesRow(on: Boolean, onChange: (Boolean) -> Unit) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            // The whole row toggles, and reads out as one switch.
+            modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = onChange),
+            headlineContent = { Text(stringResource(Res.string.consumer_names_row_title)) },
+            supportingContent = {
+                Text(stringResource(if (on) Res.string.consumer_names_row_on else Res.string.consumer_names_row_off))
+            },
+            trailingContent = { Switch(checked = on, onCheckedChange = null) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+/** Internet sync (docs/PLAN.md §8.4): whether sending phones away from this Wi-Fi can sync. */
+@Composable
+private fun InternetRow(on: Boolean, relay: RelayUsage?, onSetUp: () -> Unit) {
+    // The row, not the card, takes the tap: the list item groups its text, so the card had none to read out.
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            modifier = Modifier.clickable(onClick = onSetUp),
+            headlineContent = { Text(stringResource(Res.string.consumer_internet_row_title)) },
+            supportingContent = {
+                Column {
+                    Text(
+                        stringResource(
+                            if (on) Res.string.consumer_internet_row_on else Res.string.consumer_internet_row_off,
+                        ),
+                    )
+                    // The one-line meter (docs/PLAN.md §8.5): accented from 80 %, red once the relay stopped.
+                    relay?.let {
+                        Text(
+                            text = stringResource(
+                                Res.string.consumer_internet_row_relay,
+                                gigabytes(it.usedBytes),
+                                gigabytes(it.freeBytes),
+                            ),
+                            color = when (it.level) {
+                                RelayLevel.FINE -> MaterialTheme.colorScheme.onSurfaceVariant
+                                RelayLevel.HIGH, RelayLevel.NEARLY_USED_UP -> MaterialTheme.colorScheme.tertiary
+                                RelayLevel.USED_UP -> MaterialTheme.colorScheme.error
+                            },
+                        )
+                    }
+                }
+            },
+            trailingContent = {
+                Text(
+                    text = stringResource(
+                        if (on) Res.string.consumer_schedule_change else Res.string.consumer_internet_set_up,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun Producers(phones: List<PairedPhone>, onRemove: (PairedPhone) -> Unit) {
+    var removing by remember { mutableStateOf<PairedPhone?>(null) }
+    Column {
+        Text(
+            text = stringResource(Res.string.consumer_producers_heading),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .padding(vertical = 8.dp)
+                .semantics { heading() },
+        )
+        phones.forEachIndexed { index, phone ->
+            if (index > 0) HorizontalDivider()
+            // TalkBack says which phone: "Remove Anna's Pixel".
+            val described = stringResource(Res.string.consumer_producer_remove_described, phone.name)
+            ListItem(
+                headlineContent = { Text(phone.name) },
+                trailingContent = {
+                    TextButton(
+                        onClick = { removing = phone },
+                        modifier = Modifier.semantics { contentDescription = described },
+                    ) { Text(stringResource(Res.string.consumer_producer_remove)) }
+                },
+            )
+        }
+    }
+    removing?.let { phone ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(Res.string.consumer_producer_remove_title, phone.name)) },
+            text = { Text(stringResource(Res.string.consumer_producer_remove_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    removing = null
+                    onRemove(phone)
+                }) {
+                    Text(stringResource(Res.string.consumer_producer_remove), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { removing = null }) { Text(stringResource(Res.string.consumer_cancel)) }
+            },
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun ConsumerHomeScreenPreview() {
+    MediaSyncTheme(dynamicColor = false) {
+        ConsumerHomeScreen(
+            state = ConsumerHomeUiState(
+                listening = true,
+                transfer = IncomingTransfer("Anna's Pixel", 12, 40, 145_000_000, 830_000_000),
+                producers = listOf(PairedPhone(DeviceId.of(ByteArray(32) { 1 }), "Anna's Pixel")),
+                receivedCount = 1234,
+            ),
+            onAddProducer = {},
+            onChangeSchedule = {},
+        )
+    }
+}
