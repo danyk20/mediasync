@@ -200,9 +200,11 @@ jobs:
       - name: Build the installer
         shell: bash
         run: scripts/gradlew-retrying.sh ${{ matrix.tasks }}
-      # The app must carry at least an ad-hoc signature, or Apple Silicon refuses to start it at all.
+      # On Apple silicon the app must carry at least an ad-hoc signature, or macOS refuses to start it at all (the
+      # build adds one there). Intel Macs start an unsigned app the same way ("Open Anyway"), and the Intel build
+      # doesn't sign it, so the check is for Apple silicon only.
       - name: Check the macOS app is signed (ad hoc)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
         run: |
           app=desktopApp/build/compose/binaries/main/app/MediaSync.app
           codesign --verify --deep --strict --verbose=2 "$app"
