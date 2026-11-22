@@ -32,6 +32,10 @@ class FakeSettingsRepository(
         roleState.value = role
     }
 
+    override suspend fun clearRole() {
+        roleState.value = null
+    }
+
     override val sourceSelection: StateFlow<SourceSelection> = sourceSelectionState
 
     override suspend fun setSourceSelection(selection: SourceSelection) {

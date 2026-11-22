@@ -59,6 +59,18 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun clearingTheRoleAsksAgain() {
+        runTest {
+            val repository = DataStoreSettingsRepository(dataStore())
+            repository.setRole(DeviceRole.PRODUCER)
+
+            repository.clearRole()
+
+            repository.role.first().shouldBeNull()
+        }
+    }
+
+    @Test
     fun treatsAnUnknownStoredRoleAsNotChosen() = runTest {
         val dataStore = dataStore()
         dataStore.edit { it[DataStoreSettingsRepository.RoleKey] = "ROLE_FROM_A_NEWER_VERSION" }

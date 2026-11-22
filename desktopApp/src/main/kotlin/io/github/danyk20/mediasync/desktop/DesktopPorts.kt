@@ -41,20 +41,3 @@ class DesktopDeviceInfo(private val settings: SettingsRepository) : DeviceInfo {
 object AppVersion {
     val current: String = DesktopDeviceInfo::class.java.getPackage()?.implementationVersion ?: "0.0.0-dev"
 }
-
-/** The computer sends nothing: its library is empty. */
-@Inject
-class NoMediaSource : MediaSource {
-    override fun items(): List<SourceItem> = emptyList()
-
-    override fun open(item: SourceItem): Source = throw UnsupportedOperationException("The desktop app sends nothing")
-
-    override fun openRanges(item: SourceItem): RangeReader =
-        throw UnsupportedOperationException("The desktop app sends nothing")
-}
-
-/** Nothing records syncs here: only a sending phone has a history. */
-@Inject
-class DesktopSyncRecorder : SyncRecorder {
-    override fun recordSync(atMillis: Long, waitingForSpace: Int) = Unit
-}

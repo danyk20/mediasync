@@ -22,6 +22,7 @@ import io.github.danyk20.mediasync.connector.ConnectorRegistry
 import io.github.danyk20.mediasync.connector.folder.FolderConnectorFactory
 import io.github.danyk20.mediasync.core.database.BackupDao
 import io.github.danyk20.mediasync.core.database.LeftOutStore
+import io.github.danyk20.mediasync.core.database.MediaFingerprintDao
 import io.github.danyk20.mediasync.core.database.MediaSyncDatabase
 import io.github.danyk20.mediasync.core.database.PeerStore
 import io.github.danyk20.mediasync.core.database.ReceivedItemDao
@@ -30,6 +31,8 @@ import io.github.danyk20.mediasync.core.database.RoomSentLedger
 import io.github.danyk20.mediasync.core.datastore.SettingsRepository
 import io.github.danyk20.mediasync.core.datastore.createSettingsDataStore
 import io.github.danyk20.mediasync.core.diagnostics.FileDiagnosticLog
+import io.github.danyk20.mediasync.core.media.MediaLibrary
+import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.feature.consumer.CloudflareOAuthClient
 import io.github.danyk20.mediasync.platform.desktop.DesktopDeviceConditions
 import io.github.danyk20.mediasync.platform.desktop.DesktopIdentityProvider
@@ -37,6 +40,8 @@ import io.github.danyk20.mediasync.platform.desktop.DesktopLocalNetwork
 import io.github.danyk20.mediasync.platform.desktop.DesktopMediaSink
 import io.github.danyk20.mediasync.platform.desktop.DesktopServiceDiscovery
 import io.github.danyk20.mediasync.platform.desktop.FileSecretStore
+import io.github.danyk20.mediasync.platform.desktop.FolderMediaLibrary
+import io.github.danyk20.mediasync.platform.desktop.FolderMediaSource
 import io.github.danyk20.mediasync.platform.desktop.KeyringSecretStore
 import io.github.danyk20.mediasync.platform.desktop.SecretStore
 import io.github.danyk20.mediasync.sync.android.AddressProvider
@@ -64,6 +69,8 @@ import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toOkioPath
 
 /** Lives as long as the app: sync work outlives individual screens. */
@@ -73,8 +80,8 @@ annotation class ApplicationScope
 
 /**
  * What the shared modules need from the computer, as the Android app's storage and sync modules give the phone: the
- * files under [AppPaths], and the desktop implementation of every port the receiving
- * side and the screens use. The sending side's ports are inert: the desktop only receives (docs/PLAN.md §9, M8).
+ * files under [AppPaths], and the desktop implementation of every port the receiving and the sending side and the
+ * screens use (docs/PLAN.md §9, M8 and M9). What runs depends on the role ([RoleLifecycle]).
  */
 @ContributesTo(AppScope::class)
 @BindingContainer
@@ -102,9 +109,6 @@ interface DesktopModule {
     val DesktopDeviceInfo.bindDeviceInfo: DeviceInfo
 
     @Binds
-    val NoMediaSource.bindMediaSource: MediaSource
-
-    @Binds
     val RoomSentLedger.bindSentLedger: SentLedger
 
     @Binds
@@ -128,6 +132,79 @@ interface DesktopModule {
         /** No sign-in with Cloudflare on a computer yet: an empty client turns it off. */
         @Provides
         fun provideCloudflareOAuthClient(): CloudflareOAuthClient = CloudflareOAuthClient("", "")
+
+        /** The folders the user chose; the isolated copies (tests, checks) offer no default folders. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideDesktopFolders(
+            settings: SettingsRepository,
+            store: DataStore<Preferences>,
+            paths: AppPaths,
+        ): DesktopFolders = DesktopFolders(
+            settings,
+            store,
+            if (paths.isolated) {
+                emptyList()
+            } else {
+                DesktopFolders.defaultsIn(Paths.get(System.getProperty("user.home").orEmpty()))
+            },
+        )
+
+        /** What a sending computer sends: the chosen folders and days; fingerprints are kept in the database. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideMediaSource(
+            folders: DesktopFolders,
+            settings: SettingsRepository,
+            dao: MediaFingerprintDao,
+        ): MediaSource = FolderMediaSource(
+            folders = folders::chosen,
+            range = { runBlocking { settings.sendRange.first() } },
+            cache = RoomFingerprintCache(dao),
+        )
+
+        /** The folder list of the sending computer. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideMediaLibrary(folders: DesktopFolders): MediaLibrary =
+            FolderMediaLibrary(folders.changes, folders::candidates)
+
+        @Provides
+        @SingleIn(AppScope::class)
+        @Suppress("LongParameterList") // Collaborators, one each.
+        fun provideReceivingPart(
+            receiver: ConsumerReceiver,
+            folderBackup: FolderBackupService,
+            startAtLogin: DesktopStartAtLogin,
+            peers: PeerStore,
+            network: DesktopLocalNetwork,
+            discovery: DesktopServiceDiscovery,
+        ): ReceivingPart =
+            ReceivingPart(receiver, folderBackup, startAtLogin, peers, network, discovery, ::logStartProblem)
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideSendingPart(sync: ProducerSync, identity: IdentityProvider): SendingPart =
+            SendingPart(sync, identity, ::logStartProblem)
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideRoleLifecycle(
+            settings: SettingsRepository,
+            receiving: ReceivingPart,
+            sending: SendingPart,
+        ): RoleLifecycle = RoleLifecycle(
+            settings.role,
+            mapOf(DeviceRole.CONSUMER to receiving, DeviceRole.PRODUCER to sending),
+            ::logStartProblem,
+        )
+
+        @Provides
+        fun provideDesktopReset(
+            settings: DataStore<Preferences>,
+            database: MediaSyncDatabase,
+            history: DesktopSyncRecorder,
+        ): DesktopReset = DesktopReset(settings, database, history)
 
         /** The folder connector is the computer's only backup connector. */
         @Provides

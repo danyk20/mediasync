@@ -58,7 +58,7 @@ class AwtFolderPicker : FolderPicker {
     }
 
     private companion object {
-        const val TITLE = "Choose the backup folder"
+        const val TITLE = "Choose a folder"
         const val DIRECTORIES_PROPERTY = "apple.awt.fileDialogForDirectories"
     }
 }

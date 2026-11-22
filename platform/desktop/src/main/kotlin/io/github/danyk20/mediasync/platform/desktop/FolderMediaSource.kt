@@ -47,7 +47,7 @@ import okio.source
  *   in the future (a wrong camera clock) doesn't count as recent.
  *
  * What was read about a file is kept until its size or modification time changes, so a listing of an unchanged library
- * reads no file contents.
+ * reads no file contents. The fingerprints, which take the longest, are also kept in [cache], across restarts.
  */
 class FolderMediaSource(
     private val folders: () -> Set<Path>,
@@ -55,6 +55,7 @@ class FolderMediaSource(
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
     private val clock: () -> Long = System::currentTimeMillis,
     private val settleMillis: Long = SETTLE_MILLIS,
+    private val cache: FingerprintCache = FingerprintCache.None,
 ) : MediaSource {
 
     /** What was read about one file: [fingerprint] only once the file was in range. */
@@ -97,9 +98,12 @@ class FolderMediaSource(
             ?: read(file, zone).also { known[file.path] = it }
         val mimeType = info.mimeType ?: return null
         if (info.dateMillis !in (start ?: Long.MIN_VALUE) until (end ?: Long.MAX_VALUE)) return null
-        val fingerprint = info.fingerprint ?: channelOf(file.path).use { channel ->
-            Fingerprints.of(file.size) { offset, count -> channel.readFully(offset, count) }
-        }.also { info.fingerprint = it }
+        val fingerprint = info.fingerprint
+            ?: cache.get(file.path.toString(), file.size, file.modifiedAtMillis)
+            ?: channelOf(file.path).use { channel ->
+                Fingerprints.of(file.size) { offset, count -> channel.readFully(offset, count) }
+            }.also { cache.put(file.path.toString(), file.size, file.modifiedAtMillis, it) }
+        info.fingerprint = fingerprint
         val descriptor = MediaDescriptor(
             fingerprint = fingerprint,
             size = file.size,

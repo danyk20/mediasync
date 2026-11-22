@@ -12,4 +12,13 @@
     <string name="onboarding_how_pair">Pair each sending phone with it once, by scanning a code.</string>
     <string name="onboarding_how_sync">New photos and videos go over every night while the phones charge, or right away with Sync now. They go straight from phone to phone, encrypted, with no account.</string>
     <string name="onboarding_change_later">To change this phone's role later, choose Reset MediaSync in the ⋮ menu.</string>
+    <string name="onboarding_computer_question">How will you use this computer?</string>
+    <string name="onboarding_computer_producer_title">This computer sends</string>
+    <string name="onboarding_computer_producer_description">Sends the photos and videos in the folders you choose to your receiving device.</string>
+    <string name="onboarding_computer_consumer_title">This computer receives</string>
+    <string name="onboarding_computer_consumer_description">Collects photos and videos from your phones and copies them to a folder you choose.</string>
+    <string name="onboarding_computer_how_receive">Choose one device to receive. A computer or phone that stays on and at home works best.</string>
+    <string name="onboarding_computer_how_pair">Pair each sending device with it once, by scanning its code or pasting its link.</string>
+    <string name="onboarding_computer_how_sync">New photos and videos go over on a schedule, or right away with Sync now. They go straight from device to device, encrypted, with no account.</string>
+    <string name="onboarding_computer_change_later">To change this computer's role later, choose Reset MediaSync in the ⋮ menu; MediaSync closes, and asks again when you open it.</string>
 </resources>

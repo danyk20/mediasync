@@ -5,6 +5,7 @@
 package io.github.danyk20.mediasync.desktop
 
 import kotlin.concurrent.thread
+import kotlinx.coroutines.runBlocking
 
 /** What closing the window does. */
 enum class CloseAction { HIDE_TO_TRAY, QUIT }
@@ -38,3 +39,10 @@ class AppShutdown(private val steps: List<() -> Unit>) {
         const val LIMIT_MILLIS = 10_000L
     }
 }
+
+/**
+ * What quitting does, in order, whichever role runs (or none yet): the role's part stops first (a copy finishes, the
+ * servers close; nothing happens for a part that never started), then [cancelScope], then [closeDatabase].
+ */
+fun shutdownSteps(roles: RoleLifecycle, cancelScope: () -> Unit, closeDatabase: () -> Unit): List<() -> Unit> =
+    listOf({ runBlocking { roles.stopAll() } }, cancelScope, closeDatabase)

@@ -107,6 +107,27 @@ class FolderMediaLibraryTest {
         noticed shouldBe Unit
     }
 
+    @Test
+    fun `a change of the candidates is announced and the new candidates are watched`() = runBlocking<Unit> {
+        val first = Files.createDirectories(root.resolve("first"))
+        val second = Files.createDirectories(root.resolve("second"))
+        var candidates = setOf(first)
+        val changed = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val library = FolderMediaLibrary(changed) { candidates }
+
+        val noticed = withTimeoutOrNull(WAIT_MILLIS) {
+            coroutineScope {
+                val change = async { library.changes().first() }
+                delay(SETTLE_MILLIS)
+                candidates = setOf(first, second)
+                changed.emit(Unit)
+                change.await()
+            }
+        }
+
+        noticed shouldBe Unit
+    }
+
     private companion object {
         /** macOS polls for changes about every ten seconds. */
         const val WAIT_MILLIS = 40_000L

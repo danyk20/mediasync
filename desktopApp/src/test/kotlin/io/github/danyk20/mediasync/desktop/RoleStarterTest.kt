@@ -10,14 +10,14 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
-class ReceiverStarterTest {
+class RoleStarterTest {
 
     @Test
     fun `waits while the keychain is locked and starts once it opens, exactly once`() = runTest {
         var attempts = 0
         var started = 0
         val pauses = mutableListOf<Long>()
-        val starter = ReceiverStarter(
+        val starter = RoleStarter(
             start = {
                 attempts++
                 if (attempts <= 2) throw IdentityLockedException("locked")
@@ -31,7 +31,7 @@ class ReceiverStarterTest {
         attempts shouldBe 3
         started shouldBe 1
         pauses shouldContainExactly listOf(10_000L, 10_000L)
-        starter.state.value shouldBe StartState.RECEIVING
+        starter.state.value shouldBe StartState.RUNNING
     }
 
     @Test
@@ -39,8 +39,8 @@ class ReceiverStarterTest {
         val states = mutableListOf<StartState>()
         val logs = mutableListOf<String>()
         var attempts = 0
-        lateinit var starter: ReceiverStarter
-        starter = ReceiverStarter(
+        lateinit var starter: RoleStarter
+        starter = RoleStarter(
             start = {
                 attempts++
                 if (attempts <= 3) throw IdentityLockedException("locked")
@@ -59,7 +59,7 @@ class ReceiverStarterTest {
     fun `another failure is logged and not retried`() = runTest {
         var attempts = 0
         val logs = mutableListOf<String>()
-        val starter = ReceiverStarter(
+        val starter = RoleStarter(
             start = {
                 attempts++
                 error("port in use")

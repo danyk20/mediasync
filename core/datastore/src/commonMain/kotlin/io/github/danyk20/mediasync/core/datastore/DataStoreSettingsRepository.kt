@@ -37,6 +37,10 @@ class DataStoreSettingsRepository(private val dataStore: DataStore<Preferences>)
         dataStore.edit { it[RoleKey] = role.name }
     }
 
+    override suspend fun clearRole() {
+        dataStore.edit { it.remove(RoleKey) }
+    }
+
     override val sourceSelection: Flow<SourceSelection> = dataStore.data
         .map { preferences ->
             when (val preset = preferences[SourcePresetKey]) {

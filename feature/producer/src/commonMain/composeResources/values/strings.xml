@@ -238,4 +238,6 @@
     <string name="producer_plane_sending">Sending %1$s</string>
     <string name="producer_plane_test_file">Sending the test file</string>
     <string name="producer_status_sending_test_file">Test file first · %1$s of %2$s</string>
+    <string name="producer_folders_intro_computer">Choose the folders to send. Everything in a folder and below it is sent, once.</string>
+    <string name="producer_folders_add">Add folder…</string>
 </resources>

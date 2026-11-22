@@ -16,6 +16,7 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 
 internal const val TRAY_TOOLTIP = "MediaSync"
+internal const val TRAY_SENDING_TOOLTIP = "MediaSync: sends your folders"
 internal const val TRAY_WAITING_TOOLTIP = "MediaSync: waiting for the keychain..."
 
 /** The tray icon with "Show MediaSync" and "Quit"; only call it where a tray exists. Excluded from coverage (UI). */
