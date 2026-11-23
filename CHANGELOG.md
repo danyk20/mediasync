@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/danyk20/mediasync/compare/v0.13.0...v0.14.0) (2026-11-23)
+
+
+### Features
+
+* most of the sync engine builds for iPhone ([#189](https://github.com/danyk20/mediasync/issues/189)) ([461d372](https://github.com/danyk20/mediasync/commit/461d3723b7090afb38c4f3ddd1f79fbaec4a1a17))
+* the diagnostic log runs on iPhone too ([#187](https://github.com/danyk20/mediasync/issues/187)) ([1aabd3b](https://github.com/danyk20/mediasync/commit/1aabd3bbb0f47130306ffe7a05a5bdb08d19df16))
+* the file sender runs on coroutines and builds for iPhone ([#190](https://github.com/danyk20/mediasync/issues/190)) ([1cf1182](https://github.com/danyk20/mediasync/commit/1cf1182672c04240cd77ff672687fe5f2e6b26aa))
+* the photo metadata code runs on iPhone too ([#184](https://github.com/danyk20/mediasync/issues/184)) ([8716b13](https://github.com/danyk20/mediasync/commit/8716b13d6cc0b202632ea0aa7f5566be349d73b5))
+* the sync runtime builds for iPhone ([#196](https://github.com/danyk20/mediasync/issues/196)) ([f8ef0f1](https://github.com/danyk20/mediasync/commit/f8ef0f1c7507e0a83768714f76141e95e2a84d0f))
+
+
+### Bug Fixes
+
+* a new photo goes to the new backup folder after a folder change ([#191](https://github.com/danyk20/mediasync/issues/191)) ([3b80dcb](https://github.com/danyk20/mediasync/commit/3b80dcb656031d5a65894c37a5b7497164dfa48d))
+
 ## [0.13.0](https://github.com/danyk20/mediasync/compare/v0.12.0...v0.13.0) (2026-11-22)
 
 
