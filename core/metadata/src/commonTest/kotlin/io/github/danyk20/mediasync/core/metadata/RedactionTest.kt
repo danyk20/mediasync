@@ -15,10 +15,11 @@ import io.kotest.property.arbitrary.constant
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.long
 import io.kotest.property.checkAll
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
+import kotlin.test.Test
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
+import okio.Buffer
+import okio.buffer
+import okio.use
 
 class RedactionTest {
 
@@ -44,7 +45,7 @@ class RedactionTest {
         checkAll(edited) { (file, edits) ->
             val redaction = Redaction.Edited(edits, file.size.toLong())
 
-            val streamed = redaction.open(file.inputStream()).use { it.readBytes() }
+            val streamed = redaction.open(Buffer().write(file)).buffer().use { it.readByteArray() }
 
             streamed.toList() shouldBe reference(file, edits).toList()
             streamed.size.toLong() shouldBe redaction.outputSize
@@ -54,22 +55,15 @@ class RedactionTest {
     @Test
     fun aResumedTransferSkipsToTheSameBytes() = runTest {
         checkAll(edited, Arb.int(0..6_000)) { (file, edits), skip ->
-            val redaction = Redaction.Edited(edits, file.size.toLong())
             val whole = reference(file, edits)
             val from = minOf(skip, whole.size)
+            val source = Redaction.Edited(edits, file.size.toLong()).open(Buffer().write(file)).buffer()
 
-            val rest = redaction.open(file.inputStream()).use { stream ->
-                stream.skip(from.toLong()) shouldBe from.toLong()
-                ByteArrayOutputStream().also { out ->
-                    var b = stream.read() // Single bytes too.
-                    while (b != -1) {
-                        out.write(b)
-                        b = stream.read()
-                    }
-                }.toByteArray()
-            }
+            source.skip(from.toLong())
+            val rest = Buffer()
+            while (!source.exhausted()) rest.writeByte(source.readByte().toInt()) // Single bytes too.
 
-            rest.toList() shouldBe whole.copyOfRange(from, whole.size).toList()
+            rest.readByteArray().toList() shouldBe whole.copyOfRange(from, whole.size).toList()
         }
     }
 
@@ -81,20 +75,20 @@ class RedactionTest {
 
     @Test
     fun unknownFormatsAreWithheldAndPictureOnlyFormatsSentAsTheyAre() {
-        plan("a text file, not a photo".toByteArray()) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED)
-        plan("GIF89a and pixels".toByteArray()) shouldBe Redaction.None
+        plan("a text file, not a photo".encodeToByteArray()) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED)
+        plan("GIF89a and pixels".encodeToByteArray()) shouldBe Redaction.None
         plan(ByteArray(0)) shouldBe Redaction.None
     }
 
     @Test
     fun aDamagedFileIsWithheldNotSentWithItsDetails() {
-        val photo = golden("pixel.jpg")
+        val photo = goldenBytes("pixel.jpg")
 
         plan(photo.copyOf(photo.size / 2)) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED) // No end.
         plan(photo.copyOf(40)) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED) // Cut in its EXIF.
-        val video = golden("video.mp4")
+        val video = goldenBytes("video.mp4")
         plan(video.copyOf(video.size - 100)) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED)
-        val webp = golden("photo.webp")
+        val webp = goldenBytes("photo.webp")
         plan(webp.copyOf(200)) shouldBe Redaction.Withheld(WithheldReason.UNSUPPORTED)
     }
 
@@ -120,8 +114,8 @@ class RedactionTest {
     @Test
     fun iptcPlacesAfterTheMpfSegmentKeepTheGainMapFindable() {
         // An Ultra HDR photo with an IPTC block after its MPF segment, as a photo editor may write it.
-        val photo = golden("ultrahdr.jpg")
-        val iptc = segment(golden("pixel.jpg"), APP13)
+        val photo = goldenBytes("ultrahdr.jpg")
+        val iptc = segment(goldenBytes("pixel.jpg"), APP13)
         val mpf = segment(photo, APP2, "MPF")
         val mpfEnd = indexOf(photo, mpf) + mpf.size
         val withIptc = photo.copyOfRange(0, mpfEnd) + iptc + photo.copyOfRange(mpfEnd, photo.size)
@@ -130,12 +124,12 @@ class RedactionTest {
         gainMapStart(withIptc, mpfTiff).let { withIptc.copyOfRange(it, it + 2).toList() } shouldBe START
 
         val sent = (plan(withIptc, PhotoDetails.REMOVE_LOCATION) as Redaction.Edited)
-            .open(withIptc.inputStream()).use { it.readBytes() }
+            .open(Buffer().write(withIptc)).buffer().use { it.readByteArray() }
 
         sent.size shouldBe (withIptc.size - (iptc.size - segment(sent, APP13).size))
         gainMapStart(sent, mpfTiff).let { sent.copyOfRange(it, it + 2).toList() } shouldBe START
-        String(sent, Charsets.ISO_8859_1).contains("Zurich") shouldBe false
-        String(sent, Charsets.ISO_8859_1).contains("Lake at dawn") shouldBe true // The caption stays.
+        sent.latin1String().contains("Zurich") shouldBe false
+        sent.latin1String().contains("Lake at dawn") shouldBe true // The caption stays.
     }
 
     @Test
@@ -154,14 +148,14 @@ class RedactionTest {
             val length = ByteBuffer.allocate(2).putShort((payload.size + 2).toShort()).array()
             return byteArrayOf(0xFF.toByte(), APP1.toByte()) + length + payload
         }
-        val plain = golden("whatsapp.jpg")
+        val plain = goldenBytes("whatsapp.jpg")
         val photo = plain.copyOfRange(0, 2) + part(split, bytes.size) + part(0, split) +
             plain.copyOfRange(2, plain.size)
 
         val sent = (plan(photo, PhotoDetails.REMOVE_LOCATION) as Redaction.Edited)
-            .open(photo.inputStream()).use { it.readBytes() }
+            .open(Buffer().write(photo)).buffer().use { it.readByteArray() }
 
-        val text = String(sent, Charsets.ISO_8859_1)
+        val text = sent.latin1String()
         sent.size shouldBe photo.size
         listOf("Zu", "rich", "photoshop:City").filter { it in text } shouldBe emptyList()
         text.contains("<photoshop:Credit>Anna</photoshop:Credit>") shouldBe true
@@ -171,7 +165,7 @@ class RedactionTest {
         PhotoDetailsRemover.plan(file.size.toLong(), file.asReader(), details)
 
     private fun reference(file: ByteArray, edits: List<Edit>): ByteArray {
-        val out = ByteArrayOutputStream()
+        val out = Buffer()
         var at = 0
         for (edit in edits) {
             out.write(file, at, edit.offset.toInt() - at)
@@ -179,7 +173,7 @@ class RedactionTest {
             at = edit.end.toInt()
         }
         out.write(file, at, file.size - at)
-        return out.toByteArray()
+        return out.readByteArray()
     }
 
     /** The first segment with [marker] (and [id]) in a JPEG, header included. */
@@ -187,7 +181,7 @@ class RedactionTest {
         var at = 2
         while (true) {
             val length = ((jpeg[at + 2].toInt() and 0xFF) shl 8) or (jpeg[at + 3].toInt() and 0xFF)
-            val payload = String(jpeg, at + 4, minOf(id.length, length - 2), Charsets.ISO_8859_1)
+            val payload = jpeg.latin1String(at + 4, minOf(id.length, length - 2))
             if ((jpeg[at + 1].toInt() and 0xFF) == marker && payload == id) return jpeg.copyOfRange(at, at + 2 + length)
             at += 2 + length
         }
@@ -218,8 +212,5 @@ class RedactionTest {
         const val APP2 = 0xE2
         const val APP13 = 0xED
         val START = listOf(0xFF.toByte(), 0xD8.toByte())
-
-        fun golden(name: String): ByteArray =
-            RedactionTest::class.java.getResourceAsStream("/golden/$name")!!.use { it.readBytes() }
     }
 }

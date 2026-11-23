@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.core.metadata
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
 
 class ExifDateTextTest {
     @Test
@@ -35,5 +36,17 @@ class ExifDateTextTest {
             "12026:10:14 09:30:00",
         )
         for (text in texts) parseExifDate(text) shouldBe null
+    }
+
+    @Test
+    fun digitsOfOtherScriptsAreNotExifDates() {
+        parseExifDate("２０２６:１０:１４ ０９:３０:００") shouldBe null // Fullwidth digits.
+        parseExifDate("٢٠٢٦:١٠:١٤ ٠٩:٣٠:٠٠") shouldBe null // Arabic-Indic digits.
+    }
+
+    @Test
+    fun digitsOfOtherScriptsAreNotDatesInFileNames() {
+        CaptureDateGuess.fromName("IMG_２０２６１０１４_０９３０００.jpg", null, TimeZone.UTC) shouldBe null
+        CaptureDateGuess.fromName("IMG_٢٠٢٦١٠١٤_٠٩٣٠٠٠.jpg", null, TimeZone.UTC) shouldBe null
     }
 }
