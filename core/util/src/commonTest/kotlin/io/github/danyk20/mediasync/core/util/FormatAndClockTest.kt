@@ -2,7 +2,7 @@
  * Copyright 2026 The MediaSync Authors
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.danyk20.mediasync.sync.engine
+package io.github.danyk20.mediasync.core.util
 
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
@@ -23,6 +23,19 @@ class FormatAndClockTest {
         oneDecimal(9.99) shouldBe "10.0"
         oneDecimal(1234.56) shouldBe "1234.6"
         oneDecimal(1e9) shouldBe "1000000000.0"
+    }
+
+    @Test
+    fun twoDecimalsRoundsHalfUpAndPads() {
+        twoDecimals(1.5) shouldBe "1.50"
+        twoDecimals(0.0) shouldBe "0.00"
+        twoDecimals(2.346) shouldBe "2.35"
+        twoDecimals(Double.NaN) shouldBe "NaN"
+    }
+
+    @Test
+    fun currentTimeMillisIsAfter2020() {
+        (currentTimeMillis() > 1_577_836_800_000L) shouldBe true
     }
 
     @Test

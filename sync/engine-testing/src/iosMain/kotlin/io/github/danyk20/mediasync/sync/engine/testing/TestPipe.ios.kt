@@ -4,7 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine.testing
 
-import io.github.danyk20.mediasync.sync.engine.Lock
+import io.github.danyk20.mediasync.core.util.Lock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 import okio.Buffer

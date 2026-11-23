@@ -3,15 +3,11 @@ plugins {
 }
 
 kotlin {
-    // Lock is an expect class, which the compiler still marks Beta (warnings are errors here).
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-        // The fakes guard their state with the engine's internal Lock (EngineInternalApi): test support only.
-        optIn.add("io.github.danyk20.mediasync.sync.engine.EngineInternalApi")
-    }
     sourceSets {
         commonMain.dependencies {
             api(projects.sync.engine)
+            // The fakes guard their state with the shared Lock.
+            implementation(projects.core.util)
             api(libs.okio)
             api(libs.kotlinx.coroutines.core)
         }

@@ -48,6 +48,7 @@ dependencies {
     kover(projects.core.media)
     kover(projects.core.metadata)
     kover(projects.core.model)
+    kover(projects.core.util)
     kover(projects.desktopApp)
     kover(projects.feature.consumer)
     kover(projects.feature.diagnostics)

@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
+import io.github.danyk20.mediasync.core.util.Lock
 import kotlin.math.exp
 import kotlin.math.roundToLong
 import kotlin.time.Clock
