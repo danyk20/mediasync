@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.transport.rendezvous
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair
 import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.RelayCounter
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

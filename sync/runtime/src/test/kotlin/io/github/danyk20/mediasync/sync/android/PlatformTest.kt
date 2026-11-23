@@ -42,8 +42,7 @@ class PlatformTest {
 
     @Test
     fun aSendingPhoneTriesWhereTheReceivingPhoneSaidItIsOnThisWifiThenWhereItWasLastReached() {
-        val home = InetAddress.getByName("10.128.0.57")
-        val onHomeWifi = { address: InetAddress -> address == home }
+        val onHomeWifi = { host: String -> host == "10.128.0.57" }
 
         // On the Wi-Fi the receiving phone said it's on: there first, then where it was reached on another one.
         addressesToTry("192.168.43.20:47420", listOf("10.128.0.57:47420"), onHomeWifi) shouldBe

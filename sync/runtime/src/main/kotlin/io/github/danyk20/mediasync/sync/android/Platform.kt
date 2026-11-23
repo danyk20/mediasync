@@ -14,16 +14,16 @@ import io.github.danyk20.mediasync.sync.engine.LocalDevice
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.io.Closeable
-import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.time.Instant
 import javax.net.SocketFactory
+import kotlin.time.Instant
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
+import okio.Closeable
+import okio.IOException
 
 // Small seams around Android services, so the sync runtime can be tested on the JVM.
 
@@ -127,8 +127,13 @@ interface InternetLinks {
         override fun connect(consumer: DeviceId, worker: String, pairSecret: ByteString): PeerConnection =
             throw IOException("No internet sync on this phone")
 
-        override fun listen(worker: String, pairs: Map<DeviceId, ByteString>, serve: (PeerConnection) -> Unit) =
-            Closeable {}
+        override fun listen(
+            worker: String,
+            pairs: Map<DeviceId, ByteString>,
+            serve: (PeerConnection) -> Unit,
+        ): Closeable = object : Closeable {
+            override fun close() = Unit
+        }
 
         override fun relayUsage(worker: String, producer: DeviceId): RelayUsage =
             throw IOException("No internet sync on this phone")
@@ -233,10 +238,10 @@ interface DirectLinks {
 }
 
 /**
- * A direct link this phone joined: the address of the phone that opened it, and the [sockets] that reach it there (a
- * Wi-Fi Aware link is a network of its own).
+ * A direct link this phone joined: the address of the phone that opened it, and how to reach it there ([route]; on the
+ * JVM, the sockets of a Wi-Fi Aware link, which is a network of its own, or none for the default network).
  */
-data class JoinedLink(val host: InetAddress, val sockets: SocketFactory = SocketFactory.getDefault())
+class JoinedLink(val host: String, val route: LinkRoute? = null)
 
 /** Why background work waits for better conditions (docs/PLAN.md §10.5). */
 enum class PauseReason {
@@ -318,8 +323,8 @@ fun serviceIdOf(device: DeviceId): String =
  * receiving phone said it listens on its Wi-Fi ([told]), if that's on a network this phone is on ([isLocal]); then
  * where it was last reached ([lastAddress]), wherever that is, as it worked before.
  */
-fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (InetAddress) -> Boolean): List<String> {
-    val nearby = told.filter { address -> parseAddress(address)?.address?.let(isLocal) == true }
+fun addressesToTry(lastAddress: String?, told: List<String>, isLocal: (String) -> Boolean): List<String> {
+    val nearby = told.filter { address -> parseHostPort(address)?.host?.let(isLocal) == true }
     return (nearby + listOfNotNull(lastAddress)).distinct()
 }
 

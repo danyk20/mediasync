@@ -27,7 +27,7 @@ class RelayAlerts(private val context: Context) {
     /** Notifies if [usage] reached a level the user wasn't told about yet this month. */
     @Synchronized
     fun check(usage: RelayUsage) {
-        val period = usage.resetsAt?.toEpochMilli() ?: 0L
+        val period = usage.resetsAt?.toEpochMilliseconds() ?: 0L
         val told = if (preferences.getLong(PERIOD, -1) == period) preferences.getInt(LEVEL, 0) else 0
         val level = usage.level
         if (level.ordinal <= told) return

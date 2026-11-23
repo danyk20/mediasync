@@ -93,6 +93,7 @@ import java.text.NumberFormat
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -453,7 +454,9 @@ private fun RelayMeter(relay: RelayUsage) {
             val colors = MaterialTheme.colorScheme
             val tone = if (relay.available) colors.onSurfaceVariant else colors.error
             val resets = relay.resetsAt?.let {
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(it.atZone(ZoneId.systemDefault()))
+                DateTimeFormatter.ofLocalizedDate(
+                    FormatStyle.MEDIUM,
+                ).format(it.toJavaInstant().atZone(ZoneId.systemDefault()))
             }
             Text(
                 text = when {

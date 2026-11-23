@@ -22,6 +22,7 @@ import java.io.Closeable
 import java.net.URI
 import java.security.Signature
 import java.time.Instant
+import kotlin.time.toKotlinInstant
 import okio.ByteString
 
 /**
@@ -88,7 +89,7 @@ class AndroidInternetLinks(
                 limitBytes = meter.limitBytes,
                 freeBytes = meter.freeAllowanceBytes,
                 available = meter.relayAvailable,
-                resetsAt = runCatching { Instant.parse(meter.period.end) }.getOrNull(),
+                resetsAt = runCatching { Instant.parse(meter.period.end).toKotlinInstant() }.getOrNull(),
             )
         }.also(alerts::check) // Whenever the meter is read: the user hears when it runs low.
 

@@ -148,7 +148,6 @@ class RuntimeEndToEndTest {
     private var sendingOrder = SendingOrder.Default
     private val producerTestFiles = TestFiles(ApplicationProvider.getApplicationContext())
     private val producer = ProducerSync(
-        identity = { producerIdentity },
         peers = producerPeers,
         ledger = RoomSentLedger(producerDb.sentItemDao()),
         source = source,
@@ -164,7 +163,7 @@ class RuntimeEndToEndTest {
         },
         network = Connectivity(loopback, {
             if (offWifi) NoNetwork else SocketFactory.getDefault()
-        }, noDiscovery, producerLinks, internet),
+        }, noDiscovery, producerLinks, internet).forSending { producerIdentity },
         history = history,
         conditions = { null },
         scope = scope,
@@ -1124,7 +1123,7 @@ private class FakeInternet(private val producer: () -> DeviceId) : InternetLinks
         return if (!throughRelay) {
             end
         } else {
-            object : PeerConnection by end, io.github.danyk20.mediasync.transport.rendezvous.RelayCounter {
+            object : PeerConnection by end, io.github.danyk20.mediasync.transport.RelayCounter {
                 override fun relayedBytes() = 0L
 
                 override fun throughRelay() = true

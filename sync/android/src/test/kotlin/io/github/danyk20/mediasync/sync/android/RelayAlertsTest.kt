@@ -9,7 +9,7 @@ import android.app.Application
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
 import io.kotest.matchers.shouldBe
-import java.time.Instant
+import kotlin.time.Instant
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
