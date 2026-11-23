@@ -84,7 +84,7 @@ class WebRtcLinkTest {
             val producerConnection = producerLink.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
             forward.cancel(true)
 
-            val photos = List(6) { FakeMedia("p$it", Random(it).nextBytes(500_000)) }
+            val photos = List(6) { FakeMedia("p$it", Random(it).nextBytes(200_000)) }
             val sink = FakeMediaSink()
             val local = LocalDevice("Test phone", "test")
             val (sent, served) = runBothSides(
@@ -104,7 +104,9 @@ class WebRtcLinkTest {
 
             sent.getOrThrow().sent shouldBe 6
             served.getOrThrow()
-            sink.storedContents() shouldBe photos.map { it.bytes.toByteString() }.toSet()
+            // Digests, not whole contents: comparing 6 full copies exhausts the emulator's 16 MB heap.
+            sink.storedContents().map { it.sha256() }.toSet() shouldBe
+                photos.map { it.bytes.toByteString().sha256() }.toSet()
             // On one device the phones connect directly: nothing counts against the relay allowance.
             (producerConnection as RelayCounter).relayedBytes() shouldBe 0
             producerConnection.close()
