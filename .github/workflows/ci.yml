@@ -283,7 +283,10 @@ jobs:
             echo "::error::The interop test left no results: it was skipped, so INTEROP_DIR was not set"
             exit 1
           fi
-          for name in helloIsExchangedOverMutualTlsWithThePinnedServer aReloadedIdentityConnectsWithTheSamePeerId aWrongPinFailsTheHandshakeInTime aRefusedPortFailsInsteadOfWaiting; do
+          for name in helloIsExchangedOverMutualTlsWithThePinnedServer aReloadedIdentityConnectsWithTheSamePeerId aWrongPinFailsTheHandshakeInTime aRefusedPortFailsInsteadOfWaiting \
+            aBulkRoundTripOfSixtyFourMebibytesMatchesOnBothSides aFrameAtTheProtocolSizeLimitRoundTrips aSilentPeerTimesOutTheReadWithinItsBound \
+            aStalledPeerTimesOutTheWriteWithinItsBound closeWhileAReadIsPendingUnblocksIt closeIsIdempotentAndLaterReadsAndWritesFail \
+            aServerClosingMidStreamEndsInAnIOException aServerClosingAfterItsDataEndsTheStreamWithEof manySequentialConnectionsDoNotLeakDescriptors; do
             grep -qx "PASS $name" "$result" || { echo "::error::The interop test $name did not pass"; exit 1; }
           done
           if grep -h "<testsuite " transport/lan-apple/build/test-results/iosSimulatorArm64Test/*.xml | grep -v 'skipped="0"'; then

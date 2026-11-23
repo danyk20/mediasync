@@ -11,6 +11,7 @@ import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
@@ -34,10 +35,26 @@ kotlin {
         commonTest.dependencies {
             implementation(projects.sync.protocol)
         }
+        iosTest.dependencies {
+            // The closing test closes a connection from another thread while a read is blocked.
+            implementation(libs.kotlinx.coroutines.core)
+        }
     }
 }
 
 mediasync { iosTargets() }
+
+// The Network.framework receive shim (src/nativeInterop/cinterop/mediasync_nw.h): a C wrapper that keeps the content
+// context Network.framework passes on cancel away from Kotlin/Native, which aborts on it.
+kotlin {
+    targets.withType<KotlinNativeTarget>().configureEach {
+        compilations.named("main") {
+            cinterops.create("mediasyncNw") {
+                includeDirs(project.file("src/nativeInterop/cinterop"))
+            }
+        }
+    }
+}
 
 // The JVM InteropServer (:transport:lan-testing) that the iOS interop test talks to. Its runtime classpath is resolved
 // from this configuration, so the server runs from the same build as the tests.

@@ -28,6 +28,8 @@ internal fun readInteropServer(dir: String): InteropServerInfo {
         .associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
     return InteropServerInfo(
         port = properties.getValue("port").toInt(),
+        silentPort = properties.getValue("silentPort").toInt(),
+        dropPort = properties.getValue("dropPort").toInt(),
         pin = DeviceId(properties.getValue("pin")),
     )
 }
@@ -40,6 +42,15 @@ internal fun recordPass(test: String) {
     val dir = interopDirectory() ?: return
     FileSystem.SYSTEM.appendingSink("$dir/interop-result.txt".toPath()).buffer().use { sink ->
         sink.writeUtf8("PASS $test\n")
+    }
+}
+
+/** Appends one line of text (not a PASS line) to the same result file: CI prints it, e.g. a throughput figure. */
+internal fun recordLine(text: String) {
+    println(text)
+    val dir = interopDirectory() ?: return
+    FileSystem.SYSTEM.appendingSink("$dir/interop-result.txt".toPath()).buffer().use { sink ->
+        sink.writeUtf8("$text\n")
     }
 }
 

@@ -127,12 +127,6 @@ class InteropTest {
         recordPass("aRefusedPortFailsInsteadOfWaiting")
     }
 
-    /** An identity saved by one provider in [directory], then loaded by a new one: the relaunch path. */
-    private fun loadedIdentity(directory: String): AppleIdentity {
-        AppleIdentityProvider(FileIdentityStore(directory), NO_LOG).identity()
-        return AppleIdentityProvider(FileIdentityStore(directory), NO_LOG).identity()
-    }
-
     private fun assertNotNullFrame(frame: io.github.danyk20.mediasync.sync.protocol.Frame?) =
         checkNotNull(frame) { "The server closed the connection before its Hello" }
 

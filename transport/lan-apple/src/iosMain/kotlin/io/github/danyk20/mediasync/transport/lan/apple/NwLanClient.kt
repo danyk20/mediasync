@@ -11,16 +11,8 @@ import io.github.danyk20.mediasync.transport.PeerConnection
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import okio.IOException
-import platform.Network.nw_connection_cancel
 import platform.Network.nw_connection_create
-import platform.Network.nw_connection_set_queue
-import platform.Network.nw_connection_set_state_changed_handler
-import platform.Network.nw_connection_start
-import platform.Network.nw_connection_state_failed
-import platform.Network.nw_connection_state_ready
-import platform.Network.nw_connection_state_waiting
 import platform.Network.nw_endpoint_create_host
-import platform.Network.nw_error_get_error_code
 import platform.Network.nw_parameters_create_secure_tcp
 import platform.Network.nw_protocol_options_t
 import platform.Network.nw_tcp_options_set_connection_timeout
@@ -41,13 +33,6 @@ import platform.Security.sec_protocol_options_t
 import platform.Security.tls_protocol_version_TLSv13
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_queue_t
-
-/** Timeouts for [NwLanClient]: the same defaults as the JVM client (`LanTimeouts` in transport:lan). */
-data class AppleLanTimeouts(
-    val connectMillis: Long = 5_000,
-    val handshakeMillis: Long = 15_000,
-    val readMillis: Long = 120_000,
-)
 
 /**
  * Connects to a MediaSync device over TLS 1.3 with mutual authentication, using Network.framework.
@@ -75,39 +60,14 @@ object NwLanClient {
             { tlsOptions -> configureTls(nw_tls_copy_sec_protocol_options(tlsOptions), identity, verdict, queue) },
             { tcpOptions -> configureTcp(tcpOptions, timeouts) },
         ).orFail("nw_parameters_create_secure_tcp failed")
-        val endpoint = nw_endpoint_create_host(host, port.toString())
-        val connection = nw_connection_create(endpoint, parameters).orFail("nw_connection_create failed")
-        nw_connection_set_queue(connection, queue)
+        val connection = nw_connection_create(nw_endpoint_create_host(host, port.toString()), parameters)
+            .orFail("nw_connection_create failed")
 
-        val handshake = OneShot<Handshake>()
-        nw_connection_set_state_changed_handler(connection) { state, error ->
-            when (state) {
-                nw_connection_state_ready -> handshake.offer(Handshake.Ready)
-
-                nw_connection_state_waiting, nw_connection_state_failed -> handshake.offer(
-                    Handshake.Failed(state == nw_connection_state_waiting, error?.let { nw_error_get_error_code(it) }),
-                )
-
-                else -> Unit
-            }
-        }
-        nw_connection_start(connection)
-
-        val waitMillis = timeouts.connectMillis + timeouts.handshakeMillis
-        val outcome = handshake.await(waitMillis)
-        // Trusted only when the verify block accepted the pin and the peer is the expected device.
-        val trusted: DeviceId? = verdict.peer?.takeIf { it == expectedPeer && !verdict.pinMismatch }
-        // Returned only when the handshake is ready and the peer is trusted. Every other case cancels the connection.
-        if (outcome == Handshake.Ready && trusted != null) {
-            return NwPeerConnection(
-                connection = connection,
-                queue = queue,
-                peerId = trusted,
-                remoteAddress = "$host:$port",
-                timeouts = timeouts,
-            )
-        }
-        nw_connection_cancel(connection)
+        val peer = NwPeerConnection(connection, queue, verdict, timeouts, "$host:$port")
+        val outcome = peer.start(timeouts.connectMillis + timeouts.handshakeMillis)
+        // Returned only when the handshake is ready and the peer is the expected device. Every other case is closed.
+        if (outcome == Handshake.Ready && verdict.trusted == expectedPeer) return peer
+        peer.close()
         throw IOException(describeFailure(host, port, outcome, verdict))
     }
 
@@ -161,32 +121,25 @@ object NwLanClient {
         nw_tcp_options_set_no_delay(options, true)
         nw_tcp_options_set_connection_timeout(
             options,
-            (
-                (timeouts.connectMillis + MILLIS_PER_SECOND - 1) /
-                    MILLIS_PER_SECOND
-                ).toUInt(),
+            ((timeouts.connectMillis + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).toUInt(),
         )
     }
 
     private const val MILLIS_PER_SECOND = 1_000L
 }
 
-/** How the TLS handshake ended. `waiting` is kept apart from `failed` only for the message. */
-private sealed interface Handshake {
-    data object Ready : Handshake
-
-    class Failed(val waiting: Boolean, val code: Int?) : Handshake
-}
-
 /**
  * What the verify block learned about the server: the hash of its leaf certificate (the peer id) and whether it
  * matched the expected pin. Written on the connection's queue and read after the handshake's semaphore.
  */
-private class PeerVerdict(private val expected: DeviceId) {
+internal class PeerVerdict(private val expected: DeviceId) {
     var peer: DeviceId? = null
         private set
     var pinMismatch = false
         private set
+
+    /** The verified peer, or null when the pin did not match or the check never ran. */
+    val trusted: DeviceId? get() = peer.takeIf { !pinMismatch }
 
     /** Returns true only when the first certificate of the chain hashes to the expected id. */
     fun check(metadata: sec_protocol_metadata_t): Boolean {
