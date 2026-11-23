@@ -6,7 +6,7 @@ package io.github.danyk20.mediasync.sync.engine
 
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 /** Of several connections' files, one shows at a time (docs/PLAN.md §7, *Per-file progress*). */
 class SendingFollowerTest {

@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.sync.engine
 
 import kotlin.math.exp
 import kotlin.math.roundToLong
+import kotlin.time.Clock
 
 /**
  * A snapshot of a running transfer, for progress UI. Totals grow as further batches are offered. [bytesSkipped]: of
@@ -32,7 +33,8 @@ data class TransferProgress(
  * The file a session streams now (docs/PLAN.md §7, *Per-file progress*), for the sending animation: [key] is the
  * source's own handle ([SourceItem.key]), or [TEST_FILE_KEY] for the test file. [bytesSent] counts from the file's
  * start, so a resumed file starts partway; it reaches [size] once the whole file went, before the consumer confirms
- * it. [startedNanos]: when it started, on [System.nanoTime]'s clock, so parallel connections can tell the oldest.
+ * it. [startedNanos]: when it started, on a monotonic clock in nanoseconds, so parallel connections can tell the
+ * oldest.
  */
 data class SendingItem(
     val key: String,
@@ -57,11 +59,11 @@ data class SendingItem(
  * its end. With nothing going, the last one followed.
  */
 class SendingFollower {
+    private val lock = Lock()
     private var followed: SendingItem? = null
 
     /** The file to show of [items], each connection's latest. */
-    @Synchronized
-    fun follow(items: Collection<SendingItem?>): SendingItem? {
+    fun follow(items: Collection<SendingItem?>): SendingItem? = lock.withLock {
         val current = followed
         val next = current?.let { items.firstOrNull { item -> item?.key == it.key } }
         followed = when {
@@ -72,7 +74,7 @@ class SendingFollower {
                 .filter { !it.finished && it.key != current?.key }
                 .minByOrNull { it.startedNanos } ?: next ?: current
         }
-        return followed
+        followed
     }
 }
 
@@ -126,10 +128,11 @@ data class SpeedSample(val atMillis: Long, val bytesPerSecond: Long)
  * bytes that turn out not to need sending ([TransferProgress.bytesSkipped]) come off the time left at once.
  */
 class TransferEstimator(
-    private val now: () -> Long = System::currentTimeMillis,
+    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val windowMillis: Long = WINDOW_MILLIS,
     private val warmUpMillis: Long = WARM_UP_MILLIS,
 ) {
+    private val lock = Lock()
     private val samples = ArrayDeque<Pair<Long, Long>>() // Time, bytes moved.
     private var started = 0L
     private var last: TransferProgress? = null
@@ -144,12 +147,10 @@ class TransferEstimator(
     private var lastLeftMillis: Double? = null
 
     /** The speed every second of this transfer so far (the last 6 hours of a longer one), for its chart. */
-    @Synchronized
-    fun history(): List<SpeedSample> = speeds.toList()
+    fun history(): List<SpeedSample> = lock.withLock { speeds.toList() }
 
     /** Another transfer starts: the speed warms up again, and its chart starts empty. */
-    @Synchronized
-    fun reset() {
+    fun reset() = lock.withLock {
         samples.clear()
         speeds.clear()
         last = null
@@ -164,16 +165,14 @@ class TransferEstimator(
      * confirmations), so it may come out of order: one with fewer bytes than already known is late, and changes
      * nothing.
      */
-    @Synchronized
-    fun update(progress: TransferProgress): TransferEstimate? {
+    fun update(progress: TransferProgress): TransferEstimate? = lock.withLock {
         val latest = last?.takeIf { progress.bytesDone < it.bytesDone } ?: progress
         last = latest
-        return estimate(now(), latest)
+        estimate(now(), latest)
     }
 
     /** The estimate now, from the last progress: lower the longer nothing has come. `null` before any progress. */
-    @Synchronized
-    fun refresh(): TransferEstimate? = last?.let { estimate(now(), it) }
+    fun refresh(): TransferEstimate? = lock.withLock { last?.let { estimate(now(), it) } }
 
     private fun estimate(time: Long, progress: TransferProgress): TransferEstimate? {
         val moved = progress.bytesMoved

@@ -29,11 +29,10 @@ import io.github.danyk20.mediasync.sync.protocol.TurboRequest
 import io.github.danyk20.mediasync.sync.protocol.Want
 import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.io.IOException
-import java.security.MessageDigest
 import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import okio.IOException
 import okio.buffer
+import okio.use
 
 /** The outcome of serving one incoming connection. */
 sealed interface ServeResult {
@@ -157,13 +156,13 @@ class ConsumerSession(
         while (!ended) {
             val header = channel.nextHeader()
             if (header.type == FrameType.DATA) {
-                if (bytes == 0L) firstByteAt = System.nanoTime()
+                if (bytes == 0L) firstByteAt = monotonicNanos()
                 bytes += channel.readData(header, buffer)
             } else {
                 ended = endsLinkTest(channel.readControl(header))
             }
         }
-        val micros = if (bytes == 0L) 0L else (System.nanoTime() - firstByteAt) / NANOS_PER_MICRO
+        val micros = if (bytes == 0L) 0L else (monotonicNanos() - firstByteAt) / NANOS_PER_MICRO
         channel.send(LinkTestResult(bytes, micros))
         awaitEnd(channel)
         return ServeResult.LinkTested(bytes, micros)
@@ -319,7 +318,7 @@ class ConsumerSession(
 
         /** One file being received: writes, hashes and finally commits or discards it. */
         private inner class Transfer(val offerId: Int, val descriptor: MediaDescriptor, offset: Long) {
-            private val digest = MessageDigest.getInstance("SHA-256")
+            private val digest = newSha256()
             private val file: IncomingFile? = try {
                 sink.open(producer, descriptor, offset)
             } catch (_: IOException) {
@@ -349,7 +348,7 @@ class ConsumerSession(
                 if (end.offerId != offerId) throw ProtocolException("FILE_END for offer ${end.offerId}, not $offerId")
                 unreserve(Long.MAX_VALUE) // Done with this file, however much arrived.
                 itemsDone++
-                val sha256 = digest.digest().toByteString()
+                val sha256 = digest.digest()
                 val status = when {
                     file == null || !writable -> FileAck.Status.FAILED
                     length != descriptor.size || sha256 != end.sha256 -> FileAck.Status.CORRUPT
@@ -430,17 +429,16 @@ private const val NANOS_PER_MICRO = 1_000L
  * (they then take real space), and what's left of it ends with the session.
  */
 class SpaceBudget(private val sink: MediaSink) {
+    private val lock = Lock()
     private var reserved = 0L
 
-    @Synchronized
-    fun tryReserve(bytes: Long): Boolean {
-        if (bytes > sink.availableBytes() - reserved) return false
+    fun tryReserve(bytes: Long): Boolean = lock.withLock {
+        if (bytes > sink.availableBytes() - reserved) return@withLock false
         reserved += bytes
-        return true
+        true
     }
 
-    @Synchronized
     fun release(bytes: Long) {
-        reserved = (reserved - bytes).coerceAtLeast(0)
+        lock.withLock { reserved = (reserved - bytes).coerceAtLeast(0) }
     }
 }

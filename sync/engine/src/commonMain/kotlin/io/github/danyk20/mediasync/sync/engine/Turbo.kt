@@ -11,10 +11,9 @@ import io.github.danyk20.mediasync.sync.protocol.TurboReady
 import io.github.danyk20.mediasync.sync.protocol.TurboRequest
 import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.security.SecureRandom
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
+import kotlin.random.Random
 import okio.ByteString
+import okio.ByteString.Companion.encodeUtf8
 
 /** How the two phones link up directly for Turbo transfer (docs/PLAN.md §8.3). */
 enum class LinkKind {
@@ -48,8 +47,8 @@ data class DirectLink(
          * A fresh network for one Turbo transfer. Android wants Wi-Fi Direct names to start with `DIRECT-` and two
          * more letters or digits; the passphrase is random, so only the phone it's sent to can join.
          */
-        fun credentials(random: SecureRandom = SecureRandom()): Pair<String, String> {
-            fun text(length: Int) = String(CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] })
+        fun credentials(random: Random = secureRandom()): Pair<String, String> {
+            fun text(length: Int) = CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] }.concatToString()
             return "DIRECT-${text(2)}$NAME_MARKER" to text(PASSPHRASE_LENGTH)
         }
 
@@ -57,8 +56,8 @@ data class DirectLink(
          * A fresh Wi-Fi Aware service for one Turbo transfer: a random name, so only the phone it's sent to looks
          * for it, and a random passphrase for the data path.
          */
-        fun awareCredentials(random: SecureRandom = SecureRandom()): Pair<String, String> {
-            fun text(length: Int) = String(CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] })
+        fun awareCredentials(random: Random = secureRandom()): Pair<String, String> {
+            fun text(length: Int) = CharArray(length) { ALPHABET[random.nextInt(ALPHABET.length)] }.concatToString()
             return "MediaSync-${text(AWARE_NAME_LENGTH)}" to text(PASSPHRASE_LENGTH)
         }
 
@@ -69,10 +68,10 @@ data class DirectLink(
          */
         fun derived(key: ByteString, epoch: Long): Pair<String, String> {
             fun text(label: String, length: Int): String {
-                val mac = Mac.getInstance(HMAC)
-                mac.init(SecretKeySpec(key.toByteArray(), HMAC))
-                val bytes = mac.doFinal("mediasync-turbo-v1:$label:$epoch".toByteArray(Charsets.UTF_8))
-                return String(CharArray(length) { ALPHABET[(bytes[it].toInt() and BYTE_MASK) % ALPHABET.length] })
+                val bytes = "mediasync-turbo-v1:$label:$epoch".encodeUtf8().hmacSha256(key)
+                return CharArray(length) {
+                    ALPHABET[(bytes[it].toInt() and BYTE_MASK) % ALPHABET.length]
+                }.concatToString()
             }
             return "DIRECT-${text("prefix", 2)}$NAME_MARKER-${text("name", NAME_TAIL)}" to
                 text("passphrase", PASSPHRASE_LENGTH)
@@ -101,7 +100,6 @@ data class DirectLink(
         private const val PASSPHRASE_LENGTH = 24
         private const val NAME_TAIL = 6
         private const val AWARE_NAME_LENGTH = 16
-        private const val HMAC = "HmacSHA256"
         private const val BYTE_MASK = 0xFF
     }
 }

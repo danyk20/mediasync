@@ -8,7 +8,7 @@ import io.github.danyk20.mediasync.sync.engine.Fingerprints.SAMPLE_BYTES
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlin.random.Random
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 class FingerprintsTest {
 
@@ -38,7 +38,7 @@ class FingerprintsTest {
     }
 
     @Test
-    fun `large files are sampled, so a change only in the middle isn't seen (full hash catches it)`() {
+    fun `large files are sampled and a change only in the middle is not seen but the full hash catches it`() {
         Fingerprints.of(large.flipped(large.size / 2)) shouldBe Fingerprints.of(large)
     }
 

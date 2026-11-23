@@ -4,7 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
-import io.github.danyk20.mediasync.sync.engine.testing.deviceId
+import io.github.danyk20.mediasync.core.model.DeviceId
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
@@ -12,11 +12,13 @@ import io.kotest.property.Arb
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
-import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.toByteString
-import org.junit.jupiter.api.Test
 
 class PairingLinkTest {
+
+    private fun deviceId(seed: Int): DeviceId = DeviceId.of(ByteArray(32) { (seed * 31 + it).toByte() })
 
     private val link = PairingLink(
         consumer = deviceId(2),
@@ -36,12 +38,12 @@ class PairingLinkTest {
     }
 
     @Test
-    fun `tolerates surrounding whitespace, like a pasted link`() {
+    fun `tolerates surrounding whitespace the way a pasted link needs`() {
         PairingLink.parse("  ${link}\n") shouldBe link
     }
 
     @Test
-    fun `any name and addresses survive encoding`() = runBlocking {
+    fun `any name and addresses survive encoding`() = runTest {
         checkAll(Arb.string(0..64), Arb.list(Arb.string(1..30), 1..4)) { name, addresses ->
             val custom = link.copy(
                 consumerName = name,
@@ -51,7 +53,6 @@ class PairingLinkTest {
             )
             PairingLink.parse(custom.toString()) shouldBe custom
         }
-        Unit
     }
 
     @Test
