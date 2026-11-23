@@ -14,6 +14,8 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakePeerRegistry
 import io.github.danyk20.mediasync.sync.engine.testing.FakeReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.testing.FakeSentLedger
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
+import io.github.danyk20.mediasync.sync.protocol.Bye
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
@@ -144,6 +146,34 @@ class ParallelSyncTest {
         queue.take(maxItems = 64, maxBytes = 100).size shouldBe 1
         queue.isEmpty() shouldBe true
         queue.totalBytes shouldBe 200
+    }
+
+    @Test
+    fun aStreamsByeReasonReachesTheCaller() {
+        // The consumer doesn't know this producer, so it ends the session with Bye(NOT_PAIRED).
+        val strangers = FakePeerRegistry()
+        val pair = ConnectionPair(producerId, consumerId)
+        consumers.submit {
+            ConsumerSession(
+                local,
+                strangers,
+                received,
+                sink,
+                FakePairingGate(TOKEN),
+                space = space,
+            ).serve(pair.consumerEnd)
+        }
+        val source = FakeMediaSource(photos(count = 3, size = 1_000))
+
+        val failure = shouldThrow<PeerEndedSessionException> {
+            ParallelSync(
+                session = { listener -> ProducerSession(local, source, sent, listener, window = 4) },
+                connect = { null },
+                probeMillis = 150,
+            ).sync(pair.producerEnd)
+        }
+
+        failure.byeReason shouldBe Bye.Reason.NOT_PAIRED
     }
 
     private fun SourceItem.sized(size: Long) = copy(descriptor = descriptor.copy(size = size))

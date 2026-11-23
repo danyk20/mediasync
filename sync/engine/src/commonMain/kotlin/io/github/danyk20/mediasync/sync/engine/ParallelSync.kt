@@ -7,14 +7,17 @@ package io.github.danyk20.mediasync.sync.engine
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.io.IOException
-import java.util.Locale
-import java.util.concurrent.Callable
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import okio.IOException
+import okio.use
 
 /**
  * Sends over several connections at once when that's faster (docs/PLAN.md §7, parallel streams).
@@ -38,33 +41,42 @@ class ParallelSync(
     private val probeMillis: Long = PROBE_MILLIS,
     private val holdBack: (SourceItem) -> Boolean = { false },
 ) {
-    private val latest = ConcurrentHashMap<Int, TransferProgress>()
+    /** Guarded by [latestLock]: the newest progress of each connection. */
+    private val latestLock = Lock()
+    private val latest = HashMap<Int, TransferProgress>()
+
+    /** Serialises the reports to [progress], so one connection's report never interleaves with another's. */
+    private val reportLock = Lock()
 
     /** One file shows at a time, though several connections send at once. */
     private val follower = SendingFollower()
 
+    /**
+     * Sends over [first] and, when it pays, over more connections. Blocks the calling thread until every stream ends,
+     * so call it from a worker thread, never Main or a single-threaded dispatcher.
+     */
     fun sync(first: PeerConnection): SyncResult {
         val probe = session(ProgressListener {})
         val (held, pending) = probe.pendingFor(first.peerId).partition(holdBack)
         // The relay saver never holds the test file back: it's there to test this very connection.
         val queue = WorkQueue(pending, probe.waitingTestFile())
-        val pool = Executors.newCachedThreadPool { task -> Thread(task, "mediasync-stream").apply { isDaemon = true } }
+        val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
         try {
-            val streams = mutableListOf(start(pool, 0, queue) { session(it).sync(first, queue) })
-            grow(pool, queue, streams)
+            val streams = mutableListOf(start(scope, 0, queue) { session(it).sync(first, queue) })
+            grow(scope, queue, streams)
             return merge(streams).copy(heldBack = held.size)
         } finally {
-            pool.shutdown()
+            scope.cancel()
         }
     }
 
     /** Adds connections while each one added made the whole faster. */
-    private fun grow(pool: ExecutorService, queue: WorkQueue, streams: MutableList<Future<SyncResult>>) {
+    private fun grow(scope: CoroutineScope, queue: WorkQueue, streams: MutableList<Deferred<Result<SyncResult>>>) {
         var previous: Double? = null
         var lastBytes = 0L
         var growing = true
         while (waitForProbe(streams)) {
-            val bytes = latest.values.sumOf { it.bytesMoved }
+            val bytes = latestLock.withLock { latest.values.sumOf { it.bytesMoved } }
             val rate = (bytes - lastBytes).toDouble()
             lastBytes = bytes
             if (growing && mayGrow(streams, queue)) {
@@ -77,45 +89,47 @@ class ParallelSync(
                         Area.SEND,
                         "Connection ${streams.size + 1} added (${megabytes(rate)} MB/s over the last probe)",
                     )
-                    streams += start(pool, streams.size, queue) { connection.use { c -> session(it).sync(c, queue) } }
+                    streams += start(scope, streams.size, queue) { connection.use { c -> session(it).sync(c, queue) } }
                 }
             }
         }
     }
 
-    private fun mayGrow(streams: List<Future<SyncResult>>, queue: WorkQueue) =
+    private fun mayGrow(streams: List<Deferred<Result<SyncResult>>>, queue: WorkQueue) =
         streams.size < maxStreams && !queue.isEmpty() && !queue.sendingTestFile && mayAddStream()
 
     private fun megabytes(bytesPerProbe: Double) =
-        String.format(Locale.ROOT, "%.1f", bytesPerProbe / BYTES_PER_MEGABYTE / (probeMillis / MILLIS_PER_SECOND))
+        oneDecimal(bytesPerProbe / BYTES_PER_MEGABYTE / (probeMillis / MILLIS_PER_SECOND))
 
     /** Waits up to a probe; `false` once every stream has ended. */
-    private fun waitForProbe(streams: List<Future<SyncResult>>): Boolean {
-        val end = System.nanoTime() + probeMillis * NANOS_PER_MILLI
-        while (System.nanoTime() < end) {
-            if (streams.all { it.isDone }) return false
-            Thread.sleep(POLL_MILLIS)
-        }
-        return true
+    private fun waitForProbe(streams: List<Deferred<Result<SyncResult>>>): Boolean = runBlocking {
+        withTimeoutOrNull(probeMillis) { streams.joinAll() } == null
     }
 
+    /**
+     * Runs [run] as a coroutine in [scope]. The outcome is a [Result], not a thrown exception: awaiting a failed
+     * [Deferred] on the JVM hands back a copy of the exception (stack trace recovery, active under `-ea`), which can
+     * lose its fields, such as `PeerEndedSessionException.byeReason`. A [Result] carries the original instance.
+     */
     private fun start(
-        pool: ExecutorService,
+        scope: CoroutineScope,
         index: Int,
         queue: WorkQueue,
         run: (ProgressListener) -> SyncResult,
-    ): Future<SyncResult> = pool.submit(
-        Callable {
+    ): Deferred<Result<SyncResult>> = scope.async {
+        runCatching {
             run { part ->
                 // One at a time: the file shown follows one order, whichever connection reported last.
-                synchronized(follower) { report(index, part, queue) }
+                reportLock.withLock { report(index, part, queue) }
             }
-        },
-    )
+        }
+    }
 
     private fun report(index: Int, part: TransferProgress, queue: WorkQueue) {
-        latest[index] = part
-        val all = latest.values
+        val all = latestLock.withLock {
+            latest[index] = part
+            latest.values.toList()
+        }
         progress.onProgress(
             TransferProgress(
                 itemsDone = all.sumOf { it.itemsDone },
@@ -131,15 +145,12 @@ class ParallelSync(
     }
 
     /** One result for the whole sync; if a connection failed, its failure once every one has ended. */
-    private fun merge(streams: List<Future<SyncResult>>): SyncResult {
-        val outcomes = streams.map { stream ->
-            try {
-                Result.success(stream.get())
-            } catch (e: ExecutionException) {
-                Result.failure(e.cause ?: e)
-            }
+    private fun merge(streams: List<Deferred<Result<SyncResult>>>): SyncResult {
+        val outcomes = runBlocking { streams.awaitAll() }
+        outcomes.firstNotNullOfOrNull { it.exceptionOrNull() }?.let {
+            // The same message as java.io.IOException(cause) gives: the cause's toString().
+            throw it as? IOException ?: IOException(it.toString(), it)
         }
-        outcomes.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it as? IOException ?: IOException(it) }
         return outcomes.map { it.getOrThrow() }.reduce { a, b ->
             SyncResult(
                 sent = a.sent + b.sent,
@@ -161,8 +172,6 @@ class ParallelSync(
     private companion object {
         const val MAX_STREAMS = 4
         const val PROBE_MILLIS = 3_000L
-        const val POLL_MILLIS = 20L
-        const val NANOS_PER_MILLI = 1_000_000L
         const val BYTES_PER_MEGABYTE = 1024.0 * 1024.0
         const val MILLIS_PER_SECOND = 1000.0
 
