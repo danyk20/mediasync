@@ -1,0 +1,909 @@
+/*
+ * Copyright 2026 The MediaSync Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.danyk20.mediasync.sync.android
+
+import io.github.danyk20.mediasync.core.diagnostics.Area
+import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.metadata.isWithheld
+import io.github.danyk20.mediasync.core.model.DeviceId
+import io.github.danyk20.mediasync.core.model.PhotoDetails
+import io.github.danyk20.mediasync.core.model.SendingOrder
+import io.github.danyk20.mediasync.core.util.Lock
+import io.github.danyk20.mediasync.core.util.currentTimeMillis
+import io.github.danyk20.mediasync.core.util.ioDispatcher
+import io.github.danyk20.mediasync.core.util.monotonicNanos
+import io.github.danyk20.mediasync.sync.engine.DirectLink
+import io.github.danyk20.mediasync.sync.engine.IncompatiblePeerException
+import io.github.danyk20.mediasync.sync.engine.LinkKind
+import io.github.danyk20.mediasync.sync.engine.LinkSpeed
+import io.github.danyk20.mediasync.sync.engine.LinkTest
+import io.github.danyk20.mediasync.sync.engine.MediaSource
+import io.github.danyk20.mediasync.sync.engine.PairingClient
+import io.github.danyk20.mediasync.sync.engine.PairingDecision
+import io.github.danyk20.mediasync.sync.engine.PairingLink
+import io.github.danyk20.mediasync.sync.engine.ParallelSync
+import io.github.danyk20.mediasync.sync.engine.PeerEndedSessionException
+import io.github.danyk20.mediasync.sync.engine.ProducerSession
+import io.github.danyk20.mediasync.sync.engine.SentLedger
+import io.github.danyk20.mediasync.sync.engine.SourceItem
+import io.github.danyk20.mediasync.sync.engine.SpeedSample
+import io.github.danyk20.mediasync.sync.engine.SyncResult
+import io.github.danyk20.mediasync.sync.engine.TestFile
+import io.github.danyk20.mediasync.sync.engine.TestFileHeld
+import io.github.danyk20.mediasync.sync.engine.TestFileOutcome
+import io.github.danyk20.mediasync.sync.engine.TestFilePath
+import io.github.danyk20.mediasync.sync.engine.TestFileQueue
+import io.github.danyk20.mediasync.sync.engine.TestFileRoute
+import io.github.danyk20.mediasync.sync.engine.TransferEstimate
+import io.github.danyk20.mediasync.sync.engine.TransferEstimator
+import io.github.danyk20.mediasync.sync.engine.TransferProgress
+import io.github.danyk20.mediasync.sync.engine.TurboAnswer
+import io.github.danyk20.mediasync.sync.engine.TurboSetup
+import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
+import io.github.danyk20.mediasync.sync.protocol.Bye
+import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.RelayCounter
+import kotlin.concurrent.Volatile
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
+import okio.ByteString
+import okio.IOException
+import okio.use
+
+/** Why a pairing or sync attempt didn't work. */
+enum class SyncFailure {
+    /** No receiving phone has been paired yet. */
+    NOT_PAIRED,
+
+    /** The receiving phone wasn't found: not on the same Wi-Fi, or MediaSync isn't running there. */
+    UNREACHABLE,
+
+    /** The connection dropped mid-transfer; what was sent is kept, and the rest resumes next time. */
+    CONNECTION_LOST,
+
+    /** The receiving phone no longer recognises this one (it was unpaired there). */
+    NOT_ALLOWED,
+
+    /** The other phone runs an incompatible MediaSync version. */
+    INCOMPATIBLE,
+
+    /** Turbo: not reached over Wi-Fi, and no *Turbo receive* link of it nearby. */
+    TURBO_UNREACHABLE,
+
+    /** Turbo: not reached over Wi-Fi, and it hasn't told its Turbo key yet (one sync over Wi-Fi does). */
+    TURBO_NOT_SET_UP,
+}
+
+/** Why Turbo transfer (docs/PLAN.md §8.3) wasn't used, or not throughout: the rest went over Wi-Fi. */
+enum class TurboProblem {
+    /** The receiving phone has no Wi-Fi Direct. */
+    RECEIVER_UNSUPPORTED,
+
+    /** The receiving phone's user hasn't allowed MediaSync to connect to nearby devices. */
+    RECEIVER_NOT_ALLOWED,
+
+    /** The direct link couldn't be set up or joined. */
+    NO_LINK,
+
+    /** The direct link dropped during the transfer. */
+    DROPPED,
+}
+
+/** What the producer's home screen shows. */
+sealed interface ProducerState {
+    /** [turboProblem]: Turbo was asked for but not (fully) used, and why. */
+    data class Idle(val lastResult: SyncResult? = null, val turboProblem: TurboProblem? = null) : ProducerState
+
+    data object Connecting : ProducerState
+
+    /** Asking the receiving phone for a direct link, and joining it. */
+    data object SettingUpTurbo : ProducerState
+
+    /**
+     * Looking for the receiving phone's *Turbo receive* link (docs/PLAN.md §8.3): it isn't on this Wi-Fi, and its user
+     * may start Turbo receive there only now. Ends when it's found, after a while, or when the user stops it.
+     */
+    data object LookingForTurboReceive : ProducerState
+
+    /**
+     * [turbo]: over the direct link of Turbo transfer (docs/PLAN.md §8.3); [internet]: through the internet (§8.4).
+     * [estimate]: how fast it goes and how long the rest takes, once there's enough to go on. [manual]: the user
+     * started it, or a sync already running when they asked (*Sync now*, Turbo, sharing, the quick action), so the
+     * home screen may show the sending animation (docs/PLAN.md §3.3); a scheduled run alone isn't.
+     */
+    data class Syncing(
+        val progress: TransferProgress?,
+        val turbo: Boolean = false,
+        val internet: Boolean = false,
+        val estimate: TransferEstimate? = null,
+        val manual: Boolean = false,
+    ) : ProducerState
+
+    data class Failed(val reason: SyncFailure) : ProducerState
+}
+
+/**
+ * What the consumer doesn't have yet: [toSend], [withheld] by the *Photo details* setting, whose details can't be
+ * removed (RAW photos under *Remove all*, formats MediaSync can't read), and [leftOut] by the user.
+ */
+data class Pending(val toSend: Int = 0, val withheld: Int = 0, val bytes: Long = 0, val leftOut: Int = 0)
+
+/** The outcome of scanning a pairing QR code. */
+sealed interface PairingResult {
+    data class Paired(val consumerName: String) : PairingResult
+
+    data class Refused(val decision: PairingDecision) : PairingResult
+
+    data class Failed(val reason: SyncFailure) : PairingResult
+}
+
+/**
+ * How a sending phone looks for the receiving phone's *Turbo receive* link (docs/PLAN.md §8.3): for [searchMillis] in
+ * all, joining each name it may have for up to [joinMillis], with [pauseMillis] between rounds. Its user may start
+ * Turbo receive only after Turbo here, and Android joins a link only if it's up when asked: so this phone asks again.
+ */
+data class TurboReceiveSearch(
+    val searchMillis: Long = 120_000,
+    /** A link that's up is joined in a few seconds (3 to 4 on the test phones, docs/PLAN.md §8.3). */
+    val joinMillis: Long = 20_000,
+    val pauseMillis: Long = 2_000,
+)
+
+/** The sending side: pairs with the consumer and sends new photos and videos to it (docs/PLAN.md §5). */
+@Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
+class ProducerSync(
+    private val peers: PeerBook,
+    private val ledger: SentLedger,
+    private val source: MediaSource,
+    private val leftOut: LeftOutItems,
+    private val device: DeviceInfo,
+    network: SendLinks,
+    private val history: SyncRecorder,
+    private val conditions: DeviceConditions,
+    private val scope: CoroutineScope,
+    private val turboSearch: TurboReceiveSearch,
+    /** The test file waiting to be sent first (docs/PLAN.md §7, *Test file*). */
+    private val testFiles: TestFileQueue = NoTestFile,
+) {
+    private val discovery = network.discovery
+    private val lan = network.lan
+    private val directLinks = network.directLinks
+    private val internet = network.internet
+    private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
+    private var job: Job? = null
+
+    /**
+     * A sync is running: set until just before its outcome shows, so whoever sees that outcome may start the next
+     * one right away. Its job finishes a moment later; asked again in between, *Sync now* would otherwise be ignored.
+     */
+    @Volatile
+    private var syncing = false
+
+    @Volatile
+    private var cancelled = false
+
+    @Volatile
+    private var pauseWhen: () -> Boolean = { false }
+
+    /** The user asked for the sync running now ([ProducerState.Syncing.manual]). */
+    @Volatile
+    private var manual = false
+
+    val state: StateFlow<ProducerState> = _state.asStateFlow()
+
+    suspend fun pair(link: PairingLink): PairingResult = withContext(ioDispatcher) {
+        val connection = connectToFirst(link.addresses, link.consumer)
+            ?: return@withContext PairingResult.Failed(SyncFailure.UNREACHABLE)
+        try {
+            connection.use {
+                val outcome = PairingClient(device.local()).pair(it, link.token)
+                val consumer = outcome.consumer
+                if (consumer == null) {
+                    PairingResult.Refused(outcome.decision)
+                } else {
+                    peers.register(consumer, it.remoteAddress)
+                    peers.keepOnlyConsumer(consumer.id)
+                    // Where the code says it listens on its Wi-Fi: as good as what it tells in a session.
+                    peers.recordConsumer(
+                        consumer.id,
+                        ConsumerFacts(schedule = outcome.consumerSchedule, wifiAddresses = link.addresses),
+                    )
+                    PairingResult.Paired(consumer.name)
+                }
+            }
+        } catch (_: IncompatiblePeerException) {
+            PairingResult.Failed(SyncFailure.INCOMPATIBLE)
+        } catch (_: IOException) {
+            PairingResult.Failed(SyncFailure.CONNECTION_LOST)
+        }
+    }
+
+    /** Starts sending to the paired consumer, unless a sync is already running; either way, as the user asked. */
+    fun syncNow() {
+        launchSync(pauseWhen = { false }, turbo = false, manual = true)
+    }
+
+    /** Whether this phone can use Turbo transfer (docs/PLAN.md §8.3) now. */
+    fun turboAvailability(): TurboAvailability = directLinks.availability()
+
+    /** Turbo uses more power: worth a warning below 30 % without a charger. */
+    fun turboBatteryLow(): Boolean = conditions.lowForTurbo()
+
+    /**
+     * Syncs now, or joins the sync already running, and returns how it ended. For background work: if the
+     * caller is cancelled (the charger was unplugged), or [pauseWhen] of the sync it started becomes true (the
+     * phone got hot), the sync stops after the current file. With [turbo], over a direct link (docs/PLAN.md §8.3)
+     * if one can be set up, else over Wi-Fi. [manual]: the user asked for it ([ProducerState.Syncing.manual]); joining
+     * a sync already running, that one becomes theirs.
+     */
+    suspend fun syncAndWait(
+        pauseWhen: () -> Boolean = { false },
+        turbo: Boolean = false,
+        manual: Boolean = false,
+    ): ProducerState {
+        val running = launchSync(pauseWhen, turbo, manual)
+        try {
+            running.join()
+        } catch (e: CancellationException) {
+            cancel()
+            throw e
+        }
+        return _state.value
+    }
+
+    /** The speed and time left of the sync running now: progress stops coming while a link stalls. */
+    private val estimator = TransferEstimator()
+
+    /**
+     * The bytes this sync has done, over every connection it used: Wi-Fi, then Turbo after a swap, and of them the
+     * skipped ones ([TransferProgress.bytesSkipped]). Each one's progress starts at 0; for the speed, they're one
+     * transfer.
+     */
+    private val done = MutableStateFlow(0L)
+    private val skipped = MutableStateFlow(0L)
+    private val _speedHistory = MutableStateFlow<List<SpeedSample>>(emptyList())
+
+    /** The speed every second of the sync running now, or of the last one, for its chart. */
+    val speedHistory: StateFlow<List<SpeedSample>> = _speedHistory.asStateFlow()
+
+    /** Keeps the estimate current every second, also while nothing comes. */
+    private suspend fun refreshEstimate() {
+        while (true) {
+            delay(ESTIMATE_REFRESH_MILLIS)
+            _speedHistory.value = estimator.history()
+            _state.update { state ->
+                if (state is ProducerState.Syncing && state.progress != null) {
+                    state.copy(estimate = estimator.refresh())
+                } else {
+                    state
+                }
+            }
+        }
+    }
+
+    /** Guards the start of a sync: two callers at once must not both start one. */
+    private val launchLock = Lock()
+
+    private fun launchSync(pauseWhen: () -> Boolean, turbo: Boolean, manual: Boolean): Job =
+        launchLock.withLock { launchSyncLocked(pauseWhen, turbo, manual) }
+
+    // Not inline: a return inside withLock would not leave the function, so the body keeps its early returns here.
+    private fun launchSyncLocked(pauseWhen: () -> Boolean, turbo: Boolean, manual: Boolean): Job {
+        job?.takeIf { syncing }?.let { running ->
+            if (manual) {
+                this.manual = true
+                _state.update { state -> if (state is ProducerState.Syncing) state.copy(manual = true) else state }
+            }
+            return running
+        }
+        syncing = true
+        cancelled = false
+        this.manual = manual
+        this.pauseWhen = pauseWhen
+        estimator.reset()
+        done.value = 0
+        skipped.value = 0
+        _state.value = ProducerState.Connecting
+        return scope.launch(ioDispatcher) {
+            val estimates = launch { refreshEstimate() }
+            try {
+                val end = runSync(turbo)
+                syncing = false
+                _state.value = end
+            } finally {
+                estimates.cancel()
+                syncing = false // Also when it failed unexpectedly: never block later syncs.
+            }
+        }.also { job = it }
+    }
+
+    /** Stops after the current file; everything confirmed so far stays recorded. */
+    fun cancel() {
+        cancelled = true
+    }
+
+    /**
+     * The link test (docs/PLAN.md §7): how fast this phone can send to the receiving phone over [streams] connections
+     * at once, for [durationMillis]. `null` if it couldn't be reached; the diagnostic log says why.
+     */
+    @Suppress("TooGenericExceptionCaught") // A probe that breaks for any reason is "no result"; the log says why.
+    suspend fun linkTest(streams: Int, durationMillis: Long = LINK_TEST_MILLIS): LinkSpeed? =
+        withContext(ioDispatcher) {
+            val parent = currentCoroutineContext().job
+            val consumer = peers.consumer() ?: return@withContext null
+            val first = connect(consumer) ?: return@withContext null
+            // Filled inside the try, so that the finally closes whatever was opened, even if opening a stream fails.
+            val connections = mutableListOf<PeerConnection>()
+            try {
+                connections += first
+                repeat(streams - 1) { connectToFirst(listOf(first.remoteAddress), consumer.id)?.let(connections::add) }
+                lan.keepingAwake {
+                    // A child of the caller's job: cancelling the link test closes the connections too. Blocking reads
+                    // ignore cancellation, so without this the probe would run on until its duration ends.
+                    val closeOnCancel =
+                        CoroutineScope(parent).launch(ioDispatcher, start = CoroutineStart.UNDISPATCHED) {
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                connections.forEach { runCatching { it.close() } }
+                            }
+                        }
+                    try {
+                        // One blocked thread per stream. The finally closes every connection INSIDE runBlocking: a
+                        // failed stream must unblock its siblings (blocking reads ignore cancellation), or runBlocking
+                        // would wait.
+                        runBlocking {
+                            try {
+                                connections.map { connection ->
+                                    async(ioDispatcher) { LinkTest(device.local(), durationMillis).run(connection) }
+                                }.awaitAll().reduce(LinkSpeed::plus)
+                            } finally {
+                                connections.forEach { runCatching { it.close() } }
+                            }
+                        }
+                    } finally {
+                        closeOnCancel.cancel()
+                    }
+                }.also { speed ->
+                    Diagnostics.log(Area.SEND, "Link test over ${connections.size} connection(s): ${speed.describe()}")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Diagnostics.log(Area.SEND, "Link test failed", e)
+                null
+            } finally {
+                connections.forEach { runCatching { it.close() } }
+            }
+        }
+
+    /** Photos and videos the consumer doesn't have yet: those that will be sent, those withheld and those left out. */
+    suspend fun pendingCount(): Pending = withContext(ioDispatcher) {
+        val waiting = waiting() ?: return@withContext Pending()
+        val left = leftOut.of(waiting).toSet()
+        val details = device.photoDetails()
+        val (held, toSend) = waiting.filter { it !in left }.partition { isWithheld(it.descriptor.mimeType, details) }
+        Pending(toSend.size, held.size, toSend.sumOf { it.descriptor.size }, left.size)
+    }
+
+    /**
+     * Photos and videos the consumer doesn't have yet and the *Photo details* setting doesn't withhold: those that
+     * will be sent, and those the user left out ([LeftOutItems]). Shared items first, as they're sent.
+     */
+    suspend fun waitingItems(): List<SourceItem> = withContext(ioDispatcher) {
+        val details = device.photoDetails()
+        waiting().orEmpty().filterNot { isWithheld(it.descriptor.mimeType, details) }
+    }
+
+    /** What the consumer doesn't have yet, once each (as shared, if it was); `null` while not paired. */
+    private fun waiting(): List<SourceItem>? {
+        val consumer = peers.consumer() ?: return null
+        val sent = ledger.sentFingerprints(consumer.id)
+        return source.items()
+            .filter { it.descriptor.fingerprint !in sent }
+            .sortedByDescending { it.shared }
+            .distinctBy { it.descriptor.fingerprint }
+    }
+
+    private suspend fun runSync(turbo: Boolean): ProducerState {
+        val consumer = peers.consumer() ?: return ProducerState.Failed(SyncFailure.NOT_PAIRED)
+        val details = device.photoDetails()
+        val order = device.sendingOrder()
+        val over = if (turbo) ", Turbo asked for" else ""
+        Diagnostics.log(
+            Area.SEND,
+            "Sync to ${consumer.id.short()} (photo details: ${details.name.lowercase()}, " +
+                "order: ${order.name.lowercase()}$over)",
+        )
+        val run = Run(consumer, details, order, currentTimeMillis())
+        return try {
+            if (turbo) return run.overTurboAnyWay()
+            val connection = connect(consumer)
+            when {
+                connection != null -> run.overWifi(connection)
+                else -> run.overInternet() ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
+            }
+        } catch (e: IOException) {
+            // Where it stopped tells which side stalled: during a file, or waiting for the other phone.
+            val progress = (_state.value as? ProducerState.Syncing)?.progress
+            Diagnostics.log(Area.SEND, "Sync failed after ${since(run.started)} at ${progress.describe()}", e)
+            ProducerState.Failed(failureOf(e))
+        }
+    }
+
+    /** One sync to [consumer]: over Wi-Fi, or over a direct link while that works. */
+    private inner class Run(
+        val consumer: Peer,
+        val details: PhotoDetails,
+        val order: SendingOrder,
+        val started: Long,
+    ) {
+        /** On mobile data: how much more this month allows (docs/PLAN.md §2.2); `null` off mobile data. */
+        var mobileDataLeft: Long? = null
+
+        /** Progress comes every chunk; the home screen needs far less. */
+        private val shown = ProgressThrottle()
+
+        fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
+            _state.value = ProducerState.Syncing(progress = null, manual = manual)
+            return lan.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
+        }
+
+        /**
+         * Asks the consumer for a direct link over [connection], joins it and sends over it. Whatever doesn't work
+         * on the way, everything (or the rest) still goes over Wi-Fi, and the home screen says why. [aware]: asks
+         * for Wi-Fi Aware, and for Wi-Fi Direct again if that can't be joined. [reconnect] and [otherwise]: the way
+         * [connection] came, to ask again and to send what the link doesn't carry; Wi-Fi unless said otherwise.
+         */
+        suspend fun overTurbo(
+            connection: PeerConnection,
+            aware: Boolean = directLinks.awareAvailable(),
+            reconnect: suspend () -> PeerConnection? = { connect(consumer) },
+            otherwise: suspend (TurboProblem) -> ProducerState = { problem -> wifiAgain(problem) },
+        ): ProducerState {
+            _state.value = ProducerState.SettingUpTurbo
+            val answer = connection.use { TurboSetup(device.local()).request(it, aware) }
+            Diagnostics.log(Area.SEND, "Turbo: the receiving phone is ${answer.describe()}")
+            val link = when (answer) {
+                is TurboAnswer.Ready -> answer.link
+                is TurboAnswer.Unavailable -> return otherwise(answer.reason.toProblem())
+            }
+            val outcome = try {
+                overDirectLink(link)
+            } finally {
+                directLinks.leave()
+            }
+            return when {
+                outcome == null && link.kind == LinkKind.WIFI_AWARE -> {
+                    Diagnostics.log(Area.SEND, "Turbo: no Wi-Fi Aware link; asking for Wi-Fi Direct instead")
+                    val again = reconnect() ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
+                    overTurbo(again, aware = false, reconnect, otherwise)
+                }
+
+                outcome == null -> otherwise(TurboProblem.NO_LINK)
+
+                outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED -> otherwise(
+                    TurboProblem.DROPPED,
+                )
+
+                else -> outcome
+            }
+        }
+
+        /**
+         * Turbo asked for: over Wi-Fi if the consumer is on this phone's network, else over the internet, else its
+         * *Turbo receive* link. Where it was last reached is tried first. If it isn't there, it's asked over the
+         * internet already while it's looked for on the network, as each can take seconds: the first that reaches it
+         * is used, and the other one given up.
+         */
+        suspend fun overTurboAnyWay(): ProducerState {
+            connectKnown(consumer)?.let { return overTurbo(it) }
+            _state.value = ProducerState.SettingUpTurbo
+            val viaInternet = scope.async(ioDispatcher) { openInternet() }
+            // Found on the network first (or stopped): the internet connection, if it comes, isn't needed.
+            val dropInternet = { scope.launch { viaInternet.await()?.close() } }
+            val (connection, overInternet) = try {
+                coroutineScope {
+                    val onWifi = async { search(consumer) }
+                    val first = select {
+                        onWifi.onAwait { it to false }
+                        viaInternet.onAwait { it to true }
+                    }
+                    when {
+                        first.first == null && !first.second -> viaInternet.await() to true
+                        first.first == null -> onWifi.await() to false
+                        else -> first.also { onWifi.cancel() }
+                    }
+                }
+            } catch (e: CancellationException) {
+                dropInternet()
+                throw e
+            }
+            if (!overInternet) dropInternet()
+            return when {
+                connection == null -> overTurboReceive()
+                overInternet -> overTurboViaInternet(connection)
+                else -> overTurbo(connection)
+            }
+        }
+
+        /**
+         * Not on a network with the consumer, but reachable over the internet (docs/PLAN.md §8.3): asks it there, over
+         * [connection], for a direct link, as over Wi-Fi, so its user needn't tap *Turbo receive*. What the link
+         * doesn't carry goes over the internet.
+         */
+        private suspend fun overTurboViaInternet(connection: PeerConnection): ProducerState {
+            mobileDataLeft = internet.mobileDataLeft()
+            Diagnostics.log(Area.SEND, "Turbo: asking the receiving phone over the internet")
+            return overTurbo(connection, reconnect = ::internetConnection) { problem -> internetAgain(problem) }
+        }
+
+        /**
+         * Not on a network with the consumer: joins its *Turbo receive* link (docs/PLAN.md §8.3), whose name and
+         * passphrase come from the consumer's Turbo key and the time it was started. Its user may start it only now,
+         * after Turbo here: this phone keeps looking for a while, unless the user stops it.
+         */
+        suspend fun overTurboReceive(): ProducerState {
+            val key = consumer.turboKey ?: return ProducerState.Failed(SyncFailure.TURBO_NOT_SET_UP).also {
+                Diagnostics.log(Area.SEND, "Turbo: no key from the receiving phone yet; one sync over Wi-Fi tells it")
+            }
+            _state.value = ProducerState.LookingForTurboReceive
+            val port = (consumer.wifiAddresses + listOfNotNull(consumer.lastAddress))
+                .firstNotNullOfOrNull { parseHostPort(it)?.port } ?: PREFERRED_RECEIVER_PORT
+            val search = since(0, turboSearch.searchMillis)
+            Diagnostics.log(Area.SEND, "Turbo: looking for a Turbo receive link of the receiving phone for $search")
+            val outcome = searchTurboReceive(key, port)
+            return when {
+                cancelled -> ProducerState.Idle().also {
+                    Diagnostics.log(Area.SEND, "Turbo: stopped looking for the receiving phone's Turbo receive link")
+                }
+
+                outcome == null -> ProducerState.Failed(SyncFailure.TURBO_UNREACHABLE).also {
+                    Diagnostics.log(Area.SEND, "Turbo: no Turbo receive link of the receiving phone nearby")
+                }
+
+                // Over a link of its own, nothing to go on over: what's left goes next time.
+                outcome is ProducerState.Idle && outcome.turboProblem == TurboProblem.DROPPED ->
+                    ProducerState.Failed(SyncFailure.CONNECTION_LOST)
+
+                else -> outcome
+            }
+        }
+
+        /**
+         * Joins the link of [key] the consumer started in this epoch or the last, as soon as there is one, and sends
+         * over it. `null` if none came up in time, or the user stopped looking.
+         */
+        private suspend fun searchTurboReceive(key: ByteString, port: Int): ProducerState? {
+            // On the monotonic clock: the phone's own may be set meanwhile. The epochs go by the clock, as the link's.
+            val until = monotonicNanos() + turboSearch.searchMillis * NANOS_PER_MILLI
+            var looked: Long? = null
+            while (!cancelled) {
+                val now = currentTimeMillis()
+                for (started in DirectLink.epochsToLookFor(now, looked)) {
+                    if (cancelled) break
+                    val (name, passphrase) = DirectLink.derived(key, started)
+                    overTurboReceiveLink(DirectLink(name, passphrase, host = "", port = port))?.let { return it }
+                }
+                looked = DirectLink.epochAt(now)
+                val left = (until - monotonicNanos()) / NANOS_PER_MILLI
+                if (left <= 0) break
+                untilStopped { delay(minOf(turboSearch.pauseMillis, left)) }
+            }
+            return null
+        }
+
+        /** Joins [link], unless the user stops first, and sends over it; `null` if it wasn't joined. */
+        private suspend fun overTurboReceiveLink(link: DirectLink): ProducerState? = try {
+            untilStopped { join(link, turboSearch.joinMillis) }?.let { joined -> overJoinedLink(link, joined) }
+        } finally {
+            directLinks.leave()
+        }
+
+        /** How it ended over [link]; `null` if it couldn't be joined. A link dropping goes on over Wi-Fi. */
+        private suspend fun overDirectLink(link: DirectLink): ProducerState? {
+            val timeout = if (link.kind == LinkKind.WIFI_AWARE) AWARE_JOIN_TIMEOUT_MILLIS else JOIN_TIMEOUT_MILLIS
+            return join(link, timeout)?.let { joined -> overJoinedLink(link, joined) }
+        }
+
+        private suspend fun join(link: DirectLink, timeoutMillis: Long): JoinedLink? =
+            directLinks.join(link, timeoutMillis).also { joined ->
+                if (joined == null) {
+                    Diagnostics.log(Area.SEND, "Turbo: couldn't join $link within ${since(0, timeoutMillis)}")
+                }
+            }
+
+        /** How it ended over [link], [joined] already; `null` if the consumer didn't answer on it. */
+        private fun overJoinedLink(link: DirectLink, joined: JoinedLink): ProducerState? {
+            // Where the phone that opened the link is on it: it said so, but the link knows best.
+            val direct = connectOver(joined, link.port, consumer.id) ?: return null
+            Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host}")
+            _state.value = ProducerState.Syncing(progress = null, turbo = true, manual = manual)
+            return try {
+                lan.keepingAwake { send(direct, Path.DIRECT) { connectOver(joined, link.port, consumer.id) } }
+            } catch (e: IOException) {
+                if (failureOf(e) != SyncFailure.CONNECTION_LOST) throw e
+                Diagnostics.log(Area.SEND, "Turbo: the direct link dropped; going on over Wi-Fi", e)
+                ProducerState.Idle(turboProblem = TurboProblem.DROPPED)
+            }
+        }
+
+        /** Back on Wi-Fi after Turbo didn't work out; the rest goes there. */
+        private suspend fun wifiAgain(problem: TurboProblem): ProducerState {
+            val connection = connect(consumer) ?: return ProducerState.Failed(SyncFailure.UNREACHABLE)
+            return overWifi(connection, problem)
+        }
+
+        /**
+         * Not on a network with the consumer: through its rendezvous Worker (docs/PLAN.md §8.4), if it has one and
+         * this phone isn't on mobile data. `null` if there's no way to it that way. [turboProblem]: Turbo was asked
+         * for, and why it didn't carry this.
+         */
+        fun overInternet(turboProblem: TurboProblem? = null): ProducerState? {
+            val connection = internetConnection() ?: return null
+            _state.value = ProducerState.Syncing(progress = null, internet = true, manual = manual)
+            return lan.keepingAwake { send(connection, Path.INTERNET) }.copy(turboProblem = turboProblem)
+        }
+
+        /** Back on the internet after Turbo didn't work out; the rest goes there. */
+        private fun internetAgain(problem: TurboProblem): ProducerState =
+            overInternet(problem) ?: ProducerState.Failed(SyncFailure.UNREACHABLE)
+
+        /** A connection to the consumer through its rendezvous Worker, to send over; `null` if there's none. */
+        private fun internetConnection(): PeerConnection? =
+            openInternet()?.also { mobileDataLeft = internet.mobileDataLeft() }
+
+        /** A connection to the consumer through its rendezvous Worker; `null` if there's none. */
+        private fun openInternet(): PeerConnection? {
+            val worker = consumer.rendezvousUrl ?: return null
+            val secret = consumer.pairSecret ?: return null
+            if (!internet.allowed()) {
+                Diagnostics.log(Area.SEND, "Internet: not on Wi-Fi, and mobile data isn't allowed or its limit is used")
+                return null
+            }
+            val connection = try {
+                internet.connect(consumer.id, worker, secret)
+            } catch (e: IOException) {
+                Diagnostics.log(Area.SEND, "Internet: no connection to the receiving phone", e)
+                return null
+            }
+            Diagnostics.log(Area.SEND, "Internet: connected to the receiving phone ${connection.internetRoute()}")
+            return connection
+        }
+
+        /**
+         * Through the relay, videos wait for Wi-Fi or a direct connection unless the user lets them go (docs/PLAN.md
+         * §17, relay saver): they'd use most of the free allowance.
+         */
+        private fun relaySaver(relayed: Boolean): (SourceItem) -> Boolean {
+            if (!relayed || device.videosOverRelay()) return { false }
+            Diagnostics.log(Area.SEND, "Internet: through the relay; videos wait for Wi-Fi or a direct connection")
+            return { item -> item.descriptor.mimeType.startsWith("video/") }
+        }
+
+        /**
+         * Shows [progress] over [path]; [before] and [skippedBefore]: what this sync did over the connections it used
+         * before.
+         */
+        private fun show(progress: TransferProgress, path: Path, before: Long, skippedBefore: Long) {
+            done.update { maxOf(it, before + progress.bytesDone) }
+            skipped.update { maxOf(it, skippedBefore + progress.bytesSkipped) }
+            val all = progress.copy(
+                bytesDone = before + progress.bytesDone,
+                bytesTotal = before + progress.bytesTotal,
+                bytesSkipped = skippedBefore + progress.bytesSkipped,
+            )
+            val estimate = estimator.update(all)
+            if (shown.due(progress)) {
+                _state.value = ProducerState.Syncing(
+                    progress,
+                    turbo = path == Path.DIRECT,
+                    internet = path == Path.INTERNET,
+                    estimate = estimate,
+                    manual = manual,
+                )
+            }
+            // This month's mobile data limit reached: stops after the current file.
+            if (progress.bytesMoved >= (mobileDataLeft ?: Long.MAX_VALUE)) cancelled = true
+        }
+
+        /** [another]: one more connection the way [connection] went, for parallel streams. */
+        private fun send(
+            connection: PeerConnection,
+            path: Path,
+            another: () -> PeerConnection? = { connectToFirst(listOf(connection.remoteAddress), consumer.id) },
+        ): ProducerState.Idle = connection.use {
+            val over = when (path) {
+                Path.WIFI -> ""
+                Path.DIRECT -> " over Turbo"
+                Path.INTERNET -> " over the internet"
+            }
+            // Over the internet, the phone's own order sends photos first: more of them arrive per minute.
+            val order = order.resolved(overInternet = path == Path.INTERNET)
+            // Over the connections this sync used before this one.
+            val before = done.value
+            val skippedBefore = skipped.value
+            val relayed = (it as? RelayCounter)?.throughRelay() == true
+            val testFile = TestFileRoute(path.forTestFile(relayed), testFiles)
+            val result = ParallelSync(
+                session = { progress ->
+                    ProducerSession(
+                        device.local(),
+                        source,
+                        ledger,
+                        progress,
+                        { !cancelled && !pauseWhen() },
+                        details,
+                        order,
+                        leftOut = { items -> leftOut.of(items) },
+                        testFiles = testFile,
+                    )
+                },
+                connect = { another() },
+                progress = { progress -> show(progress, path, before, skippedBefore) },
+                // Over the internet, one connection carries it all.
+                mayAddStream = { path != Path.INTERNET && lan.canUseMoreConnections() },
+                holdBack = relaySaver(relayed),
+            ).sync(it)
+            mobileDataLeft?.let { left ->
+                internet.countMobileData(result.bytesSent)
+                if (result.bytesSent >=
+                    left
+                ) {
+                    Diagnostics.log(Area.SEND, "Internet: this month's mobile data limit is used")
+                }
+            }
+            peers.recordConsumer(
+                consumer.id,
+                ConsumerFacts(
+                    // A direct link's address is fleeting; over the internet, there's none.
+                    address = it.remoteAddress.takeIf { path == Path.WIFI },
+                    schedule = result.consumerSchedule,
+                    turboKey = result.consumerTurboKey,
+                    pairSecret = result.consumerPairSecret,
+                    rendezvousUrl = result.consumerRendezvousUrl,
+                    wifiAddresses = result.consumerWifiAddresses,
+                ),
+            )
+            if (!result.cancelled) history.recordSync(currentTimeMillis(), result.deferred)
+            Diagnostics.log(Area.SEND, "Sync done$over in ${since(started)}: ${result.describe()}")
+            ProducerState.Idle(result)
+        }
+    }
+
+    private fun failureOf(error: IOException): SyncFailure = when {
+        error is PeerEndedSessionException && error.byeReason == Bye.Reason.NOT_PAIRED -> SyncFailure.NOT_ALLOWED
+        error is IncompatiblePeerException -> SyncFailure.INCOMPATIBLE
+        else -> SyncFailure.CONNECTION_LOST
+    }
+
+    /**
+     * Where the consumer said it listens on this phone's Wi-Fi, and where it was last reached, first (fast); then
+     * whatever the network advertises (docs/PLAN.md §8.2): mDNS doesn't get through on every Wi-Fi.
+     */
+    private suspend fun connect(consumer: Peer): PeerConnection? = connectKnown(consumer) ?: search(consumer)
+
+    /** [consumer] where it was last reached, or said it is, on this phone's network; `null` if not there. */
+    private fun connectKnown(consumer: Peer): PeerConnection? {
+        val known = addressesToTry(consumer.lastAddress, consumer.wifiAddresses, lan::isOnLocalNetwork)
+        if (known.isEmpty()) return null
+        connectToFirst(known, consumer.id)?.let { return it }
+        Diagnostics.log(Area.SEND, "Not at ${known.joinToString(" or ")}; looking for it on the network")
+        return null
+    }
+
+    /** [consumer] found on this phone's network; `null` if it isn't found in time. */
+    private suspend fun search(consumer: Peer): PeerConnection? {
+        val found = discovery.find(serviceIdOf(consumer.id), DISCOVERY_TIMEOUT_MILLIS)
+        if (found == null) {
+            Diagnostics.log(Area.SEND, "Not found on the network within ${since(0, DISCOVERY_TIMEOUT_MILLIS)}")
+            return null
+        }
+        return connectToFirst(listOf(found), consumer.id).also { connection ->
+            Diagnostics.log(
+                Area.SEND,
+                if (connection ==
+                    null
+                ) {
+                    "Found at $found, but it didn't answer"
+                } else {
+                    "Found at $found"
+                },
+            )
+        }
+    }
+
+    /** [block]'s outcome; or `null` at once when the user stops the sync ([cancel]), which cancels [block]. */
+    private suspend fun <T> untilStopped(block: suspend () -> T): T? = coroutineScope {
+        val work = async { block() }
+        val stop = launch { while (!cancelled) delay(STOP_POLL_MILLIS) }
+        select {
+            work.onAwait { outcome ->
+                stop.cancel()
+                outcome
+            }
+            stop.onJoin {
+                work.cancel()
+                null
+            }
+        }
+    }
+
+    /** [direct]: over a direct link, which Android routes by itself, not through a Wi-Fi network. */
+    private fun connectToFirst(addresses: List<String>, expected: DeviceId): PeerConnection? =
+        addresses.asSequence().mapNotNull(::parseHostPort).firstNotNullOfOrNull { address ->
+            connectTo(address, expected, via = null)
+        }
+
+    /** Over a direct link this phone [joined]: through the network the link is. */
+    private fun connectOver(joined: JoinedLink, port: Int, expected: DeviceId): PeerConnection? =
+        connectTo(HostPort(joined.host, port), expected, joined.route)
+
+    private fun connectTo(address: HostPort, expected: DeviceId, via: LinkRoute?): PeerConnection? = try {
+        lan.connect(address, expected, CONNECT_TIMEOUT_MILLIS, via)
+    } catch (e: IOException) {
+        Diagnostics.log(Area.SEND, "Couldn't connect to $address", e)
+        null
+    }
+
+    private companion object {
+        const val DISCOVERY_TIMEOUT_MILLIS = 5_000L
+
+        /** How soon what waits for a link stops once the user stops the sync. */
+        const val STOP_POLL_MILLIS = 200L
+        const val ESTIMATE_REFRESH_MILLIS = 1_000L
+        const val LINK_TEST_MILLIS = 5_000L
+
+        /** Joining a Wi-Fi Direct group usually takes a few seconds; some phones take longer. */
+        const val JOIN_TIMEOUT_MILLIS = 30_000L
+
+        /** Wi-Fi Aware usually links up within seconds; Wi-Fi Direct is the fallback after this. */
+        const val AWARE_JOIN_TIMEOUT_MILLIS = 15_000L
+        const val CONNECT_TIMEOUT_MILLIS = 3_000
+        const val NANOS_PER_MILLI = 1_000_000L
+    }
+}
+
+private fun TurboUnavailable.toProblem() = when (this) {
+    TurboUnavailable.UNSUPPORTED -> TurboProblem.RECEIVER_UNSUPPORTED
+    TurboUnavailable.NOT_ALLOWED -> TurboProblem.RECEIVER_NOT_ALLOWED
+    TurboUnavailable.FAILED -> TurboProblem.NO_LINK
+}
+
+/** How a sync reaches the consumer (docs/PLAN.md §8). */
+private enum class Path { WIFI, DIRECT, INTERNET }
+
+/** As both phones' *Diagnostics* name it, for a test file: [relayed], through the relay. */
+private fun Path.forTestFile(relayed: Boolean) = when (this) {
+    Path.WIFI -> TestFilePath.WIFI
+    Path.DIRECT -> TestFilePath.TURBO
+    Path.INTERNET -> if (relayed) TestFilePath.RELAY else TestFilePath.INTERNET
+}
+
+/** Where no test file is ever sent. */
+private object NoTestFile : TestFileQueue {
+    override fun waiting(): TestFile? = null
+
+    override fun checked(file: TestFile, outcome: TestFileOutcome) = Unit
+
+    override fun held(file: TestFile, reason: TestFileHeld) = Unit
+}
