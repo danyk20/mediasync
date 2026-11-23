@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/danyk20/mediasync/compare/v0.15.0...v0.16.0) (2026-11-23)
+
+
+### Features
+
+* the iPhone's link carries whole syncs with timeouts and backpressure ([#200](https://github.com/danyk20/mediasync/issues/200)) ([321a16f](https://github.com/danyk20/mediasync/commit/321a16fbde710362f9c3261f40c1ebd1529bddd5))
+
 ## [0.15.0](https://github.com/danyk20/mediasync/compare/v0.14.0...v0.15.0) (2026-11-23)
 
 
