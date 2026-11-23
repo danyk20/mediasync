@@ -14,8 +14,8 @@ dependencies {
     implementation(libs.java.keyring)
     implementation(libs.jmdns)
 
-    testImplementation(testFixtures(projects.transport.lan))
-    testImplementation(testFixtures(projects.core.metadata)) // the golden photos and videos, for their dates
+    testImplementation(projects.transport.lanTesting)
+    testImplementation(projects.core.metadataTesting) // the golden photos and videos, for their dates
     testImplementation(libs.mockk) // fakes JmDNS, which is abstract, for the mDNS session tests
 }
 

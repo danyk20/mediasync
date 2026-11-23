@@ -6,7 +6,7 @@ A connector backs up what the receiving phone received to one kind of place: a c
 
 | Module | What it has |
 |---|---|
-| `:connector:api` | The interfaces (`BackupConnectorFactory`, `BackupConnector`, `DeviceAppConnector`), descriptors and limits, the settings schema, the registry, the shared decorators, and the pipeline (`BackupOrchestrator`, `BackupCoordinator`). Pure Kotlin. Its `testFixtures` have in-memory fakes. |
+| `:connector:api` | The interfaces (`BackupConnectorFactory`, `BackupConnector`, `DeviceAppConnector`), descriptors and limits, the settings schema, the registry, the shared decorators, and the pipeline (`BackupOrchestrator`, `BackupCoordinator`). Pure Kotlin. `:connector:api-testing` has its in-memory fakes. |
 | `:connector:contract-tests` | `BackupConnectorContractTest`: the checks every connector passes. |
 | `:connector:folder` | The folder connector for the desktop app: backs up into a folder on the computer, a mounted NAS share, or a folder another app syncs. Pure Kotlin/JVM, no Metro: the desktop app registers its factory. |
 | `:connector:android` | The Metro registration (`@ConnectorKey`), the backup ledger in the app's database, the accounts, and `CloudBackup`, which starts backups as items arrive. |

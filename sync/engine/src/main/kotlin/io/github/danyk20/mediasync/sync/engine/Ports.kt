@@ -12,7 +12,7 @@ import okio.ByteString
 import okio.Source
 
 // Interfaces the engine needs from the platform. Android implements them with MediaStore and Room;
-// tests use the in-memory fakes in testFixtures. All calls are blocking and made on an I/O thread.
+// tests use the in-memory fakes in `:sync:engine-testing`. All calls are blocking and made on an I/O thread.
 
 /** The producer's photos and videos that are eligible for sync. */
 interface MediaSource {

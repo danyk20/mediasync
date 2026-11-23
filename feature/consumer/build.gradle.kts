@@ -29,7 +29,7 @@ kotlin {
             implementation(projects.sync.android)
             implementation(projects.connector.android)
             implementation(projects.core.media)
-            implementation(project.dependencies.testFixtures(projects.connector.api))
+            implementation(projects.connector.apiTesting)
         }
     }
 }

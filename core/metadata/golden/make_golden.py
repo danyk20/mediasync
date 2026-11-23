@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """
 Creates the golden media set for the Photo details tests (docs/PLAN.md §6.5) in
-src/test/resources/golden. Everything is generated here (images, videos, the colour profile), so the set is
+core/metadata-testing/src/main/resources/golden. Everything is generated here (images, videos, the colour profile), so the set is
 free of third-party content. Needs ImageMagick (magick), exiftool, ffmpeg (libx264, libx265) and macOS sips.
 
     python3 core/metadata/golden/make_golden.py
@@ -18,7 +18,7 @@ import tempfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "..", "src", "testFixtures", "resources", "golden")
+OUT = os.path.join(HERE, "..", "..", "metadata-testing", "src", "main", "resources", "golden")
 
 LAT, LON, ALT = "47.3769", "8.5417", "408"
 TAKEN = "2026:10:14 09:30:00"

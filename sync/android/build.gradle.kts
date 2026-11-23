@@ -33,9 +33,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
 
-    testImplementation(testFixtures(projects.sync.engine))
-    testImplementation(testFixtures(projects.core.metadata))
-    testImplementation(testFixtures(projects.transport.lan))
+    testImplementation(projects.sync.engineTesting)
+    testImplementation(projects.core.metadataTesting)
+    testImplementation(projects.transport.lanTesting)
     testImplementation(libs.androidx.room.runtime)
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
@@ -48,6 +48,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotest.assertions)
     androidTestImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(testFixtures(projects.sync.engine))
-    androidTestImplementation(testFixtures(projects.transport.rendezvous))
+    androidTestImplementation(projects.sync.engineTesting)
+    androidTestImplementation(projects.transport.rendezvousTesting)
 }
