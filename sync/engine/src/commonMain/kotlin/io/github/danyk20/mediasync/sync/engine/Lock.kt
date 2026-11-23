@@ -6,14 +6,21 @@ package io.github.danyk20.mediasync.sync.engine
 
 /**
  * A mutual-exclusion lock with one condition. NOT reentrant on any platform: a nested [withLock] on the same lock
- * deadlocks on iOS, and the JVM actual fails fast instead.
+ * deadlocks on iOS, and the JVM actual fails fast instead. Public for the fakes of `sync:engine-testing` only.
  */
-internal expect class Lock() {
+@EngineInternalApi
+expect class Lock() {
     /** Runs [block] holding the lock, and returns what it returns. */
     fun <T> withLock(block: () -> T): T
 
     /** Releases the lock and waits for [signalAll]; call only inside [withLock]. May wake spuriously: loop. */
     fun await()
+
+    /**
+     * Like [await], but gives up after [timeoutMillis]. Returns false when the time ran out, true when woken (which
+     * may be spurious: the caller loops).
+     */
+    fun await(timeoutMillis: Long): Boolean
 
     /** Wakes every waiter; call only inside [withLock]. */
     fun signalAll()

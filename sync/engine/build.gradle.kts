@@ -3,9 +3,11 @@ plugins {
 }
 
 kotlin {
-    // Lock is an expect class, which the compiler still marks Beta (warnings are errors here). Only this module uses it.
+    // Lock is an expect class, which the compiler still marks Beta (warnings are errors here).
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
+        // The engine's own code uses its internal Lock; sync:engine-testing uses it too (EngineInternalApi).
+        optIn.add("io.github.danyk20.mediasync.sync.engine.EngineInternalApi")
     }
     sourceSets {
         commonMain.dependencies {
@@ -19,10 +21,12 @@ kotlin {
             implementation(projects.core.metadata)
             implementation(projects.core.diagnostics)
         }
+        commonTest.dependencies {
+            // In-memory fakes: the sessions' tests run on every target, so they use the common fakes.
+            implementation(projects.sync.engineTesting)
+        }
         jvmTest.dependencies {
             implementation(projects.core.metadataTesting)
-            // In-memory fakes shared with the transport integration tests.
-            implementation(projects.sync.engineTesting)
         }
     }
 }
