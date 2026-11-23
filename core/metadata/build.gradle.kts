@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
+
 plugins {
     alias(libs.plugins.mediasync.kmp.library)
 }
@@ -19,6 +21,18 @@ kotlin {
 }
 
 mediasync { iosTargets() }
+
+// Tests that read the golden media set from a folder (an iOS test has no classpath): GOLDEN_DIR on the JVM,
+// SIMCTL_CHILD_GOLDEN_DIR for the simulator (simctl hands it on as GOLDEN_DIR). Inputs, so changed files rerun the tests.
+val goldenDir = layout.projectDirectory.dir("../metadata-testing/src/main/resources/golden")
+tasks.withType<Test>().configureEach {
+    inputs.dir(goldenDir)
+    environment("GOLDEN_DIR", goldenDir.asFile.absolutePath)
+}
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    inputs.dir(goldenDir)
+    environment("SIMCTL_CHILD_GOLDEN_DIR", goldenDir.asFile.absolutePath)
+}
 
 // Decides what leaves the phone: held to a stricter bar than the project-wide 70 %.
 kover {
