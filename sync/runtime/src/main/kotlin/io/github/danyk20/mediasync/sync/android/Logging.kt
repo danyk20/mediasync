@@ -12,7 +12,7 @@ import io.github.danyk20.mediasync.sync.engine.SyncResult
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
 import io.github.danyk20.mediasync.sync.engine.TurboAnswer
 import io.github.danyk20.mediasync.transport.PeerConnection
-import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
+import io.github.danyk20.mediasync.transport.RelayCounter
 import java.time.Duration
 import java.util.Locale
 

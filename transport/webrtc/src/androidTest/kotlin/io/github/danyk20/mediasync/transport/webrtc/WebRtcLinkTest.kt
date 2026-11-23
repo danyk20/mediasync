@@ -20,7 +20,7 @@ import io.github.danyk20.mediasync.sync.engine.testing.FakeReceivedLedger
 import io.github.danyk20.mediasync.sync.engine.testing.FakeSentLedger
 import io.github.danyk20.mediasync.sync.engine.testing.deviceId
 import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
-import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
+import io.github.danyk20.mediasync.transport.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.Signal
 import io.github.danyk20.mediasync.transport.rendezvous.SignalPipe
 import io.kotest.matchers.shouldBe

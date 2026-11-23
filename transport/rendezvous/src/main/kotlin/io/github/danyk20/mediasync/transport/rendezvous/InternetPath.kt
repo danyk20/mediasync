@@ -6,6 +6,7 @@ package io.github.danyk20.mediasync.transport.rendezvous
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.transport.PeerConnection
+import io.github.danyk20.mediasync.transport.RelayCounter
 import java.io.Closeable
 import java.io.IOException
 import java.net.URI
@@ -31,15 +32,6 @@ interface SignalPipe {
 
     /** Signals from the other phone, as they arrive. */
     val incoming: BlockingQueue<Signal>
-}
-
-/** A connection that may go through the TURN relay, which counts against the relay allowance (PLAN §8.5). */
-interface RelayCounter {
-    /** Bytes sent and received through the relay so far; 0 while the phones are connected directly. */
-    fun relayedBytes(): Long
-
-    /** Whether the connection goes through the relay now, rather than directly between the phones. */
-    fun throughRelay(): Boolean = false
 }
 
 /** A connection between the two phones that signals set up: WebRTC (transport:webrtc). */

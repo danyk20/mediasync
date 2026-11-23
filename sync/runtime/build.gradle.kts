@@ -11,7 +11,6 @@ dependencies {
     api(libs.okio)
     implementation(projects.core.diagnostics)
     implementation(projects.core.metadata)
-    implementation(projects.transport.rendezvous)
 
     testImplementation(projects.sync.engineTesting)
 }

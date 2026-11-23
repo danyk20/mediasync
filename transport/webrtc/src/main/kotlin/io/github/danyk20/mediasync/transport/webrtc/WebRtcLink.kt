@@ -7,12 +7,12 @@ package io.github.danyk20.mediasync.transport.webrtc
 import android.content.Context
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.transport.PeerConnection as SyncConnection
+import io.github.danyk20.mediasync.transport.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.ChannelPeerConnection
 import io.github.danyk20.mediasync.transport.rendezvous.ChannelStream
 import io.github.danyk20.mediasync.transport.rendezvous.IceServer
 import io.github.danyk20.mediasync.transport.rendezvous.MessageChannel
 import io.github.danyk20.mediasync.transport.rendezvous.PeerLinks
-import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
 import io.github.danyk20.mediasync.transport.rendezvous.Signal
 import io.github.danyk20.mediasync.transport.rendezvous.SignalPipe
 import java.io.IOException

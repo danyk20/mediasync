@@ -40,17 +40,11 @@ import io.github.danyk20.mediasync.sync.engine.TurboSetup
 import io.github.danyk20.mediasync.sync.engine.TurboUnavailable
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.transport.PeerConnection
-import io.github.danyk20.mediasync.transport.lan.IdentityProvider
-import io.github.danyk20.mediasync.transport.lan.LanClient
-import io.github.danyk20.mediasync.transport.lan.LanTimeouts
-import io.github.danyk20.mediasync.transport.rendezvous.RelayCounter
-import java.io.IOException
-import java.net.InetSocketAddress
+import io.github.danyk20.mediasync.transport.RelayCounter
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import javax.net.SocketFactory
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +60,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okio.ByteString
+import okio.IOException
 
 /** Why a pairing or sync attempt didn't work. */
 enum class SyncFailure {
@@ -169,13 +164,12 @@ data class TurboReceiveSearch(
 /** The sending side: pairs with the consumer and sends new photos and videos to it (docs/PLAN.md §5). */
 @Suppress("LongParameterList") // Collaborators, one each, and the timings tests shorten.
 class ProducerSync(
-    private val identity: IdentityProvider,
     private val peers: PeerBook,
     private val ledger: SentLedger,
     private val source: MediaSource,
     private val leftOut: LeftOutItems,
     private val device: DeviceInfo,
-    network: Connectivity,
+    network: SendLinks,
     private val history: SyncRecorder,
     private val conditions: DeviceConditions,
     private val scope: CoroutineScope,
@@ -184,7 +178,7 @@ class ProducerSync(
     private val testFiles: TestFileQueue = NoTestFile,
 ) {
     private val discovery = network.discovery
-    private val sockets = network.sockets
+    private val lan = network.lan
     private val directLinks = network.directLinks
     private val internet = network.internet
     private val _state = MutableStateFlow<ProducerState>(ProducerState.Idle())
@@ -347,7 +341,7 @@ class ProducerSync(
                     .filterNotNull()
             val pool = Executors.newFixedThreadPool(connections.size)
             try {
-                sockets.keepingAwake {
+                lan.keepingAwake {
                     connections.map { connection ->
                         pool.submit<LinkSpeed> { LinkTest(device.local(), durationMillis).run(connection) }
                     }
@@ -434,7 +428,7 @@ class ProducerSync(
 
         fun overWifi(connection: PeerConnection, turboProblem: TurboProblem? = null): ProducerState {
             _state.value = ProducerState.Syncing(progress = null, manual = manual)
-            return sockets.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
+            return lan.keepingAwake { send(connection, Path.WIFI) }.copy(turboProblem = turboProblem)
         }
 
         /**
@@ -537,7 +531,7 @@ class ProducerSync(
             }
             _state.value = ProducerState.LookingForTurboReceive
             val port = (consumer.wifiAddresses + listOfNotNull(consumer.lastAddress))
-                .firstNotNullOfOrNull { parseAddress(it)?.port } ?: ConsumerReceiver.PREFERRED_PORT
+                .firstNotNullOfOrNull { parseHostPort(it)?.port } ?: ConsumerReceiver.PREFERRED_PORT
             val search = since(0, turboSearch.searchMillis)
             Diagnostics.log(Area.SEND, "Turbo: looking for a Turbo receive link of the receiving phone for $search")
             val outcome = searchTurboReceive(key, port)
@@ -605,10 +599,10 @@ class ProducerSync(
         private fun overJoinedLink(link: DirectLink, joined: JoinedLink): ProducerState? {
             // Where the phone that opened the link is on it: it said so, but the link knows best.
             val direct = connectOver(joined, link.port, consumer.id) ?: return null
-            Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host.hostAddress}")
+            Diagnostics.log(Area.SEND, "Turbo: sending over ${link.networkName} at ${joined.host}")
             _state.value = ProducerState.Syncing(progress = null, turbo = true, manual = manual)
             return try {
-                sockets.keepingAwake { send(direct, Path.DIRECT) { connectOver(joined, link.port, consumer.id) } }
+                lan.keepingAwake { send(direct, Path.DIRECT) { connectOver(joined, link.port, consumer.id) } }
             } catch (e: IOException) {
                 if (failureOf(e) != SyncFailure.CONNECTION_LOST) throw e
                 Diagnostics.log(Area.SEND, "Turbo: the direct link dropped; going on over Wi-Fi", e)
@@ -630,7 +624,7 @@ class ProducerSync(
         fun overInternet(turboProblem: TurboProblem? = null): ProducerState? {
             val connection = internetConnection() ?: return null
             _state.value = ProducerState.Syncing(progress = null, internet = true, manual = manual)
-            return sockets.keepingAwake { send(connection, Path.INTERNET) }.copy(turboProblem = turboProblem)
+            return lan.keepingAwake { send(connection, Path.INTERNET) }.copy(turboProblem = turboProblem)
         }
 
         /** Back on the internet after Turbo didn't work out; the rest goes there. */
@@ -730,7 +724,7 @@ class ProducerSync(
                 connect = { another() },
                 progress = { progress -> show(progress, path, before, skippedBefore) },
                 // Over the internet, one connection carries it all.
-                mayAddStream = { path != Path.INTERNET && sockets.canUseMoreConnections() },
+                mayAddStream = { path != Path.INTERNET && lan.canUseMoreConnections() },
                 holdBack = relaySaver(relayed),
             ).sync(it)
             mobileDataLeft?.let { left ->
@@ -773,7 +767,7 @@ class ProducerSync(
 
     /** [consumer] where it was last reached, or said it is, on this phone's network; `null` if not there. */
     private fun connectKnown(consumer: Peer): PeerConnection? {
-        val known = addressesToTry(consumer.lastAddress, consumer.wifiAddresses, sockets::isOnLocalNetwork)
+        val known = addressesToTry(consumer.lastAddress, consumer.wifiAddresses, lan::isOnLocalNetwork)
         if (known.isEmpty()) return null
         connectToFirst(known, consumer.id)?.let { return it }
         Diagnostics.log(Area.SEND, "Not at ${known.joinToString(" or ")}; looking for it on the network")
@@ -819,21 +813,20 @@ class ProducerSync(
 
     /** [direct]: over a direct link, which Android routes by itself, not through a Wi-Fi network. */
     private fun connectToFirst(addresses: List<String>, expected: DeviceId): PeerConnection? =
-        addresses.asSequence().mapNotNull(::parseAddress).firstNotNullOfOrNull { address ->
-            connectTo(address, expected, sockets.factoryFor(address))
+        addresses.asSequence().mapNotNull(::parseHostPort).firstNotNullOfOrNull { address ->
+            connectTo(address, expected, via = null)
         }
 
     /** Over a direct link this phone [joined]: through the network the link is. */
     private fun connectOver(joined: JoinedLink, port: Int, expected: DeviceId): PeerConnection? =
-        connectTo(InetSocketAddress(joined.host, port), expected, joined.sockets)
+        connectTo(HostPort(joined.host, port), expected, joined.route)
 
-    private fun connectTo(address: InetSocketAddress, expected: DeviceId, factory: SocketFactory): PeerConnection? =
-        try {
-            LanClient.connect(address, identity.identity(), expected, TIMEOUTS, factory)
-        } catch (e: IOException) {
-            Diagnostics.log(Area.SEND, "Couldn't connect to ${address.hostString}:${address.port}", e)
-            null
-        }
+    private fun connectTo(address: HostPort, expected: DeviceId, via: LinkRoute?): PeerConnection? = try {
+        lan.connect(address, expected, CONNECT_TIMEOUT_MILLIS, via)
+    } catch (e: IOException) {
+        Diagnostics.log(Area.SEND, "Couldn't connect to $address", e)
+        null
+    }
 
     private companion object {
         const val DISCOVERY_TIMEOUT_MILLIS = 5_000L
@@ -848,7 +841,7 @@ class ProducerSync(
 
         /** Wi-Fi Aware usually links up within seconds; Wi-Fi Direct is the fallback after this. */
         const val AWARE_JOIN_TIMEOUT_MILLIS = 15_000L
-        val TIMEOUTS = LanTimeouts(connectMillis = 3_000)
+        const val CONNECT_TIMEOUT_MILLIS = 3_000
     }
 }
 

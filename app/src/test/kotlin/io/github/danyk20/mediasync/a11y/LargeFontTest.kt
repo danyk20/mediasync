@@ -54,8 +54,8 @@ import io.github.danyk20.mediasync.feature.producer.ProducerHomeUiState
 import io.github.danyk20.mediasync.sync.android.ProducerState
 import io.github.danyk20.mediasync.sync.android.RelayUsage
 import io.github.danyk20.mediasync.sync.engine.TransferProgress
-import java.time.Instant
 import java.time.ZonedDateTime
+import kotlin.time.Instant
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
