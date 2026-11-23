@@ -1,17 +1,25 @@
 plugins {
-    alias(libs.plugins.mediasync.jvm.library)
+    alias(libs.plugins.mediasync.kmp.library)
 }
 
-dependencies {
-    api(projects.core.model)
-    implementation(projects.core.metadata)
-    implementation(projects.core.diagnostics)
-    api(projects.sync.protocol)
-    api(projects.transport.api)
-
-    testImplementation(projects.core.metadataTesting)
-    // In-memory fakes shared with the transport integration tests.
-    testImplementation(projects.sync.engineTesting)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            api(projects.core.model)
+            api(projects.sync.protocol)
+            api(projects.transport.api)
+        }
+        jvmMain.dependencies {
+            // Plain-JVM or JVM-only for now: they move to commonMain with the PRs that convert them.
+            implementation(projects.core.metadata)
+            implementation(projects.core.diagnostics)
+        }
+        jvmTest.dependencies {
+            implementation(projects.core.metadataTesting)
+            // In-memory fakes shared with the transport integration tests.
+            implementation(projects.sync.engineTesting)
+        }
+    }
 }
 
 // Sync logic decides what is sent and stored: held to a stricter bar than the project-wide 70 %.
