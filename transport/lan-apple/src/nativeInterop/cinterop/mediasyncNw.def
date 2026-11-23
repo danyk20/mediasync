@@ -1,0 +1,4 @@
+language = Objective-C
+headers = mediasync_nw.h
+package = io.github.danyk20.mediasync.transport.lan.apple.shim
+compilerOpts = -fblocks
