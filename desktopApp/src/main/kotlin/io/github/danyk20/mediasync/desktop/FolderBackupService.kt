@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -89,7 +90,11 @@ class FolderBackupService(
             merge(received.observeCount().map { }, ticks()).collect { arrivals.trySend(Unit) }
         }
         val accounts = settings.backupFolder.map { listOfNotNull(accountFor(it)) }
-        copying = BackupCoordinator(registry, orchestrator).start(scope, accounts, arrivals.receiveAsFlow())
+        // Fresh read of the source of truth (DataStore), not the flow above, which lags the write.
+        val isCurrent: suspend (ConnectorAccount) -> Boolean = { account ->
+            accountFor(settings.backupFolder.first()) == account
+        }
+        copying = BackupCoordinator(registry, orchestrator).start(scope, accounts, arrivals.receiveAsFlow(), isCurrent)
         cleanup = scope.launch { cleanUpAfterCopies() }
     }
 

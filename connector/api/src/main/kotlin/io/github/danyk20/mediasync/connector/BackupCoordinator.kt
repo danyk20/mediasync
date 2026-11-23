@@ -34,15 +34,28 @@ class BackupCoordinator(
     /**
      * Backs up to each of [accounts] while [scope] lives: at once, then whenever [arrivals] says something was
      * received. Runs for one account never overlap; changes that come in meanwhile lead to one more run.
+     *
+     * [isCurrent] is asked just before each pass and each item: a follower whose account has been replaced, but not
+     * yet cancelled, backs nothing up. The follower for the new account picks the item up (its arrivals flow starts
+     * with an emit).
      */
-    fun start(scope: CoroutineScope, accounts: Flow<List<ConnectorAccount>>, arrivals: Flow<Unit>): Job = scope.launch {
+    fun start(
+        scope: CoroutineScope,
+        accounts: Flow<List<ConnectorAccount>>,
+        arrivals: Flow<Unit>,
+        isCurrent: suspend (ConnectorAccount) -> Boolean = { true },
+    ): Job = scope.launch {
         accounts.distinctUntilChanged().collectLatest { current ->
-            coroutineScope { current.forEach { account -> launch { follow(account, arrivals) } } }
+            coroutineScope { current.forEach { account -> launch { follow(account, arrivals, isCurrent) } } }
         }
     }
 
     @OptIn(FlowPreview::class)
-    private suspend fun follow(account: ConnectorAccount, arrivals: Flow<Unit>) = coroutineScope {
+    private suspend fun follow(
+        account: ConnectorAccount,
+        arrivals: Flow<Unit>,
+        isCurrent: suspend (ConnectorAccount) -> Boolean,
+    ) = coroutineScope {
         val connector = registry.connectorFor(account)
         if (connector == null) {
             Diagnostics.log(Area.BACKUP, "No connector ${account.connectorId} in this version; not backing up to it")
@@ -52,7 +65,18 @@ class BackupCoordinator(
         val turn = Mutex()
         launch {
             arrivals.onStart { emit(Unit) }.conflate().collect {
-                turn.withLock { guarded { orchestrator.backUp(account, connector) } }
+                turn.withLock {
+                    guarded {
+                        if (isCurrent(account)) {
+                            orchestrator.backUp(account, connector) { isCurrent(account) }
+                        } else {
+                            Diagnostics.log(
+                                Area.BACKUP,
+                                "${account.connectorId} is no longer the account; skipping this pass",
+                            )
+                        }
+                    }
+                }
             }
         }
         val app = connector.deviceApp() ?: return@coroutineScope

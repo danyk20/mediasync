@@ -56,18 +56,34 @@ class BackupOrchestrator(
     private val preprocessor: Preprocessor = Preprocessor.None,
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
 ) {
-    /** Backs up everything waiting for [account] through [connector]. */
-    suspend fun backUp(account: ConnectorAccount, connector: BackupConnector): BackupRun {
+    /**
+     * Backs up everything waiting for [account] through [connector]. [shouldContinue] is asked before each item is
+     * started; once it says no, the run ends there with what is done so far. An item already started is finished and
+     * gets its receipt, so a copy that was in progress when the answer changed stays where it was made.
+     *
+     * By design, the one item being copied when the answer changes may still land in the old destination:
+     * [shouldContinue] is only asked between items, never during an upload.
+     */
+    suspend fun backUp(
+        account: ConnectorAccount,
+        connector: BackupConnector,
+        shouldContinue: suspend () -> Boolean = { true },
+    ): BackupRun {
         var run = BackupRun()
+        var interrupted = false
         val seen = HashSet<ContentId>()
-        while (run.stoppedBy == null) {
+        while (run.stoppedBy == null && !interrupted) {
             val batch = ledger.pending(account.id, batchSize).filter { seen.add(it.contentId) }
             if (batch.isEmpty()) break // Done, or the ledger keeps offering what this run has already done.
             for (item in batch) {
+                // A failure, or an answer of no, ends the run before the next item is started.
+                if (run.stoppedBy != null || !shouldContinue()) {
+                    interrupted = true
+                    break
+                }
                 val result = upload(item, connector)
                 run = run.after(result)
-                if (result is UploadResult.Failed) break
-                ledger.record(listOf(receiptFor(item, account, result)))
+                if (result !is UploadResult.Failed) ledger.record(listOf(receiptFor(item, account, result)))
             }
         }
         if (run.total > 0 || run.stoppedBy != null) log(connector.descriptor, run)
