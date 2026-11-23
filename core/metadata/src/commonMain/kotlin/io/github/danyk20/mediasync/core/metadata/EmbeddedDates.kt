@@ -4,7 +4,9 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.time.ZoneId
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.offsetIn
 
 /** A capture time found inside a file; the offset is the camera's if [offsetKnown], else the reader's zone's. */
 data class CapturedAt(val epochMillis: Long, val utcOffsetMinutes: Int, val offsetKnown: Boolean)
@@ -17,16 +19,16 @@ object EmbeddedDates {
 
     /** `null` if the file has no readable date, is of another format, or is damaged. */
     @Suppress("TooGenericExceptionCaught") // Reading untrusted bytes: a bounds error means a damaged file.
-    fun capturedAt(size: Long, reader: ByteReader, zone: ZoneId): CapturedAt? {
+    fun capturedAt(size: Long, reader: ByteReader, zone: TimeZone): CapturedAt? {
         if (size < SNIFF_BYTES) return null
         return try {
             read(size, reader, zone)
         } catch (e: RuntimeException) {
-            if (UNREADABLE.any { it.isInstance(e) }) null else throw e
+            if (e.isDamagedFile()) null else throw e
         }
     }
 
-    private fun read(size: Long, reader: ByteReader, zone: ZoneId): CapturedAt? =
+    private fun read(size: Long, reader: ByteReader, zone: TimeZone): CapturedAt? =
         when (Format.of(reader.read(0, SNIFF_BYTES.toInt()))) {
             Format.JPEG -> Jpeg(reader, 0, size).exifTiff()?.capturedAt(zone)
             Format.TIFF -> Tiff(reader, 0, size).capturedAt(zone)
@@ -34,7 +36,7 @@ object EmbeddedDates {
             else -> null
         }
 
-    private fun isobmff(size: Long, reader: ByteReader, zone: ZoneId): CapturedAt? {
+    private fun isobmff(size: Long, reader: ByteReader, zone: TimeZone): CapturedAt? {
         val file = Isobmff(reader, 0, size)
         return when (file.kind) {
             Isobmff.Kind.HEIF -> file.exifTiff()?.capturedAt(zone)
@@ -43,18 +45,12 @@ object EmbeddedDates {
         }
     }
 
-    private fun video(size: Long, reader: ByteReader, zone: ZoneId): CapturedAt? =
+    private fun video(size: Long, reader: ByteReader, zone: TimeZone): CapturedAt? =
         VideoDates.capturedAtMillis(size, reader)?.let { millis ->
-            val offset = zone.rules.getOffset(java.time.Instant.ofEpochMilli(millis))
+            val offset = Instant.fromEpochMilliseconds(millis).offsetIn(zone)
             CapturedAt(millis, offset.totalSeconds / SECONDS_PER_MINUTE, offsetKnown = false)
         }
 
-    private val UNREADABLE = listOf(
-        MalformedMediaException::class.java,
-        IllegalArgumentException::class.java,
-        IndexOutOfBoundsException::class.java,
-        java.nio.BufferUnderflowException::class.java,
-    )
     private const val SNIFF_BYTES = 16L
     private const val SECONDS_PER_MINUTE = 60
 }

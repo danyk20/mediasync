@@ -4,19 +4,19 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.time.DateTimeException
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.UtcOffset
+import kotlinx.datetime.offsetIn
+import kotlinx.datetime.toInstant
 
 /** The file isn't what its header says, or is damaged: its details can't be removed with certainty. */
 internal class MalformedMediaException(message: String) : RuntimeException(message)
 
 internal fun malformed(message: String): Nothing = throw MalformedMediaException(message)
+
+/** What reading a damaged file throws: a format error, a bad argument, or a read outside the bytes. */
+internal fun RuntimeException.isDamagedFile(): Boolean =
+    this is MalformedMediaException || this is IllegalArgumentException || this is IndexOutOfBoundsException
 
 /**
  * A TIFF structure, as EXIF is stored in photos and RAW files are built: directories (IFDs) of tagged values.
@@ -133,7 +133,7 @@ internal class Tiff(private val reader: ByteReader, private val base: Long, priv
      * When the photo was taken: the EXIF original date, else the digitized one, else the file's date, with the UTC
      * offset the camera wrote, if any; otherwise [zone]'s at that moment. `null` if there is no readable date.
      */
-    fun capturedAt(zone: ZoneId): CapturedAt? {
+    fun capturedAt(zone: TimeZone): CapturedAt? {
         val ifd0 = ifd0()
         val exif = child(ifd0, EXIF_IFD)
         val (date, offset) = listOf(
@@ -143,27 +143,17 @@ internal class Tiff(private val reader: ByteReader, private val base: Long, priv
         ).firstNotNullOfOrNull { (ifd, tags) ->
             ifd?.find(tags.first)?.let { text(it) }?.takeIf { it.isNotBlank() }?.let { it to ifd.find(tags.second) }
         } ?: return null
-        val local = try {
-            LocalDateTime.parse(date, EXIF_DATE)
-        } catch (_: DateTimeParseException) {
-            return null // Cameras without a clock write zeros.
-        }
-        val explicit = offset?.let { text(it) }?.let {
-            try {
-                ZoneOffset.of(it)
-            } catch (_: DateTimeException) {
-                null
-            }
-        }
-        val instant = local.atZone(explicit ?: zone).toInstant()
-        val used = explicit ?: zone.rules.getOffset(instant)
-        return CapturedAt(instant.toEpochMilli(), used.totalSeconds / SECONDS_PER_MINUTE, explicit != null)
+        val local = parseExifDate(date) ?: return null // Cameras without a clock write zeros.
+        val explicit = offset?.let { text(it) }?.let { parseUtcOffsetSeconds(it) }?.let { UtcOffset(seconds = it) }
+        val instant = if (explicit != null) local.toInstant(explicit) else local.toInstant(zone)
+        val used = explicit ?: instant.offsetIn(zone)
+        return CapturedAt(instant.toEpochMilliseconds(), used.totalSeconds / SECONDS_PER_MINUTE, explicit != null)
     }
 
     private fun text(entry: Entry): String? = if (entry.type ==
         ASCII
     ) {
-        String(bytes(entry), Charsets.ISO_8859_1).trim { it == '\u0000' || it == ' ' }
+        bytes(entry).latin1String().trim { it == '\u0000' || it == ' ' }
     } else {
         null
     }
@@ -185,7 +175,6 @@ internal class Tiff(private val reader: ByteReader, private val base: Long, priv
         const val OFFSET_TIME_DIGITIZED = 0x9012
         private const val ASCII = 2
         private const val SECONDS_PER_MINUTE = 60
-        private val EXIF_DATE = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss")
         val CAPTURE_DATE_TAGS = listOf(DATE_TIME_ORIGINAL, 0x9011, 0x9291) // Date, its UTC offset, sub-seconds.
         val DIGITIZED_TAGS = listOf(0x9004, 0x9012, 0x9292)
 
@@ -217,7 +206,7 @@ private class TiffWriter(private val order: ByteOrder) {
             .filter { it.size > Tiff.INLINE_BYTES }
         val total = dataAt + outOfLine.sumOf { it.size + it.size % 2 }
         out = ByteBuffer.allocate(total).order(order)
-        out.put(if (order == ByteOrder.LITTLE_ENDIAN) "II".toByteArray() else "MM".toByteArray())
+        out.put(if (order == ByteOrder.LITTLE_ENDIAN) "II".latin1() else "MM".latin1())
         out.putShort(MAGIC).putInt(Tiff.HEADER_SIZE)
         var data = dataAt
         data = ifd(Tiff.HEADER_SIZE, main.map { (entry, value) -> entry to value }, data, exifAt)

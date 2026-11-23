@@ -4,8 +4,6 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.nio.ByteBuffer
-
 /**
  * A JPEG from [start] to [end] in the file [reader] reads: its metadata segments (before the image data), where
  * the image ends, and what follows it (an Ultra HDR gain map, a Motion Photo's video, a Samsung trailer).
@@ -228,8 +226,6 @@ internal class Jpeg(private val reader: ByteReader, private val start: Long, pri
         val FTYP = "ftyp".latin1()
     }
 }
-
-internal fun String.latin1(): ByteArray = toByteArray(Charsets.ISO_8859_1)
 
 /** Reads a file sequentially in blocks, for scanning image data quickly. */
 internal class Blocks(private val reader: ByteReader, private val end: Long) {

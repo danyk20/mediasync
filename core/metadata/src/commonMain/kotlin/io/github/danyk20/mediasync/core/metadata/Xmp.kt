@@ -15,7 +15,7 @@ internal object Xmp {
     /** Edits, relative to the packet's first byte, that blank every location property in [packet]. */
     fun locationEdits(packet: ByteArray): List<Edit> {
         // Byte offsets stay character offsets: XML syntax is ASCII, and other bytes are only ever replaced 1:1.
-        val text = String(packet, Charsets.ISO_8859_1)
+        val text = packet.latin1String()
         if (packet.take(NARROW_CHECK).any { it == 0.toByte() }) malformed("XMP not in UTF-8")
         val namespaces = NAMESPACE.findAll(text).associate { it.groupValues[1] to it.groupValues[2] }
         return Scanner(text) { name -> isLocation(name, namespaces) }.blankRanges()
@@ -24,8 +24,8 @@ internal object Xmp {
 
     /** A valid packet that says nothing, padded with spaces to exactly [length] bytes (all spaces if too short). */
     fun emptyPacket(length: Int): ByteArray {
-        val head = EMPTY_HEAD.toByteArray(Charsets.UTF_8)
-        val tail = EMPTY_TAIL.toByteArray(Charsets.UTF_8)
+        val head = EMPTY_HEAD.encodeToByteArray()
+        val tail = EMPTY_TAIL.encodeToByteArray()
         if (length < head.size + tail.size) return ByteArray(length) { SPACE }
         return head + ByteArray(length - head.size - tail.size) { SPACE } + tail
     }

@@ -24,6 +24,7 @@ import io.github.danyk20.mediasync.core.metadata.ByteReader
 import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
 import io.github.danyk20.mediasync.core.metadata.Redaction
 import io.github.danyk20.mediasync.core.metadata.VideoDates
+import io.github.danyk20.mediasync.core.metadata.open
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.core.model.SendRange

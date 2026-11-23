@@ -7,6 +7,7 @@ package io.github.danyk20.mediasync.sync.engine
 import io.github.danyk20.mediasync.core.metadata.ByteReader
 import io.github.danyk20.mediasync.core.metadata.PhotoDetailsRemover
 import io.github.danyk20.mediasync.core.metadata.Redaction
+import io.github.danyk20.mediasync.core.metadata.open
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.PhotoDetails
 import io.github.danyk20.mediasync.sync.engine.testing.ConnectionPair

@@ -8,15 +8,15 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 class XmpTest {
 
     private fun blank(xmp: String): String {
-        val bytes = xmp.toByteArray(Charsets.UTF_8)
+        val bytes = xmp.encodeToByteArray()
         val out = apply(bytes, Xmp.locationEdits(bytes))
         out.size shouldBe bytes.size
-        return String(out, Charsets.UTF_8)
+        return out.decodeToString()
     }
 
     private fun description(namespaces: String, body: String, attributes: String = "") =
@@ -79,16 +79,16 @@ class XmpTest {
 
     @Test
     fun brokenPacketsAreNotGuessedAt() {
-        shouldThrow<MalformedMediaException> { Xmp.locationEdits("<a b=c>".toByteArray()) }
-        shouldThrow<MalformedMediaException> { Xmp.locationEdits("<exif:GPSLatitude>1".toByteArray()) }
-        val utf16 = "<\u0000x\u0000m\u0000p".toByteArray(Charsets.ISO_8859_1)
+        shouldThrow<MalformedMediaException> { Xmp.locationEdits("<a b=c>".encodeToByteArray()) }
+        shouldThrow<MalformedMediaException> { Xmp.locationEdits("<exif:GPSLatitude>1".encodeToByteArray()) }
+        val utf16 = "<\u0000x\u0000m\u0000p".latin1()
         shouldThrow<MalformedMediaException> { Xmp.locationEdits(utf16) }
     }
 
     @Test
     fun anEmptyPacketFillsExactlyItsSpace() {
         Xmp.emptyPacket(200).size shouldBe 200
-        String(Xmp.emptyPacket(200), Charsets.UTF_8) shouldContain "<x:xmpmeta"
+        Xmp.emptyPacket(200).decodeToString() shouldContain "<x:xmpmeta"
         Xmp.emptyPacket(10).toList() shouldBe List(10) { ' '.code.toByte() }
     }
 }

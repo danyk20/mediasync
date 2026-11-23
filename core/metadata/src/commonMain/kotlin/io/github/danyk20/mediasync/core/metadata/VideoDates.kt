@@ -4,8 +4,6 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.nio.ByteBuffer
-
 /**
  * The capture time inside MP4, MOV and 3GP videos: the creation time of the movie header (`mvhd`), which Android's
  * media scanner and Google Photos read (docs/PLAN.md §6.2). Videos count seconds since 1904, in UTC; zero means
@@ -33,7 +31,7 @@ object VideoDates {
     }.orEmpty()
 
     private fun video(size: Long, reader: ByteReader): Isobmff? {
-        if (size < SNIFF_BYTES || String(reader.read(4, 4), Charsets.ISO_8859_1) !in FIRST_BOXES) return null
+        if (size < SNIFF_BYTES || reader.read(4, 4).latin1String() !in FIRST_BOXES) return null
         return Isobmff(reader, 0, size).takeIf { it.kind == Isobmff.Kind.VIDEO }
     }
 
@@ -67,15 +65,9 @@ object VideoDates {
     private fun <T> readable(read: () -> T): T? = try {
         read()
     } catch (e: RuntimeException) {
-        if (UNREADABLE.any { it.isInstance(e) }) null else throw e
+        if (e.isDamagedFile()) null else throw e
     }
 
-    private val UNREADABLE = listOf(
-        MalformedMediaException::class.java,
-        IllegalArgumentException::class.java,
-        IndexOutOfBoundsException::class.java,
-        java.nio.BufferUnderflowException::class.java,
-    )
     private val FIRST_BOXES = setOf("ftyp", "moov", "mdat", "wide", "free", "skip", "pnot")
     private const val SNIFF_BYTES = 8L
     private const val V1_TIMES = 20L
