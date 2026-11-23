@@ -43,7 +43,7 @@ jobs:
           desktop=$(git diff --name-only "$BASE"...HEAD | grep -E '^(desktopApp/|platform/desktop/|core/|sync/|transport/|connector/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^(version\.txt|LICENSE)$|^\.github/workflows/ci\.yml$' || true)
           if [ -n "$desktop" ]; then echo "desktop=true"; else echo "desktop=false"; fi >> "$GITHUB_OUTPUT"
           # The iOS job builds and tests the modules that have iOS targets, and the build that decides how.
-          ios=$(git diff --name-only "$BASE"...HEAD | grep -E '^(core/model/|core/metadata/|core/metadata-testing/|core/diagnostics/|core/util/|sync/protocol/|sync/engine/|sync/engine-testing/|sync/runtime/|transport/api/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^\.github/workflows/ci\.yml$' || true)
+          ios=$(git diff --name-only "$BASE"...HEAD | grep -E '^(core/model/|core/metadata/|core/metadata-testing/|core/diagnostics/|core/util/|sync/protocol/|sync/engine/|sync/engine-testing/|sync/runtime/|transport/api/|transport/lan/|transport/lan-apple/|transport/lan-testing/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^\.github/workflows/ci\.yml$' || true)
           if [ -n "$ios" ]; then echo "ios=true"; else echo "ios=false"; fi >> "$GITHUB_OUTPUT"
           others=$(git diff --name-only "$BASE"...HEAD | grep -vE '^(docs/|infra/rendezvous/)|\.md$' || true)
           echo "Changes outside docs and the Worker:"
@@ -271,8 +271,26 @@ jobs:
       - name: Build for iPhones, test on the iOS Simulator
         run: >
           scripts/gradlew-retrying.sh
-          :core:model:compileKotlinIosArm64 :core:metadata:compileKotlinIosArm64 :core:diagnostics:compileKotlinIosArm64 :core:util:compileKotlinIosArm64 :sync:protocol:compileKotlinIosArm64 :sync:engine:compileKotlinIosArm64 :sync:engine-testing:compileKotlinIosArm64 :sync:runtime:compileKotlinIosArm64 :transport:api:compileKotlinIosArm64
-          :core:model:iosSimulatorArm64Test :core:metadata:iosSimulatorArm64Test :core:diagnostics:iosSimulatorArm64Test :core:util:iosSimulatorArm64Test :sync:protocol:iosSimulatorArm64Test :sync:engine:iosSimulatorArm64Test :sync:engine-testing:iosSimulatorArm64Test :sync:runtime:iosSimulatorArm64Test :transport:api:iosSimulatorArm64Test
+          :core:model:compileKotlinIosArm64 :core:metadata:compileKotlinIosArm64 :core:diagnostics:compileKotlinIosArm64 :core:util:compileKotlinIosArm64 :sync:protocol:compileKotlinIosArm64 :sync:engine:compileKotlinIosArm64 :sync:engine-testing:compileKotlinIosArm64 :sync:runtime:compileKotlinIosArm64 :transport:api:compileKotlinIosArm64 :transport:lan-apple:compileKotlinIosArm64
+          :core:model:iosSimulatorArm64Test :core:metadata:iosSimulatorArm64Test :core:diagnostics:iosSimulatorArm64Test :core:util:iosSimulatorArm64Test :sync:protocol:iosSimulatorArm64Test :sync:engine:iosSimulatorArm64Test :sync:engine-testing:iosSimulatorArm64Test :sync:runtime:iosSimulatorArm64Test :transport:api:iosSimulatorArm64Test :transport:lan-apple:iosSimulatorArm64Test
+      # The interop test skips (and leaves no result) when Gradle did not give it the server's directory. That must
+      # fail the job, not pass it: every interop case must have passed and none may be skipped.
+      - name: The interop test ran against the JVM server
+        run: |
+          set -eu
+          result=transport/lan-apple/build/interop/interop-result.txt
+          if [ ! -s "$result" ]; then
+            echo "::error::The interop test left no results: it was skipped, so INTEROP_DIR was not set"
+            exit 1
+          fi
+          for name in helloIsExchangedOverMutualTlsWithThePinnedServer aWrongPinFailsTheHandshakeInTime aRefusedPortFailsInsteadOfWaiting; do
+            grep -qx "PASS $name" "$result" || { echo "::error::The interop test $name did not pass"; exit 1; }
+          done
+          if grep -h "<testsuite " transport/lan-apple/build/test-results/iosSimulatorArm64Test/*.xml | grep -v 'skipped="0"'; then
+            echo "::error::A test in transport:lan-apple was skipped"
+            exit 1
+          fi
+          cat "$result"
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

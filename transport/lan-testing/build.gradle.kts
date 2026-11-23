@@ -6,4 +6,12 @@ plugins {
 dependencies {
     api(projects.transport.lan)
     implementation(libs.bouncycastle.bcpkix)
+    // The interop server (InteropServer.kt) speaks the sync protocol's Hello frame.
+    implementation(projects.sync.protocol)
+}
+
+// Test-only JVM code: the JDK's default PRNG is the one every JVM test uses, so the Android 4.3 PRNG warning does not
+// apply. Lint on this JVM module reports it at the key generator, where a Kotlin @Suppress does not reach.
+lint {
+    disable += "TrulyRandom"
 }
