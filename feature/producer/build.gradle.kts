@@ -25,7 +25,7 @@ kotlin {
             implementation(projects.core.media)
             implementation(libs.androidx.room.runtime)
             implementation(libs.androidx.test.core)
-            implementation(project.dependencies.testFixtures(projects.sync.engine))
+            implementation(projects.sync.engineTesting)
         }
     }
 }

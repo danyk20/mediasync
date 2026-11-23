@@ -8,7 +8,7 @@ dependencies {
     api(projects.connector.api)
 
     testImplementation(projects.connector.contractTests)
-    testImplementation(testFixtures(projects.connector.api))
+    testImplementation(projects.connector.apiTesting)
 }
 
 // The contract-test kit is JUnit 4, so the tests of this module (kit and own) run on JUnit 4.

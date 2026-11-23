@@ -18,9 +18,9 @@ dependencies {
 
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
-    testImplementation(testFixtures(projects.core.metadata))
+    testImplementation(projects.core.metadataTesting)
 
-    androidTestImplementation(testFixtures(projects.core.metadata))
+    androidTestImplementation(projects.core.metadataTesting)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

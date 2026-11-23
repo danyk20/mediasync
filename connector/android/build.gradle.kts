@@ -15,7 +15,7 @@ dependencies {
     implementation(projects.core.model)
     implementation(libs.androidx.core.ktx)
 
-    testImplementation(testFixtures(projects.connector.api))
+    testImplementation(projects.connector.apiTesting)
     testImplementation(projects.core.testing)
     testImplementation(libs.androidx.room.runtime)
     testImplementation(libs.androidx.test.core)

@@ -13,5 +13,5 @@ dependencies {
     implementation(projects.core.metadata)
     implementation(projects.transport.rendezvous)
 
-    testImplementation(testFixtures(projects.sync.engine))
+    testImplementation(projects.sync.engineTesting)
 }

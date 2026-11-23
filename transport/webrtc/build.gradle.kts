@@ -13,7 +13,7 @@ dependencies {
     api(projects.transport.rendezvous)
     implementation(libs.webrtc)
 
-    androidTestImplementation(testFixtures(projects.sync.engine))
+    androidTestImplementation(projects.sync.engineTesting)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotest.assertions)

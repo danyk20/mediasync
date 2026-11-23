@@ -13,9 +13,9 @@ dependencies {
     api(libs.kotest.assertions)
     api(libs.kotlinx.coroutines.test)
     // Sample photos and videos with a date and a place inside: the golden media set (docs/PLAN.md §6.5).
-    implementation(testFixtures(projects.core.metadata))
+    implementation(projects.core.metadataTesting)
 
-    testImplementation(testFixtures(projects.connector.api))
+    testImplementation(projects.connector.apiTesting)
 }
 
 // Never on a phone, so compiled like tests rather than for Android's Java 8 API: Kotest's assertions, which the kit

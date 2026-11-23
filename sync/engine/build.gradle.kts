@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.mediasync.jvm.library)
-    `java-test-fixtures`
 }
 
 dependencies {
@@ -10,9 +9,9 @@ dependencies {
     api(projects.sync.protocol)
     api(projects.transport.api)
 
+    testImplementation(projects.core.metadataTesting)
     // In-memory fakes shared with the transport integration tests.
-    testFixturesApi(libs.okio)
-    testImplementation(testFixtures(projects.core.metadata))
+    testImplementation(projects.sync.engineTesting)
 }
 
 // Sync logic decides what is sent and stored: held to a stricter bar than the project-wide 70 %.

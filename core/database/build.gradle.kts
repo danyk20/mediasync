@@ -18,7 +18,7 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.androidx.room.testing)
             implementation(libs.androidx.sqlite.bundled)
-            implementation(project.dependencies.testFixtures(projects.sync.engine))
+            implementation(projects.sync.engineTesting)
         }
     }
 }

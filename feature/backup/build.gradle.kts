@@ -19,7 +19,7 @@ kotlin {
         androidHostTest.dependencies {
             implementation(projects.connector.android)
             implementation(libs.androidx.test.core)
-            implementation(project.dependencies.testFixtures(projects.connector.api))
+            implementation(projects.connector.apiTesting)
         }
     }
 }
