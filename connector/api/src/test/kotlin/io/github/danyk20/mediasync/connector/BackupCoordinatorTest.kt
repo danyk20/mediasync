@@ -138,6 +138,36 @@ class BackupCoordinatorTest {
         receiptOf(1)?.state shouldBe BackupState.BACKED_UP
     }
 
+    @Test
+    fun aFollowerWhoseAccountWasReplacedBacksNothingUpUntilTheNewOneTakesOver() = runTest {
+        val old = account("test-cloud").copy(settings = mapOf("folder" to "old"))
+        val new = old.copy(settings = mapOf("folder" to "new"))
+        val truth = MutableStateFlow(old) // Stands for the settings store, which is written first.
+        val seen = MutableStateFlow(listOf(old)) // Stands for the accounts flow, which lags behind.
+        val factory = FakeConnectorFactory()
+        val registry = ConnectorRegistry(mapOf("test-cloud" to factory))
+        BackupCoordinator(registry, BackupOrchestrator(ledger, clock))
+            .start(backgroundScope, seen, arrivals) { it == truth.value }
+        runCurrent()
+
+        ledger.received += backupItem(1)
+        arrivals.emit(Unit)
+        runCurrent()
+        receiptOf(1)?.state shouldBe BackupState.BACKED_UP
+
+        truth.value = new // The folder changes; the accounts flow has not caught up yet.
+        ledger.received += backupItem(2)
+        arrivals.emit(Unit)
+        runCurrent()
+        receiptOf(2).shouldBeNull()
+        factory.created.size shouldBe 1 // Still only the old connector; nothing went up.
+
+        seen.value = listOf(new) // Now the old follower is cancelled and the new one starts.
+        runCurrent()
+        receiptOf(2)?.state shouldBe BackupState.BACKED_UP
+        factory.created.last() shouldBe new // Both accounts share the ledger id, as the real folder account does.
+    }
+
     private companion object {
         const val SETTLE_MILLIS = 5_000L
     }

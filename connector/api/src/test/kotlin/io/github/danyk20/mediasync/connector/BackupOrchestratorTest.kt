@@ -21,10 +21,15 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BackupOrchestratorTest {
 
     private val ledger = InMemoryBackupLedger()
@@ -180,6 +185,41 @@ class BackupOrchestratorTest {
         )
         ledger.receipt(contentId(2), app.id)?.state shouldBe BackupState.HANDED_OVER
         logged.last() shouldBe "backup: test-app: 1 backed up and removed from the phone"
+    }
+
+    @Test
+    fun aRunEndsBeforeTheNextItemOnceToldNotToContinue() = runTest {
+        ledger.received += (1..3).map { backupItem(it) }
+        var allowed = 1
+
+        val run = BackupOrchestrator(ledger, clock).backUp(cloud, FakeConnector()) { allowed-- > 0 }
+
+        run shouldBe BackupRun(uploaded = 1)
+        ledger.receipt(contentId(1), cloud.id)?.state shouldBe BackupState.BACKED_UP
+        ledger.receipt(contentId(2), cloud.id).shouldBeNull()
+        ledger.pending(cloud.id, 10).map { it.contentId } shouldBe listOf(contentId(2), contentId(3))
+    }
+
+    @Test
+    fun anItemAlreadyStartedIsFinishedAndRecorded() = runTest {
+        ledger.received += listOf(backupItem(1), backupItem(2))
+        val gate = CompletableDeferred<Unit>()
+        var current = true
+        val connector = FakeConnector(answer = {
+            gate.await()
+            UploadResult.Uploaded("r", it.size)
+        })
+        val orchestrator = BackupOrchestrator(ledger, clock)
+
+        val job = async { orchestrator.backUp(cloud, connector) { current } }
+        runCurrent() // Item 1 is started and is waiting on the gate.
+        current = false // The folder changes while item 1 is copying.
+        gate.complete(Unit)
+        job.await()
+
+        ledger.receipt(contentId(1), cloud.id)?.state shouldBe BackupState.BACKED_UP
+        ledger.receipt(contentId(2), cloud.id).shouldBeNull()
+        connector.uploads shouldBe listOf(contentId(1))
     }
 
     @Test
