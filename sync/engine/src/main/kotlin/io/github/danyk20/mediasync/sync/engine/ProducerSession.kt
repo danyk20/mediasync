@@ -34,7 +34,6 @@ import okio.BufferedSource
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import okio.buffer
-import okio.source
 
 /** The outcome of one producer session. */
 data class SyncResult(
@@ -354,7 +353,7 @@ class ProducerSession(
         private fun openOrNull(prepared: Prepared): BufferedSource? = try {
             val original = source.open(prepared.item)
             when (val redaction = prepared.redaction) {
-                is Redaction.Edited -> redaction.open(original.buffer().inputStream()).source().buffer()
+                is Redaction.Edited -> redaction.open(original).buffer()
                 else -> original.buffer()
             }
         } catch (_: IOException) {

@@ -4,30 +4,29 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
+import okio.Buffer
 
 /**
  * Photoshop image resources (a JPEG's APP13 segment), where IPTC captions, keywords and place names live. Desktop
  * photo tools write them; cameras rarely do.
  */
 internal object PhotoshopResources {
-    val SIGNATURE = "Photoshop 3.0\u0000".toByteArray(Charsets.ISO_8859_1)
+    val SIGNATURE = "Photoshop 3.0\u0000".latin1()
 
     /** [payload] (an APP13 segment's) without IPTC location datasets; `null` when there's nothing to remove. */
     fun withoutLocation(payload: ByteArray): ByteArray? {
         if (!payload.startsWith(SIGNATURE)) return null
-        val out = ByteArrayOutputStream().apply { write(SIGNATURE) }
+        val out = Buffer().apply { write(SIGNATURE) }
         var changed = false
         var i = SIGNATURE.size
         while (i < payload.size) {
             if (i + RESOURCE_HEADER > payload.size || !payload.startsWith(RESOURCE, i)) malformed("Photoshop resource")
-            val id = ByteBuffer.wrap(payload, i + 4, 2).short.toInt() and USHORT
+            val id = ByteBuffer.wrap(payload).getShort(i + 4).toInt() and USHORT
             val nameLength = payload[i + 6].toInt() and BYTE
             val nameField = (1 + nameLength).let { it + it % 2 }
             val sizeAt = i + 6 + nameField
             if (sizeAt + 4 > payload.size) malformed("Photoshop resource name")
-            val size = ByteBuffer.wrap(payload, sizeAt, 4).int
+            val size = ByteBuffer.wrap(payload).getInt(sizeAt)
             val dataAt = sizeAt + 4
             if (size < 0 || dataAt + size > payload.size) malformed("Photoshop resource of $size bytes")
             val data = payload.copyOfRange(dataAt, dataAt + size)
@@ -36,13 +35,13 @@ internal object PhotoshopResources {
             out.write(payload, i, sizeAt - i)
             out.write(ByteBuffer.allocate(4).putInt(kept.size).array())
             out.write(kept)
-            if (kept.size % 2 == 1) out.write(0)
+            if (kept.size % 2 == 1) out.writeByte(0)
             i = dataAt + size + size % 2
         }
-        return if (changed) out.toByteArray() else null
+        return if (changed) out.readByteArray() else null
     }
 
-    private val RESOURCE = "8BIM".toByteArray(Charsets.ISO_8859_1)
+    private val RESOURCE = "8BIM".latin1()
     private const val IPTC = 0x0404
     private const val RESOURCE_HEADER = 12
     private const val USHORT = 0xFFFF
@@ -59,7 +58,7 @@ internal object Iptc {
     private const val HEADER = 5
 
     fun withoutLocation(data: ByteArray): ByteArray {
-        val out = ByteArrayOutputStream()
+        val out = Buffer()
         var i = 0
         while (i < data.size) {
             if (data[i].toInt() != TAG_MARKER) {
@@ -82,7 +81,7 @@ internal object Iptc {
             if (!(record == APPLICATION_RECORD && dataset in LOCATION)) out.write(data, i, end - i)
             i = end
         }
-        return out.toByteArray()
+        return out.readByteArray()
     }
 }
 

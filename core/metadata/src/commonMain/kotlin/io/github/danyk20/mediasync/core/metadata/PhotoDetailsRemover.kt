@@ -22,7 +22,7 @@ object PhotoDetailsRemover {
             redaction(size, reader, all = details == PhotoDetails.REMOVE_ALL)
         } catch (e: RuntimeException) {
             // A damaged or contradictory file: its details can't be removed with certainty.
-            if (UNREADABLE.any { it.isInstance(e) }) Redaction.Withheld(WithheldReason.UNSUPPORTED) else throw e
+            if (e.isDamagedFile()) Redaction.Withheld(WithheldReason.UNSUPPORTED) else throw e
         }
     }
 
@@ -62,14 +62,6 @@ object PhotoDetailsRemover {
 
     private fun edited(size: Long, edits: List<Edit>): Redaction =
         if (edits.isEmpty()) Redaction.None else Redaction.Edited(mergeZeros(edits), size)
-
-    /** What reading a damaged file throws; [Redaction.Edited] also rejects contradictory (overlapping) edits. */
-    private val UNREADABLE = listOf(
-        MalformedMediaException::class.java,
-        IllegalArgumentException::class.java,
-        IndexOutOfBoundsException::class.java,
-        java.nio.BufferUnderflowException::class.java,
-    )
 
     private const val SNIFF_BYTES = 16L
 }

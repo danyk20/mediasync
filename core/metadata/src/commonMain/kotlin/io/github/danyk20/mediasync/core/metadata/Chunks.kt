@@ -4,12 +4,9 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.util.zip.CRC32
-import java.util.zip.DeflaterOutputStream
-import java.util.zip.InflaterInputStream
+import okio.Buffer
+import okio.buffer
+import okio.use
 
 /**
  * A PNG: chunks of length, type, data and checksum. Nothing points into a PNG by offset, so chunks may change size
@@ -28,7 +25,7 @@ internal class Png(private val reader: ByteReader, private val fileSize: Long) :
             if (at + HEADER + CRC_SIZE > fileSize) malformed("PNG chunk header at $at")
             val header = ByteBuffer.wrap(reader.read(at, HEADER))
             val length = header.getInt(0)
-            val chunk = Chunk(String(header.array(), 4, 4, Charsets.ISO_8859_1), at, length)
+            val chunk = Chunk(header.array().latin1String(4, 4), at, length)
             if (length < 0 || chunk.end > fileSize) malformed("PNG chunk of $length bytes")
             add(chunk)
             at = chunk.end
@@ -79,14 +76,10 @@ internal class Png(private val reader: ByteReader, private val fileSize: Long) :
         at = data.zeroAfter(at) + 1
         at = data.zeroAfter(at) + 1
         val text = data.copyOfRange(at, data.size)
-        val packet = if (compressed) InflaterInputStream(text.inputStream()).use { it.readBytes() } else text
+        val packet = if (compressed) Zlib.inflate(text) else text
         val blanked = apply(packet, Xmp.locationEdits(packet))
         if (blanked === packet) return emptyList()
-        val newText = if (compressed) {
-            ByteArrayOutputStream().also { out -> DeflaterOutputStream(out).use { it.write(blanked) } }.toByteArray()
-        } else {
-            blanked
-        }
+        val newText = if (compressed) Zlib.deflate(blanked) else blanked
         return listOf(replace(chunk, data.copyOfRange(0, at) + newText))
     }
 
@@ -95,7 +88,7 @@ internal class Png(private val reader: ByteReader, private val fileSize: Long) :
     private fun keyword(chunk: Chunk): String {
         val head = reader.read(chunk.dataAt, minOf(chunk.length, MAX_KEYWORD))
         val end = head.indexOf(0).takeIf { it >= 0 } ?: head.size
-        return String(head, 0, end, Charsets.ISO_8859_1)
+        return head.latin1String(0, end)
     }
 
     private fun data(chunk: Chunk) = reader.read(chunk.dataAt, chunk.length)
@@ -103,7 +96,7 @@ internal class Png(private val reader: ByteReader, private val fileSize: Long) :
     /** The whole [chunk] replaced by one of the same type holding [data]. */
     private fun replace(chunk: Chunk, data: ByteArray): Edit {
         val typeAndData = chunk.type.latin1() + data
-        val crc = CRC32().apply { update(typeAndData) }.value
+        val crc = crc32(typeAndData)
         val bytes = ByteBuffer.allocate(HEADER + data.size + CRC_SIZE)
             .putInt(data.size).put(typeAndData).putInt(crc.toInt()).array()
         return Edit(chunk.at, chunk.end - chunk.at, bytes)
@@ -140,7 +133,7 @@ internal class WebP(private val reader: ByteReader, private val fileSize: Long) 
         while (at + HEADER <= fileSize) {
             val header = ByteBuffer.wrap(reader.read(at, HEADER)).order(ByteOrder.LITTLE_ENDIAN)
             val length = header.getInt(4).toLong() and UINT
-            val chunk = Chunk(String(header.array(), 0, 4, Charsets.ISO_8859_1), at, length)
+            val chunk = Chunk(header.array().latin1String(0, 4), at, length)
             if (chunk.dataAt + length > fileSize) malformed("WebP chunk of $length bytes")
             add(chunk)
             at = minOf(chunk.end, fileSize)
@@ -218,5 +211,6 @@ internal class WebP(private val reader: ByteReader, private val fileSize: Long) 
 /** [data] with [edits] applied (in memory), or [data] itself when there are none. */
 internal fun apply(data: ByteArray, edits: List<Edit>): ByteArray {
     if (edits.isEmpty()) return data
-    return Redaction.Edited(mergeZeros(edits), data.size.toLong()).open(data.inputStream()).use { it.readBytes() }
+    return Redaction.Edited(mergeZeros(edits), data.size.toLong()).open(Buffer().write(data)).buffer()
+        .use { it.readByteArray() }
 }

@@ -7,6 +7,8 @@ package io.github.danyk20.mediasync.platform.desktop
 import io.github.danyk20.mediasync.core.metadata.ByteReader
 import io.github.danyk20.mediasync.core.metadata.CaptureDateGuess
 import io.github.danyk20.mediasync.core.metadata.EmbeddedDates
+import io.github.danyk20.mediasync.core.metadata.capturedAt
+import io.github.danyk20.mediasync.core.metadata.resolve
 import io.github.danyk20.mediasync.core.model.SendRange
 import io.github.danyk20.mediasync.core.model.endMillis
 import io.github.danyk20.mediasync.core.model.startMillis

@@ -4,13 +4,13 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.time.DateTimeException
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZoneOffset
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /** Where a capture date for a file without one came from, best first (docs/PLAN.md §6.2, point 3). */
 enum class DateSource {
@@ -38,7 +38,7 @@ object CaptureDateGuess {
      * times in names were taken; the sending phone's zone isn't known without a gallery date, so callers pass their
      * own.
      */
-    fun resolve(galleryMillis: Long?, fileName: String, modifiedAtMillis: Long?, zone: ZoneId): CaptureDate? = when {
+    fun resolve(galleryMillis: Long?, fileName: String, modifiedAtMillis: Long?, zone: TimeZone): CaptureDate? = when {
         galleryMillis != null && galleryMillis > 0 -> CaptureDate(galleryMillis, DateSource.GALLERY)
 
         else -> fromName(fileName, modifiedAtMillis, zone)?.let { CaptureDate(it, DateSource.FILE_NAME) }
@@ -53,32 +53,32 @@ object CaptureDateGuess {
      *
      * A date after the file was last changed can't be its capture date, so it isn't used.
      */
-    fun fromName(fileName: String, modifiedAtMillis: Long?, zone: ZoneId): Long? {
+    fun fromName(fileName: String, modifiedAtMillis: Long?, zone: TimeZone): Long? {
         val name = fileName.substringBeforeLast('.')
         val found = dateTime(name, zone) ?: dateOnly(name, modifiedAtMillis, zone) ?: return null
         return found.takeUnless { modifiedAtMillis != null && it > modifiedAtMillis + DAY_MILLIS }
     }
 
-    private fun dateTime(name: String, zone: ZoneId): Long? {
+    private fun dateTime(name: String, zone: TimeZone): Long? {
         val match = DATE_TIME.find(name) ?: DASHED_DATE_TIME.find(name) ?: return null
         val local = localDateTime(match.groupValues.subList(1, MILLIS_GROUP).map(String::toInt)) ?: return null
         val millis = match.groups[MILLIS_GROUP]?.value?.padEnd(MILLIS_DIGITS, '0')?.toLong() ?: 0
         // Pixel phones name photos by the UTC time they were taken.
-        val at = if (name.startsWith(PIXEL_PREFIX, ignoreCase = true)) ZoneOffset.UTC else zone
-        return local.atZone(at).toInstant().toEpochMilli() + millis
+        val at = if (name.startsWith(PIXEL_PREFIX, ignoreCase = true)) TimeZone.UTC else zone
+        return local.toInstant(at).toEpochMilliseconds() + millis
     }
 
-    private fun dateOnly(name: String, modifiedAtMillis: Long?, zone: ZoneId): Long? {
+    private fun dateOnly(name: String, modifiedAtMillis: Long?, zone: TimeZone): Long? {
         val (year, month, day) = DATE.find(name)?.destructured ?: return null
         val date = localDate(year.toInt(), month.toInt(), day.toInt()) ?: return null
-        val modified = modifiedAtMillis?.let { Instant.ofEpochMilli(it).atZone(zone) }
-        if (modified?.toLocalDate() == date) return modifiedAtMillis
-        return date.atTime(LocalTime.NOON).atZone(zone).toInstant().toEpochMilli()
+        val modified = modifiedAtMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(zone).date }
+        if (modified == date) return modifiedAtMillis
+        return LocalDateTime(date, LocalTime(NOON_HOUR, 0)).toInstant(zone).toEpochMilliseconds()
     }
 
     private fun localDate(year: Int, month: Int, day: Int): LocalDate? = try {
-        LocalDate.of(year, month, day).takeIf { it.year in YEARS }
-    } catch (_: DateTimeException) {
+        LocalDate(year, month, day).takeIf { it.year in YEARS }
+    } catch (_: IllegalArgumentException) {
         null
     }
 
@@ -87,13 +87,14 @@ object CaptureDateGuess {
         val (year, month, day) = parts
         val date = localDate(year, month, day) ?: return null
         return try {
-            date.atTime(parts[HOUR], parts[MINUTE], parts[SECOND])
-        } catch (_: DateTimeException) {
+            LocalDateTime(date, LocalTime(parts[HOUR], parts[MINUTE], parts[SECOND]))
+        } catch (_: IllegalArgumentException) {
             null
         }
     }
 
     private const val PIXEL_PREFIX = "PXL_"
+    private const val NOON_HOUR = 12
     private const val HOUR = 3
     private const val MINUTE = 4
     private const val SECOND = 5

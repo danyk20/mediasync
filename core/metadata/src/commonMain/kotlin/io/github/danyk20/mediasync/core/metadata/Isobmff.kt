@@ -4,8 +4,6 @@
  */
 package io.github.danyk20.mediasync.core.metadata
 
-import java.nio.ByteBuffer
-
 /**
  * An ISO base media file from [start] to [end]: MP4, MOV and 3GP videos, HEIC and AVIF photos.
  *
@@ -33,7 +31,7 @@ internal class Isobmff(
     val kind: Kind = run {
         val ftyp = top.firstOrNull()?.takeIf { it.type == "ftyp" } ?: return@run Kind.VIDEO // Old QuickTime.
         val brands = reader.read(ftyp.payloadAt, minOf(ftyp.payloadSize, MAX_BRANDS).toInt())
-            .let { bytes -> (0 until bytes.size / 4).map { String(bytes, it * 4, 4, Charsets.ISO_8859_1) } }
+            .let { bytes -> (0 until bytes.size / 4).map { bytes.latin1String(it * 4, 4) } }
             .filterIndexed { i, _ -> i != 1 } // Index 1 is the minor version.
         when {
             brands.any { it in RAW_BRANDS } -> Kind.RAW
@@ -124,7 +122,7 @@ internal class Isobmff(
             if (at + 8 > payload.capacity()) malformed("Metadata keys")
             val size = payload.getInt(at)
             if (size < 8 || at + size > payload.capacity()) malformed("Metadata key of $size bytes")
-            val name = String(payload.array(), at + 8, size - 8, Charsets.ISO_8859_1)
+            val name = payload.array().latin1String(at + 8, size - 8)
             val keep = when (remove) {
                 Remove.ALL -> name in KEPT_KEYS
                 Remove.LOCATION -> !name.contains("location", ignoreCase = true)
@@ -137,7 +135,7 @@ internal class Isobmff(
         }
         ilst?.let { list ->
             children(list, lenient = true)
-                .filter { ByteBuffer.wrap(it.type.latin1()).int in removed }
+                .filter { ByteBuffer.wrap(it.type.latin1()).getInt() in removed }
                 .forEach { edits += free(it) }
         }
         return edits
@@ -170,7 +168,7 @@ internal class Isobmff(
         val id = infos.entries.firstOrNull { it.value.type == "Exif" }?.key ?: return null
         val item = locations[id]?.let { Item(it, idat) } ?: return null
         if (item.size < 4) malformed("EXIF item of ${item.size} bytes")
-        val tiffAt = 4 + (ByteBuffer.wrap(item.read(0, 4)).int.toLong() and UINT)
+        val tiffAt = 4 + (ByteBuffer.wrap(item.read(0, 4)).getInt().toLong() and UINT)
         return Tiff(item::read, tiffAt, item.size - tiffAt)
     }
 
@@ -204,7 +202,7 @@ internal class Isobmff(
 
     private fun exifItemEdits(item: Item, remove: Remove): List<Edit> {
         if (item.size < 4) malformed("EXIF item of ${item.size} bytes")
-        val tiffAt = 4 + (ByteBuffer.wrap(item.read(0, 4)).int.toLong() and UINT)
+        val tiffAt = 4 + (ByteBuffer.wrap(item.read(0, 4)).getInt().toLong() and UINT)
         val tiff = Tiff(item::read, tiffAt, item.size - tiffAt)
         return when (remove) {
             Remove.LOCATION -> tiff.locationEdits()
@@ -238,11 +236,11 @@ internal class Isobmff(
             val idSize = if (infeVersion == 2) 2 else 4
             val id = if (idSize == 2) buffer.getShort(4).toInt() and USHORT else buffer.getInt(4)
             val typeAt = 4 + idSize + 2
-            val type = String(data, typeAt, 4, Charsets.ISO_8859_1)
+            val type = data.latin1String(typeAt, 4)
             val nameEnd = data.indexOfZero(typeAt + 4)
             val contentType = if (type == "mime" && nameEnd >= 0) {
                 val typeEnd = data.indexOfZero(nameEnd + 1).takeIf { it >= 0 } ?: data.size
-                String(data, nameEnd + 1, typeEnd - nameEnd - 1, Charsets.ISO_8859_1)
+                data.latin1String(nameEnd + 1, typeEnd - nameEnd - 1)
             } else {
                 null
             }
@@ -262,13 +260,13 @@ internal class Isobmff(
         val baseOffsetSize = (baseSizes shr NIBBLE) and NIBBLE_MASK
         val indexSize = if (version == 1 || version == 2) baseSizes and NIBBLE_MASK else 0
         data.position(6)
-        val count = if (version < 2) data.short.toInt() and USHORT else data.int
+        val count = if (version < 2) data.getShort().toInt() and USHORT else data.getInt()
         return (0 until count).associate {
-            val id = if (version < 2) data.short.toInt() and USHORT else data.int
-            val method = if (version == 1 || version == 2) data.short.toInt() and NIBBLE_MASK else 0
-            data.short // Data reference index.
+            val id = if (version < 2) data.getShort().toInt() and USHORT else data.getInt()
+            val method = if (version == 1 || version == 2) data.getShort().toInt() and NIBBLE_MASK else 0
+            data.getShort() // Data reference index.
             val base = data.number(baseOffsetSize)
-            val extents = List(data.short.toInt() and USHORT) {
+            val extents = List(data.getShort().toInt() and USHORT) {
                 data.number(indexSize)
                 (base + data.number(offsetSize)) to data.number(lengthSize)
             }
@@ -305,14 +303,9 @@ internal class Isobmff(
                 val from = maxOf(offset + filled, itemAt)
                 val to = minOf(offset + byteCount, itemAt + length)
                 if (from < to) {
-                    System.arraycopy(
-                        reader.read(at + from - itemAt, (to - from).toInt()),
-                        0,
-                        out,
-                        filled,
-                        (to - from).toInt(),
-                    )
-                    filled += (to - from).toInt()
+                    val count = (to - from).toInt()
+                    reader.read(at + from - itemAt, count).copyInto(out, filled, 0, count)
+                    filled += count
                 }
                 itemAt += length
             }
@@ -364,7 +357,7 @@ internal class Isobmff(
     /** The box at [at], if it fits before [to]. */
     private fun boxAt(at: Long, to: Long): Box? {
         val header = ByteBuffer.wrap(reader.read(at, BOX_HEADER))
-        val type = String(header.array(), 4, 4, Charsets.ISO_8859_1)
+        val type = header.array().latin1String(4, 4)
         val (size, headerSize) = when (val size = header.getInt(0).toLong() and UINT) {
             0L -> (to - at) to BOX_HEADER
 
@@ -373,7 +366,7 @@ internal class Isobmff(
             ) {
                 return null
             } else {
-                ByteBuffer.wrap(reader.read(at + BOX_HEADER, 8)).long to LARGE_HEADER
+                ByteBuffer.wrap(reader.read(at + BOX_HEADER, 8)).getLong() to LARGE_HEADER
             }
 
             else -> size to BOX_HEADER
@@ -381,12 +374,12 @@ internal class Isobmff(
         return Box(type, at, headerSize, at + size).takeIf { size >= headerSize && at + size <= to }
     }
 
-    private fun type(at: Long) = String(reader.read(at, 4), Charsets.ISO_8859_1)
+    private fun type(at: Long) = reader.read(at, 4).latin1String()
 
     private fun ByteBuffer.number(size: Int): Long = when (size) {
         0 -> 0L
-        4 -> int.toLong() and UINT
-        8 -> long
+        4 -> getInt().toLong() and UINT
+        8 -> getLong()
         else -> malformed("Number of $size bytes")
     }
 
@@ -414,9 +407,9 @@ internal class Isobmff(
         val KEPT_KEYS = setOf("com.android.capture.fps")
 
         /** A TIFF with an empty first directory, in [order]. */
-        val EMPTY_TIFF: (java.nio.ByteOrder) -> ByteArray = { order ->
+        val EMPTY_TIFF: (ByteOrder) -> ByteArray = { order ->
             ByteBuffer.allocate(Tiff.HEADER_SIZE + 2 + 4).order(order)
-                .put((if (order == java.nio.ByteOrder.LITTLE_ENDIAN) "II" else "MM").latin1())
+                .put((if (order == ByteOrder.LITTLE_ENDIAN) "II" else "MM").latin1())
                 .putShort(42).putInt(Tiff.HEADER_SIZE).putShort(0).putInt(0).array()
         }
     }

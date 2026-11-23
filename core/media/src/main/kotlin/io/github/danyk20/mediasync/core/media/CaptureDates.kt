@@ -10,6 +10,7 @@ import io.github.danyk20.mediasync.core.metadata.CaptureDate
 import io.github.danyk20.mediasync.core.metadata.CaptureDateGuess
 import io.github.danyk20.mediasync.core.metadata.DateSource
 import io.github.danyk20.mediasync.core.metadata.VideoDates
+import io.github.danyk20.mediasync.core.metadata.resolve
 import io.github.danyk20.mediasync.core.model.ExercisedOnDevice
 import io.github.danyk20.mediasync.sync.engine.MediaDescriptor
 import java.io.FileDescriptor
