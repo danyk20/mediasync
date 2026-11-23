@@ -14,9 +14,8 @@ kotlin {
             api(projects.transport.api)
             // The engine's API exposes ByteString, Source and BufferedSource: a direct dependency, not a transitive one.
             api(libs.okio)
-        }
-        jvmMain.dependencies {
-            // Used only by ProducerSession and ParallelSync, which stay on the JVM until they're converted.
+            // The sessions run their reader and sender work on coroutines (Dispatchers.IO).
+            api(libs.kotlinx.coroutines.core)
             implementation(projects.core.metadata)
             implementation(projects.core.diagnostics)
         }

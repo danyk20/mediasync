@@ -22,17 +22,15 @@ import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
 import io.github.danyk20.mediasync.sync.protocol.ProtocolException
 import io.github.danyk20.mediasync.sync.protocol.WireRole
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.io.IOException
-import java.security.MessageDigest
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
+import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okio.BufferedSource
 import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import okio.IOException
 import okio.buffer
+import okio.use
 
 /** The outcome of one producer session. */
 data class SyncResult(
@@ -148,8 +146,8 @@ class ProducerSession(
     }
 
     /**
-     * One session. This thread offers and sends; a second one reads the consumer's replies: confirmations as they
-     * come, and offer responses for this thread. Counters are shared, under [lock].
+     * One session. The calling coroutine offers and sends; a second one reads the consumer's replies: confirmations as
+     * they come, and offer responses for the sending side. Counters are shared, under [lock].
      */
     private inner class Run(
         private val connection: PeerConnection,
@@ -159,11 +157,19 @@ class ProducerSession(
         private val bytesTotal: Long,
     ) {
         private val buffer = ByteArray(CHUNK_SIZE)
-        private val lock = ReentrantLock()
-        private val changed = lock.newCondition()
+        private val lock = Lock()
+
+        /**
+         * Held across taking a snapshot and delivering it. The sender thread and the reply reader both report, so
+         * without this an older snapshot could be delivered after a newer one: progress would go backwards or flip
+         * between files.
+         */
+        private val reportLock = Lock()
         private val inFlight = LinkedHashMap<Int, Prepared>()
-        private val responses = LinkedBlockingQueue<Any>()
-        private val replies = Thread(::readReplies, "mediasync-replies").apply { isDaemon = true }
+
+        /** Guarded by [lock]: the offer responses for the sending side, and the failure that ends the session. */
+        private val responses = ArrayDeque<Any>()
+        private val repliesScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
         @Volatile
         private var failure: IOException? = null
@@ -195,7 +201,7 @@ class ProducerSession(
             try {
                 // First, alone on the connection: the consumer's replies are read as they come.
                 testFiles?.let { route -> queue.takeTestFile()?.let { sendTestFile(it, route, queue) } }
-                replies.start()
+                repliesScope.launch { readReplies() }
                 while (!cancelled) {
                     if (!shouldContinue()) cancelled = true
                     val batch = if (cancelled) emptyList() else queue.take(OFFER_BATCH_SIZE, OFFER_BATCH_BYTES)
@@ -362,7 +368,7 @@ class ProducerSession(
         /** Sends `FILE_BEGIN` and the bytes after [offset]; returns the SHA-256 of the whole file. */
         private fun stream(offerId: Int, prepared: Prepared, offset: Long, input: BufferedSource): ByteString {
             val item = prepared.item
-            val digest = MessageDigest.getInstance("SHA-256")
+            val digest = newSha256()
             hashPrefix(input, digest, offset)
             channel.send(FileBegin(offerId, offset))
             val descriptor = prepared.descriptor
@@ -380,16 +386,16 @@ class ProducerSession(
                 report(item)
                 n = input.read(buffer, 0, buffer.size)
             }
-            return digest.digest().toByteString()
+            return digest.digest()
         }
 
         /** [key] starts going over the link, [offset] bytes in (docs/PLAN.md §7, *Per-file progress*). */
         private fun startSending(key: String, name: String, size: Long, video: Boolean, offset: Long) = count {
-            sending = SendingItem(key, name, size, video, bytesSent = offset, startedNanos = System.nanoTime())
+            sending = SendingItem(key, name, size, video, bytesSent = offset, startedNanos = monotonicNanos())
         }
 
         /** The consumer already holds the first [offset] bytes; hash them without sending. */
-        private fun hashPrefix(input: BufferedSource, digest: MessageDigest, offset: Long) {
+        private fun hashPrefix(input: BufferedSource, digest: Sha256, offset: Long) {
             var remaining = offset
             while (remaining > 0) {
                 val n = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
@@ -403,25 +409,31 @@ class ProducerSession(
             }
         }
 
-        /** The replies' thread: confirmations update the session; offer responses go to the sending thread. */
-        @Suppress("TooGenericExceptionCaught") // Anything that ends this thread must end the session too.
+        /** The replies' coroutine: confirmations update the session; offer responses go to the sending side. */
+        @Suppress("TooGenericExceptionCaught") // Anything that ends this coroutine must end the session too.
         private fun readReplies() {
             try {
                 while (true) {
                     when (val message = channel.receive()) {
                         is FileAck -> onAck(message)
-                        is OfferResponse -> responses.put(message)
+                        is OfferResponse -> respond(message)
                         is Bye -> throw PeerEndedSessionException(message.reason)
                         else -> throw ProtocolException("Unexpected ${message::class.simpleName}")
                     }
                 }
             } catch (e: Exception) {
                 if (finished) return // The consumer closing after our Bye.
-                failure = e as? IOException ?: ProtocolException("Reading replies failed", e)
-                responses.put(failure!!)
-                lock.withLock { changed.signalAll() }
-                connection.close() // Unblocks the sending thread if it's writing.
+                val error = e as? IOException ?: ProtocolException("Reading replies failed", e)
+                failure = error
+                respond(error)
+                connection.close() // Unblocks the sending side if it's writing.
             }
+        }
+
+        /** Hands [item] to the sending side, which waits for it in [takeResponse]. */
+        private fun respond(item: Any) = lock.withLock {
+            responses.addLast(item)
+            lock.signalAll()
         }
 
         private fun onAck(ack: FileAck) {
@@ -439,23 +451,29 @@ class ProducerSession(
             lock.withLock {
                 inFlight.remove(ack.offerId) ?: throw ProtocolException("ACK for offer ${ack.offerId} twice")
                 if (confirmed) sent++ else failed++
-                changed.signalAll()
+                lock.signalAll()
             }
         }
 
-        private fun awaitResponse(): OfferResponse = when (val next = responses.take()) {
+        private fun awaitResponse(): OfferResponse = when (val next = takeResponse()) {
             is OfferResponse -> next
             is IOException -> throw next
             else -> throw ProtocolException("Unexpected $next")
         }
 
+        /** Waits for the next response from the replies side: an offer response, or the failure that ended it. */
+        private fun takeResponse(): Any = lock.withLock {
+            while (responses.isEmpty()) lock.await()
+            responses.removeFirst()
+        }
+
         /** Waits until at most [count] files await confirmation. */
         private fun awaitInFlight(count: Int) = lock.withLock {
-            while (inFlight.size > count && failure == null) changed.await()
+            while (inFlight.size > count && failure == null) lock.await()
             failure?.let { throw it }
         }
 
-        private inline fun count(update: () -> Unit) = lock.withLock { update() }
+        private inline fun count(crossinline update: () -> Unit) = lock.withLock { update() }
 
         /** [item] isn't sent in this sync after all: its bytes are done, without moving. */
         private fun skip(item: SourceItem) = skip(item.descriptor.size)
@@ -472,7 +490,7 @@ class ProducerSession(
 
         private fun report(item: SourceItem) = report(item.descriptor.displayName)
 
-        private fun report(currentItem: String?, testFile: Boolean = false) {
+        private fun report(currentItem: String?, testFile: Boolean = false) = reportLock.withLock {
             val snapshot = lock.withLock {
                 TransferProgress(
                     itemsDone,
@@ -503,8 +521,10 @@ class ProducerSession(
  * count in [totalBytes] (docs/PLAN.md §7, *Test file*).
  */
 class WorkQueue(items: List<SourceItem>, testFile: TestFile? = null) {
-    private val queue = ConcurrentLinkedQueue(items)
-    private val testFile = AtomicReference(testFile)
+    /** Guards [queue] and [testFile]: one lock per batch, not per item. */
+    private val lock = Lock()
+    private val queue = ArrayDeque(items)
+    private var testFile: TestFile? = testFile
     val total: Int = items.size
     val totalBytes: Long = items.sumOf { it.descriptor.size } + (testFile?.size ?: 0)
 
@@ -514,7 +534,7 @@ class WorkQueue(items: List<SourceItem>, testFile: TestFile? = null) {
         private set
 
     /** The test file, to the first connection that asks; `null` to the others, and if there's none. */
-    fun takeTestFile(): TestFile? = testFile.getAndSet(null)
+    fun takeTestFile(): TestFile? = lock.withLock { testFile.also { testFile = null } }
 
     /** The connection that took the test file is done with it. */
     fun testFileDone() {
@@ -522,16 +542,18 @@ class WorkQueue(items: List<SourceItem>, testFile: TestFile? = null) {
     }
 
     /** Up to [maxItems], ending once they reach [maxBytes]; always at least one while there is one. */
-    fun take(maxItems: Int, maxBytes: Long = Long.MAX_VALUE): List<SourceItem> = buildList {
-        var bytes = 0L
-        while (size < maxItems && bytes < maxBytes) {
-            val item = queue.poll() ?: break
-            add(item)
-            bytes += item.descriptor.size
+    fun take(maxItems: Int, maxBytes: Long = Long.MAX_VALUE): List<SourceItem> = lock.withLock {
+        buildList {
+            var bytes = 0L
+            while (size < maxItems && bytes < maxBytes) {
+                val item = queue.removeFirstOrNull() ?: break
+                add(item)
+                bytes += item.descriptor.size
+            }
         }
     }
 
-    fun isEmpty(): Boolean = queue.isEmpty()
+    fun isEmpty(): Boolean = lock.withLock { queue.isEmpty() }
 }
 
 /** Sorts what's waiting in this order, apart from shared items; within photos or videos, the newest first. */
