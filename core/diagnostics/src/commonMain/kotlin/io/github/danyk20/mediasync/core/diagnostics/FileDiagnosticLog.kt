@@ -53,6 +53,11 @@ class FileDiagnosticLog(
     /** Waits, for a second at most, until what's been logged is written: before the app ends. */
     fun flush() = writer.await(FLUSH_MILLIS)
 
+    /** Waits, without a time limit, until every entry logged so far is on disk. For tests. */
+    internal fun drain() {
+        writer.submit { }
+    }
+
     /** Everything kept, oldest first, once what's being written is written. */
     fun read(): String = writer.submit {
         segments().joinToString("") { textOrEmpty(it.file) } + textOrEmpty(current)
