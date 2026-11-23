@@ -4,9 +4,11 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-internal actual class Lock actual constructor() {
+@EngineInternalApi
+actual class Lock actual constructor() {
     private val mutex = ReentrantLock()
     private val changed = mutex.newCondition()
 
@@ -24,6 +26,8 @@ internal actual class Lock actual constructor() {
     actual fun await() {
         changed.await()
     }
+
+    actual fun await(timeoutMillis: Long): Boolean = changed.await(timeoutMillis, TimeUnit.MILLISECONDS)
 
     actual fun signalAll() {
         changed.signalAll()

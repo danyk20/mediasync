@@ -5,8 +5,11 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import platform.Foundation.NSCondition
+import platform.Foundation.NSDate
+import platform.Foundation.dateWithTimeIntervalSinceNow
 
-internal actual class Lock actual constructor() {
+@EngineInternalApi
+actual class Lock actual constructor() {
     private val condition = NSCondition()
 
     actual fun <T> withLock(block: () -> T): T {
@@ -22,7 +25,12 @@ internal actual class Lock actual constructor() {
         condition.wait()
     }
 
+    actual fun await(timeoutMillis: Long): Boolean =
+        condition.waitUntilDate(NSDate.dateWithTimeIntervalSinceNow(timeoutMillis / MILLIS_PER_SECOND))
+
     actual fun signalAll() {
         condition.broadcast()
     }
 }
+
+private const val MILLIS_PER_SECOND = 1000.0
