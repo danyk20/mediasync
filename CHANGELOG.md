@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/danyk20/mediasync/compare/v0.14.0...v0.15.0) (2026-11-23)
+
+
+### Features
+
+* an iPhone can open a mutual-TLS link to a receiver ([#197](https://github.com/danyk20/mediasync/issues/197)) ([a9d3513](https://github.com/danyk20/mediasync/commit/a9d3513902e1e2465b3084608f9d9f977065695a))
+* the iPhone keeps its identity across launches ([#199](https://github.com/danyk20/mediasync/issues/199)) ([1cfc723](https://github.com/danyk20/mediasync/commit/1cfc7230702b79ca49483dd894f52154156c4d0e))
+
 ## [0.14.0](https://github.com/danyk20/mediasync/compare/v0.13.0...v0.14.0) (2026-11-23)
 
 
