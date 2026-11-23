@@ -7,9 +7,11 @@
 package io.github.danyk20.mediasync.transport.lan.apple
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
@@ -18,11 +20,18 @@ import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
 import platform.CoreFoundation.CFDataRef
+import platform.CoreFoundation.CFDictionaryAddValue
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFMutableDictionaryRef
 import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.CFStringCreateWithCString
 import platform.CoreFoundation.CFStringGetCString
 import platform.CoreFoundation.CFStringGetLength
 import platform.CoreFoundation.CFStringRef
+import platform.CoreFoundation.CFTypeRef
 import platform.CoreFoundation.kCFStringEncodingUTF8
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 
 /** The value, or an [AppleLanException] with [message] when it is null. */
 internal fun <T : Any> T?.orFail(message: String): T = this ?: throw AppleLanException(message)
@@ -57,7 +66,26 @@ internal fun CFStringRef.toKotlinString(): String? {
 
 private const val MAX_UTF8_BYTES_PER_UNIT = 4
 
+/** A new CFString with the text of [text]. The caller releases it. */
+internal fun cfString(text: String): CFStringRef = CFStringCreateWithCString(null, text, kCFStringEncodingUTF8)
+    ?: throw AppleLanException("CFStringCreateWithCString failed")
+
+/**
+ * A new mutable CFDictionary holding [entries], in order. The dictionary retains its keys and values, so the caller
+ * may release the values once it is built; the caller releases the dictionary.
+ */
+internal fun cfDictionary(entries: List<Pair<COpaquePointer?, COpaquePointer?>>): CFMutableDictionaryRef {
+    val dictionary = CFDictionaryCreateMutable(
+        null,
+        entries.size.toLong(),
+        kCFTypeDictionaryKeyCallBacks.ptr,
+        kCFTypeDictionaryValueCallBacks.ptr,
+    ) ?: throw AppleLanException("CFDictionaryCreateMutable returned NULL")
+    for ((key, value) in entries) CFDictionaryAddValue(dictionary, key, value)
+    return dictionary
+}
+
 /** Releases a Core Foundation or Security object this code owns (a `Create`, `Copy` or retained result). */
-internal fun release(reference: platform.CoreFoundation.CFTypeRef?) {
+internal fun release(reference: CFTypeRef?) {
     if (reference != null) CFRelease(reference)
 }

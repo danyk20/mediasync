@@ -26,6 +26,11 @@ kotlin {
             api(projects.transport.api)
             api(libs.okio)
         }
+        iosMain.dependencies {
+            // The identity log (which store was chosen, corruption) goes to the diagnostic log; the provider's lock.
+            implementation(projects.core.diagnostics)
+            implementation(projects.core.util)
+        }
         commonTest.dependencies {
             implementation(projects.sync.protocol)
         }

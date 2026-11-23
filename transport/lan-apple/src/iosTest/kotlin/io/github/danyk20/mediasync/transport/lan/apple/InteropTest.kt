@@ -25,7 +25,8 @@ import okio.IOException
 
 /**
  * Talks to the JVM InteropServer (transport/lan-testing) that Gradle starts for this test: Apple's TLS client against
- * the JDK's TLS server, with mutual authentication and the pin, then one framed Hello each way.
+ * the JDK's TLS server, with mutual authentication and the pin, then one framed Hello each way. Every case uses an
+ * identity that went through [FileIdentityStore] (saved, then loaded again), as the app's identity does.
  */
 class InteropTest {
     private val timeouts = AppleLanTimeouts()
@@ -33,64 +34,103 @@ class InteropTest {
 
     @Test
     fun helloIsExchangedOverMutualTlsWithThePinnedServer() {
-        val dir = interopDirectory() ?: run {
+        val serverDir = interopDirectory() ?: run {
             println(SKIP_REASON)
             return
         }
-        val server = readInteropServer(dir)
-        val identity = AppleIdentityFactory.create()
-
-        val connection = NwLanClient.connect("127.0.0.1", server.port, identity, server.pin, timeouts)
-        try {
-            assertEquals(server.pin, connection.peerId)
-            FrameCodec.write(
-                MessageCodec.encode(Hello(PROTOCOL_VERSION, "ios-interop", WireRole.PRODUCER)),
-                connection.sink,
+        val server = readInteropServer(serverDir)
+        inTempDirectory { identityDir ->
+            val connection = NwLanClient.connect(
+                "127.0.0.1",
+                server.port,
+                loadedIdentity(identityDir),
+                server.pin,
+                timeouts,
             )
-            connection.sink.flush()
+            try {
+                assertEquals(server.pin, connection.peerId)
+                FrameCodec.write(
+                    MessageCodec.encode(Hello(PROTOCOL_VERSION, "ios-interop", WireRole.PRODUCER)),
+                    connection.sink,
+                )
+                connection.sink.flush()
 
-            val reply = assertIs<Hello>(MessageCodec.decode(assertNotNullFrame(FrameCodec.read(connection.source))))
-            assertEquals(PROTOCOL_VERSION, reply.protocolVersion)
-            assertEquals(WireRole.CONSUMER, reply.role)
+                val reply = assertIs<Hello>(MessageCodec.decode(assertNotNullFrame(FrameCodec.read(connection.source))))
+                assertEquals(PROTOCOL_VERSION, reply.protocolVersion)
+                assertEquals(WireRole.CONSUMER, reply.role)
 
-            FrameCodec.write(MessageCodec.encode(Bye()), connection.sink)
-            connection.sink.flush()
-        } finally {
-            connection.close()
+                FrameCodec.write(MessageCodec.encode(Bye()), connection.sink)
+                connection.sink.flush()
+            } finally {
+                connection.close()
+            }
         }
         recordPass("helloIsExchangedOverMutualTlsWithThePinnedServer")
     }
 
     @Test
-    fun aWrongPinFailsTheHandshakeInTime() {
-        val dir = interopDirectory() ?: run {
+    fun aReloadedIdentityConnectsWithTheSamePeerId() {
+        val serverDir = interopDirectory() ?: run {
             println(SKIP_REASON)
             return
         }
-        val server = readInteropServer(dir)
-        val identity = AppleIdentityFactory.create()
+        val server = readInteropServer(serverDir)
+        inTempDirectory { identityDir ->
+            val first = AppleIdentityProvider(FileIdentityStore(identityDir), NO_LOG).identity()
+            // A new provider and a new store object: nothing of the first identity is in memory any more.
+            val reloaded = AppleIdentityProvider(FileIdentityStore(identityDir), NO_LOG).identity()
+            assertEquals(first.id, reloaded.id)
+
+            val connection = NwLanClient.connect("127.0.0.1", server.port, reloaded, server.pin, timeouts)
+            try {
+                assertEquals(server.pin, connection.peerId)
+            } finally {
+                connection.close()
+            }
+        }
+        recordPass("aReloadedIdentityConnectsWithTheSamePeerId")
+    }
+
+    @Test
+    fun aWrongPinFailsTheHandshakeInTime() {
+        val serverDir = interopDirectory() ?: run {
+            println(SKIP_REASON)
+            return
+        }
+        val server = readInteropServer(serverDir)
         val first = server.pin.hex.first()
         val wrongPin = DeviceId((if (first == '0') '1' else '0').toString() + server.pin.hex.drop(1))
 
-        val started = TimeSource.Monotonic.markNow()
-        assertFailsWith<IOException> {
-            NwLanClient.connect("127.0.0.1", server.port, identity, wrongPin, timeouts)
+        inTempDirectory { identityDir ->
+            val identity = loadedIdentity(identityDir)
+            val started = TimeSource.Monotonic.markNow()
+            assertFailsWith<IOException> {
+                NwLanClient.connect("127.0.0.1", server.port, identity, wrongPin, timeouts)
+            }
+            assertTrue(started.elapsedNow() < failureBudget, "The pin mismatch took ${started.elapsedNow()}")
         }
-        assertTrue(started.elapsedNow() < failureBudget, "The pin mismatch took ${started.elapsedNow()}")
         recordPass("aWrongPinFailsTheHandshakeInTime")
     }
 
     @Test
     fun aRefusedPortFailsInsteadOfWaiting() {
-        val identity = AppleIdentityFactory.create()
         val expected = DeviceId("0".repeat(64))
 
-        val started = TimeSource.Monotonic.markNow()
-        assertFailsWith<IOException> {
-            NwLanClient.connect("127.0.0.1", REFUSED_PORT, identity, expected, timeouts)
+        inTempDirectory { identityDir ->
+            val identity = loadedIdentity(identityDir)
+            val started = TimeSource.Monotonic.markNow()
+            assertFailsWith<IOException> {
+                NwLanClient.connect("127.0.0.1", REFUSED_PORT, identity, expected, timeouts)
+            }
+            assertTrue(started.elapsedNow() < failureBudget, "The refused connection took ${started.elapsedNow()}")
         }
-        assertTrue(started.elapsedNow() < failureBudget, "The refused connection took ${started.elapsedNow()}")
         recordPass("aRefusedPortFailsInsteadOfWaiting")
+    }
+
+    /** An identity saved by one provider in [directory], then loaded by a new one: the relaunch path. */
+    private fun loadedIdentity(directory: String): AppleIdentity {
+        AppleIdentityProvider(FileIdentityStore(directory), NO_LOG).identity()
+        return AppleIdentityProvider(FileIdentityStore(directory), NO_LOG).identity()
     }
 
     private fun assertNotNullFrame(frame: io.github.danyk20.mediasync.sync.protocol.Frame?) =

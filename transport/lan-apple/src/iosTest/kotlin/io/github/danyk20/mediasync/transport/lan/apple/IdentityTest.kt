@@ -13,15 +13,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.value
-import platform.CoreFoundation.CFErrorRefVar
-import platform.Security.SecCertificateCopyKey
-import platform.Security.SecCertificateCreateWithData
-import platform.Security.SecKeyVerifySignature
-import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA256
 
 class IdentityTest {
     @Test
@@ -58,48 +49,12 @@ class IdentityTest {
         // The signed bytes are the whole TBSCertificate TLV. The BIT STRING starts with a count of unused bits (0).
         val tbsBytes = der.copyOfRange(tbs.start, tbs.end)
         val signature = der.copyOfRange(signatureValue.contentStart + 1, signatureValue.end)
-        assertTrue(verifies(der, tbsBytes, signature), "The certificate's own signature must verify")
+        assertTrue(verifiesWithCertificate(der, tbsBytes, signature), "The certificate's own signature must verify")
 
         val tampered = tbsBytes.copyOf()
         tampered[tampered.size - 1] = (tampered[tampered.size - 1].toInt() xor 1).toByte()
-        assertFalse(verifies(der, tampered, signature), "A changed TBSCertificate must not verify")
+        assertFalse(verifiesWithCertificate(der, tampered, signature), "A changed TBSCertificate must not verify")
         recordPass("theCertificateSignatureVerifiesWithItsOwnPublicKeyOnIos")
-    }
-
-    /** Checks [signature] over [signed] with the public key of the certificate [certificateDer]. */
-    private fun verifies(certificateDer: ByteArray, signed: ByteArray, signature: ByteArray): Boolean {
-        val certificateData = certificateDer.toCFData()
-        val certificate = SecCertificateCreateWithData(null, certificateData)
-            .orFail("SecCertificateCreateWithData rejected the certificate")
-        try {
-            val publicKey = SecCertificateCopyKey(certificate).orFail("SecCertificateCopyKey returned NULL")
-            try {
-                val signedData = signed.toCFData()
-                val signatureData = signature.toCFData()
-                try {
-                    return memScoped {
-                        val error = alloc<CFErrorRefVar>()
-                        val valid = SecKeyVerifySignature(
-                            publicKey,
-                            kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
-                            signedData,
-                            signatureData,
-                            error.ptr,
-                        )
-                        release(error.value)
-                        valid
-                    }
-                } finally {
-                    release(signatureData)
-                    release(signedData)
-                }
-            } finally {
-                release(publicKey)
-            }
-        } finally {
-            release(certificate)
-            release(certificateData)
-        }
     }
 
     /** A DER element: its tag, its start offset, where its content starts, and where it ends. */

@@ -24,6 +24,7 @@ import platform.CoreFoundation.CFErrorRef
 import platform.CoreFoundation.CFErrorRefVar
 import platform.CoreFoundation.CFNumberCreate
 import platform.CoreFoundation.kCFBooleanFalse
+import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFNumberIntType
 import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
 import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
@@ -33,10 +34,14 @@ import platform.Security.SecKeyCopyExternalRepresentation
 import platform.Security.SecKeyCopyPublicKey
 import platform.Security.SecKeyCreateRandomKey
 import platform.Security.SecKeyCreateSignature
+import platform.Security.SecKeyCreateWithData
 import platform.Security.SecKeyRef
 import platform.Security.SecRandomCopyBytes
 import platform.Security.errSecSuccess
+import platform.Security.kSecAttrIsExtractable
 import platform.Security.kSecAttrIsPermanent
+import platform.Security.kSecAttrKeyClass
+import platform.Security.kSecAttrKeyClassPrivate
 import platform.Security.kSecAttrKeySizeInBits
 import platform.Security.kSecAttrKeyType
 import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
@@ -55,7 +60,14 @@ import platform.posix.arc4random_buf
  * yet (only needed if the primary fails on a device; see the report).
  */
 internal object AppleIdentityFactory {
-    fun create(): AppleIdentity {
+    /** A new identity that lives in memory only. */
+    fun create(): AppleIdentity = identityFrom(createMaterial())
+
+    /**
+     * A new identity as bytes, for a store to keep: a fresh P-256 key, its exported private key, and a certificate
+     * the key signs.
+     */
+    fun createMaterial(): AppleIdentityMaterial {
         val key = generatePrivateKey()
         try {
             val publicKey = SecKeyCopyPublicKey(key) ?: throw AppleLanException("SecKeyCopyPublicKey returned NULL")
@@ -70,13 +82,77 @@ internal object AppleIdentityFactory {
                 serial = randomSerial(),
                 sign = { tbs -> signEcdsaSha256(key, tbs) },
             )
-            return AppleIdentity(der, secIdentityFor(der, key))
+            return AppleIdentityMaterial(exportPrivateKey(key), der)
         } finally {
             release(key)
         }
     }
 
-    /** A P-256 key that is not stored: Security keeps it in memory for this process only. */
+    /**
+     * The identity that [material] holds. Rebuilds the private key from its bytes and checks that it belongs to the
+     * certificate (the certificate must carry the key's public point), so a mismatched pair is refused.
+     */
+    fun identityFrom(material: AppleIdentityMaterial): AppleIdentity {
+        // A copy, so the material's own bytes survive for its owner; the copy is zeroed once the key is built.
+        val keyBytes = material.privateKey.copyOf()
+        try {
+            val key = keyFrom(keyBytes)
+            try {
+                val publicKey = SecKeyCopyPublicKey(key) ?: throw AppleLanException("SecKeyCopyPublicKey returned NULL")
+                val x963 = try {
+                    exportX963(publicKey)
+                } finally {
+                    release(publicKey)
+                }
+                if (!material.certificateDer.containsSubarray(x963)) {
+                    throw IdentityMismatchException("the private key does not belong to the certificate")
+                }
+                return AppleIdentity(material.certificateDer, secIdentityFor(material.certificateDer, key))
+            } finally {
+                release(key)
+            }
+        } finally {
+            keyBytes.fill(0)
+        }
+    }
+
+    /**
+     * The private key as ANSI X9.63 bytes (`04 || X || Y || K`). The key must be extractable, see [generatePrivateKey].
+     */
+    private fun exportPrivateKey(key: SecKeyRef): ByteArray = memScoped {
+        val error = alloc<CFErrorRefVar>()
+        val data = SecKeyCopyExternalRepresentation(key, error.ptr)
+            ?: throw cfError("SecKeyCopyExternalRepresentation (private)", error.value)
+        try {
+            data.toByteArray()
+        } finally {
+            release(data)
+        }
+    }
+
+    /** The private key that [bytes] (ANSI X9.63) stand for, as a non-permanent Security key. */
+    private fun keyFrom(bytes: ByteArray): SecKeyRef = memScoped {
+        val data = bytes.toCFData()
+        val attributes = cfDictionary(
+            listOf(
+                kSecAttrKeyType to kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeyClass to kSecAttrKeyClassPrivate,
+            ),
+        )
+        try {
+            val error = alloc<CFErrorRefVar>()
+            SecKeyCreateWithData(data, attributes, error.ptr)
+                ?: throw IdentityMismatchException(
+                    "SecKeyCreateWithData rejected the saved private key: " +
+                        cfError("SecKeyCreateWithData", error.value).message,
+                )
+        } finally {
+            release(attributes)
+            release(data)
+        }
+    }
+
+    /** A P-256 key that is not stored: Security keeps it in memory for this process only, and it can be exported. */
     private fun generatePrivateKey(): SecKeyRef = memScoped {
         val attributes =
             CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
@@ -88,6 +164,8 @@ internal object AppleIdentityFactory {
             CFDictionaryAddValue(attributes, kSecAttrKeySizeInBits, sizeNumber)
             // Not permanent: the key is never written to the keychain. kCFBooleanFalse is a constant, not released.
             CFDictionaryAddValue(attributes, kSecAttrIsPermanent, kCFBooleanFalse)
+            // Extractable: the private key is exported into the identity store (SecKeyCopyExternalRepresentation).
+            CFDictionaryAddValue(attributes, kSecAttrIsExtractable, kCFBooleanTrue)
             val error = alloc<CFErrorRefVar>()
             val key = SecKeyCreateRandomKey(attributes, error.ptr)
             key ?: throw cfError("SecKeyCreateRandomKey", error.value)
