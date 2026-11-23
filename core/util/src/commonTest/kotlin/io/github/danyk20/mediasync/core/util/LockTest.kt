@@ -2,7 +2,7 @@
  * Copyright 2026 The MediaSync Authors
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.danyk20.mediasync.sync.engine
+package io.github.danyk20.mediasync.core.util
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe

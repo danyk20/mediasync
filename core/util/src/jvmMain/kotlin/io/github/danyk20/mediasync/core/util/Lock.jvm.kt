@@ -2,12 +2,11 @@
  * Copyright 2026 The MediaSync Authors
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.danyk20.mediasync.sync.engine
+package io.github.danyk20.mediasync.core.util
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-@EngineInternalApi
 actual class Lock actual constructor() {
     private val mutex = ReentrantLock()
     private val changed = mutex.newCondition()

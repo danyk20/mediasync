@@ -6,6 +6,9 @@ package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.util.Lock
+import io.github.danyk20.mediasync.core.util.ioDispatcher
+import io.github.danyk20.mediasync.core.util.oneDecimal
 import io.github.danyk20.mediasync.transport.PeerConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred

@@ -24,6 +24,7 @@ flowchart TB
 | `:core:database` | Kotlin Multiplatform | Room database (`jvm` target; Android uses the framework SQLite and builds it in `:app`, the desktop app uses the bundled SQLite), ledgers and the peer book |
 | `:core:model` | Kotlin Multiplatform | Domain types shared everywhere |
 | `:core:testing` | Android library | Fakes, test rules, screenshot helper |
+| `:core:util` | Kotlin Multiplatform | Shared small utilities: the lock, the I/O dispatcher, monotonic and wall clocks, decimal formatting (`commonMain`, with JVM and iOS actuals) |
 | `:sync:protocol` | Kotlin Multiplatform | Wire protocol: frame encoding and decoding |
 | `:sync:runtime` | Pure Kotlin | Sync platform ports (`Platform.kt`), pairing window, progress throttle, producer and consumer sync (`ProducerSync`, `ConsumerReceiver`), left-out items: what the Android and desktop apps both implement or use |
 

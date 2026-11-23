@@ -4,7 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine.testing
 
-import io.github.danyk20.mediasync.sync.engine.Lock
+import io.github.danyk20.mediasync.core.util.Lock
 
 /*
  * Collections that the sessions' threads share in the fakes. Every call takes the collection's own lock, so no

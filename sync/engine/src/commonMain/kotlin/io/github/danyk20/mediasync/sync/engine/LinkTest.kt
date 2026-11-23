@@ -4,6 +4,7 @@
  */
 package io.github.danyk20.mediasync.sync.engine
 
+import io.github.danyk20.mediasync.core.util.monotonicNanos
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.Hello
 import io.github.danyk20.mediasync.sync.protocol.LinkTestBegin

@@ -2,13 +2,12 @@
  * Copyright 2026 The MediaSync Authors
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.danyk20.mediasync.sync.engine
+package io.github.danyk20.mediasync.core.util
 
 import platform.Foundation.NSCondition
 import platform.Foundation.NSDate
 import platform.Foundation.dateWithTimeIntervalSinceNow
 
-@EngineInternalApi
 actual class Lock actual constructor() {
     private val condition = NSCondition()
 

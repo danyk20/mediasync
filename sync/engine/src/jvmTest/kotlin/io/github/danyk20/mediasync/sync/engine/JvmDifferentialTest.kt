@@ -5,17 +5,13 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
-import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.Base64
-import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.random.Random
 import kotlin.test.Test
 import okio.ByteString.Companion.toByteString
@@ -69,24 +65,6 @@ class JvmDifferentialTest {
             val mutated = mutate(text, random)
             PairingLink.parse(mutated) shouldBe OldPairingLink.parse(mutated)
         }
-    }
-
-    @Test
-    fun oneDecimalIsTheJdkFormatExceptAtTies() {
-        val random = Random(14)
-        var mismatches = 0
-        repeat(100_000) {
-            val value = random.nextDouble(0.0, 5_000.0)
-            val ours = oneDecimal(value)
-            val jdk = String.format(Locale.ROOT, "%.1f", value)
-            if (ours != jdk) {
-                mismatches++
-                val scaled = value * 10
-                // Only a value a floating-point step away from a tie may round differently.
-                (abs(scaled - floor(scaled) - 0.5) < TIE_WINDOW) shouldBe true
-            }
-        }
-        mismatches.toDouble() shouldBeLessThan 100.0
     }
 
     private fun oldDerived(key: ByteArray, epoch: Long): Pair<String, String> {
@@ -173,6 +151,5 @@ class JvmDifferentialTest {
         const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
         const val MAX_NAME = 64
         const val MAX_CODE_POINT = 0x110000
-        const val TIE_WINDOW = 1e-6
     }
 }

@@ -6,6 +6,8 @@ package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
+import io.github.danyk20.mediasync.core.util.Lock
+import io.github.danyk20.mediasync.core.util.monotonicNanos
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.ControlMessage
 import io.github.danyk20.mediasync.sync.protocol.FileAck
