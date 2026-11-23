@@ -7,8 +7,8 @@ package io.github.danyk20.mediasync.sync.engine
 import io.github.danyk20.mediasync.core.model.DeviceId
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.core.model.SyncSchedule
-import java.io.Closeable
 import okio.ByteString
+import okio.Closeable
 import okio.Source
 
 // Interfaces the engine needs from the platform. Android implements them with MediaStore and Room;

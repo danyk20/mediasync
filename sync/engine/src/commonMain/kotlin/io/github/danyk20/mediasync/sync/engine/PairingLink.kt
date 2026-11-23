@@ -5,10 +5,8 @@
 package io.github.danyk20.mediasync.sync.engine
 
 import io.github.danyk20.mediasync.core.model.DeviceId
-import java.net.URLDecoder
-import java.net.URLEncoder
-import java.util.Base64
 import okio.ByteString
+import okio.ByteString.Companion.decodeBase64
 import okio.ByteString.Companion.toByteString
 
 /**
@@ -35,9 +33,9 @@ data class PairingLink(
         append(SCHEME_PREFIX)
         append("v=").append(VERSION)
         append("&id=").append(consumer.hex)
-        append("&t=").append(BASE64.encodeToString(token.toByteArray()))
-        append("&a=").append(addresses.joinToString(",") { encode(it) })
-        append("&n=").append(encode(consumerName))
+        append("&t=").append(token.base64Url().trimEnd('='))
+        append("&a=").append(addresses.joinToString(",") { PercentCodec.encode(it) })
+        append("&n=").append(PercentCodec.encode(consumerName))
     }
 
     companion object {
@@ -45,7 +43,8 @@ data class PairingLink(
         private const val VERSION = "1"
         private const val SCHEME_PREFIX = "mediasync://pair?"
         private const val MAX_NAME_LENGTH = 64
-        private val BASE64 = Base64.getUrlEncoder().withoutPadding()
+        private const val TOKEN_CHARACTERS = 22
+        private val TOKEN_TEXT = Regex("[A-Za-z0-9_-]{$TOKEN_CHARACTERS}(==)?")
 
         /** Parses a scanned or pasted link; `null` if it isn't a valid MediaSync pairing link. */
         fun parse(text: String): PairingLink? {
@@ -59,18 +58,21 @@ data class PairingLink(
             return runCatching {
                 PairingLink(
                     consumer = DeviceId(params.getValue("id")),
-                    token = Base64.getUrlDecoder().decode(params.getValue("t")).toByteString(),
-                    addresses = params.getValue("a").split(",").map(::decode).filter { it.isNotBlank() },
-                    consumerName = decode(params.getValue("n")),
+                    token = decodeToken(params.getValue("t")),
+                    addresses = params.getValue("a").split(",").map(PercentCodec::decode).filter { it.isNotBlank() },
+                    consumerName = PercentCodec.decode(params.getValue("n")),
                 )
             }.getOrNull()
         }
 
-        // The charset-name overloads: the Charset ones need Android 13.
-        private fun encode(value: String) = URLEncoder.encode(value, UTF_8)
-
-        private fun decode(value: String) = URLDecoder.decode(value, UTF_8)
-
-        private const val UTF_8 = "UTF-8"
+        /**
+         * The token as [PairingLink] writes it: URL-safe base64 without padding. The strict pattern first: the decoder
+         * also takes `+`, `/`, whitespace and sloppy padding, which the link never contains.
+         */
+        private fun decodeToken(text: String): ByteString {
+            require(TOKEN_TEXT.matches(text)) { "Not a pairing token" }
+            return text.decodeBase64()?.takeIf { it.size == TOKEN_BYTES }
+                ?: throw IllegalArgumentException("Not a pairing token")
+        }
     }
 }

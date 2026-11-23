@@ -13,8 +13,8 @@ import io.github.danyk20.mediasync.sync.protocol.FrameType
 import io.github.danyk20.mediasync.sync.protocol.MessageCodec
 import io.github.danyk20.mediasync.sync.protocol.ProtocolException
 import io.github.danyk20.mediasync.transport.PeerConnection
-import java.io.IOException
 import okio.EOFException
+import okio.IOException
 
 /** The peer closed the session, either with `Bye` ([byeReason]) or by closing the stream (`null`). */
 class PeerEndedSessionException(val byeReason: Int?) :

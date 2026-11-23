@@ -45,9 +45,9 @@ class LinkTest(private val local: LocalDevice, private val durationMillis: Long 
         channel.send(LinkTestBegin())
         channel.expect<LinkTestBegin>() // Ready; an unpaired phone is told so here.
         val filler = Random.nextBytes(CHUNK_SIZE)
-        val end = System.nanoTime() + durationMillis * NANOS_PER_MILLI
+        val end = monotonicNanos() + durationMillis * NANOS_PER_MILLI
         var sent = 0L
-        while (System.nanoTime() < end) {
+        while (monotonicNanos() < end) {
             channel.sendData(filler, filler.size)
             sent += filler.size
         }

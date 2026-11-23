@@ -11,7 +11,7 @@ import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlin.math.abs
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
 
 /** Speed and time left, for the progress shown while syncing. */
 class TransferEstimatorTest {

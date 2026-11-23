@@ -12,11 +12,10 @@ import io.github.danyk20.mediasync.sync.protocol.TestFileBegin
 import io.github.danyk20.mediasync.sync.protocol.TestFileEnd
 import io.github.danyk20.mediasync.sync.protocol.TestFileReady
 import io.github.danyk20.mediasync.sync.protocol.TestFileResult
-import java.io.Closeable
-import java.io.IOException
-import java.security.MessageDigest
 import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import okio.Closeable
+import okio.IOException
+import okio.use
 
 // The test file (docs/PLAN.md §7, *Test file*): a file of the size the user chose, sent first in the next sync to
 // test the speed and the connection. Its bytes are made while they're sent, so it takes no space on the sending
@@ -209,7 +208,7 @@ internal class TestFileSender(
 
     /** Sends the bytes and returns their SHA-256; `null` if the sync stopped first, and the consumer was told. */
     private fun stream(file: TestFile, buffer: ByteArray): ByteString? {
-        val digest = MessageDigest.getInstance("SHA-256")
+        val digest = newSha256()
         val bytes = TestFileBytes(file.seed)
         var left = file.size
         var chunks = 0
@@ -226,7 +225,7 @@ internal class TestFileSender(
             left -= n
             onBytes(n)
         }
-        return digest.digest().toByteString()
+        return digest.digest()
     }
 
     private companion object {
@@ -276,19 +275,19 @@ internal class TestFileReceiver(
 
     /** One test file arriving into [file], which is deleted when this closes. */
     private inner class Transfer(private val size: Long, private val file: IncomingTestFile) : Closeable {
-        private val digest = MessageDigest.getInstance("SHA-256")
+        private val digest = newSha256()
         private var writable = true
         private var length = 0L
         private var firstByteAt = 0L
 
         fun run(buffer: ByteArray, path: TestFilePath): TestFileOutcome? {
             val end = readUntilEnd(buffer)
-            val micros = if (length == 0L) 0L else (System.nanoTime() - firstByteAt) / NANOS_PER_MICRO
+            val micros = if (length == 0L) 0L else (monotonicNanos() - firstByteAt) / NANOS_PER_MICRO
             file.delete()
             val status = when {
                 end.cancelled -> null
                 !writable -> TestFileStatus.NOT_STORED
-                length != size || digest.digest().toByteString() != end.sha256 -> TestFileStatus.MISMATCHED
+                length != size || digest.digest() != end.sha256 -> TestFileStatus.MISMATCHED
                 else -> TestFileStatus.MATCHED
             }
             channel.send(TestFileResult(status.toWire(), length, micros))
@@ -310,7 +309,7 @@ internal class TestFileReceiver(
         }
 
         private fun append(buffer: ByteArray, count: Int) {
-            if (length == 0L) firstByteAt = System.nanoTime()
+            if (length == 0L) firstByteAt = monotonicNanos()
             length += count
             onBytes(count)
             if (length > size) return // More than announced: it doesn't match.

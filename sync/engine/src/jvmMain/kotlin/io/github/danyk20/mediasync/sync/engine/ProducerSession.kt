@@ -17,7 +17,6 @@ import io.github.danyk20.mediasync.sync.protocol.FileBegin
 import io.github.danyk20.mediasync.sync.protocol.FileEnd
 import io.github.danyk20.mediasync.sync.protocol.Hello
 import io.github.danyk20.mediasync.sync.protocol.Offer
-import io.github.danyk20.mediasync.sync.protocol.OfferItem
 import io.github.danyk20.mediasync.sync.protocol.OfferResponse
 import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
 import io.github.danyk20.mediasync.sync.protocol.ProtocolException
@@ -497,27 +496,6 @@ class ProducerSession(
         const val WINDOW = 16
     }
 }
-
-internal fun MediaDescriptor.toOfferItem(offerId: Int) = OfferItem(
-    offerId = offerId,
-    size = size,
-    fingerprint = fingerprint,
-    mimeType = mimeType,
-    displayName = displayName,
-    capturedAtMillis = meta.capturedAtMillis,
-    utcOffsetMinutes = meta.utcOffsetMinutes,
-    album = meta.album,
-    favorite = meta.favorite,
-    modifiedAtMillis = meta.modifiedAtMillis,
-)
-
-internal fun OfferItem.toDescriptor() = MediaDescriptor(
-    fingerprint = fingerprint,
-    size = size,
-    mimeType = mimeType,
-    displayName = displayName,
-    meta = MediaMeta(capturedAtMillis, utcOffsetMinutes, album, favorite, modifiedAtMillis),
-)
 
 /**
  * The items one sync sends, shared by its connections: each takes the next batch when it's ready for more, so no

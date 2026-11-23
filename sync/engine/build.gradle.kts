@@ -3,14 +3,20 @@ plugins {
 }
 
 kotlin {
+    // Lock is an expect class, which the compiler still marks Beta (warnings are errors here). Only this module uses it.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
     sourceSets {
         commonMain.dependencies {
             api(projects.core.model)
             api(projects.sync.protocol)
             api(projects.transport.api)
+            // The engine's API exposes ByteString, Source and BufferedSource: a direct dependency, not a transitive one.
+            api(libs.okio)
         }
         jvmMain.dependencies {
-            // Plain-JVM or JVM-only for now: they move to commonMain with the PRs that convert them.
+            // Used only by ProducerSession and ParallelSync, which stay on the JVM until they're converted.
             implementation(projects.core.metadata)
             implementation(projects.core.diagnostics)
         }
@@ -21,6 +27,8 @@ kotlin {
         }
     }
 }
+
+mediasync { iosTargets() }
 
 // Sync logic decides what is sent and stored: held to a stricter bar than the project-wide 70 %.
 kover {

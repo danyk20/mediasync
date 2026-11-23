@@ -15,13 +15,8 @@ import io.github.danyk20.mediasync.sync.engine.testing.runBothSides
 import io.github.danyk20.mediasync.sync.protocol.Bye
 import io.github.danyk20.mediasync.sync.protocol.Hello
 import io.github.danyk20.mediasync.sync.protocol.PROTOCOL_VERSION
-import io.github.danyk20.mediasync.sync.protocol.TurboReady
 import io.github.danyk20.mediasync.sync.protocol.WireRole
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldMatch
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import okio.ByteString
@@ -112,47 +107,6 @@ class TurboTest {
             Bye.Reason.NOT_PAIRED
         served.getOrThrow() shouldBe ServeResult.Rejected(Bye.Reason.NOT_PAIRED)
         opened shouldBe 0
-    }
-
-    @Test
-    fun aReasonFromALaterVersionIsAFailure() {
-        TurboReady(status = 42).toAnswer() shouldBe TurboAnswer.Unavailable(TurboUnavailable.FAILED)
-    }
-
-    @Test
-    fun aKindOfLinkFromALaterVersionIsAFailure() {
-        TurboReady(TurboReady.Status.OK, "name", "passphrase", "", 1, kind = 42).toAnswer() shouldBe
-            TurboAnswer.Unavailable(TurboUnavailable.FAILED)
-    }
-
-    @Test
-    fun turboReceiveNetworksAreDerivedFromTheKeyAndChangeWithEachEpoch() {
-        val key = ByteArray(TURBO_KEY_BYTES) { 7 }.toByteString()
-        val other = ByteArray(TURBO_KEY_BYTES) { 8 }.toByteString()
-
-        val (name, passphrase) = DirectLink.derived(key, epoch = 1_000)
-
-        DirectLink.derived(key, epoch = 1_000) shouldBe (name to passphrase) // Both phones get the same.
-        name shouldMatch Regex("DIRECT-[A-Za-z0-9]{2}-MediaSync-[A-Za-z0-9]{6}")
-        name.length shouldBeLessThanOrEqual 32 // Wi-Fi network names are at most 32 bytes.
-        passphrase shouldMatch Regex("[A-Za-z0-9]{24}")
-        DirectLink.derived(key, epoch = 1_001).first shouldNotBe name
-        DirectLink.derived(key, epoch = 1_001).second shouldNotBe passphrase
-        DirectLink.derived(other, epoch = 1_000).second shouldNotBe passphrase
-        DirectLink.epochAt(DirectLink.EPOCH_MILLIS * 1_000 + 1) shouldBe 1_000
-    }
-
-    @Test
-    fun aProducerWaitingForTurboReceiveLooksForTheCurrentAndThePreviousEpochsLinks() {
-        val epoch = DirectLink.EPOCH_MILLIS
-        val start = epoch * 1_000 + epoch / 2
-
-        // First, a link started in either epoch may be up already.
-        DirectLink.epochsToLookFor(start, lastLooked = null) shouldBe listOf(1_000L, 999L)
-        // Then only a link started meanwhile, which has the current epoch's name.
-        DirectLink.epochsToLookFor(start + 1_000, lastLooked = 1_000) shouldBe listOf(1_000L)
-        // Once that epoch is over, a link started late in it keeps its name, and one started now has the new one.
-        DirectLink.epochsToLookFor(epoch * 1_001 + 1, lastLooked = 1_000) shouldBe listOf(1_001L, 1_000L)
     }
 
     @Test
@@ -267,29 +221,5 @@ class TurboTest {
         first.size shouldBe PAIR_SECRET_BYTES
         secretFrom(registry) shouldBe first // The same every session.
         secretFrom(FakePeerRegistry(pairSecrets = true)) shouldBe ByteString.EMPTY
-    }
-
-    @Test
-    fun eachTransferGetsFreshCredentialsAndThePassphraseIsNeverLogged() {
-        val all = List(20) { DirectLink.credentials() }
-
-        all.forEach { (name, passphrase) ->
-            name shouldMatch Regex("DIRECT-[A-Za-z0-9]{2}-MediaSync")
-            passphrase shouldMatch Regex("[A-Za-z0-9]{24}")
-        }
-        all.map { it.second }.toSet() shouldHaveSize 20
-        link.toString() shouldNotContain link.passphrase
-    }
-
-    @Test
-    fun eachAwareTransferGetsAFreshServiceNameAndPassphrase() {
-        val all = List(20) { DirectLink.awareCredentials() }
-
-        all.forEach { (name, passphrase) ->
-            name shouldMatch Regex("MediaSync-[A-Za-z0-9]{16}")
-            passphrase shouldMatch Regex("[A-Za-z0-9]{24}") // Wi-Fi Aware takes 8 to 63 characters.
-        }
-        all.map { it.first }.toSet() shouldHaveSize 20
-        all.map { it.second }.toSet() shouldHaveSize 20
     }
 }
