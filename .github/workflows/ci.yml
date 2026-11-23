@@ -43,7 +43,7 @@ jobs:
           desktop=$(git diff --name-only "$BASE"...HEAD | grep -E '^(desktopApp/|platform/desktop/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^(version\.txt|LICENSE)$|^\.github/workflows/ci\.yml$' || true)
           if [ -n "$desktop" ]; then echo "desktop=true"; else echo "desktop=false"; fi >> "$GITHUB_OUTPUT"
           # The iOS job builds and tests the modules that have iOS targets, and the build that decides how.
-          ios=$(git diff --name-only "$BASE"...HEAD | grep -E '^(core/model/|core/metadata/|core/metadata-testing/|sync/protocol/|transport/api/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^\.github/workflows/ci\.yml$' || true)
+          ios=$(git diff --name-only "$BASE"...HEAD | grep -E '^(core/model/|core/metadata/|core/metadata-testing/|core/diagnostics/|sync/protocol/|transport/api/|build-logic/|gradle/|scripts/gradlew-retrying\.sh)|(^|/)[^/]*\.gradle\.kts$|^\.github/workflows/ci\.yml$' || true)
           if [ -n "$ios" ]; then echo "ios=true"; else echo "ios=false"; fi >> "$GITHUB_OUTPUT"
           others=$(git diff --name-only "$BASE"...HEAD | grep -vE '^(docs/|infra/rendezvous/)|\.md$' || true)
           echo "Changes outside docs and the Worker:"
@@ -271,8 +271,8 @@ jobs:
       - name: Build for iPhones, test on the iOS Simulator
         run: >
           scripts/gradlew-retrying.sh
-          :core:model:compileKotlinIosArm64 :core:metadata:compileKotlinIosArm64 :sync:protocol:compileKotlinIosArm64 :transport:api:compileKotlinIosArm64
-          :core:model:iosSimulatorArm64Test :core:metadata:iosSimulatorArm64Test :sync:protocol:iosSimulatorArm64Test :transport:api:iosSimulatorArm64Test
+          :core:model:compileKotlinIosArm64 :core:metadata:compileKotlinIosArm64 :core:diagnostics:compileKotlinIosArm64 :sync:protocol:compileKotlinIosArm64 :transport:api:compileKotlinIosArm64
+          :core:model:iosSimulatorArm64Test :core:metadata:iosSimulatorArm64Test :core:diagnostics:iosSimulatorArm64Test :sync:protocol:iosSimulatorArm64Test :transport:api:iosSimulatorArm64Test
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

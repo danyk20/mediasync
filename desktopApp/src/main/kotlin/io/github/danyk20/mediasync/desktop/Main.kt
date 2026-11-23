@@ -25,6 +25,7 @@ import io.github.danyk20.mediasync.core.designsystem.component.LocalIsComputer
 import io.github.danyk20.mediasync.core.designsystem.theme.MediaSyncTheme
 import io.github.danyk20.mediasync.core.diagnostics.Area
 import io.github.danyk20.mediasync.core.diagnostics.Diagnostics
+import io.github.danyk20.mediasync.core.diagnostics.logCrashes
 import io.github.danyk20.mediasync.core.model.DeviceRole
 import io.github.danyk20.mediasync.feature.diagnostics.LocalResetMediaSync
 import io.github.danyk20.mediasync.navigation.MediaSyncNavigation
