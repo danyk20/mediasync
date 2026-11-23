@@ -56,7 +56,7 @@ class FileDiagnosticLogTest {
 
         repeat(1_000) {
             log.log(Area.WORK, "entry $it")
-            log.flush()
+            log.drain()
             directory.stored() shouldBeLessThanOrEqual 10_000
         }
 
@@ -71,7 +71,7 @@ class FileDiagnosticLogTest {
     fun aSmallerLimitDropsTheOldestEntriesAtOnce() {
         val log = newLog(maxBytes = 100_000)
         repeat(1_000) { log.log(Area.WORK, "entry $it") }
-        log.flush()
+        log.drain()
         directory.stored() shouldBeGreaterThan 40_000
 
         log.limitTo(5_000)
@@ -82,7 +82,7 @@ class FileDiagnosticLogTest {
         log.read() shouldNotContain "entry 0\n"
 
         repeat(500) { log.log(Area.WORK, "more $it") }
-        log.flush()
+        log.drain()
         directory.stored() shouldBeLessThanOrEqual 5_000
         log.recent(1).single() shouldContain "more 499"
     }
@@ -127,7 +127,7 @@ class FileDiagnosticLogTest {
         val entry = "x".repeat(1_000)
 
         repeat(1_500) { log.log(Area.WORK, entry) }
-        log.flush()
+        log.drain()
 
         directory.stored() shouldBeLessThanOrEqual 1_048_576
         directory.stored() shouldBeGreaterThan 900_000

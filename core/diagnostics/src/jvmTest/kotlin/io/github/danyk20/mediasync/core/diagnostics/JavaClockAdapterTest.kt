@@ -22,7 +22,7 @@ class JavaClockAdapterTest {
             val log = FileDiagnosticLog(directory, clock)
 
             log.log(Area.SEND, "x")
-            log.flush()
+            log.drain()
 
             File(directory, "diagnostics.log").readText() shouldBe "2026-10-14 09:30:00.250 +0200 send     x\n"
         } finally {
